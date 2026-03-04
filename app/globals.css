@@ -5,10 +5,12 @@
   --foreground: #254153;
   --primary: #254153;
   --primary-foreground: #ffffff;
+  --font-geist-sans: "Geist", "Arial", sans-serif;
+  --font-geist-mono: "Geist Mono", "Courier New", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans);
 }
