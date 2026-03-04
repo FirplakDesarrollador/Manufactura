@@ -32,22 +32,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
 
 
 
-    // Load ordenes on mount
-    useEffect(() => {
-        loadOrdenes()
-    }, [])
-
-    // Load moldes when orden is selected
-    useEffect(() => {
-        if (selectedOrden) {
-            loadMoldes(selectedOrden.molde_sku)
-        } else {
-            setMoldesDisponibles([])
-            setSelectedMolde(null)
-        }
-    }, [selectedOrden])
-
-    const loadOrdenes = async () => {
+    const loadOrdenes = React.useCallback(async () => {
         setLoading(true)
         try {
             const data = await getOrdenesFabricacion()
@@ -57,16 +42,31 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
 
-    const loadMoldes = async (moldeSku: string) => {
+    const loadMoldes = React.useCallback(async (moldeSku: string) => {
         try {
             const data = await getMoldesDisponibles(moldeSku)
             setMoldesDisponibles(data)
         } catch (error) {
             console.error('Error loading moldes:', error)
         }
-    }
+    }, [])
+
+    // Load ordenes on mount
+    useEffect(() => {
+        loadOrdenes()
+    }, [loadOrdenes])
+
+    // Load moldes when orden is selected
+    useEffect(() => {
+        if (selectedOrden) {
+            loadMoldes(selectedOrden.sku || '')
+        } else {
+            setMoldesDisponibles([])
+            setSelectedMolde(null)
+        }
+    }, [selectedOrden, loadMoldes])
 
     // Filter ordenes based on search and date
     const filteredOrdenes = useMemo(() => {
@@ -74,8 +74,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             const matchesSearch = !searchText ||
                 orden.producto_descripcion.toLowerCase().includes(searchText.toLowerCase()) ||
                 orden.orden_fabricacion.toLowerCase().includes(searchText.toLowerCase()) ||
-                orden.numero_pedido.toLowerCase().includes(searchText.toLowerCase()) ||
-                orden.molde_descripcion.toLowerCase().includes(searchText.toLowerCase())
+                orden.pedido.toLowerCase().includes(searchText.toLowerCase()) ||
+                (orden.molde_descripcion || '').toLowerCase().includes(searchText.toLowerCase())
 
             const matchesDate = !selectedDate ||
                 (orden.fecha_ideal_produccion &&
@@ -87,8 +87,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
 
     // Calculate metrics
     const metrics = useMemo(() => {
-        const total = filteredOrdenes.reduce((sum, o) => sum + o.cantidad, 0)
-        const programado = filteredOrdenes.reduce((sum, o) => sum + o.programado, 0)
+        const total = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0)
+        const programado = filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
 
         // These would come from trazabilidad records in a real implementation
         return {

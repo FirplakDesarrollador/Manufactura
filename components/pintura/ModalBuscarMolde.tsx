@@ -16,18 +16,18 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
     const [searchText, setSearchText] = useState('')
     const [updating, setUpdating] = useState<number | null>(null)
 
-    useEffect(() => {
-        if (isOpen) {
-            loadMoldes()
-        }
-    }, [isOpen])
-
-    const loadMoldes = async () => {
+    const loadMoldes = React.useCallback(async () => {
         setLoading(true)
         const data = await getAllMoldes()
         setMoldes(data)
         setLoading(false)
-    }
+    }, [])
+
+    useEffect(() => {
+        if (isOpen) {
+            loadMoldes()
+        }
+    }, [isOpen, loadMoldes])
 
     const handleUpdateEstado = async (moldeId: number) => {
         setUpdating(moldeId)
@@ -125,7 +125,7 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
                                         {molde.molde_descripcion}
                                     </div>
                                     <div className={`text-[11px] font-bold mt-2 inline-block px-2 py-0.5 rounded-full ${molde.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
-                                            molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                                        molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                                         }`}>
                                         {molde.estado}
                                     </div>

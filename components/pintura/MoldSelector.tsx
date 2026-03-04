@@ -34,7 +34,7 @@ export default function MoldSelector({
                 </option>
                 {moldes.map((molde) => (
                     <option key={molde.id} value={molde.id}>
-                        {molde.serial} - {molde.molde_descripcion} (Vueltas: {molde.vueltas_actuales}/{molde.vueltas_mto})
+                        {molde.serial} - {molde.molde_descripcion} (Vueltas: {molde.vueltas_actuales}/{molde.vueltas_totales})
                     </option>
                 ))}
             </select>
@@ -56,24 +56,24 @@ export default function MoldSelector({
                         </div>
                         <div>
                             <span className="font-bold text-gray-900">Vueltas Mto:</span>
-                            <span className="ml-2 text-gray-900 font-bold">{selectedMolde.vueltas_mto}</span>
+                            <span className="ml-2 text-gray-900 font-bold">{selectedMolde.vueltas_totales}</span>
                         </div>
-                        {selectedMolde.linea_actual && (
+                        {selectedMolde.linea && (
                             <div className="col-span-2">
                                 <span className="font-bold text-gray-900">Línea Actual:</span>
-                                <span className="ml-2 text-gray-900 font-bold">{selectedMolde.linea_actual}</span>
+                                <span className="ml-2 text-gray-900 font-bold">{selectedMolde.linea}</span>
                             </div>
                         )}
                     </div>
 
                     {/* Warning if mold needs maintenance soon */}
-                    {selectedMolde.vueltas_actuales >= selectedMolde.vueltas_mto * 0.9 && (
+                    {selectedMolde.vueltas_actuales >= selectedMolde.vueltas_totales * 0.9 && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800">
                             ⚠️ Este molde está próximo a mantenimiento
                         </div>
                     )}
 
-                    {selectedMolde.vueltas_actuales >= selectedMolde.vueltas_mto && (
+                    {selectedMolde.vueltas_actuales >= selectedMolde.vueltas_totales && (
                         <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800">
                             🚨 Este molde requiere mantenimiento
                         </div>

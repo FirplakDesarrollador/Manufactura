@@ -33,12 +33,12 @@ export default function OrdenCard({ orden, isActive, onClick }: OrdenCardProps) 
                         <span className="text-xs font-bold text-gray-900">OF: {orden.orden_fabricacion}</span>
                         <span className="bg-blue-200 text-blue-800 text-[10px] px-1 rounded font-bold ml-auto">ENSAYO</span>
                     </div>
-                    <div className="text-[11px] font-bold text-cyan-600">Pedido: {orden.numero_pedido}</div>
+                    <div className="text-[11px] font-bold text-cyan-600">Pedido: {orden.pedido}</div>
                     <div className="text-[11px] text-gray-500 mt-1 line-clamp-1">{orden.producto_descripcion}</div>
                 </div>
                 <div className="flex items-center gap-1 text-cyan-500 mt-auto">
                     <Users size={12} />
-                    <span className="text-[11px] font-bold">Cliente: {orden.cliente}</span>
+                    <span className="text-[11px] font-bold">Cliente: {orden.cliente || orden.cliente_nombre}</span>
                 </div>
             </div>
 
@@ -55,7 +55,7 @@ export default function OrdenCard({ orden, isActive, onClick }: OrdenCardProps) 
 
             {/* Right Section: Process Grid */}
             <div className="flex-1 pl-3 grid grid-cols-8 gap-1">
-                <MiniMetric label="Cantidad" value={orden.cantidad} color="bg-cyan-50 border-cyan-200" />
+                <MiniMetric label="Cantidad" value={orden.cantidad || orden.cantidad_programada} color="bg-cyan-50 border-cyan-200" />
                 <MiniMetric label="Pintura" value={0} />
                 <MiniMetric label="Desgelcada" value={0} />
                 <MiniMetric label="Pulido" value={0} />
@@ -64,7 +64,7 @@ export default function OrdenCard({ orden, isActive, onClick }: OrdenCardProps) 
                 <MiniMetric label="Empaque" value={0} />
                 <MiniMetric label="Transito" value={0} />
 
-                <MiniMetric label="Programado" value={orden.programado} color="bg-orange-50 border-orange-200" />
+                <MiniMetric label="Programado" value={orden.programado || 0} color="bg-orange-50 border-orange-200" />
                 <MiniMetric label="Vaciado" value={0} />
                 <MiniMetric label="Estanteria" value={0} />
                 <MiniMetric label="Acabado" value={0} />

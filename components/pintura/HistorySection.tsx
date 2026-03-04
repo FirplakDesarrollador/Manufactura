@@ -78,7 +78,7 @@ export default function HistorySection() {
                             <div className="w-1/4 min-w-[150px] border-l border-gray-100 pl-4 bg-gray-50/50 p-2 rounded">
                                 <span className="text-[10px] uppercase font-bold text-cyan-500 block mb-1">MOLDE {registro.molde_descripcion}</span>
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-[11px] font-bold text-gray-700">Serial: {registro.serial}</span>
+                                    <span className="text-[11px] font-bold text-gray-700">Serial: {registro.molde_serial}</span>
                                     <div className="flex items-center gap-1">
                                         <Layers size={10} className="text-gray-400" />
                                         <span className="text-[11px] font-bold text-gray-700">Línea {registro.linea?.replace('Linea ', '')}</span>
@@ -106,7 +106,7 @@ export default function HistorySection() {
 
                             {/* Delete Action (matching screenshot requirement) */}
                             <div className="w-[120px] border-l border-gray-100 pl-4 flex flex-col items-center justify-center">
-                                {!canDelete(registro.pintura_fecha, registro.estado) ? (
+                                {!canDelete(registro.pintura_fecha, registro.estado || '') ? (
                                     <div className="flex flex-col items-center text-center opacity-60">
                                         <Ban size={24} className="text-red-500 mb-1" />
                                         <span className="text-[10px] font-bold text-red-500 leading-tight">Ya no puedes eliminar este registro</span>
