@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { getRegistrosAcabado } from '@/lib/supabase/queries/acabado'
 import RegistroAcabadoCard from './RegistroAcabadoCard'
-import { Search, Eraser, ClipboardList, Scissors, Loader2, Sparkles, Layers } from 'lucide-react'
+import { Search, Eraser, ClipboardList, Loader2, Sparkles } from 'lucide-react'
 
 type TabType = 'Acabado' | 'Estanteria'
 
@@ -14,11 +14,7 @@ export default function AcabadoModule({ userEmail }: { userEmail: string }) {
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
 
-    useEffect(() => {
-        loadRegistros()
-    }, [activeTab])
-
-    const loadRegistros = async () => {
+    const loadRegistros = useCallback(async () => {
         setLoading(true)
         try {
             const data = await getRegistrosAcabado(activeTab)
@@ -28,7 +24,11 @@ export default function AcabadoModule({ userEmail }: { userEmail: string }) {
         } finally {
             setLoading(false)
         }
-    }
+    }, [activeTab])
+
+    useEffect(() => {
+        loadRegistros()
+    }, [loadRegistros])
 
     const filteredRegistros = registros.filter(r => {
         if (!searchText) return true

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Search, X, ChevronLeft, Filter, Calendar as CalendarIcon } from 'lucide-react'
@@ -19,26 +19,60 @@ import {
 export default function ReportedDefectsListPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(true)
-    const [reports, setReports] = useState<any[]>([])
-    const [products, setProducts] = useState<any[]>([])
+    const [reports, setReports] = useState<ReportDefectItem[]>([])
+    const [products, setProducts] = useState<ProductMS[]>([])
+
+    interface ProductMS {
+        id: number
+        Referencia: string
+    }
+
+    interface DefectItem {
+        defecto?: string
+        Defecto?: string
+        nombre?: string
+        Nombre?: string
+    }
+
+    interface MSReportQueryResult {
+        id: number
+        created_at: string
+        create_by: number
+        defecto: string | DefectItem[]
+        producto_id: number
+        Molde: string
+        producto?: {
+            Referencia: string
+        }
+    }
+
+    interface ReportDefectItem {
+        id: string
+        defecto_especifico: string
+        cantidad: number
+        productos_lista: string
+        creado_por: string
+        reporters: Set<string>
+        productos: Set<string>
+        hora_registro: string
+        Molde: string
+    }
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
-    const fetchData = async () => {
-        setLoading(true)
+    const fetchData = useCallback(async () => {
+        // No synchronous setLoading(true) here to avoid cascading render error in useEffect
 
-        // Calculate a range that safely covers the Bogotá day (UTC-5)
-        // From Day 00:00 UTC (covers early Bogotá hours) to Day+1 10:00 UTC (covers late Bogotá hours)
         const day = new Date(selectedDate)
         const nextDay = new Date(day)
         nextDay.setDate(day.getDate() + 1)
         const nextDayStr = nextDay.toISOString().split('T')[0]
 
         const queryStart = `${selectedDate}T00:00:00Z`
-        const queryEnd = `${nextDayStr}T12:00:00Z` // Extra buffer
+        const queryEnd = `${nextDayStr}T12:00:00Z`
 
         const [reportsRes, productsRes] = await Promise.all([
             supabase
@@ -54,10 +88,9 @@ export default function ReportedDefectsListPage() {
         ])
 
         if (reportsRes.data) {
-            // Filter in JS to be exactly sure about the local date 
-            // since Supabase .gte/.lte can be tricky with timezones
-            const userIds = [...new Set(reportsRes.data.map((r: any) => r.create_by))].filter(Boolean)
-            let usersMap: Record<number, string> = {}
+            const typedData = reportsRes.data as unknown as MSReportQueryResult[]
+            const userIds = [...new Set(typedData.map(r => r.create_by))].filter(Boolean)
+            const usersMap: Record<number, string> = {}
 
             if (userIds.length > 0) {
                 const { data: usersData } = await supabase
@@ -72,19 +105,18 @@ export default function ReportedDefectsListPage() {
                 }
             }
 
-            const groupedMap: Record<string, any> = {}
+            const groupedMap: Record<string, ReportDefectItem> = {}
 
-            reportsRes.data.forEach((r: any) => {
+            typedData.forEach(r => {
                 const defects = Array.isArray(r.defecto) ? r.defecto : []
                 const isCorrectDate = new Date(r.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }) === selectedDate
 
                 if (!isCorrectDate) return
 
-                defects.forEach((d: any) => {
+                defects.forEach(d => {
                     const defectName = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)
                     if (!defectName) return
 
-                    // Key is strictly the defect name to group across all products
                     const key = defectName
 
                     if (!groupedMap[key]) {
@@ -92,8 +124,10 @@ export default function ReportedDefectsListPage() {
                             id: key,
                             defecto_especifico: defectName,
                             cantidad: 0,
-                            productos: new Set(),
+                            productos_lista: '',
+                            creado_por: '',
                             reporters: new Set(),
+                            productos: new Set(),
                             hora_registro: new Date(r.created_at).toLocaleTimeString('es-CO', {
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -105,8 +139,10 @@ export default function ReportedDefectsListPage() {
                     }
 
                     groupedMap[key].cantidad += 1
-                    groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id || 'Sin Producto')
-                    groupedMap[key].reporters.add(usersMap[r.create_by] || 'Anónimo')
+                    groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
+                    if (!groupedMap[key].reporters.has(usersMap[r.create_by] || 'Anónimo')) {
+                        groupedMap[key].reporters.add(usersMap[r.create_by] || 'Anónimo')
+                    }
                 })
             })
 
@@ -116,24 +152,27 @@ export default function ReportedDefectsListPage() {
                     creado_por: Array.from(item.reporters).join(', '),
                     productos_lista: Array.from(item.productos).join(', ')
                 }))
-                .sort((a, b) => b.cantidad - a.cantidad) // Pareto: most frequent first
+                .sort((a, b) => b.cantidad - a.cantidad)
 
             setReports(finalReports)
         }
 
         if (productsRes.data) setProducts(productsRes.data)
         setLoading(false)
-    }
-
-    useEffect(() => {
-        fetchData()
     }, [selectedDate])
 
+    useEffect(() => {
+        const load = async () => {
+            await fetchData()
+        }
+        void load()
+    }, [fetchData])
+
     const filteredReports = reports.filter(report => {
-        const matchesProductFilter = selectedProduct === '' || report.producto === selectedProduct
+        const matchesProductFilter = selectedProduct === '' || report.productos_lista.includes(String(selectedProduct))
         const searchLower = searchTerm.toLowerCase()
         const matchesSearch = searchTerm === '' ||
-            (report.producto && report.producto.toLowerCase().includes(searchLower)) ||
+            (report.productos_lista.toLowerCase().includes(searchLower)) ||
             (report.defecto_especifico && report.defecto_especifico.toLowerCase().includes(searchLower)) ||
             (report.creado_por && report.creado_por.toLowerCase().includes(searchLower))
 
@@ -187,8 +226,11 @@ export default function ReportedDefectsListPage() {
                         <input
                             type="date"
                             value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-none font-black text-xs text-[#254153] outline-none focus:border-[#254153] cursor-pointer"
+                            onChange={(e) => {
+                                setLoading(true)
+                                setSelectedDate(e.target.value)
+                            }}
+                            className="w-full bg-white border border-gray-300 rounded-none px-4 py-2 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-10"
                         />
                     </div>
 
@@ -200,8 +242,8 @@ export default function ReportedDefectsListPage() {
                             className="w-full px-4 py-2 bg-white border border-gray-300 rounded-none font-black text-xs text-[#254153] outline-none focus:border-[#254153]"
                         >
                             <option value="">-- TODAS LAS REFERENCIAS --</option>
-                            {products.map(p => (
-                                <option key={p.id} value={p.Referencia}>{p.Referencia}</option>
+                            {products.map((p) => (
+                                <option key={p.id} value={p.id.toString()}>{p.Referencia}</option>
                             ))}
                         </select>
                     </div>

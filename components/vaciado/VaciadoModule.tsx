@@ -13,18 +13,18 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
 
-    useEffect(() => {
-        if (activeTab === 'reportar') {
-            loadRegistros()
-        }
-    }, [activeTab])
-
     const loadRegistros = async () => {
         setLoading(true)
         const data = await getRegistrosParaVaciado()
         setRegistros(data)
         setLoading(false)
     }
+
+    useEffect(() => {
+        if (activeTab === 'reportar') {
+            loadRegistros()
+        }
+    }, [activeTab])
 
     const filteredRegistros = registros.filter(r => {
         if (!searchText) return true

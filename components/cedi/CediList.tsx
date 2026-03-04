@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion } from '@/types/pintura'
 import { getRegistrosTrazabilidad } from '@/lib/supabase/queries/pintura'
 import RegistroDigitadoCard from '../digitado/RegistroDigitadoCard'
-import { Truck, Info, Hash, Package, Keyboard, Warehouse } from 'lucide-react'
+import { Truck, Info, Hash, Keyboard, Warehouse } from 'lucide-react'
 
 interface CediListProps {
     order: OrdenFabricacion
@@ -17,9 +17,7 @@ export default function CediList({ order, userEmail, onRefresh }: CediListProps)
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(false)
 
-    useEffect(() => { loadRegistros() }, [order.orden_fabricacion])
-
-    const loadRegistros = async () => {
+    const loadRegistros = useCallback(async () => {
         setLoading(true)
         try {
             const data = await getRegistrosTrazabilidad()
@@ -29,7 +27,9 @@ export default function CediList({ order, userEmail, onRefresh }: CediListProps)
         } finally {
             setLoading(false)
         }
-    }
+    }, [order.orden_fabricacion])
+
+    useEffect(() => { loadRegistros() }, [loadRegistros])
 
     const filteredRegistros = registros.filter(r => {
         if (activeTab === 'Digitado') return r.estado === 'Digitado'

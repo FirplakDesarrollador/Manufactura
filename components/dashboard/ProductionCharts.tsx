@@ -15,8 +15,13 @@ export default function ProductionCharts({ data }: ProductionChartsProps) {
     // Transform data for line chart (hourly trend)
     const hours = Array.from({ length: 18 }, (_, i) => i + 6)
 
+    interface HourlyPoint {
+        time: string
+        [key: string]: string | number | undefined
+    }
+
     const hourlyData = hours.map(h => {
-        const point: any = { time: `${h}:00` }
+        const point: HourlyPoint = { time: `${h}:00` }
         data.forEach(process => {
             const key = `h${h}` as keyof TrazabilidadDia
             point[process.proceso] = process[key]

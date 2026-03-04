@@ -8,14 +8,15 @@ interface OrdenCardProps {
     onClick: () => void
 }
 
+// Helper to render a small metric box within the card
+const MiniMetric = ({ label, value, color }: { label: string, value: number, color?: string }) => (
+    <div className={`flex flex-col items-center justify-center p-1 border rounded min-w-[70px] ${color || 'border-gray-200'}`}>
+        <span className="text-[10px] font-bold text-gray-900 uppercase">{label}</span>
+        <span className="text-sm font-bold text-gray-900">{value}</span>
+    </div>
+)
+
 export default function OrdenCard({ orden, isActive, onClick }: OrdenCardProps) {
-    // Helper to render a small metric box within the card
-    const MiniMetric = ({ label, value, color }: { label: string, value: number, color?: string }) => (
-        <div className={`flex flex-col items-center justify-center p-1 border rounded min-w-[70px] ${color || 'border-gray-200'}`}>
-            <span className="text-[10px] font-bold text-gray-900 uppercase">{label}</span>
-            <span className="text-sm font-bold text-gray-900">{value}</span>
-        </div>
-    )
 
     return (
         <button

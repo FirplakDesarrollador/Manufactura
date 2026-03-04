@@ -1,17 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
-    const [user, setUser] = useState<any>(null)
+    const [user, setUser] = useState<User | null>(null)
+
+    interface User {
+        id: string
+        email?: string
+    }
     const [loading, setLoading] = useState(true)
-    const [products, setProducts] = useState<any[]>([])
-    const [defects, setDefects] = useState<any[]>([])
-    const [todaysReports, setTodaysReports] = useState<any[]>([])
+    const [products, setProducts] = useState<ProducloMS[]>([])
+    const [defects, setDefects] = useState<DefectoMS[]>([])
+    const [todaysReports, setTodaysReports] = useState<Record<string, string | number | null | undefined>[]>([])
+
+    interface ProducloMS {
+        id: number
+        Referencia: string
+    }
+
+    interface DefectoMS {
+        id: number
+        defecto?: string
+        Defecto?: string
+        nombre?: string
+        Nombre?: string
+    }
     const [stats, setStats] = useState({
         buenos: 0,
         defectuosos: 0,
@@ -22,7 +40,7 @@ export default function CalidadMsReportPage() {
     const [selectedProduct, setSelectedProduct] = useState<string>('')
     const [selectedDefects, setSelectedDefects] = useState<Record<number, boolean>>({})
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         const { data: userData } = await supabase.auth.getUser()
         if (!userData.user) {
             router.push('/login')
@@ -44,9 +62,9 @@ export default function CalidadMsReportPage() {
         }
 
         setLoading(false)
-    }
+    }, [router])
 
-    const calculateStats = (reports: any[]) => {
+    const calculateStats = (reports: { defectos_lista?: string }[]) => {
         const total = reports.length
         const defectuosos = reports.filter(r => r.defectos_lista && r.defectos_lista !== '').length
         const buenos = total - defectuosos
@@ -56,14 +74,18 @@ export default function CalidadMsReportPage() {
     }
 
     useEffect(() => {
-        fetchData()
-    }, [router])
+        const load = async () => {
+            await fetchData()
+        }
+        void load()
+    }, [fetchData])
 
     const getDefectCount = (defectName: string) => {
         if (!todaysReports || !defectName) return 0
         let count = 0
         todaysReports.forEach(report => {
-            if (report.defectos_lista && report.defectos_lista.toLowerCase().includes(defectName.toLowerCase())) {
+            const defectos = String(report.defectos_lista || '')
+            if (defectos.toLowerCase().includes(defectName.toLowerCase())) {
                 count++
             }
         })
@@ -89,7 +111,7 @@ export default function CalidadMsReportPage() {
 
         const reportData = {
             producto_id: parseInt(selectedProduct),
-            create_by: user.id,
+            create_by: user?.id,
             defecto: selectedDefectNames,
             created_at: new Date().toISOString()
         }
@@ -99,6 +121,7 @@ export default function CalidadMsReportPage() {
             console.error('Error saving report:', error)
             alert('Error al guardar el reporte')
         } else {
+            setLoading(true)
             await fetchData()
             setSelectedDefects({})
             setSelectedProduct('')

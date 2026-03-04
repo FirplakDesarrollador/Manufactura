@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -32,7 +32,7 @@ export default function LoginPage() {
         }
         router.push('/home')
       }
-    } catch (err) {
+    } catch {
       setError('Error al iniciar sesión. Intenta de nuevo.')
     } finally {
       setLoading(false)

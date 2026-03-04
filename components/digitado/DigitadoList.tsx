@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion } from '@/types/pintura'
 import RegistroDigitadoCard from './RegistroDigitadoCard'
 import { Truck, Info, Hash, Package } from 'lucide-react'
@@ -17,22 +17,21 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(false)
 
-    React.useEffect(() => {
-        loadRegistros()
-    }, [order.orden_fabricacion])
-
-    const loadRegistros = async () => {
-        setLoading(true)
+    const loadRegistros = React.useCallback(async () => {
+        setLoading(true);
         try {
-            const data = await getRegistrosTrazabilidad()
-            // Filter piece by piece OF string matching selected order OF string
-            setRegistros(data.filter(r => r.orden_fabricacion === order.orden_fabricacion))
+            const data = await getRegistrosTrazabilidad();
+            setRegistros(data.filter(r => r.orden_fabricacion === order.orden_fabricacion));
         } catch (error) {
-            console.error('Error loading registros for order:', error)
+            console.error('Error loading registros for order:', error);
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-    }
+    }, [order]);
+
+    React.useEffect(() => {
+        loadRegistros();
+    }, [loadRegistros]);
 
     const filteredRegistros = registros.filter(r => {
         if (activeTab === 'Pulido') {

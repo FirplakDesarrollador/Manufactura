@@ -20,18 +20,26 @@ import AdministracionModule from '@/components/administracion/AdministracionModu
 
 export default function MarmorPage() {
     const router = useRouter()
-    const [user, setUser] = useState<any>(null)
+    const [user, setUser] = useState<User | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    interface User {
+        id: string
+        email?: string
+    }
     const [sidebarOpen, setSidebarOpen] = useState(true)
     const [activeModule, setActiveModule] = useState('pintura')
 
     useEffect(() => {
         const getUser = async () => {
+            setLoading(true)
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
                 router.push('/login')
             } else {
                 setUser(user)
             }
+            setLoading(false)
         }
         getUser()
     }, [router])
@@ -41,6 +49,7 @@ export default function MarmorPage() {
         router.push('/login')
     }
 
+    if (loading) return null
     if (!user) return null
 
     return (
@@ -69,7 +78,7 @@ export default function MarmorPage() {
                         <div className="flex items-center space-x-4">
                             <div className="text-right hidden sm:block">
                                 <p className="text-sm text-gray-200">Bienvenido</p>
-                                <p className="text-sm font-semibold text-white">{user?.email}</p>
+                                <p className="text-white font-semibold">{user?.email || 'Usuario'}</p>
                             </div>
                             <button
                                 onClick={handleSignOut}

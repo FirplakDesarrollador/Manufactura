@@ -6,8 +6,13 @@ import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  interface User {
+    id: string
+    email?: string
+  }
 
   useEffect(() => {
     const getUser = async () => {
@@ -55,7 +60,7 @@ export default function HomePage() {
           <div className="flex items-center space-x-4">
             <div className="text-right">
               <p className="text-sm text-white/70">Bienvenido</p>
-              <p className="text-white font-semibold">{user?.email}</p>
+              <p className="text-white font-semibold">{user?.email || 'Usuario'}</p>
             </div>
             <button
               onClick={handleLogout}

@@ -15,14 +15,10 @@ import {
     Eraser,
     Edit2,
     Trash2,
-    Loader2,
-    ChevronLeft,
-    ChevronRight,
-    Filter,
     X
 } from 'lucide-react'
 
-export default function AdministracionModule({ userEmail }: { userEmail: string }) {
+export default function AdministracionModule() {
     const [activeTab, setActiveTab] = useState<'of' | 'trazabilidad'>('of')
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
@@ -31,7 +27,11 @@ export default function AdministracionModule({ userEmail }: { userEmail: string 
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
     // Modal State
-    const [editModal, setEditModal] = useState<{ type: 'of' | 'registro', item: any } | null>(null)
+    const [editModal, setEditModal] = useState<{
+        type: 'of' | 'registro',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        item: any
+    } | null>(null)
     const [saving, setSaving] = useState(false)
 
     useEffect(() => {
@@ -113,7 +113,7 @@ export default function AdministracionModule({ userEmail }: { userEmail: string 
             else await deleteRegistroTrazabilidad(id)
             alert('Eliminado correctamente')
             loadData()
-        } catch (error) {
+        } catch {
             alert('Error al eliminar')
         }
     }
@@ -129,7 +129,7 @@ export default function AdministracionModule({ userEmail }: { userEmail: string 
             alert('Actualizado correctamente')
             setEditModal(null)
             loadData()
-        } catch (error) {
+        } catch {
             alert('Error al actualizar')
         } finally {
             setSaving(false)

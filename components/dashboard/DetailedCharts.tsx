@@ -5,11 +5,23 @@ import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend
 } from 'recharts'
 import { ProgramacionColor, ProgramacionTamano } from "@/lib/supabase/queries/dashboard"
-import { Palette, Maximize, Target } from "lucide-react"
+import { Palette, Maximize, Target, LucideIcon } from "lucide-react";
+import TableHeader from "./TableHeader";
+
+const TableHeader = ({ title, icon: Icon }: { title: string, icon: LucideIcon }) => (
+    <div className="flex items-center gap-2 mb-4">
+        <h3 className="text-[#00a3e0] text-sm font-bold uppercase tracking-widest">{title}</h3>
+        <Icon size={16} className="text-[#00a3e0]" />
+    </div>
+)
+
+interface GenericRecord {
+    [key: string]: number | string | null | undefined
+}
 
 interface DetailedChartsProps {
-    pinturaColor: any | null // Using any because it's the MetricasDia full response now
-    vaciadoTamano: any | null
+    pinturaColor: GenericRecord | null
+    vaciadoTamano: GenericRecord | null
     progColor: ProgramacionColor[]
     progTamano: ProgramacionTamano[]
     loading: boolean
@@ -28,12 +40,6 @@ export function DetailedCharts({ pinturaColor, vaciadoTamano, progColor, progTam
         )
     }
 
-    const TableHeader = ({ title, icon: Icon }: { title: string, icon: any }) => (
-        <div className="flex items-center gap-2 mb-4">
-            <h3 className="text-[#00a3e0] text-sm font-bold uppercase tracking-widest">{title}</h3>
-            <Icon size={16} className="text-[#00a3e0]" />
-        </div>
-    )
 
     // Map Pintura Colors from the data
     const colorsList = [
@@ -136,7 +142,7 @@ export function DetailedCharts({ pinturaColor, vaciadoTamano, progColor, progTam
                                         outerRadius={80}
                                         paddingAngle={0}
                                         dataKey="value"
-                                        label={({ name, value }) => `${value}`}
+                                        label={({ value }) => `${value}`}
                                     >
                                         {progTamano.map((_, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

@@ -10,31 +10,6 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccess(null)
-    setLoading(true)
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccess('¡Registro exitoso! Por favor verifica tu email.')
-        setEmail('')
-        setPassword('')
-      }
-    } catch (err) {
-      setError('Error al registrarse')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,7 +18,7 @@ export default function LoginForm() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -55,7 +30,7 @@ export default function LoginForm() {
         setEmail('')
         setPassword('')
       }
-    } catch (err) {
+    } catch {
       setError('Error al iniciar sesión')
     } finally {
       setLoading(false)

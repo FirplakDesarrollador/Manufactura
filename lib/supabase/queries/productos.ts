@@ -23,7 +23,14 @@ export async function updateProductosBulk(
         modified_by: string
     }
 ) {
-    const updatePayload: any = {
+    interface ProductUpdatePayload {
+        modified_at: string
+        modified_by: string
+        porcentaje_reduccion?: number
+        kilos_reduccion?: number
+    }
+
+    const updatePayload: ProductUpdatePayload = {
         modified_at: new Date().toISOString(),
         modified_by: data.modified_by
     }

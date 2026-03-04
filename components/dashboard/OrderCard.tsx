@@ -8,10 +8,6 @@ interface OrderCardProps {
 }
 
 export function OrderCard({ order }: OrderCardProps) {
-    const mainStats = [
-        { label: 'CANTIDAD', value: order.cantidad, color: 'text-[#00bcd4]' },
-        { label: 'PROGRAMADO', value: order.programado, color: 'text-[#ff9800]' },
-    ]
 
     const stages = [
         { label: 'PINTURA', value: order.pintura, color: 'text-[#009688]' },

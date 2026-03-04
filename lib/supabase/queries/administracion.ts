@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
+import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
 
-export async function updateOrdenFabricacion(id: number, data: any) {
+export async function updateOrdenFabricacion(id: number, data: Partial<OrdenFabricacion>) {
     const { error } = await supabase
         .from('ordenes_fabricacion')
         .update(data)
@@ -24,7 +25,7 @@ export async function deleteOrdenFabricacion(id: number) {
     }
 }
 
-export async function updateRegistroTrazabilidad(id: number, data: any) {
+export async function updateRegistroTrazabilidad(id: number, data: Partial<RegistroTrazabilidad>) {
     const { error } = await supabase
         .from('trazabilidad_ms')
         .update(data)

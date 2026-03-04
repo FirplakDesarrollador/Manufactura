@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { getRegistrosSinContramolde } from '@/lib/supabase/queries/contramoldes'
 import RegistroContramoldeCard from './RegistroContramoldeCard'
@@ -11,16 +11,19 @@ export default function ContramoldeModule({ userEmail }: { userEmail: string }) 
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
 
-    useEffect(() => {
-        loadRegistros()
-    }, [])
-
-    const loadRegistros = async () => {
+    const loadRegistros = useCallback(async () => {
         setLoading(true)
         const data = await getRegistrosSinContramolde()
         setRegistros(data)
         setLoading(false)
-    }
+    }, [])
+
+    useEffect(() => {
+        const load = async () => {
+            await loadRegistros()
+        }
+        void load()
+    }, [loadRegistros])
 
     const filteredRegistros = registros.filter(r => {
         if (!searchText) return true
