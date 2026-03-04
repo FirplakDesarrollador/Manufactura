@@ -65,7 +65,7 @@ export default function LoginForm() {
   return (
     <div className="min-h-screen bg-[#254153] flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-5xl font-bold text-center mb-8 text-[#254153]">Control de Piso</h1>
+        <h1 className="text-5xl font-bold text-center mb-8 text-[#254153]">Manufactura</h1>
 
         <form className="space-y-6">
           <div>

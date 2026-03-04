@@ -57,7 +57,7 @@ export default function LoginPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-[#254153] mb-2">Control de Piso</h1>
+            <h1 className="text-3xl font-bold text-[#254153] mb-2">Manufactura</h1>
             <p className="text-[#254153]/70">Bienvenido de nuevo</p>
           </div>
 

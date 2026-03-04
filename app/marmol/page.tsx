@@ -4,6 +4,19 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import PinturaModule from '@/components/pintura/PinturaModule'
+import DashboardModule from '@/components/dashboard/DashboardModule'
+import ContramoldeModule from '@/components/contramoldes/ContramoldeModule'
+import VaciadoModule from '@/components/vaciado/VaciadoModule'
+import DesmoldeModule from '@/components/desmolde/DesmoldeModule'
+import PulidoModule from '@/components/pulido/PulidoModule'
+import AcabadoModule from '@/components/acabado/AcabadoModule'
+import ReparacionModule from '@/components/reparacion/ReparacionModule'
+import EmpaqueModule from '@/components/empaque/EmpaqueModule'
+import DigitadoModule from '@/components/digitado/DigitadoModule'
+import CediModule from '@/components/cedi/CediModule'
+import ParametrosModule from '@/components/parametros/ParametrosModule'
+import AdministracionModule from '@/components/administracion/AdministracionModule'
+
 
 export default function MarmorPage() {
     const router = useRouter()
@@ -51,7 +64,7 @@ export default function MarmorPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                             </div>
-                            <h1 className="text-xl font-bold text-white">Control de Piso - Mármol</h1>
+                            <h1 className="text-xl font-bold text-white">Manufactura - Mármol</h1>
                         </div>
                         <div className="flex items-center space-x-4">
                             <div className="text-right hidden sm:block">
@@ -287,6 +300,30 @@ export default function MarmorPage() {
                 <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-0' : 'ml-0'} h-[calc(100vh-4rem)] bg-white`}>
                     {activeModule === 'pintura' ? (
                         <PinturaModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'contramoldes' ? (
+                        <ContramoldeModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'vaciado' ? (
+                        <VaciadoModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'desmolde' ? (
+                        <DesmoldeModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'pulido' ? (
+                        <PulidoModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'acabado' ? (
+                        <AcabadoModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'reparacion' ? (
+                        <ReparacionModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'empaque' ? (
+                        <EmpaqueModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'digitado' ? (
+                        <DigitadoModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'cedi' ? (
+                        <CediModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'dashboard' ? (
+                        <DashboardModule />
+                    ) : activeModule === 'parametros' ? (
+                        <ParametrosModule userEmail={user?.email || ''} />
+                    ) : activeModule === 'administracion' ? (
+                        <AdministracionModule userEmail={user?.email || ''} />
                     ) : (
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                             <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">

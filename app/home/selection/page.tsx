@@ -44,7 +44,7 @@ export default function SelectionPage() {
       <header className="bg-[#254153] sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <button 
+            <button
               onClick={() => router.push('/home')}
               className="inline-flex items-center justify-center w-10 h-10 bg-white rounded-full hover:bg-gray-100 transition-colors"
             >
@@ -83,7 +83,7 @@ export default function SelectionPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-200">Control de Piso Mármol</span>
+            <span className="text-xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-200">Manufactura Mármol</span>
           </button>
 
           {/* Muebles Button */}
@@ -93,7 +93,7 @@ export default function SelectionPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-200">Control de Piso Muebles</span>
+            <span className="text-xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-200">Manufactura Muebles</span>
           </button>
 
           {/* Fibra Button */}
@@ -103,7 +103,7 @@ export default function SelectionPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-200">Control de Piso Fibra</span>
+            <span className="text-xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-200">Manufactura Fibra</span>
           </button>
         </div>
       </main>

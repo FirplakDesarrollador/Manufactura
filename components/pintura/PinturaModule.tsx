@@ -6,7 +6,11 @@ import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura } from '@
 import MetricCard from './MetricCard'
 import OrdenCard from './OrdenCard'
 import MoldSelector from './MoldSelector'
-import { Search, X, Calendar } from 'lucide-react'
+import { Search, X, Calendar, History, ClipboardList } from 'lucide-react'
+import HistorySection from './HistorySection'
+import ModalBuscarMolde from './ModalBuscarMolde'
+
+
 
 interface PinturaModuleProps {
     userEmail: string
@@ -23,6 +27,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     const [moldesDisponibles, setMoldesDisponibles] = useState<Molde[]>([])
     const [selectedMolde, setSelectedMolde] = useState<Molde | null>(null)
     const [submitting, setSubmitting] = useState(false)
+    const [view, setView] = useState<'report' | 'history'>('report')
+    const [isMoldModalOpen, setIsMoldModalOpen] = useState(false)
+
+
 
     // Load ordenes on mount
     useEffect(() => {
@@ -175,25 +183,31 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 </div>
             </div>
 
-            {/* Orders List - Full Width */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
-                    Ordenes encontradas: {filteredOrdenes.length}
-                </div>
-
-                {loading ? (
-                    <div className="text-center py-8 text-gray-500">Cargando órdenes...</div>
-                ) : filteredOrdenes.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">No se encontraron órdenes</div>
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-y-auto p-4">
+                {view === 'history' ? (
+                    <HistorySection />
                 ) : (
-                    filteredOrdenes.map((orden) => (
-                        <OrdenCard
-                            key={orden.id}
-                            orden={orden}
-                            isActive={selectedOrden?.id === orden.id}
-                            onClick={() => setSelectedOrden(orden)}
-                        />
-                    ))
+                    <div className="space-y-2">
+                        <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
+                            Ordenes encontradas: {filteredOrdenes.length}
+                        </div>
+
+                        {loading ? (
+                            <div className="text-center py-8 text-gray-500">Cargando órdenes...</div>
+                        ) : filteredOrdenes.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">No se encontraron órdenes</div>
+                        ) : (
+                            filteredOrdenes.map((orden) => (
+                                <OrdenCard
+                                    key={orden.id}
+                                    orden={orden}
+                                    isActive={selectedOrden?.id === orden.id}
+                                    onClick={() => setSelectedOrden(orden)}
+                                />
+                            ))
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -247,12 +261,42 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                     </button>
 
                     {/* Moldes Info Button */}
-                    <button className="bg-white text-gray-900 font-bold py-3 px-6 rounded-lg flex items-center gap-2 border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors">
+                    <button
+                        onClick={() => setIsMoldModalOpen(true)}
+                        className="bg-white text-gray-900 font-bold py-3 px-6 rounded-lg flex items-center gap-2 border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors"
+                    >
                         <Search size={20} className="text-cyan-500" />
                         Moldes
                     </button>
+
+                    {/* Registros / Volver Button */}
+                    <button
+                        onClick={() => setView(view === 'report' ? 'history' : 'report')}
+                        className={`font-bold py-3 px-6 rounded-lg flex items-center gap-2 border shadow-sm transition-colors ${view === 'history'
+                            ? 'bg-cyan-600 text-white border-cyan-700 hover:bg-cyan-700'
+                            : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+                            }`}
+                    >
+                        {view === 'history' ? (
+                            <>
+                                <ClipboardList size={20} />
+                                Volver a Reportar
+                            </>
+                        ) : (
+                            <>
+                                <History size={20} className="text-cyan-500" />
+                                Registros
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
+
+            {/* Modals */}
+            <ModalBuscarMolde
+                isOpen={isMoldModalOpen}
+                onClose={() => setIsMoldModalOpen(false)}
+            />
         </div>
     )
 }

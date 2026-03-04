@@ -45,6 +45,36 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
     return data || []
 }
 
+export async function getAllMoldes(): Promise<Molde[]> {
+    const { data, error } = await supabase
+        .from('query_moldes')
+        .select('*')
+        .neq('estado', 'Destruido')
+        .order('molde_descripcion', { ascending: true })
+
+    if (error) {
+        console.error('Error fetching all moldes:', error)
+        return []
+    }
+
+    return data || []
+}
+
+export async function updateMoldeEstado(moldeId: number, nuevoEstado: string) {
+    const { data, error } = await supabase
+        .from('moldes')
+        .update({ estado: nuevoEstado })
+        .eq('id', moldeId)
+        .select()
+
+    if (error) {
+        console.error('Error updating molde estado:', error)
+        throw error
+    }
+
+    return data
+}
+
 export async function registrarPintura(pinturaData: {
     orden_fabricacion_id: number
     molde_id: number
