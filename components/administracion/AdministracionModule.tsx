@@ -18,7 +18,9 @@ import {
     X
 } from 'lucide-react'
 
-export default function AdministracionModule() {
+export default function AdministracionModule({ userEmail }: { userEmail?: string }) {
+    // userEmail available for future use
+    void userEmail;
     const [activeTab, setActiveTab] = useState<'of' | 'trazabilidad'>('of')
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])

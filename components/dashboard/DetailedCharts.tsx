@@ -4,9 +4,8 @@ import React from 'react'
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend
 } from 'recharts'
-import { ProgramacionColor, ProgramacionTamano } from "@/lib/supabase/queries/dashboard"
+import { PinturaColor, VaciadoTamano, ProgramacionColor, ProgramacionTamano } from "@/lib/supabase/queries/dashboard"
 import { Palette, Maximize, Target, LucideIcon } from "lucide-react";
-import TableHeader from "./TableHeader";
 
 const TableHeader = ({ title, icon: Icon }: { title: string, icon: LucideIcon }) => (
     <div className="flex items-center gap-2 mb-4">
@@ -15,13 +14,9 @@ const TableHeader = ({ title, icon: Icon }: { title: string, icon: LucideIcon })
     </div>
 )
 
-interface GenericRecord {
-    [key: string]: number | string | null | undefined
-}
-
 interface DetailedChartsProps {
-    pinturaColor: GenericRecord | null
-    vaciadoTamano: GenericRecord | null
+    pinturaColor: PinturaColor | null
+    vaciadoTamano: VaciadoTamano | null
     progColor: ProgramacionColor[]
     progTamano: ProgramacionTamano[]
     loading: boolean

@@ -79,6 +79,7 @@ export interface OrdenFabricacionDetalle {
 }
 
 export interface PinturaColor {
+    [key: string]: string | number | undefined
     pintura_fecha: string
     total_pintado: number
     blancas: number
@@ -94,6 +95,7 @@ export interface PinturaColor {
 }
 
 export interface VaciadoTamano {
+    [key: string]: string | number | undefined
     vaciado_fecha: string
     total_vaciado: number
     grandes: number

@@ -63,6 +63,14 @@ export default function ReportedDefectsListPage() {
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
+    // Stats for total pieces
+    const [pieceStats, setPieceStats] = useState({
+        total: 0,
+        buenos: 0,
+        defectuosos: 0,
+        eficiencia: 0
+    })
+
     const fetchData = useCallback(async () => {
         // No synchronous setLoading(true) here to avoid cascading render error in useEffect
 
@@ -105,13 +113,29 @@ export default function ReportedDefectsListPage() {
                 }
             }
 
+            // Calculate total pieces stats (each record = 1 piece inspected)
+            const filteredByDate = typedData.filter(r =>
+                new Date(r.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }) === selectedDate
+            )
+            const totalPieces = filteredByDate.length
+            const defectivePieces = filteredByDate.filter(r => {
+                const defects = Array.isArray(r.defecto) ? r.defecto : []
+                return defects.length > 0
+            }).length
+            const goodPieces = totalPieces - defectivePieces
+            const efficiency = totalPieces > 0 ? (goodPieces / totalPieces) * 100 : 0
+
+            setPieceStats({
+                total: totalPieces,
+                buenos: goodPieces,
+                defectuosos: defectivePieces,
+                eficiencia: efficiency
+            })
+
             const groupedMap: Record<string, ReportDefectItem> = {}
 
-            typedData.forEach(r => {
+            filteredByDate.forEach(r => {
                 const defects = Array.isArray(r.defecto) ? r.defecto : []
-                const isCorrectDate = new Date(r.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }) === selectedDate
-
-                if (!isCorrectDate) return
 
                 defects.forEach(d => {
                     const defectName = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)
@@ -273,6 +297,29 @@ export default function ReportedDefectsListPage() {
                     <div className="bg-[#254153] text-white px-6 py-2 rounded-none text-xs font-black uppercase tracking-widest border border-black shadow-inner">
                         REGISTROS: {filteredReports.length}
                     </div>
+
+                    {/* Piece Stats Summary */}
+                    <div className="flex items-center space-x-4 ml-auto">
+                        <div className="flex items-center space-x-1.5">
+                            <div className="w-2 h-2 bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase">OK:</span>
+                            <span className="text-base font-black text-green-600">{pieceStats.buenos}</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                            <div className="w-2 h-2 bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.5)]" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase">DEF:</span>
+                            <span className="text-base font-black text-red-600">{pieceStats.defectuosos}</span>
+                        </div>
+                        <div className="h-8 w-px bg-gray-300" />
+                        <div className="flex flex-col items-center">
+                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Total Piezas</span>
+                            <span className="text-lg font-black text-[#254153] leading-none">{pieceStats.total}</span>
+                        </div>
+                        <div className="flex flex-col items-center px-3 border-l border-gray-300">
+                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Eficiencia</span>
+                            <span className={`text-lg font-black leading-none ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -331,9 +378,28 @@ export default function ReportedDefectsListPage() {
                                         </h2>
                                         <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Frecuencia de defectos por tipo en la fecha seleccionada</p>
                                     </div>
-                                    <div className="text-right">
-                                        <span className="text-[10px] font-black text-[#254153] opacity-30 uppercase block">Total Defectos</span>
-                                        <span className="text-xl font-black text-red-600">{filteredReports.reduce((acc, curr) => acc + curr.cantidad, 0)}</span>
+                                    <div className="flex items-center space-x-6">
+                                        <div className="text-right">
+                                            <span className="text-[10px] font-black text-[#254153] opacity-30 uppercase block">Piezas Revisadas</span>
+                                            <span className="text-xl font-black text-[#254153]">{pieceStats.total}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-[10px] font-black text-green-600 opacity-60 uppercase block">Sin Defectos</span>
+                                            <span className="text-xl font-black text-green-600">{pieceStats.buenos}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-[10px] font-black text-red-600 opacity-60 uppercase block">Con Defectos</span>
+                                            <span className="text-xl font-black text-red-600">{pieceStats.defectuosos}</span>
+                                        </div>
+                                        <div className="text-right border-l border-gray-200 pl-6">
+                                            <span className="text-[10px] font-black text-blue-600 opacity-60 uppercase block">Eficiencia</span>
+                                            <span className={`text-xl font-black ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="h-8 w-px bg-gray-200" />
+                                        <div className="text-right">
+                                            <span className="text-[10px] font-black text-[#254153] opacity-30 uppercase block">Total Defectos</span>
+                                            <span className="text-xl font-black text-red-600">{filteredReports.reduce((acc, curr) => acc + curr.cantidad, 0)}</span>
+                                        </div>
                                     </div>
                                 </div>
 
