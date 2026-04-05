@@ -21,6 +21,7 @@ export interface OrdenFabricacion {
     pintura?: number
     cliente?: string
     producto_sku?: string
+    molde_sku?: string
     molde_descripcion?: string
     fecha_ideal_produccion?: string
 }
@@ -33,6 +34,8 @@ export interface Molde {
     estado: string
     vueltas_totales: number
     vueltas_actuales: number
+    vueltas_mto: number
+    vueltas_mto_atipicas: number
     linea: string
 }
 
@@ -61,6 +64,7 @@ export interface RegistroTrazabilidad {
     producto_sku?: string
     kilos_vaciados?: number
     producto_tamano?: string
+    molde_masa_teorica?: number
 }
 
 export interface KilosReferencia {

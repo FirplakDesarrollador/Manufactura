@@ -100,11 +100,20 @@ export default function MarmorPage() {
                 </div>
             </header>
 
-            <div className="flex">
+            <div className="flex min-h-[calc(100vh-4rem)] relative">
+                {/* Sidebar Backdrop (Mobile only) */}
+                {sidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )}
+
                 {/* Sidebar */}
                 <aside
-                    className={`${sidebarOpen ? 'w-64' : 'w-0'
-                        } bg-white border-r border-gray-200 transition-all duration-300 overflow-hidden shadow-lg`}
+                    className={`fixed md:relative inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out bg-white border-r border-gray-200 shadow-lg
+                        ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-0'}
+                        overflow-hidden`}
                 >
                     <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100vh-4rem)]">
 
@@ -306,10 +315,11 @@ export default function MarmorPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-0' : 'ml-0'} h-[calc(100vh-4rem)] bg-white`}>
-                    {activeModule === 'pintura' ? (
-                        <PinturaModule userEmail={user?.email || ''} />
-                    ) : activeModule === 'contramoldes' ? (
+                <main className="flex-1 h-[calc(100vh-4rem)] bg-white overflow-hidden relative">
+                    <div className="h-full overflow-y-auto">
+                        {activeModule === 'pintura' ? (
+                            <PinturaModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'contramoldes' ? (
                         <ContramoldeModule userEmail={user?.email || ''} />
                     ) : activeModule === 'vaciado' ? (
                         <VaciadoModule userEmail={user?.email || ''} />
@@ -351,7 +361,8 @@ export default function MarmorPage() {
                                 </div>
                             </div>
                         </div>
-                    )}
+                        )}
+                    </div>
                 </main>
             </div>
         </div >
