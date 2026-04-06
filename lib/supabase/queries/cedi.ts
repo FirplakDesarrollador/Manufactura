@@ -17,7 +17,7 @@ export async function getRegistrosTransito(): Promise<RegistroTrazabilidad[]> {
     return data || []
 }
 
-export async function marcarTodoComoCedi(usuarioEmail: string) {
+export async function moverTransitoACedi(usuarioEmail: string) {
     // Buscar todos los registros en 'Transito' y pasarlos a 'Cedi'
     const userId = await requireUserId(usuarioEmail)
 
