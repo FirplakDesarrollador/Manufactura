@@ -1,49 +1,60 @@
 import { supabase } from '@/lib/supabase'
+import { RegistroTrazabilidad } from '@/types/pintura'
+import { requireUserId } from './helpers'
 
-export async function moverTransitoACedi(usuarioEmail: string) {
-    // 1. Get user ID from email (assuming users table exists as per FF logic)
-    const { data: userData, error: userError } = await supabase
-        .from('usuarios')
-        .select('id')
-        .eq('email', usuarioEmail)
-        .single()
+export async function getRegistrosTransito(): Promise<RegistroTrazabilidad[]> {
+    const { data, error } = await supabase
+        .from('query_trazabilidad_ms')
+        .select('*')
+        .eq('estado', 'Transito')
+        .order('pintura_fecha', { ascending: true })
 
-    if (userError) throw userError
+    if (error) {
+        console.error('Error fetching registros en transito:', error)
+        return []
+    }
 
-    // 2. Update all records in 'Transito' to 'Cedi'
+    return data || []
+}
+
+export async function marcarTodoComoCedi(usuarioEmail: string) {
+    // Buscar todos los registros en 'Transito' y pasarlos a 'Cedi'
+    const userId = await requireUserId(usuarioEmail)
+
     const { data, error } = await supabase
         .from('trazabilidad_ms')
         .update({
             estado: 'Cedi',
             cedi_fecha: new Date().toISOString(),
-            cedi_user_id: userData.id
+            cedi_user_id: userId
         })
         .eq('estado', 'Transito')
         .select()
 
-    if (error) throw error
+    if (error) {
+        console.error('Error marcando registros para Cedi:', error)
+        throw new Error(`Error en Cedi: [${error.code}] ${error.message}`)
+    }
+
     return data
 }
 
-export async function registrarCediIndividual(registroId: number, usuarioEmail: string) {
-    const { data: userData, error: userError } = await supabase
-        .from('usuarios')
-        .select('id')
-        .eq('email', usuarioEmail)
-        .single()
-
-    if (userError) throw userError
+export async function registrarCedi(registroId: number, usuarioEmail: string) {
+    const userId = await requireUserId(usuarioEmail)
 
     const { error } = await supabase
         .from('trazabilidad_ms')
         .update({
             estado: 'Cedi',
             cedi_fecha: new Date().toISOString(),
-            cedi_user_id: userData.id
+            cedi_user_id: userId
         })
         .eq('id', registroId)
 
-    if (error) throw error
+    if (error) {
+        console.error('Error registrando Cedi:', error)
+        throw new Error(`Error en Cedi: [${error.code}] ${error.message}`)
+    }
 }
 
 export async function reversarCedi(registroId: number) {
@@ -56,5 +67,8 @@ export async function reversarCedi(registroId: number) {
         })
         .eq('id', registroId)
 
-    if (error) throw error
+    if (error) {
+        console.error('Error reversando Cedi:', error)
+        throw new Error(`Error al reversar Cedi: [${error.code}] ${error.message}`)
+    }
 }

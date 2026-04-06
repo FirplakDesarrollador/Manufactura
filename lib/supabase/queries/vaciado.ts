@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad, KilosReferencia } from '@/types/pintura'
+import { requireUserId } from './helpers'
 
 export async function getRegistrosParaVaciado(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
@@ -31,19 +32,23 @@ export async function getKilosReferencia(): Promise<KilosReferencia[]> {
 }
 
 export async function registrarVaciado(registroId: number, usuarioEmail: string) {
-    // Assuming a registros_vaciado table exists or updating the existing traceability record
+    // Vaciado = UPDATE trazabilidad_ms: vaciado_fecha, vaciado_user_id, estado -> 'Vaciado'
+    const userId = await requireUserId(usuarioEmail)
+
     const { data, error } = await supabase
-        .from('registros_vaciado')
-        .insert({
-            trazabilidad_id: registroId,
-            usuario_email: usuarioEmail,
-            fecha: new Date().toISOString()
+        .from('trazabilidad_ms')
+        .update({
+            estado: 'Vaciado',
+            vaciado_fecha: new Date().toISOString(),
+            vaciado_user_id: userId
         })
+        .eq('id', registroId)
         .select()
+        .single()
 
     if (error) {
         console.error('Error registrando vaciado:', error)
-        throw error
+        throw new Error(`Error al registrar vaciado: [${error.code}] ${error.message}`)
     }
 
     return data

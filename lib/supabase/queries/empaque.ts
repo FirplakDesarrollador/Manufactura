@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad } from '@/types/pintura'
+import { requireUserId } from './helpers'
 
 export async function getRegistrosParaEmpaque(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
@@ -17,18 +18,22 @@ export async function getRegistrosParaEmpaque(): Promise<RegistroTrazabilidad[]>
 }
 
 export async function registrarEmpaque(registroId: number, usuarioEmail: string) {
+    // Empaque = UPDATE trazabilidad_ms: empaque_fecha, empaque_user_id, estado
+    const userId = await requireUserId(usuarioEmail)
+
     const { data, error } = await supabase
-        .from('registros_empaque')
-        .insert({
-            trazabilidad_id: registroId,
-            usuario_email: usuarioEmail,
-            fecha: new Date().toISOString()
+        .from('trazabilidad_ms')
+        .update({
+            estado: 'Empaque',
+            empaque_fecha: new Date().toISOString(),
+            empaque_user_id: userId
         })
+        .eq('id', registroId)
         .select()
+        .single()
 
     if (error) {
-        console.error('Error registrando empaque:', error)
-        throw error
+        throw new Error(`Error al registrar empaque: [${error.code}] ${error.message}`)
     }
 
     return data

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad } from '@/types/pintura'
+import { requireUserId } from './helpers'
 
 export async function getRegistrosAcabado(estado: 'Acabado' | 'Estanteria'): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
@@ -17,19 +18,22 @@ export async function getRegistrosAcabado(estado: 'Acabado' | 'Estanteria'): Pro
 }
 
 export async function registrarAcabado(registroId: number, usuarioEmail: string, nuevoEstado: string) {
+    // Acabado = UPDATE trazabilidad_ms: acabado_fecha, acabado_user_id, estado
+    const userId = await requireUserId(usuarioEmail)
+
     const { data, error } = await supabase
-        .from('registros_acabado')
-        .insert({
-            trazabilidad_id: registroId,
-            usuario_email: usuarioEmail,
-            estado_destino: nuevoEstado,
-            fecha: new Date().toISOString()
+        .from('trazabilidad_ms')
+        .update({
+            estado: nuevoEstado,
+            acabado_fecha: new Date().toISOString(),
+            acabado_user_id: userId
         })
+        .eq('id', registroId)
         .select()
+        .single()
 
     if (error) {
-        console.error('Error registrando acabado:', error)
-        throw error
+        throw new Error(`Error al registrar acabado: [${error.code}] ${error.message}`)
     }
 
     return data

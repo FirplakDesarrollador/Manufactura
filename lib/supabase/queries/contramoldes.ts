@@ -1,11 +1,13 @@
 import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad } from '@/types/pintura'
+import { requireUserId } from './helpers'
 
 export async function getRegistrosSinContramolde(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')
-        .eq('contramolde', false)
+        .eq('contramolde', true) // Only show if contramolde is marked as true in pintura
+        .is('contramolde_fecha', null) // And not yet processed
         .order('pintura_fecha', { ascending: true })
 
     if (error) {
@@ -17,19 +19,21 @@ export async function getRegistrosSinContramolde(): Promise<RegistroTrazabilidad
 }
 
 export async function registrarContramolde(registroId: number, usuarioEmail: string) {
-    // Asumiendo que existe una tabla registros_contramolde
+    // Contramolde = UPDATE trazabilidad_ms: contramolde_fecha, contramolde_user_id
+    const userId = await requireUserId(usuarioEmail)
+
     const { data, error } = await supabase
-        .from('registros_contramolde')
-        .insert({
-            trazabilidad_id: registroId,
-            usuario_email: usuarioEmail,
-            fecha: new Date().toISOString()
+        .from('trazabilidad_ms')
+        .update({
+            contramolde_fecha: new Date().toISOString(),
+            contramolde_user_id: userId
         })
+        .eq('id', registroId)
         .select()
+        .single()
 
     if (error) {
-        console.error('Error registrando contramolde:', error)
-        throw error
+        throw new Error(`Error al registrar contramolde: [${error.code}] ${error.message}`)
     }
 
     return data

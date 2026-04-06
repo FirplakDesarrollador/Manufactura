@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad } from '@/types/pintura'
+import { requireUserId } from './helpers'
 
 export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
@@ -17,19 +18,22 @@ export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> 
 }
 
 export async function registrarPulido(registroId: number, usuarioEmail: string, nuevoEstado: string) {
+    // Pulido = UPDATE trazabilidad_ms: pulido_fecha, pulido_user_id, estado
+    const userId = await requireUserId(usuarioEmail)
+
     const { data, error } = await supabase
-        .from('registros_pulido')
-        .insert({
-            trazabilidad_id: registroId,
-            usuario_email: usuarioEmail,
-            estado_destino: nuevoEstado,
-            fecha: new Date().toISOString()
+        .from('trazabilidad_ms')
+        .update({
+            estado: nuevoEstado,
+            pulido_fecha: new Date().toISOString(),
+            pulido_user_id: userId
         })
+        .eq('id', registroId)
         .select()
+        .single()
 
     if (error) {
-        console.error('Error registrando pulido:', error)
-        throw error
+        throw new Error(`Error al registrar pulido: [${error.code}] ${error.message}`)
     }
 
     return data

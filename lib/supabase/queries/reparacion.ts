@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad } from '@/types/pintura'
+import { requireUserId } from './helpers'
 
 export type ReparacionTab = 'Reparacion' | 'Saldo' | 'Destruccion'
 
@@ -25,19 +26,22 @@ export async function getRegistrosReparacion(tab: ReparacionTab): Promise<Regist
 }
 
 export async function registrarAccionReparacion(registroId: number, usuarioEmail: string, nuevoEstado: string) {
+    // Reparacion = UPDATE trazabilidad_ms: reparacion_fecha, reparacion_user_id, estado
+    const userId = await requireUserId(usuarioEmail)
+
     const { data, error } = await supabase
-        .from('registros_reparacion')
-        .insert({
-            trazabilidad_id: registroId,
-            usuario_email: usuarioEmail,
-            estado_destino: nuevoEstado,
-            fecha: new Date().toISOString()
+        .from('trazabilidad_ms')
+        .update({
+            estado: nuevoEstado,
+            reparacion_fecha: new Date().toISOString(),
+            reparacion_user_id: userId
         })
+        .eq('id', registroId)
         .select()
+        .single()
 
     if (error) {
-        console.error('Error registrando acción de reparación:', error)
-        throw error
+        throw new Error(`Error al registrar reparación: [${error.code}] ${error.message}`)
     }
 
     return data
