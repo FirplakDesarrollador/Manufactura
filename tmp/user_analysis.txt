@@ -1,0 +1,8 @@
+Buscar por correo: status=200, body=[]
+
+pintura_user_id tipo: {"description":"Note:\nThis is a Foreign Key to `usuarios.id`.<fk table='usuarios' column='id'/>","format":"bigint","type":"integer"}
+
+usuarios.uuid tipo: {"format":"uuid","type":"string"}
+usuarios.id tipo: {"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"}
+
+Ejemplos de pintura_user_id existentes: []

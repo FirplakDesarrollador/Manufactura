@@ -1,0 +1,220 @@
+Total tablas/vistas: 116
+
+== TABLAS CON 'traz' (7) ==
+
+--- query_trazabilidad_fv ---
+  Columnas (67): orden_fabricacion_id, molde_id, pintura_user_id, pintura_linea, vaciado_fecha, vaciado_user_id, contramolde, contramolde_fecha, contramolde_user_id, pulido_fecha, pulido_user_id, enviar_reparar_molde, reparacion_fecha, reparacion_user_id, empaque_fecha, empaque_user_id, cedi_fecha, cedi_user_id, digitado_user_id, digitado_fecha, transito_fecha, transito_user_id, acabado_user_id, acabado_fecha, saldo_user_id, saldo_fecha, vaciado_linea, registrer, estado, destruccion_user_id, destruccion_fecha, estanteria_user_id, estanteria_fecha, kilos_vaciados, numero_pedido, orden_fabricacion, of_cantidad, of_fecha_entrega_estimada, of_pendiente, producto_sku, producto_descripcion, producto_tamano, producto_color, producto_flauta, planta, molde_descripcion, molde_sku, molde_serial, molde_estado, molde_vueltas_actuales, molde_vueltas_acumuladas, molde_vueltas_mto, molde_mto_atipicas, molde_observaciones, molde_masa_teorica, pintura_user_name, vaciado_user_name, pulido_user_name, acabado_user_name, reparacion_user_name, contramolde_user_name, empaque_user_name, digitado_user_name, transito_user_name, cedi_user_name, saldo_user_name, destruccion_user_name
+  Requeridos (0): Ninguno
+  ¿Es vista? Probablemente SÍ
+
+--- query_trazabilidad_ms ---
+  Columnas (69): id, pintura_fecha, orden_fabricacion_id, molde_id, pintura_user_id, pintura_linea, vaciado_fecha, vaciado_user_id, contramolde, contramolde_fecha, contramolde_user_id, pulido_fecha, pulido_user_id, enviar_reparar_molde, reparacion_fecha, reparacion_user_id, empaque_fecha, empaque_user_id, cedi_fecha, cedi_user_id, digitado_user_id, digitado_fecha, transito_fecha, transito_user_id, acabado_user_id, acabado_fecha, saldo_user_id, saldo_fecha, vaciado_linea, registrer, estado, destruccion_user_id, destruccion_fecha, estanteria_user_id, estanteria_fecha, kilos_vaciados, numero_pedido, orden_fabricacion, of_cantidad, of_fecha_entrega_estimada, of_pendiente, producto_sku, producto_descripcion, producto_tamano, producto_color, producto_flauta, planta, molde_descripcion, molde_sku, molde_serial, molde_estado, molde_vueltas_actuales, molde_vueltas_acumuladas, molde_vueltas_mto, molde_mto_atipicas, molde_observaciones, molde_masa_teorica, pintura_user_name, vaciado_user_name, pulido_user_name, acabado_user_name, reparacion_user_name, contramolde_user_name, empaque_user_name, digitado_user_name, transito_user_name, cedi_user_name, saldo_user_name, destruccion_user_name
+  Requeridos (0): Ninguno
+  ¿Es vista? Probablemente SÍ
+
+--- query_trazabilidad_muebles ---
+  Columnas (16): id, created_at, orden_fabricacion, creado_por, cantidad, proceso, turno, taladro, supervisor, of_pendiente, producto_sku, producto_descripcion, planta, piezas, canto_ml, tablero_m2
+  Requeridos (0): Ninguno
+  ¿Es vista? Probablemente SÍ
+
+--- trazabilidad_dia ---
+  Columnas (21): proceso, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, total_dia, promedio, h18, h19, h20, h21, h22, h23
+  Requeridos (0): Ninguno
+  ¿Es vista? Probablemente SÍ
+
+--- trazabilidad_fv ---
+  Columnas (35): pintura_fecha, orden_fabricacion_id, molde_id, pintura_user_id, pintura_linea, vaciado_fecha, vaciado_user_id, contramolde, contramolde_fecha, contramolde_user_id, pulido_fecha, pulido_user_id, enviar_reparar_molde, reparacion_fecha, reparacion_user_id, empaque_fecha, empaque_user_id, cedi_fecha, cedi_user_id, digitado_user_id, digitado_fecha, transito_fecha, transito_user_id, acabado_user_id, acabado_fecha, saldo_user_id, saldo_fecha, vaciado_linea, registrer, estado, destruccion_user_id, destruccion_fecha, estanteria_user_id, estanteria_fecha, kilos_vaciados
+  Requeridos (10): pintura_fecha, orden_fabricacion_id, molde_id, pintura_user_id, pintura_linea, contramolde, enviar_reparar_molde, registrer, estado, kilos_vaciados
+  ¿Es vista? Probablemente NO (tiene campos requeridos)
+
+--- trazabilidad_ms ---
+  Columnas (37): id, pintura_fecha, orden_fabricacion_id, molde_id, pintura_user_id, pintura_linea, vaciado_fecha, vaciado_user_id, contramolde, contramolde_fecha, contramolde_user_id, pulido_fecha, pulido_user_id, enviar_reparar_molde, reparacion_fecha, reparacion_user_id, empaque_fecha, empaque_user_id, cedi_fecha, cedi_user_id, digitado_user_id, digitado_fecha, transito_fecha, transito_user_id, acabado_user_id, acabado_fecha, saldo_user_id, saldo_fecha, vaciado_linea, registrer, estado, destruccion_user_id, destruccion_fecha, estanteria_user_id, estanteria_fecha, kilos_vaciados, vaciado_maquina
+  Requeridos (11): id, pintura_fecha, orden_fabricacion_id, molde_id, pintura_user_id, pintura_linea, contramolde, enviar_reparar_molde, registrer, estado, kilos_vaciados
+  ¿Es vista? Probablemente NO (tiene campos requeridos)
+
+--- trazabilidad_muebles ---
+  Columnas (11): id, created_at, orden_fabricacion, creado_por, cantidad, proceso, turno, taladro, supervisor, linea, Piezas
+  Requeridos (8): id, created_at, orden_fabricacion, creado_por, cantidad, proceso, taladro, linea
+  ¿Es vista? Probablemente NO (tiene campos requeridos)
+
+
+== TABLAS CON 'molde' (15) ==
+
+--- BD_moldes ---
+  Columnas (27): id, Título, CODIGO MOLDE, DEFECTOS A REPARAR, FECHA ENTRADA, FECHA ESPERADA, FECHA ENTREGA, ESTADO, OBSERVACIONES, Usuario, Recibido, Prioridad, H altura de pestaña, Created, Responsable, Tipo de reparacion, Tipo, ID, espesor_pestana, espesor_bowl, espesor_fondo, espesor_parte_plana, espesor_angulos, espesor_radios, Modified, Created By, Modified By
+  Requeridos (1): id
+
+--- Defectos_moldes ---
+  Columnas (3): Título, Tiempo, id
+  Requeridos (1): id
+
+--- Materia_prima_moldes ---
+  Columnas (5): id, Número de artículo SAP, Materia Prima, Unidad de medida de compras, Usuario
+  Requeridos (1): id
+
+--- Personal app moldes ---
+  Columnas (2): Nombre, Cedula
+  Requeridos (0): Ninguno
+
+--- base_datos_historico_moldes ---
+  Columnas (15): id, titulo, codigo_molde, defectos_a_reparar, fecha_entrada, fecha_esperada, fecha_entrega, estado, observaciones, usuario, recibido, created, responsable, tipo_de_reparacion, tipo
+  Requeridos (0): Ninguno
+
+--- migracion_moldes ---
+  Columnas (17): Título, CODIGO MOLDE, DEFECTOS A REPARAR, FECHA ENTRADA, FECHA ESPERADA, FECHA ENTREGA, ESTADO, OBSERVACIONES, Usuario, Recibido, Prioridad, H altura de pestaña, Created, Responsable, Tipo de reparación, Tipo, ID
+  Requeridos (0): Ninguno
+
+--- moldes ---
+  Columnas (22): id, created_at, serial, estado, vueltas_actuales, vueltas_acumuladas, tipo_molde_id, observaciones, modificado_por, modificado_desde, modified_at, vueltas_mto_atipicas, tipo_molde_sku, Fecha_de_ingreso, Fecha_de_entrega, Fecha_esperada, Estado_reparacion, Observaciones_reparacion, Responsable, Tipo_de_reparacion, descripcion_molde, nombre_articulo
+  Requeridos (8): id, created_at, serial, estado, vueltas_actuales, vueltas_acumuladas, tipo_molde_id, vueltas_mto_atipicas
+
+--- moldes_activos ---
+  Columnas (12): id, nombre, codigo, estado, defectos, tipo_reparacion, fecha_entrada, fecha_entrega_esperada, observaciones, comentario_seguimiento, created_at, created_by
+  Requeridos (4): id, nombre, estado, tipo_reparacion
+
+--- moldes_fv ---
+  Columnas (13): id, created_at, serial, estado, vueltas_actuales, vueltas_acumuladas, tipo_molde_id, observaciones, modificado_por, modificado_desde, modified_at, vueltas_mto_atipicas, tipo_molde_sku
+  Requeridos (8): id, created_at, serial, estado, vueltas_actuales, vueltas_acumuladas, tipo_molde_id, vueltas_mto_atipicas
+
+--- pv_moldes ---
+  Columnas (24): id, created_at, auditadoPor, pinesCentrados, ceraGlass, golpesCaidas, defectoReparacion, golpesContramolde, aplicaPlastilina, acumulacionCera, aplicaCeraGlass, despiqueFisuras, rebabas, prensas, golpesMoldes, rayaEspatula, objetosDentro, observacionesAlistamiento, observacionesEncerado, observacionesDesprensado, observacionesDesmolde, DejaCaerMolde, Deformaciones, RayaMolde
+  Requeridos (17): id, created_at, auditadoPor, pinesCentrados, ceraGlass, golpesCaidas, defectoReparacion, golpesContramolde, aplicaPlastilina, acumulacionCera, aplicaCeraGlass, despiqueFisuras, rebabas, prensas, golpesMoldes, rayaEspatula, objetosDentro
+
+--- query_carga_moldes ---
+  Columnas (11): molde_sku, molde_descripcion, total_ordenes, piezas_programadas, moldes_totales, moldes_habilitados, moldes_disponibles, moldes_en_uso, moldes_en_reparacion, moldes_en_fabricacion, promedio_vueltas
+  Requeridos (0): Ninguno
+
+--- query_moldes ---
+  Columnas (17): id, created_at, serial, estado, vueltas_actuales, vueltas_acumuladas, tipo_molde_id, observaciones, modificado_por, modificado_desde, modified_at, vueltas_mto_atipicas, tipo_molde_sku, molde_descripcion, molde_sku, vueltas_mto, masa_teorica
+  Requeridos (0): Ninguno
+
+--- registros_moldes ---
+  Columnas (26): ID, Nombre, CODIGO MOLDE, DEFECTOS A REPARAR, FECHA ENTRADA, FECHA ESPERADA, FECHA ENTREGA, ESTADO, OBSERVACIONES, Usuario, Recibido, Prioridad, H altura de pestaña, Created, Responsable, Tipo de reparacion, Tipo, espesor_pestana, espesor_bowl, espesor_fondo, espesor_parte_plana, espesor_angulos, espesor_radios, Modified, Created By, Modified By
+  Requeridos (0): Ninguno
+
+--- tipos_moldes ---
+  Columnas (8): created_at, molde_descripcion, id, molde_sku, vueltas_mto, masa_teorica, tamano, planta
+  Requeridos (6): created_at, molde_descripcion, id, molde_sku, vueltas_mto, masa_teorica
+
+--- tipos_moldes_fv ---
+  Columnas (8): id, created_at, molde_descripcion, molde_sku, vueltas_mto, masa_teorica, tamano, planta
+  Requeridos (6): id, created_at, molde_descripcion, molde_sku, vueltas_mto, masa_teorica
+
+
+== TODAS LAS TABLAS/VISTAS ==
+6M
+BD_ COLORES_GRUPOS
+BD_moldes
+Datos personal completa
+Defectos_moldes
+Entradas_salidas_MP
+HDT_MUEBLES
+KT_ProgramacionDia
+KT_ProgramacionProducto
+Materia_prima_moldes
+OPT
+Personal app moldes
+REPUESTOS_MANTENIMIENTO
+SAP_SKU
+SaldosDestrucciones
+app_config
+base_datos_historico_moldes
+checklist_limpieza_forms
+checklist_limpieza_items
+defectos
+hdt_steps
+hdts
+inventariosap
+kitting
+mapa_5s_forms
+metricas_actuales_ms
+metricas_actuales_pintura_ms
+metricas_actuales_vaciado_ms
+metricas_turno_dia_muebles
+migracion_moldes
+moldes
+moldes_activos
+moldes_fv
+ms_defectos
+ms_reporte_defectos
+ordenes_fabricacion
+ordenes_fabricacion_fibra
+ordenes_fabricacion_fv
+ordenes_fabricacion_muebles
+ordenes_marmol_api
+parametros
+pasar_datos
+productos
+productos desde sap
+productos_defectos_ms
+productos_fv
+pruebaesteban
+pv_corte_cefi
+pv_corte_mbl
+pv_enchape_cefi
+pv_enchape_mbl
+pv_inspeccion_fv
+pv_inspeccion_mbl
+pv_inspeccion_ms
+pv_moldes
+pv_otros_cefi
+pv_otros_mbl
+pv_otros_ms
+pv_pintura_fv
+pv_pintura_ms
+pv_taladros
+pv_vaciado_RTM
+pv_vaciado_fv
+pv_vaciado_ms
+query_carga_moldes
+query_carga_productos
+query_cedi_actual_muebles
+query_cedi_dia_ms
+query_conteo_defectos_mb
+query_conteo_defectos_ms
+query_hora_hora_marmol
+query_kilos_referencia
+query_kitting
+query_metricas_dia
+query_moldes
+query_ms_ifi_dia
+query_ms_reporte_defectos_dia
+query_of_muebles
+query_of_muebles_all
+query_ordenes_fabricacion
+query_ordenes_fabricacion_fv
+query_piezas_por_mueble_of
+query_pintura_dia_ms
+query_productos_defectos_ms
+query_productos_ms
+query_programacion_colores
+query_programacion_tamanos
+query_reposiciones_muebles
+query_saldos_destrucciones
+query_supervisores_turno
+query_trazabilidad_fv
+query_trazabilidad_ms
+query_trazabilidad_muebles
+query_vaciado_dia_ms
+query_vaciado_maquina
+registros_moldes
+rejilla_5s_forms
+rejilla_5s_results
+reposiciones_muebles
+seleccionar_ordenar_forms
+seleccionar_ordenar_items
+solicitudes
+supervisores
+supervisores_turno
+tipos_moldes
+tipos_moldes_fv
+trazabilidad_dia
+trazabilidad_fv
+trazabilidad_ms
+trazabilidad_muebles
+turno_actual
+turnos
+usuarios
+v_ordenes_fabricacion_con_descripcion
+vista_alertas_defectos_hoy
+vw_inspeccion_piezas_por_turno_dia

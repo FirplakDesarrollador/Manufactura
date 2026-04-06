@@ -1,0 +1,5 @@
+Columnas de usuarios (12): id, created_at, nombre, correo, rol, permisos, uuid, linea_predeterminada, modulo_predeterminado, modulo_predeterminado_muebles, planta_muebles, modulo_predeterminado_fibra
+Requeridos: id, created_at, nombre, correo, rol, permisos, linea_predeterminada, planta_muebles
+
+Status: 200
+Usuarios encontrados: 0
