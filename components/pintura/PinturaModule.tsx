@@ -32,6 +32,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     const [submitting, setSubmitting] = useState(false)
     const [view, setView] = useState<'report' | 'history'>('report')
     const [isMoldModalOpen, setIsMoldModalOpen] = useState(false)
+    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
 
 
@@ -47,7 +48,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             setTrazabilidad(trazaData)
             setAllMoldes(moldesData)
         } catch (error) {
-            console.error('Error loading data:', error)
+            console.error('Supabase error en registrarPintura:', error)
+            throw error
         } finally {
             setLoading(false)
         }
@@ -66,6 +68,14 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     useEffect(() => {
         loadOrdenes()
     }, [loadOrdenes])
+
+    // Auto-hide notification
+    useEffect(() => {
+        if (notification) {
+            const timer = setTimeout(() => setNotification(null), 5000)
+            return () => clearTimeout(timer)
+        }
+    }, [notification])
 
     // Load moldes when orden is selected
     useEffect(() => {
@@ -209,14 +219,42 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         setSelectedDate('')
     }
 
+    const checkMantenimiento = (molde: Molde) => {
+        const threshold = molde.vueltas_mto_atipicas > 0 
+            ? molde.vueltas_mto_atipicas - 1
+            : molde.vueltas_mto - 1;
+
+        if (molde.vueltas_actuales >= threshold) {
+            const isNew = molde.vueltas_mto_atipicas === 1;
+            const title = isNew ? '🆕 Molde nuevo 🆕' : '⚠️ Molde para desmanchar ⚠️';
+            const message = isNew 
+                ? `El ${molde.molde_descripcion} # ${molde.serial} Se debe encerar en el puesto`
+                : `El ${molde.molde_descripcion} # ${molde.serial} Se debe sacar para desmanchar`;
+            
+            alert(`${title}\n\n${message}`);
+            return true;
+        }
+        return false;
+    };
+
     const handleSubmit = async () => {
-        if (!selectedOrden || !selectedLinea || !selectedMolde) {
-            alert('Por favor complete todos los campos')
+        // 1. Validaciones previas
+        if (!selectedOrden) {
+            alert('Error: Debe seleccionar una Orden de Fabricación.')
+            return
+        }
+        if (!selectedLinea) {
+            alert('Error: Debe seleccionar una Línea.')
+            return
+        }
+        if (!selectedMolde) {
+            alert('Error: Debe seleccionar un Molde.')
             return
         }
 
         setSubmitting(true)
         try {
+            // 2. Proceso de registro (verificado en el backend)
             await registrarPintura({
                 orden_fabricacion_id: selectedOrden.id,
                 molde_id: selectedMolde.id,
@@ -224,18 +262,22 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 usuario_email: userEmail
             })
 
-            alert('Pintura registrada exitosamente')
-
-            // Reset form
+            // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
+            setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
+            
+            // Limpia los campos del formulario
             setSelectedOrden(null)
             setSelectedLinea('')
             setSelectedMolde(null)
 
-            // Reload data
+            // Recargar datos para actualizar métricas y caché
             loadOrdenes()
-        } catch (error) {
-            console.error('Error registrando pintura:', error)
-            alert('Error al registrar pintura')
+        } catch (error: any) {
+            console.error('Error detallado registrando pintura:', error)
+            const detail = error.message || 'Error desconocido en el servidor'
+            // Diálogo de error con el detalle específico del fallo
+            alert(`Error al registrar pintura: ${detail}`)
+            setNotification({ message: `Fallo: ${detail}`, type: 'error' })
         } finally {
             setSubmitting(false)
         }
@@ -339,6 +381,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                         const molde = moldesDisponibles.find(m => m.id === parseInt(e.target.value))
                                         if (molde) {
                                             setSelectedMolde(molde)
+                                            checkMantenimiento(molde)
                                         }
                                     }}
                                     disabled={!selectedOrden || !selectedLinea}
@@ -416,6 +459,20 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Notification Snackbar */}
+            {notification && (
+                <div className={`fixed bottom-24 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300 ${
+                    notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                }`}>
+                    <div className="font-bold text-sm">
+                        {notification.message}
+                    </div>
+                    <button onClick={() => setNotification(null)} className="p-1 hover:bg-black/10 rounded">
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
 
             {/* Modals */}
             <ModalBuscarMolde

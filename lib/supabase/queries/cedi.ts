@@ -12,7 +12,7 @@ export async function moverTransitoACedi(usuarioEmail: string) {
 
     // 2. Update all records in 'Transito' to 'Cedi'
     const { data, error } = await supabase
-        .from('registros_trazabilidad')
+        .from('trazabilidad_ms')
         .update({
             estado: 'Cedi',
             cedi_fecha: new Date().toISOString(),
@@ -35,7 +35,7 @@ export async function registrarCediIndividual(registroId: number, usuarioEmail: 
     if (userError) throw userError
 
     const { error } = await supabase
-        .from('registros_trazabilidad')
+        .from('trazabilidad_ms')
         .update({
             estado: 'Cedi',
             cedi_fecha: new Date().toISOString(),
@@ -48,7 +48,7 @@ export async function registrarCediIndividual(registroId: number, usuarioEmail: 
 
 export async function reversarCedi(registroId: number) {
     const { error } = await supabase
-        .from('registros_trazabilidad')
+        .from('trazabilidad_ms')
         .update({
             estado: 'Transito',
             cedi_fecha: null,
