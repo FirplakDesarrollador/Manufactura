@@ -19,6 +19,17 @@ export interface OrdenFabricacion {
     programado?: number
     cantidad?: number
     pintura?: number
+    desgelcada?: number
+    estanteria?: number
+    reparacion?: number
+    reparacion_larga?: number
+    destruccion?: number
+    cedi?: number
+    moldes_totales?: number
+    moldes_disponibles?: number
+    moldes_en_uso?: number
+    moldes_en_reparacion?: number
+    moldes_en_fabricacion?: number
     cliente?: string
     producto_sku?: string
     molde_sku?: string

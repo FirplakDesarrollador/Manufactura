@@ -16,7 +16,7 @@ export default function RegistroAcabadoCard({ registro, usuarioEmail, onRefresh 
     const [selectedStatus, setSelectedStatus] = useState('')
 
     // Determinamos las opciones de estado basadas en el estado actual
-    const isEstanteria = registro.estado === 'Estanteria'
+    const currentStatus = registro.estado
 
     const handleRegister = async () => {
         if (!selectedStatus) {
@@ -56,7 +56,7 @@ export default function RegistroAcabadoCard({ registro, usuarioEmail, onRefresh 
                             <div className="flex items-center gap-2 mt-2">
                                 <Clock size={16} className="text-slate-400" />
                                 <p className="text-sm font-bold text-slate-400">
-                                    Vaciado: {new Date(registro.pintura_fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                                    {currentStatus === 'Pulido' ? 'Pulido' : 'Acabado'}: {new Date(currentStatus === 'Pulido' ? registro.pulido_fecha! : registro.acabado_fecha!).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>
@@ -98,9 +98,9 @@ export default function RegistroAcabadoCard({ registro, usuarioEmail, onRefresh 
                             className={`w-full appearance-none bg-slate-50 border-2 ${selectedStatus ? 'border-sky-500 bg-white' : 'border-slate-200'} rounded-2xl px-6 py-5 pr-12 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-sky-100 transition-all cursor-pointer text-lg`}
                         >
                             <option value="">Seleccione estado...</option>
-                            {!isEstanteria && <option value="Estanteria">Estantería</option>}
+                            {currentStatus === 'Pulido' && <option value="Acabado">Acabado</option>}
+                            {currentStatus === 'Acabado' && <option value="Estanteria">Estantería</option>}
                             <option value="Reparacion">Reparación</option>
-                            {isEstanteria && <option value="Empaque">Empaque</option>}
                             <option value="Destruccion">Destrucción</option>
                         </select>
                         <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-slate-400">

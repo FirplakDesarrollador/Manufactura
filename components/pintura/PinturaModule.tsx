@@ -123,7 +123,9 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 (orden.fecha_ideal_produccion &&
                     orden.fecha_ideal_produccion.includes(selectedDate))
 
-            return matchesSearch && matchesDate
+            const isProgramada = (orden.programado || 0) > 0
+
+            return matchesSearch && matchesDate && isProgramada
         })
     }, [ordenes, searchText, selectedDate])
 

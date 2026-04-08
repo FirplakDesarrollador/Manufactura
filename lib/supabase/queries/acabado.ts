@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { requireUserId } from './helpers'
 
-export async function getRegistrosAcabado(estado: 'Acabado' | 'Estanteria'): Promise<RegistroTrazabilidad[]> {
+export async function getRegistrosAcabado(estado: 'Pulido' | 'Acabado'): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')

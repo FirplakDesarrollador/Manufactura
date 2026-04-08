@@ -53,33 +53,33 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
             {/* Middle Section: Mold Status */}
             <div className="w-full md:w-1/5 md:px-3 md:border-r border-gray-300 flex flex-col justify-center bg-gray-50 md:bg-transparent p-2 md:p-0 rounded">
                 <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-bold">
-                    <div className="text-cyan-600">Totales: <span className="text-gray-900">{relevantMoldes.length}</span></div>
-                    <div className="text-red-500">Reparación: <span className="text-gray-900">{enReparacion}</span></div>
-                    <div className="text-green-600">Disponibles: <span className="text-gray-900">{disponibles}</span></div>
-                    <div className="text-orange-600">Fabricación: <span className="text-gray-900">0</span></div>
-                    <div className="text-yellow-600">En uso: <span className="text-gray-900">{enUso}</span></div>
+                    <div className="text-cyan-600">Totales: <span className="text-gray-900">{orden.moldes_totales || relevantMoldes.length}</span></div>
+                    <div className="text-red-500">Reparación: <span className="text-gray-900">{orden.moldes_en_reparacion || enReparacion}</span></div>
+                    <div className="text-green-600">Disponibles: <span className="text-gray-900">{orden.moldes_disponibles || disponibles}</span></div>
+                    <div className="text-orange-600">Fabricación: <span className="text-gray-900">{orden.moldes_en_fabricacion || 0}</span></div>
+                    <div className="text-yellow-600">En uso: <span className="text-gray-900">{orden.moldes_en_uso || enUso}</span></div>
                 </div>
             </div>
 
             {/* Right Section: Process Grid */}
             <div className="flex-1 md:pl-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1">
                 <MiniMetric label="Cantidad" value={orden.cantidad || orden.cantidad_programada} color="bg-cyan-50 border-cyan-200" />
-                <MiniMetric label="Pintura" value={0} />
-                <MiniMetric label="Desgelcada" value={0} />
-                <MiniMetric label="Pulido" value={0} />
-                <MiniMetric label="Reparación" value={0} />
-                <MiniMetric label="Saldo" value={0} />
-                <MiniMetric label="Empaque" value={0} />
-                <MiniMetric label="Transito" value={0} />
+                <MiniMetric label="Pintura" value={orden.pintura || 0} />
+                <MiniMetric label="Desgelcada" value={orden.desgelcada || 0} />
+                <MiniMetric label="Pulido" value={orden.pulido || 0} />
+                <MiniMetric label="Reparación" value={orden.reparacion || 0} />
+                <MiniMetric label="Saldo" value={orden.saldo || 0} />
+                <MiniMetric label="Empaque" value={orden.empaque || 0} />
+                <MiniMetric label="Transito" value={orden.transito || 0} />
 
                 <MiniMetric label="Programado" value={orden.programado || 0} color="bg-orange-50 border-orange-200" />
-                <MiniMetric label="Vaciado" value={0} />
-                <MiniMetric label="Estanteria" value={0} />
-                <MiniMetric label="Acabado" value={0} />
-                <MiniMetric label="Rep. Larga" value={0} />
-                <MiniMetric label="Destrucción" value={0} />
-                <MiniMetric label="Digitado" value={0} />
-                <MiniMetric label="CEDI" value={0} color="bg-cyan-50 border-cyan-200" />
+                <MiniMetric label="Vaciado" value={orden.vaciado || 0} />
+                <MiniMetric label="Estanteria" value={orden.estanteria || 0} />
+                <MiniMetric label="Acabado" value={orden.acabado || 0} />
+                <MiniMetric label="Rep. Larga" value={orden.reparacion_larga || 0} />
+                <MiniMetric label="Destrucción" value={orden.destruccion || 0} />
+                <MiniMetric label="Digitado" value={orden.digitado || 0} />
+                <MiniMetric label="CEDI" value={orden.cedi || 0} color="bg-cyan-50 border-cyan-200" />
             </div>
         </button>
     )

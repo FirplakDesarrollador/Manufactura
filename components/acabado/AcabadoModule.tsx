@@ -4,12 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { getRegistrosAcabado } from '@/lib/supabase/queries/acabado'
 import RegistroAcabadoCard from './RegistroAcabadoCard'
-import { Search, Eraser, ClipboardList, Loader2, Sparkles } from 'lucide-react'
+import { Search, Eraser, ClipboardList, Loader2, Sparkles, LayoutGrid } from 'lucide-react'
 
-type TabType = 'Acabado' | 'Estanteria'
+type TabType = 'Pulido' | 'Acabado'
 
 export default function AcabadoModule({ userEmail }: { userEmail: string }) {
-    const [activeTab, setActiveTab] = useState<TabType>('Acabado')
+    const [activeTab, setActiveTab] = useState<TabType>('Pulido')
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
@@ -31,59 +31,66 @@ export default function AcabadoModule({ userEmail }: { userEmail: string }) {
     }, [loadRegistros])
 
     const filteredRegistros = registros.filter(r => {
-        if (!searchText) return true
-        const search = searchText.toLowerCase()
-        return (
-            (r.molde_serial?.toLowerCase() || '').includes(search) ||
-            (r.molde_descripcion?.toLowerCase() || '').includes(search) ||
-            (r.orden_fabricacion?.toLowerCase() || '').includes(search) ||
-            (r.producto_descripcion?.toLowerCase() || '').includes(search) ||
-            (r.pedido?.toLowerCase() || '').includes(search) ||
-            (r.numero_pedido?.toLowerCase() || '').includes(search) ||
-            (r.producto_sku?.toLowerCase() || '').includes(search)
-        )
+        // Si hay búsqueda, mostrar todo (ignorar filtro de fecha)
+        if (searchText) {
+            const search = searchText.toLowerCase()
+            return (
+                r.orden_fabricacion?.toLowerCase().includes(search) ||
+                r.pedido?.toLowerCase().includes(search) ||
+                r.producto_sku?.toLowerCase().includes(search) ||
+                r.producto_descripcion?.toLowerCase().includes(search) ||
+                r.molde_serial?.toLowerCase().includes(search) ||
+                r.numero_pedido?.toLowerCase().includes(search)
+            )
+        }
+
+        // Filtro por fecha (Desde la medianoche de hoy para turno actual)
+        const midnight = new Date()
+        midnight.setHours(0, 0, 0, 0)
+        
+        const pulidoDate = r.pulido_fecha ? new Date(r.pulido_fecha) : null
+        const acabadoDate = r.acabado_fecha ? new Date(r.acabado_fecha) : null
+        
+        const isToday = activeTab === 'Pulido' 
+            ? (pulidoDate && pulidoDate >= midnight)
+            : (acabadoDate && acabadoDate >= midnight)
+
+        return isToday
     })
 
     return (
-        <div className="h-full flex flex-col bg-slate-50/30 animate-in fade-in duration-500">
-            {/* Header Section */}
-            <div className="bg-white border-b border-slate-200 px-8 py-8 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-sky-600 rounded-2xl text-white shadow-lg shadow-sky-200">
-                                <Sparkles size={32} />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase">Módulo Acabado</h1>
-                                <p className="text-base text-slate-500 font-bold mt-1 uppercase tracking-widest opacity-80">
-                                    Control de calidad final y almacenamiento.
-                                </p>
-                            </div>
+        <div className="flex flex-col h-full bg-slate-50">
+            {/* Header mejorado */}
+            <div className="bg-white px-8 py-8 border-b-2 border-slate-100 shadow-sm transition-all duration-300">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 max-w-[1600px] mx-auto">
+                    <div className="flex items-center gap-6">
+                        <div className="bg-sky-600 p-4 rounded-2xl text-white shadow-lg shadow-sky-100 flex items-center justify-center">
+                            <Sparkles size={40} />
+                        </div>
+                        <div>
+                            <h1 className="text-4xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                                MÓDULO ACABADO
+                            </h1>
+                            <p className="text-slate-400 font-bold tracking-widest text-sm uppercase mt-1">
+                                Control de calidad final y almacenamiento.
+                            </p>
                         </div>
                     </div>
-
-                    <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+                    
+                    <div className="flex p-2 bg-slate-100 rounded-[2rem] min-w-[440px] shadow-inner border border-slate-200/50">
                         <button
-                            onClick={() => setActiveTab('Acabado')}
-                            className={`flex items-center gap-3 px-8 py-4 rounded-xl font-black transition-all ${activeTab === 'Acabado'
-                                ? 'bg-white text-sky-700 shadow-md scale-[1.02]'
-                                : 'text-slate-500 hover:bg-white/50'
-                                }`}
+                            onClick={() => setActiveTab('Pulido')}
+                            className={`flex-1 flex items-center justify-center gap-4 py-6 px-4 rounded-[1.8rem] font-black transition-all duration-300 ${activeTab === 'Pulido' ? 'bg-white shadow-xl text-sky-600 scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
                         >
-                            <Sparkles size={24} />
-                            <span className="uppercase tracking-widest">Pulido</span>
+                            <Sparkles size={24} fill={activeTab === 'Pulido' ? 'currentColor' : 'none'} />
+                            PULIDO
                         </button>
                         <button
-                            onClick={() => setActiveTab('Estanteria')}
-                            className={`flex items-center gap-3 px-8 py-4 rounded-xl font-black transition-all ${activeTab === 'Estanteria'
-                                ? 'bg-white text-sky-700 shadow-md scale-[1.02]'
-                                : 'text-slate-500 hover:bg-white/50'
-                                }`}
+                            onClick={() => setActiveTab('Acabado')}
+                            className={`flex-1 flex items-center justify-center gap-4 py-6 px-4 rounded-[1.8rem] font-black transition-all duration-300 ${activeTab === 'Acabado' ? 'bg-white shadow-xl text-sky-600 scale-[1.02]' : 'text-slate-400 hover:text-slate-600'}`}
                         >
-                            <span className="flex items-center gap-2">
-                                <span className="uppercase tracking-widest">Estantería</span>
-                            </span>
+                            <LayoutGrid size={24} fill={activeTab === 'Acabado' ? 'currentColor' : 'none'} />
+                            ESTANTERÍA
                         </button>
                     </div>
                 </div>
@@ -91,7 +98,7 @@ export default function AcabadoModule({ userEmail }: { userEmail: string }) {
 
             {/* Search Bar Section */}
             <div className="p-8 pb-4">
-                <div className="max-w-7xl mx-auto">
+                <div className="max-w-[1600px] mx-auto">
                     <div className="bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm flex flex-col md:flex-row gap-6">
                         <div className="relative flex-1 group">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-600 transition-colors">
@@ -118,7 +125,7 @@ export default function AcabadoModule({ userEmail }: { userEmail: string }) {
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto p-8 pt-4">
-                <div className="max-w-7xl mx-auto h-full">
+                <div className="max-w-[1600px] mx-auto h-full">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-40 space-y-6">
                             <Loader2 className="w-16 h-16 text-sky-600 animate-spin" />
@@ -133,14 +140,14 @@ export default function AcabadoModule({ userEmail }: { userEmail: string }) {
                             <p className="text-lg text-slate-500 max-w-sm mt-3 font-semibold">
                                 {searchText
                                     ? "No hay coincidencias con los criterios de búsqueda actuales."
-                                    : `No hay piezas en estado '${activeTab}' pendientes.`}
+                                    : `No hay piezas en estado '${activeTab}' pendientes desde la medianoche.`}
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-8 pb-10">
                             <div className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] px-2 flex items-center gap-4">
                                 <div className="h-1.5 w-16 bg-sky-200 rounded-full" />
-                                Lista de Piezas: {filteredRegistros.length}
+                                Lista de Piezas Hoy: {filteredRegistros.length}
                             </div>
                             <div className="grid grid-cols-1 gap-8">
                                 {filteredRegistros.map((registro) => (
