@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion } from '@/types/pintura'
-import { getRegistrosTrazabilidad } from '@/lib/supabase/queries/pintura'
+import { getRegistrosTrazabilidadPorOrden } from '@/lib/supabase/queries/pintura'
 import RegistroDigitadoCard from '../digitado/RegistroDigitadoCard'
 import { Truck, Info, Hash, Keyboard, Warehouse } from 'lucide-react'
 
@@ -20,8 +20,8 @@ export default function CediList({ order, userEmail, onRefresh }: CediListProps)
     const loadRegistros = useCallback(async () => {
         setLoading(true)
         try {
-            const data = await getRegistrosTrazabilidad()
-            setRegistros(data.filter(r => r.orden_fabricacion === order.orden_fabricacion))
+            const data = await getRegistrosTrazabilidadPorOrden(order.orden_fabricacion)
+            setRegistros(data)
         } catch (error) {
             console.error('Error loading piezas:', error)
         } finally {

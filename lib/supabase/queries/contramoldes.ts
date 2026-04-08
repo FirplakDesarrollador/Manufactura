@@ -6,7 +6,7 @@ export async function getRegistrosSinContramolde(): Promise<RegistroTrazabilidad
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')
-        .eq('contramolde', true) // Only show if contramolde is marked as true in pintura
+        .eq('contramolde', false) // Only show if contramolde is not yet processed (matches Flutter logic)
         .is('contramolde_fecha', null) // And not yet processed
         .order('pintura_fecha', { ascending: true })
 
@@ -25,6 +25,7 @@ export async function registrarContramolde(registroId: number, usuarioEmail: str
     const { data, error } = await supabase
         .from('trazabilidad_ms')
         .update({
+            contramolde: true,
             contramolde_fecha: new Date().toISOString(),
             contramolde_user_id: userId
         })

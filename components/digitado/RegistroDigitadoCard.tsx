@@ -16,7 +16,7 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
-        if (!confirm(`¿Desea completar el digitado de esta pieza y moverla al CEDI?`)) return
+        if (!confirm(`¿Desea completar el digitado de esta pieza y moverla a Tránsito?`)) return
 
         setLoading(true)
         try {
@@ -95,7 +95,7 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
                             className="bg-blue-600 hover:bg-blue-700 text-white p-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-lg shadow-blue-100 active:scale-95 transition-all disabled:opacity-50 uppercase tracking-widest"
                         >
                             {loading ? <Loader2 className="animate-spin" /> : <Send size={24} />}
-                            Enviar Cedi
+                            Enviar a Tránsito
                         </button>
                     ) : (
                         <button

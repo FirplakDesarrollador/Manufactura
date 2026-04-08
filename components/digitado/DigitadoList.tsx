@@ -4,7 +4,7 @@ import React, { useState, useCallback } from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion } from '@/types/pintura'
 import RegistroDigitadoCard from './RegistroDigitadoCard'
 import { Truck, Info, Hash, Package } from 'lucide-react'
-import { getRegistrosTrazabilidad } from '@/lib/supabase/queries/pintura'
+import { getRegistrosTrazabilidadPorOrden } from '@/lib/supabase/queries/pintura'
 
 interface DigitadoListProps {
     order: OrdenFabricacion
@@ -20,8 +20,8 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
     const loadRegistros = React.useCallback(async () => {
         setLoading(true);
         try {
-            const data = await getRegistrosTrazabilidad();
-            setRegistros(data.filter(r => r.orden_fabricacion === order.orden_fabricacion));
+            const data = await getRegistrosTrazabilidadPorOrden(order.orden_fabricacion);
+            setRegistros(data);
         } catch (error) {
             console.error('Error loading registros for order:', error);
         } finally {
@@ -35,7 +35,7 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
 
     const filteredRegistros = registros.filter(r => {
         if (activeTab === 'Pulido') {
-            return ['Pulido', 'Acabado', 'Empaque'].includes(r.estado || '')
+            return ['Desgelcada', 'Pulido', 'Acabado', 'Empaque'].includes(r.estado || '')
         }
         return r.estado === 'Transito' || r.estado === 'Digitado'
     })

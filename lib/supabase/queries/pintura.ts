@@ -29,6 +29,21 @@ export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]
     return data || []
 }
 
+export async function getRegistrosTrazabilidadPorOrden(ordenFabricacion: string): Promise<RegistroTrazabilidad[]> {
+    const { data, error } = await supabase
+        .from('query_trazabilidad_ms')
+        .select('*')
+        .eq('orden_fabricacion', ordenFabricacion)
+        .order('pintura_fecha', { ascending: false })
+
+    if (error) {
+        console.error('Error fetching registros trazabilidad por orden:', error)
+        return []
+    }
+
+    return data || []
+}
+
 export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
     const { data, error } = await supabase
         .from('query_moldes')

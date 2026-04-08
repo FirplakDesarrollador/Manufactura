@@ -12,7 +12,6 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [fechaFiltro, setFechaFiltro] = useState<string | null>(null)
-    const [soloPulido, setSoloPulido] = useState(false)
     const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
 
     useEffect(() => {
@@ -38,7 +37,6 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const clearFilters = () => {
         setSearchText('')
         setFechaFiltro(null)
-        setSoloPulido(false)
         setSelectedOrderId(null)
     }
 
@@ -58,14 +56,16 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
             o.fecha_entrega_estimada === fechaFiltro
         )
 
-        const matchesSoloPulido = !soloPulido || (
+        const hasRelevantPieces = (
             (o.pulido || 0) > 0 ||
+            (o.desgelcada || 0) > 0 ||
             (o.empaque || 0) > 0 ||
             (o.acabado || 0) > 0 ||
-            (o.digitado || 0) > 0
+            (o.digitado || 0) > 0 ||
+            (o.transito || 0) > 0
         )
 
-        return matchesSearch && matchesFecha && matchesSoloPulido
+        return matchesSearch && matchesFecha && hasRelevantPieces
     })
 
     const todayStr = new Date().toLocaleDateString('es-ES')
@@ -75,7 +75,8 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const totalProgramado = filteredOrdenes.reduce((acc, o) => acc + (o.programado || 0), 0)
     const totalPintura = filteredOrdenes.reduce((acc, o) => acc + (o.pintura || 0), 0)
     const totalVaciado = filteredOrdenes.reduce((acc, o) => acc + (o.vaciado || 0), 0)
-    const totalPulido = filteredOrdenes.reduce((acc, o) => acc + (o.pulido || 0), 0)
+    const totalDesgelcada = filteredOrdenes.reduce((acc, o) => acc + (o.desgelcada || 0), 0)
+    const totalPulido = filteredOrdenes.reduce((acc, o) => acc + (o.pulido || 0) + (o.desgelcada || 0), 0)
     const totalSaldo = filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0)
 
     const countAcabado = registros.filter(r =>
@@ -111,9 +112,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                     <SummaryCard label="Programado" value={totalProgramado} color="blue" />
                     <SummaryCard label="Pintura" value={totalPintura} color="blue" />
                     <SummaryCard label="Vaciado" value={totalVaciado} color="blue" />
-                    <div onClick={() => setSoloPulido(!soloPulido)} className="cursor-pointer">
-                        <SummaryCard label="Pulido" value={totalPulido} color={soloPulido ? "orange" : "blue"} />
-                    </div>
+                    <SummaryCard label="Pulido" value={totalPulido} color="blue" />
                     <SummaryCard label="Saldo" value={totalSaldo} color="blue" />
                     <SummaryCard label="Acabado" value={countAcabado} color="blue" />
                     <SummaryCard label="Digitado" value={totalDigitado} color="blue" isPrimary />
@@ -244,12 +243,12 @@ function OrderCard({ order, isSelected, onClick }: { order: OrdenFabricacion, is
                     <Package size={12} /> {order.cantidad} un
                 </div>
             </div>
-            {isSelected && (
-                <div className="mt-3 pt-3 border-t border-blue-100 flex gap-2">
-                    <div className="bg-blue-600 text-white px-2 py-1 rounded text-[9px] font-bold">PUL: {order.pulido || 0}</div>
-                    <div className="bg-orange-500 text-white px-2 py-1 rounded text-[9px] font-bold">DIG: {order.digitado || 0}</div>
-                </div>
-            )}
+            <div className="mt-3 pt-3 border-t border-slate-50 flex flex-wrap gap-2">
+                <div className="bg-amber-500 text-white px-2 py-1 rounded text-[9px] font-bold">DES: {order.desgelcada || 0}</div>
+                <div className="bg-blue-600 text-white px-2 py-1 rounded text-[9px] font-bold">PUL: {order.pulido || 0}</div>
+                <div className="bg-orange-500 text-white px-2 py-1 rounded text-[9px] font-bold">DIG: {order.digitado || 0}</div>
+                <div className="bg-orange-600 text-white px-2 py-1 rounded text-[9px] font-bold">TRA: {order.transito || 0}</div>
+            </div>
         </div>
     )
 }

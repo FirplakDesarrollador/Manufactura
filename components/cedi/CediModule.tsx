@@ -100,7 +100,9 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
             o.fecha_entrega_estimada === fechaFiltro
         )
 
-        return matchesSearch && matchesFecha
+        const hasPieces = (o.transito || 0) > 0 || (o.cedi || 0) > 0
+
+        return matchesSearch && matchesFecha && hasPieces
     })
 
     const todayStr = new Date().toLocaleDateString('es-ES')

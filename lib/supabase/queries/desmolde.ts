@@ -7,6 +7,7 @@ export async function getRegistrosParaDesmolde(): Promise<RegistroTrazabilidad[]
         .from('query_trazabilidad_ms')
         .select('*')
         .eq('estado', 'Vaciado')
+        .eq('contramolde', true)
         .order('pintura_fecha', { ascending: true })
 
     if (error) {

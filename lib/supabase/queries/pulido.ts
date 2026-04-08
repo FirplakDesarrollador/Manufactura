@@ -6,7 +6,7 @@ export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> 
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')
-        .eq('estado', 'Pulido')
+        .eq('estado', 'Desgelcada')
         .order('pintura_fecha', { ascending: true })
 
     if (error) {
