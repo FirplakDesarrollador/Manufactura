@@ -48,7 +48,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             setTrazabilidad(trazaData)
             setAllMoldes(moldesData)
         } catch (error) {
-            console.error('Supabase error en registrarPintura:', error)
+            console.error('Error cargando datos iniciales en loadOrdenes:', error)
             throw error
         } finally {
             setLoading(false)
@@ -222,16 +222,16 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     }
 
     const checkMantenimiento = (molde: Molde) => {
-        const threshold = molde.vueltas_mto_atipicas > 0 
-            ? molde.vueltas_mto_atipicas - 1
-            : molde.vueltas_mto - 1;
+        const threshold = (molde.Vueltas_Desmanchado || 40) - 1;
 
         if (molde.vueltas_actuales >= threshold) {
-            const isNew = molde.vueltas_mto_atipicas === 1;
-            const title = isNew ? '🆕 Molde nuevo 🆕' : '⚠️ Molde para desmanchar ⚠️';
-            const message = isNew 
-                ? `El ${molde.molde_descripcion} # ${molde.serial} Se debe encerar en el puesto`
-                : `El ${molde.molde_descripcion} # ${molde.serial} Se debe sacar para desmanchar`;
+            const isNearLimit = molde.vueltas_actuales === threshold;
+            const isOverLimit = molde.vueltas_actuales > threshold;
+            
+            const title = isOverLimit ? '⚠️ Molde al Límite ⚠️' : '🔔 Aviso de Mantenimiento 🔔';
+            const message = isOverLimit 
+                ? `El ${molde.molde_descripcion} # ${molde.serial} ha alcanzado su límite de ${molde.Vueltas_Desmanchado} vueltas. Al intentar pintar, será enviado a REPARACIÓN.`
+                : `El ${molde.molde_descripcion} # ${molde.serial} está a una vuelta de su mantenimiento (${molde.Vueltas_Desmanchado} vueltas).`;
             
             alert(`${title}\n\n${message}`);
             return true;
@@ -264,7 +264,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 usuario_email: userEmail
             })
 
-            // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
+            // 3. Éxito convencional
             setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
             
             // Limpia los campos del formulario
@@ -272,14 +272,27 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             setSelectedLinea('')
             setSelectedMolde(null)
 
-            // Recargar datos para actualizar métricas y caché
+            // Recargar datos
             loadOrdenes()
         } catch (error: any) {
             console.error('Error detallado registrando pintura:', error)
-            const detail = error.message || 'Error desconocido en el servidor'
-            // Diálogo de error con el detalle específico del fallo
-            alert(`Error al registrar pintura: ${detail}`)
-            setNotification({ message: `Fallo: ${detail}`, type: 'error' })
+            const detail = error.message || ''
+            
+            // Caso Especial: Mantenimiento Automático (Menciona al usuario la reparación)
+            if (detail.includes('MANTENIMIENTO_AUTOMATICO')) {
+                const cleanMessage = detail.replace('MANTENIMIENTO_AUTOMATICO: ', '')
+                setNotification({ message: cleanMessage, type: 'success' }) // Se muestra en verde porque es una acción del sistema exitosa
+                
+                // Limpiar campos porque el molde ya no se puede usar
+                setSelectedMolde(null)
+                loadOrdenes() // Recargar para ver el nuevo estado del molde
+                return
+            }
+
+            // Error Real
+            const errorMessage = detail || 'Error desconocido en el servidor'
+            alert(`Error al registrar pintura: ${errorMessage}`)
+            setNotification({ message: `Fallo: ${errorMessage}`, type: 'error' })
         } finally {
             setSubmitting(false)
         }
@@ -291,7 +304,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             <div className="bg-gray-50 p-2 flex flex-col md:flex-row md:items-center gap-4 border-b border-gray-200">
                 {/* Top Controls */}
                 <div className="flex items-center gap-2 w-full md:w-auto">
-                    <button className="p-2 bg-cyan-500 text-white rounded-lg flex-shrink-0">
+                    <button className="p-2 bg-cyan-500 text-white rounded-lg shrink-0">
                         <Calendar size={20} />
                     </button>
                     <div className="relative flex-1 md:w-64">
@@ -305,7 +318,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                     </div>
                     <button
                         onClick={handleClearFilters}
-                        className="p-2 bg-orange-400 text-white rounded-lg flex-shrink-0"
+                        className="p-2 bg-orange-400 text-white rounded-lg shrink-0"
                     >
                         <X size={20} />
                     </button>

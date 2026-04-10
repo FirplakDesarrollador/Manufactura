@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { Molde } from '@/types/pintura'
-import { getAllMoldes, updateMoldeEstado } from '@/lib/supabase/queries/pintura'
-import { Search, X, Eraser, RefreshCw } from 'lucide-react'
+import { getAllMoldes, updateMoldeEstado, getCurrentUserProfile } from '@/lib/supabase/queries/pintura'
+import { Search, X, Eraser, RefreshCw, Wrench } from 'lucide-react'
 
 interface ModalBuscarMoldeProps {
     isOpen: boolean
@@ -15,6 +15,32 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [updating, setUpdating] = useState<number | null>(null)
+    const [sapStatuses, setSapStatuses] = useState<Record<string, { status: string; loading: boolean; error?: boolean; notFound?: boolean }>>({})
+    const [currentUser, setCurrentUser] = useState<{ nombre: string; correo: string } | null>(null)
+
+    const loadSapStatus = async (serial: string) => {
+        if (sapStatuses[serial]) return;
+
+        setSapStatuses(prev => ({ ...prev, [serial]: { status: '', loading: true } }))
+        try {
+            const res = await fetch(`/api/sap/mold-status/${serial}`)
+            if (!res.ok) throw new Error('Error de conexión con SAP')
+            const data = await res.json()
+            
+            if (data.found === false) {
+                // Molde no existe en SAP
+                setSapStatuses(prev => ({ ...prev, [serial]: { status: 'No registrado', loading: false, notFound: true } }))
+            } else if (data.estadoSAP) {
+                // Molde encontrado con estado
+                setSapStatuses(prev => ({ ...prev, [serial]: { status: data.estadoSAP, loading: false } }))
+            } else {
+                // Molde encontrado pero sin estado asignado
+                setSapStatuses(prev => ({ ...prev, [serial]: { status: 'Sin estado', loading: false } }))
+            }
+        } catch (err) {
+            setSapStatuses(prev => ({ ...prev, [serial]: { status: 'Error', loading: false, error: true } }))
+        }
+    }
 
     const loadMoldes = React.useCallback(async () => {
         setLoading(true)
@@ -23,17 +49,43 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
         setLoading(false)
     }, [])
 
+    const loadUser = async () => {
+        const profile = await getCurrentUserProfile()
+        if (profile) setCurrentUser(profile)
+    }
+
     useEffect(() => {
         if (isOpen) {
             loadMoldes()
+            loadUser()
         }
     }, [isOpen, loadMoldes])
 
-    const handleUpdateEstado = async (moldeId: number) => {
+    // Cargar estados de SAP para los moldes filtrados (limitado para evitar sobrecarga)
+    useEffect(() => {
+        const visibleMoldes = moldes.filter(m =>
+            !searchText ||
+            m.serial.toLowerCase().includes(searchText.toLowerCase()) ||
+            m.molde_descripcion.toLowerCase().includes(searchText.toLowerCase())
+        ).slice(0, 20); // Solo los primeros 20 visibles
+
+        visibleMoldes.forEach(m => {
+            if (!sapStatuses[m.serial]) {
+                loadSapStatus(m.serial)
+            }
+        })
+    }, [searchText, moldes])
+
+    const handleUpdateEstado = async (moldeId: number, nuevoEstado: string = 'Disponible', descripcion?: string) => {
         setUpdating(moldeId)
         try {
-            await updateMoldeEstado(moldeId, 'Disponible')
-            alert('¡Acción exitosa! Se cambió el estado del molde correctamente')
+            await updateMoldeEstado(
+                moldeId, 
+                nuevoEstado, 
+                descripcion, 
+                currentUser?.nombre || currentUser?.correo || undefined
+            )
+            alert(`¡Acción exitosa! Se cambió el estado del molde a ${nuevoEstado} correctamente`)
             loadMoldes()
         } catch (error) {
             console.error('Error updating status:', error)
@@ -121,27 +173,66 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
                                     <div className="text-base font-bold text-cyan-700 truncate">
                                         {molde.serial}
                                     </div>
-                                    <div className="text-xs font-medium text-gray-500 mt-1">
+                                    <div className="text-xs font-medium text-gray-500 mt-0.5">
                                         {molde.molde_descripcion}
                                     </div>
-                                    <div className={`text-[11px] font-bold mt-2 inline-block px-2 py-0.5 rounded-full ${molde.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
-                                        molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                        {molde.estado}
+                                    
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${molde.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
+                                            molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                            App: {molde.estado}
+                                        </div>
+
+                                        {/* Etiqueta SAP */}
+                                        {(() => {
+                                            const sap = sapStatuses[molde.serial]
+                                            const styleClass = !sap || sap.loading 
+                                                ? 'bg-gray-50 text-gray-400 border-gray-200'
+                                                : sap.error 
+                                                    ? 'bg-red-50 text-red-600 border-red-200'
+                                                    : sap.notFound 
+                                                        ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                                        : 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                                            return (
+                                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${styleClass}`}>
+                                                    <span className="opacity-60 text-[9px] uppercase tracking-wider">SAP:</span>
+                                                    {!sap || sap.loading ? (
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                                    ) : (
+                                                        <span>{sap.status}</span>
+                                                    )}
+                                                </div>
+                                            )
+                                        })()}
                                     </div>
                                 </div>
 
-                                {molde.estado === 'En uso' && (
-                                    <button
-                                        onClick={() => handleUpdateEstado(molde.id)}
-                                        disabled={updating === molde.id}
-                                        className="flex flex-col items-center justify-center p-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 transition-all shadow-md active:scale-95 disabled:bg-gray-300"
-                                        title="Liberar Molde"
-                                    >
-                                        <RefreshCw size={20} className={updating === molde.id ? 'animate-spin' : ''} />
-                                        <span className="text-[10px] font-bold mt-1">LIBERAR</span>
-                                    </button>
-                                )}
+                                <div className="flex gap-2">
+                                    {(molde.estado === 'En uso' || molde.estado === 'En reparacion') && (
+                                        <button
+                                            onClick={() => handleUpdateEstado(molde.id, 'Disponible', molde.molde_descripcion)}
+                                            disabled={updating === molde.id}
+                                            className="flex flex-col items-center justify-center p-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-md active:scale-95 disabled:bg-gray-300"
+                                            title="Liberar Molde"
+                                        >
+                                            <RefreshCw size={20} className={updating === molde.id ? 'animate-spin' : ''} />
+                                            <span className="text-[10px] font-bold mt-1 uppercase">Liberar</span>
+                                        </button>
+                                    )}
+                                    
+                                    {molde.estado !== 'En reparacion' && (
+                                        <button
+                                            onClick={() => handleUpdateEstado(molde.id, 'En reparacion', molde.molde_descripcion)}
+                                            disabled={updating === molde.id}
+                                            className="flex flex-col items-center justify-center p-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-all shadow-md active:scale-95 disabled:bg-gray-300"
+                                            title="Enviar a Reparación"
+                                        >
+                                            <Wrench size={20} className={updating === molde.id ? 'animate-spin' : ''} />
+                                            <span className="text-[10px] font-bold mt-1 uppercase">Reparar</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))
                     )}

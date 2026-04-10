@@ -48,6 +48,8 @@ export interface Molde {
     vueltas_acumuladas?: number
     vueltas_mto: number
     vueltas_mto_atipicas: number
+    Vuletas_MTO: number
+    Vueltas_Desmanchado: number
     linea: string
 }
 

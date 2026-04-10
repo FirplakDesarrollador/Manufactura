@@ -55,8 +55,8 @@ export default function MoldSelector({
                             <span className="ml-2 text-gray-900 font-bold">{selectedMolde.vueltas_actuales}</span>
                         </div>
                         <div>
-                            <span className="font-bold text-gray-900">Vueltas Mto:</span>
-                            <span className="ml-2 text-gray-900 font-bold">{selectedMolde.vueltas_totales}</span>
+                            <span className="font-bold text-gray-900">Límite Mto:</span>
+                            <span className="ml-2 text-gray-900 font-bold">{selectedMolde.Vueltas_Desmanchado || 40}</span>
                         </div>
                         {selectedMolde.linea && (
                             <div className="col-span-2">
@@ -66,16 +66,16 @@ export default function MoldSelector({
                         )}
                     </div>
 
-                    {/* Warning if mold needs maintenance soon */}
-                    {selectedMolde.vueltas_actuales >= selectedMolde.vueltas_totales * 0.9 && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800">
-                            ⚠️ Este molde está próximo a mantenimiento
+                    {/* Warning based on Vueltas_Desmanchado */}
+                    {selectedMolde.vueltas_actuales >= (selectedMolde.Vueltas_Desmanchado || 40) - 1 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800 font-medium">
+                            🔔 Este molde está por alcanzar su límite de {selectedMolde.Vueltas_Desmanchado || 40} vueltas.
                         </div>
                     )}
 
-                    {selectedMolde.vueltas_actuales >= selectedMolde.vueltas_totales && (
-                        <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800">
-                            🚨 Este molde requiere mantenimiento
+                    {selectedMolde.vueltas_actuales >= (selectedMolde.Vueltas_Desmanchado || 40) && (
+                        <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800 font-bold">
+                            🚨 Molde alcanzado: Se enviará a REPARACIÓN al intentar usarlo.
                         </div>
                     )}
                 </div>
