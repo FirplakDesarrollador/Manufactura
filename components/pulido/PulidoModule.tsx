@@ -44,60 +44,60 @@ export default function PulidoModule({ userEmail }: { userEmail: string }) {
     return (
         <div className="h-full flex flex-col bg-slate-50/30 animate-in fade-in duration-500">
             {/* Header Section */}
-            <div className="bg-white border-b border-slate-200 px-8 py-8 shadow-sm">
+            <div className="bg-white border-b border-slate-200 px-4 py-2 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-cyan-600 rounded-2xl text-white shadow-lg shadow-cyan-200">
-                                <PenTool size={32} />
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-cyan-600 rounded-lg text-white shadow-lg shadow-cyan-200">
+                                <PenTool size={20} />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase">Módulo Pulido</h1>
-                                <p className="text-base text-slate-500 font-bold mt-1 uppercase tracking-widest opacity-80">
-                                    Control de acabado y preparación de superficies.
+                                <h1 className="text-xl font-black text-slate-800 tracking-tight uppercase">Módulo Pulido</h1>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest opacity-80">
+                                    Control de acabado y superficies.
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-cyan-50 px-8 py-4 flex items-center border border-cyan-100 rounded-2xl">
+                    <div className="bg-cyan-50 px-3 py-1 flex items-center border border-cyan-100 rounded-lg">
                         <div className="text-right">
-                            <p className="text-xs font-black text-cyan-500 uppercase tracking-widest leading-none">Pendientes</p>
-                            <p className="text-3xl font-black text-cyan-700 leading-none mt-2">{registros.length}</p>
+                            <p className="text-[8px] font-black text-cyan-500 uppercase tracking-widest leading-none">Pendientes</p>
+                            <p className="text-lg font-black text-cyan-700 leading-none mt-1">{registros.length}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Search Bar Section */}
-            <div className="p-8 pb-4">
+            <div className="p-2 pb-1">
                 <div className="max-w-7xl mx-auto">
-                    <div className="bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm flex flex-col md:flex-row gap-6">
+                    <div className="bg-white p-2 rounded-xl border-2 border-slate-100 shadow-sm flex flex-col md:flex-row gap-2">
                         <div className="relative flex-1 group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-cyan-600 transition-colors">
-                                <Search size={24} />
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-cyan-600 transition-colors">
+                                <Search size={18} />
                             </div>
                             <input
                                 type="text"
                                 placeholder="Buscar por OF, Producto, Pedido o Molde..."
                                 value={searchText}
                                 onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full pl-14 pr-4 py-5 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600 outline-none transition-all shadow-inner font-bold text-lg text-slate-800 placeholder:text-slate-400"
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-2 border-transparent rounded-lg focus:bg-white focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600 outline-none transition-all shadow-inner font-bold text-sm text-slate-800 placeholder:text-slate-400"
                             />
                         </div>
                         <button
                             onClick={() => setSearchText('')}
-                            className="bg-orange-500 hover:bg-orange-600 text-white px-10 py-5 rounded-2xl transition-all shadow-md active:scale-95 flex items-center gap-3"
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-2"
                         >
-                            <Eraser size={24} />
-                            <span className="text-base font-black uppercase tracking-widest">Limpiar</span>
+                            <Eraser size={18} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Limpiar</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-y-auto p-8 pt-4">
+            <div className="flex-1 overflow-y-auto p-2 pt-1">
                 <div className="max-w-7xl mx-auto h-full">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-40 space-y-6">
@@ -117,12 +117,12 @@ export default function PulidoModule({ userEmail }: { userEmail: string }) {
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-8 pb-10">
-                            <div className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] px-2 flex items-center gap-4">
-                                <div className="h-1.5 w-16 bg-cyan-200 rounded-full" />
-                                Lista de Piezas: {filteredRegistros.length}
+                        <div className="space-y-2 pb-10">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-2 flex items-center gap-2">
+                                <div className="h-1 w-8 bg-cyan-200 rounded-full" />
+                                Lista: {filteredRegistros.length}
                             </div>
-                            <div className="grid grid-cols-1 gap-8">
+                            <div className="grid grid-cols-1 gap-2">
                                 {filteredRegistros.map((registro) => (
                                     <RegistroPulidoCard
                                         key={registro.id}

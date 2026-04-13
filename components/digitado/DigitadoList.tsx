@@ -43,18 +43,18 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
     return (
         <div className="h-full flex flex-col">
             {/* Header: Selected Order info */}
-            <div className="p-4 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="bg-blue-50 p-2 rounded-xl text-blue-600">
-                        <Hash size={24} />
+            <div className="p-2 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="bg-blue-50 p-1.5 rounded-lg text-blue-600">
+                        <Hash size={18} />
                     </div>
                     <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400">Orden de Fabricación (OF)</p>
-                        <h4 className="text-2xl font-black text-slate-800 tracking-tighter">{order.orden_fabricacion}</h4>
+                        <p className="text-[8px] font-black uppercase text-slate-400 leading-none">Orden Fabricación (OF)</p>
+                        <h4 className="text-lg font-black text-slate-800 tracking-tighter">{order.orden_fabricacion}</h4>
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Producto</p>
+                    <p className="text-[9px] font-black uppercase text-slate-400 leading-none">Producto</p>
                     <p className="text-sm font-bold text-slate-600 line-clamp-1 max-w-sm">{order.producto_descripcion}</p>
                 </div>
             </div>
@@ -63,22 +63,22 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
             <div className="flex bg-white border-b border-slate-200">
                 <button
                     onClick={() => setActiveTab('Pulido')}
-                    className={`flex-1 py-4 flex items-center justify-center gap-2 font-black uppercase text-sm transition-all ${activeTab === 'Pulido' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-black uppercase text-xs transition-all ${activeTab === 'Pulido' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                    <Package size={18} />
+                    <Package size={16} />
                     Pulido
                 </button>
                 <button
                     onClick={() => setActiveTab('Transito')}
-                    className={`flex-1 py-4 flex items-center justify-center gap-2 font-black uppercase text-sm transition-all ${activeTab === 'Transito' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-black uppercase text-xs transition-all ${activeTab === 'Transito' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                    <Truck size={18} />
+                    <Truck size={16} />
                     Transito
                 </button>
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {loading ? (
                     <div className="flex justify-center items-center h-40">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

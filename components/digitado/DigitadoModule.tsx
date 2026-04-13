@@ -106,8 +106,8 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     return (
         <div className="h-full flex flex-col bg-slate-50/30">
             {/* Summary Header */}
-            <div className="p-4 bg-white border-b border-slate-200 overflow-x-auto">
-                <div className="flex flex-wrap gap-2 min-w-max">
+            <div className="p-2 bg-white border-b border-slate-200 overflow-x-auto">
+                <div className="flex flex-wrap gap-1 min-w-max">
                     <SummaryCard label="Cantidad" value={totalCantidad} color="blue" />
                     <SummaryCard label="Programado" value={totalProgramado} color="blue" />
                     <SummaryCard label="Pintura" value={totalPintura} color="blue" />
@@ -123,7 +123,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
             </div>
 
             {/* Filter Bar */}
-            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
+            <div className="p-2 bg-white border-b border-slate-200 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-4 items-center">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -134,21 +134,21 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                             placeholder="Sku / Of / Pedido / Molde"
                             value={searchText}
                             onChange={(e) => setSearchText(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
+                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs text-slate-800"
                         />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 items-stretch">
                         <button
-                            className="p-3 bg-blue-600 text-white rounded-xl shadow-md active:scale-95"
+                            className="px-3 bg-blue-600 text-white rounded-lg shadow-md active:scale-95"
                             onClick={() => {/* Date picker logic */ }}
                         >
-                            <Calendar size={20} />
+                            <Calendar size={16} />
                         </button>
                         <button
                             onClick={clearFilters}
-                            className="bg-orange-500 hover:bg-orange-600 text-white p-3 rounded-xl transition-all shadow-md active:scale-95"
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-3 rounded-lg transition-all shadow-md active:scale-95"
                         >
-                            <Eraser size={20} />
+                            <Eraser size={16} />
                         </button>
                     </div>
                 </div>
@@ -160,7 +160,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
             {/* Content Area */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Panel: Orders List */}
-                <div className="w-1/3 border-r border-slate-200 overflow-y-auto p-4 space-y-3 bg-white">
+                <div className="w-64 border-r border-slate-200 overflow-y-auto p-2 space-y-2 bg-white">
                     {loading ? (
                         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" /></div>
                     ) : filteredOrdenes.length === 0 ? (
@@ -208,16 +208,16 @@ function SummaryCard({ label, value, color, isPrimary = false }: { label: string
     }
 
     if (isPrimary && color === 'blue') return (
-        <div className="flex flex-col items-center justify-center min-w-[70px] h-[70px] bg-blue-600 text-white rounded-xl shadow-lg border border-blue-700">
-            <span className="text-[10px] font-bold uppercase opacity-90 text-center px-1">{label}</span>
-            <span className="text-xl font-black">{value}</span>
+        <div className="flex flex-col items-center justify-center min-w-[75px] h-[60px] bg-blue-600 text-white rounded-lg shadow-sm border border-blue-700">
+            <span className="text-[9px] font-bold uppercase opacity-90 text-center px-1 leading-tight mb-0.5">{label}</span>
+            <span className="text-base font-black tracking-tight">{value}</span>
         </div>
     )
 
     return (
-        <div className={`flex flex-col items-center justify-center min-w-[70px] h-[70px] rounded-xl border-2 shadow-sm ${colorClasses[color] || colorClasses.blue}`}>
-            <span className="text-[10px] font-bold uppercase opacity-80 text-center px-1">{label}</span>
-            <span className="text-xl font-black">{value}</span>
+        <div className={`flex flex-col items-center justify-center min-w-[75px] h-[60px] rounded-lg border shadow-sm ${colorClasses[color] || colorClasses.blue}`}>
+            <span className="text-[9px] font-bold uppercase opacity-80 text-center px-1 leading-tight mb-0.5">{label}</span>
+            <span className="text-base font-black tracking-tight">{value}</span>
         </div>
     )
 }
@@ -226,7 +226,7 @@ function OrderCard({ order, isSelected, onClick }: { order: OrdenFabricacion, is
     return (
         <div
             onClick={onClick}
-            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-100 bg-white hover:border-blue-200 shadow-sm'}`}
+            className={`p-2 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100' : 'border-slate-100 bg-white hover:border-blue-200 shadow-sm'}`}
         >
             <div className="flex justify-between items-start mb-2">
                 <span className="text-[10px] font-black uppercase text-slate-400">OF: {order.orden_fabricacion}</span>
@@ -243,11 +243,11 @@ function OrderCard({ order, isSelected, onClick }: { order: OrdenFabricacion, is
                     <Package size={12} /> {order.cantidad} un
                 </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-50 flex flex-wrap gap-2">
-                <div className="bg-amber-500 text-white px-2 py-1 rounded text-[9px] font-bold">DES: {order.desgelcada || 0}</div>
-                <div className="bg-blue-600 text-white px-2 py-1 rounded text-[9px] font-bold">PUL: {order.pulido || 0}</div>
-                <div className="bg-orange-500 text-white px-2 py-1 rounded text-[9px] font-bold">DIG: {order.digitado || 0}</div>
-                <div className="bg-orange-600 text-white px-2 py-1 rounded text-[9px] font-bold">TRA: {order.transito || 0}</div>
+            <div className="mt-1 flex flex-wrap gap-1">
+                <div className="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">D:{order.desgelcada || 0}</div>
+                <div className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">P:{order.pulido || 0}</div>
+                <div className="bg-orange-500 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">D:{order.digitado || 0}</div>
+                <div className="bg-orange-600 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">T:{order.transito || 0}</div>
             </div>
         </div>
     )

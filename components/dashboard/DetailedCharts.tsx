@@ -61,30 +61,30 @@ export function DetailedCharts({ pinturaColor, vaciadoTamano, progColor, progTam
     ]
 
     return (
-        <div className="flex flex-col gap-8">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Column 1: Color Breakdown Table */}
                 <div className="flex flex-col">
                     <TableHeader title="Piezas pintadas hoy por colores" icon={Palette} />
                     <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-[#00a3e0] text-white uppercase text-[10px] font-black tracking-widest">
+                            <thead className="bg-[#00a3e0] text-white uppercase text-[8px] font-black tracking-widest">
                                 <tr>
-                                    <th className="px-4 py-3">Color</th>
-                                    <th className="px-4 py-3 text-center">Total</th>
-                                    <th className="px-4 py-3 text-center">Linea 1</th>
-                                    <th className="px-4 py-3 text-center">Linea 2</th>
-                                    <th className="px-4 py-3 text-center">Linea 3</th>
+                                    <th className="px-2 py-1">Color</th>
+                                    <th className="px-2 py-1 text-center">Tot</th>
+                                    <th className="px-2 py-1 text-center">L1</th>
+                                    <th className="px-2 py-1 text-center">L2</th>
+                                    <th className="px-2 py-1 text-center">L3</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-gray-100 italic">
                                 {colorsList.map((c, i) => (
                                     <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-4 py-2 font-bold text-gray-900 border-r border-gray-100">{c.display}</td>
-                                        <td className="px-4 py-2 text-center text-gray-700 font-medium">{pinturaColor?.[c.total] || 0}</td>
-                                        <td className="px-4 py-2 text-center text-gray-500">{pinturaColor?.[c.l1] || 0}</td>
-                                        <td className="px-4 py-2 text-center text-gray-500">{pinturaColor?.[c.l2] || 0}</td>
-                                        <td className="px-4 py-2 text-center text-gray-500">{pinturaColor?.[c.l3] || 0}</td>
+                                        <td className="px-2 py-0.5 font-bold text-gray-800 border-r border-gray-100 text-[10px] leading-tight">{c.display}</td>
+                                        <td className="px-2 py-0.5 text-center text-gray-700 font-bold text-[11px]">{pinturaColor?.[c.total] || 0}</td>
+                                        <td className="px-2 py-0.5 text-center text-gray-500 text-[9px]">{pinturaColor?.[c.l1] || 0}</td>
+                                        <td className="px-2 py-0.5 text-center text-gray-500 text-[9px]">{pinturaColor?.[c.l2] || 0}</td>
+                                        <td className="px-2 py-0.5 text-center text-gray-500 text-[9px]">{pinturaColor?.[c.l3] || 0}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -92,27 +92,27 @@ export function DetailedCharts({ pinturaColor, vaciadoTamano, progColor, progTam
                     </div>
 
                     {/* Size Breakdown Table directly below */}
-                    <div className="mt-8">
+                    <div className="mt-4">
                         <TableHeader title="Piezas vaciados hoy por tamaño" icon={Maximize} />
                         <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-[#00a3e0] text-white uppercase text-[10px] font-black tracking-widest">
+                                <thead className="bg-[#00a3e0] text-white uppercase text-[8px] font-black tracking-widest">
                                     <tr>
-                                        <th className="px-4 py-3">Tamaño</th>
-                                        <th className="px-4 py-3 text-center">Total</th>
-                                        <th className="px-4 py-3 text-center">Linea 1</th>
-                                        <th className="px-4 py-3 text-center">Linea 2</th>
-                                        <th className="px-4 py-3 text-center">Linea 3</th>
+                                        <th className="px-2 py-1">Tamaño</th>
+                                        <th className="px-2 py-1 text-center">Tot</th>
+                                        <th className="px-2 py-1 text-center">L1</th>
+                                        <th className="px-2 py-1 text-center">L2</th>
+                                        <th className="px-2 py-1 text-center">L3</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {sizesList.map((s, i) => (
                                         <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-4 py-2 font-bold text-gray-900 border-r border-gray-100">{s.display}</td>
-                                            <td className="px-4 py-2 text-center text-gray-700 font-medium">{vaciadoTamano?.[s.total] || 0}</td>
-                                            <td className="px-4 py-2 text-center text-gray-500">{vaciadoTamano?.[s.l1] || 0}</td>
-                                            <td className="px-4 py-2 text-center text-gray-500">{vaciadoTamano?.[s.l2] || 0}</td>
-                                            <td className="px-4 py-2 text-center text-gray-500">{vaciadoTamano?.[s.l3] || 0}</td>
+                                            <td className="px-2 py-0.5 font-bold text-gray-800 border-r border-gray-100 text-[10px] leading-tight">{s.display}</td>
+                                            <td className="px-2 py-0.5 text-center text-gray-700 font-bold text-[11px]">{vaciadoTamano?.[s.total] || 0}</td>
+                                            <td className="px-2 py-0.5 text-center text-gray-500 text-[9px]">{vaciadoTamano?.[s.l1] || 0}</td>
+                                            <td className="px-2 py-0.5 text-center text-gray-500 text-[9px]">{vaciadoTamano?.[s.l2] || 0}</td>
+                                            <td className="px-2 py-0.5 text-center text-gray-500 text-[9px]">{vaciadoTamano?.[s.l3] || 0}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -122,11 +122,11 @@ export function DetailedCharts({ pinturaColor, vaciadoTamano, progColor, progTam
                 </div>
 
                 {/* Column 2: Programmed Charts/Tables */}
-                <div className="flex flex-col gap-8">
+                <div className="flex flex-col gap-4">
                     {/* Programmed Size PIE */}
                     <div>
                         <TableHeader title="Piezas programadas por tamaño" icon={Target} />
-                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 h-[300px]">
+                        <div className="bg-white rounded-xl p-2 shadow-sm border border-gray-200 h-[220px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
@@ -134,17 +134,17 @@ export function DetailedCharts({ pinturaColor, vaciadoTamano, progColor, progTam
                                         cx="50%"
                                         cy="50%"
                                         innerRadius={0}
-                                        outerRadius={80}
+                                        outerRadius={65}
                                         paddingAngle={0}
                                         dataKey="value"
-                                        label={({ value }) => `${value}`}
+                                        label={({ name, value }) => `${name}: ${value}`}
                                     >
                                         {progTamano.map((_, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }} />
-                                    <Legend align="left" verticalAlign="top" layout="vertical" />
+                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)', fontSize: '10px' }} />
+                                    <Legend align="left" verticalAlign="top" layout="vertical" iconSize={10} wrapperStyle={{ fontSize: '10px' }} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>

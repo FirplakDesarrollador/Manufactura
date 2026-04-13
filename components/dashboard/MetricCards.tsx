@@ -11,9 +11,9 @@ interface MetricCardsProps {
 export function MetricCards({ data, loading }: MetricCardsProps) {
     if (loading) {
         return (
-            <div className="grid grid-cols-3 gap-3 w-fit">
+            <div className="grid grid-cols-4 gap-1.5 w-fit">
                 {[...Array(17)].map((_, i) => (
-                    <div key={i} className="animate-pulse w-28 h-28 bg-gray-100 rounded-xl" />
+                    <div key={i} className="animate-pulse w-20 h-20 bg-gray-100 rounded-lg" />
                 ))}
             </div>
         )
@@ -52,26 +52,26 @@ export function MetricCards({ data, loading }: MetricCardsProps) {
     ]
 
     return (
-        <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-3 gap-3">
+        <div className="flex flex-col gap-1.5 w-fit">
+            <div className="grid grid-cols-4 gap-1.5">
                 {squares.map((s, i) => (
                     <div
                         key={i}
-                        className={`${s.bg} ${s.text} w-28 h-28 rounded-xl flex flex-col items-center justify-center shadow-lg border ${s.bg === 'bg-white' ? 'border-gray-200' : 'border-transparent'} hover:border-gray-400 transition-all`}
+                        className={`${s.bg} ${s.text} w-20 h-20 rounded-lg flex flex-col items-center justify-center shadow-sm border ${s.bg === 'bg-white' ? 'border-gray-200' : 'border-transparent'} hover:border-blue-400 transition-all p-1`}
                     >
-                        <span className="text-[10px] font-bold uppercase tracking-wider mb-2 opacity-80">{s.title}</span>
-                        <span className="text-2xl font-black">{Math.round(Number(s.value)).toLocaleString()}</span>
+                        <span className="text-[8px] font-black uppercase tracking-tighter mb-0.5 opacity-80 text-center leading-none px-1 h-4 flex items-center">{s.title}</span>
+                        <span className="text-lg font-black tracking-tighter leading-none">{Math.round(Number(s.value)).toLocaleString()}</span>
                     </div>
                 ))}
             </div>
-            <div className="flex justify-center gap-3 pr-10">
+            <div className="grid grid-cols-4 gap-1.5">
                 {bottomSquares.map((s, i) => (
                     <div
                         key={i}
-                        className={`${s.bg} ${s.text} w-28 h-28 rounded-xl flex flex-col items-center justify-center shadow-lg border ${s.bg === 'bg-white' ? 'border-gray-200' : 'border-transparent'} hover:border-gray-400 transition-all`}
+                        className={`${s.bg} ${s.text} w-20 h-20 rounded-lg flex flex-col items-center justify-center shadow-sm border ${s.bg === 'bg-white' ? 'border-gray-200' : 'border-transparent'} hover:border-blue-400 transition-all p-1`}
                     >
-                        <span className="text-[10px] font-bold uppercase tracking-wider mb-2 opacity-80">{s.title}</span>
-                        <span className="text-2xl font-black">{Math.round(Number(s.value)).toLocaleString()}</span>
+                        <span className="text-[8px] font-black uppercase tracking-tighter mb-0.5 opacity-80 text-center leading-none px-1 h-4 flex items-center">{s.title}</span>
+                        <span className="text-lg font-black tracking-tighter leading-none">{Math.round(Number(s.value)).toLocaleString()}</span>
                     </div>
                 ))}
             </div>
