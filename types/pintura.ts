@@ -77,6 +77,7 @@ export interface RegistroTrazabilidad {
     kilos_vaciados?: number
     producto_tamano?: string
     molde_masa_teorica?: number
+    fecha_ideal_produccion?: string
 }
 
 export interface KilosReferencia {

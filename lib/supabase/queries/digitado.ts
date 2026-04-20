@@ -39,6 +39,26 @@ export async function registrarDigitado(registroId: number, usuarioEmail: string
     return data
 }
 
+export async function registrarDigitadoMasivo(registroIds: number[], usuarioEmail: string) {
+    const userId = await requireUserId(usuarioEmail)
+
+    const { data, error } = await supabase
+        .from('trazabilidad_ms')
+        .update({
+            estado: 'Transito',
+            digitado_fecha: new Date().toISOString(),
+            digitado_user_id: userId
+        })
+        .in('id', registroIds)
+        .select()
+
+    if (error) {
+        throw new Error(`Error al registrar digitado masivo: [${error.code}] ${error.message}`)
+    }
+
+    return data
+}
+
 export async function reversarDigitado(registroId: number) {
     // Reversar = Volver a Empaque
     const { data, error } = await supabase

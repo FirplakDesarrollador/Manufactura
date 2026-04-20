@@ -41,6 +41,11 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                         <span className="bg-blue-200 text-blue-800 text-[10px] px-1 rounded font-bold ml-auto shrink-0">ENSAYO</span>
                     </div>
                     <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido}</div>
+                    {orden.fecha_ideal_produccion && (
+                        <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-1 inline-block">
+                            📅 Ideal: {new Date(orden.fecha_ideal_produccion).toLocaleDateString('es-ES')}
+                        </div>
+                    )}
                     <div className="text-[11px] text-gray-500 mt-1 line-clamp-2 leading-tight h-8">{orden.producto_descripcion}</div>
                     <div className="text-[9px] text-gray-400 italic mt-1 truncate">SKU: {sku || 'No definido'}</div>
                 </div>

@@ -15,12 +15,9 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
-        if (!confirm('¿Desea registrar el contramolde para esta pieza?')) return
-
         setLoading(true)
         try {
             await registrarContramolde(registro.id, usuarioEmail)
-            alert('¡Contramolde registrado exitosamente!')
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -87,6 +84,19 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
                                 </p>
                             </div>
                         </div>
+                        {registro.fecha_ideal_produccion && (
+                            <div className="flex items-center gap-3">
+                                <div className="bg-orange-50 p-2 rounded-lg text-orange-600">
+                                    <Clock size={18} />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] text-orange-400 uppercase font-black tracking-tighter text-[10px]">Fecha Ideal</p>
+                                    <p className="text-sm font-bold text-gray-900">
+                                        {new Date(registro.fecha_ideal_produccion).toLocaleDateString('es-ES')}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 

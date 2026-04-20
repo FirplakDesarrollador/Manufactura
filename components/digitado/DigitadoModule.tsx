@@ -6,6 +6,7 @@ import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy } from '@/lib/supaba
 import { getRegistrosParaDigitado } from '@/lib/supabase/queries/digitado'
 import { Search, Eraser, Loader2, Keyboard, Calendar, Hash, Package, Zap, Info, ClipboardList, TrendingUp, Boxes, Truck, Warehouse, Weight, Calculator } from 'lucide-react'
 import DigitadoList from './DigitadoList'
+import { toast } from 'sonner'
 
 export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
@@ -175,6 +176,10 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                                 isSelected={o.id === selectedOrderId}
                                 onClick={() => {
                                     setSelectedOrderId(o.id)
+                                    if (o.orden_fabricacion) {
+                                        navigator.clipboard.writeText(o.orden_fabricacion)
+                                        toast.success(`Orden ${o.orden_fabricacion} copiada`)
+                                    }
                                 }}
                             />
                         ))

@@ -15,12 +15,9 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh 
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
-        if (!confirm('¿Desea registrar el vaciado para esta pieza?')) return
-
         setLoading(true)
         try {
             await registrarVaciado(registro.id, usuarioEmail)
-            alert('¡Vaciado registrado exitosamente!')
             onRefresh()
         } catch (error) {
             console.error('Error:', error)

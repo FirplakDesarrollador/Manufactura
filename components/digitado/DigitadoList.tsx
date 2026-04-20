@@ -5,6 +5,8 @@ import { RegistroTrazabilidad, OrdenFabricacion } from '@/types/pintura'
 import RegistroDigitadoCard from './RegistroDigitadoCard'
 import { Truck, Info, Hash, Package } from 'lucide-react'
 import { getRegistrosTrazabilidadPorOrden } from '@/lib/supabase/queries/pintura'
+import { registrarDigitadoMasivo } from '@/lib/supabase/queries/digitado'
+import { toast } from 'sonner'
 
 interface DigitadoListProps {
     order: OrdenFabricacion
@@ -16,6 +18,8 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
     const [activeTab, setActiveTab] = useState<'Pulido' | 'Transito'>('Pulido')
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(false)
+    const [cantidadLote, setCantidadLote] = useState(1)
+    const [bulkLoading, setBulkLoading] = useState(false)
 
     const loadRegistros = React.useCallback(async () => {
         setLoading(true);
@@ -40,6 +44,29 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
         return r.estado === 'Transito' || r.estado === 'Digitado'
     })
 
+    const handleRegistroMasivo = async () => {
+        const piezasDisponibles = filteredRegistros.filter(r => ['Desgelcada', 'Pulido', 'Acabado', 'Empaque'].includes(r.estado || ''))
+        if (piezasDisponibles.length === 0) return
+
+        const selectCount = Math.min(cantidadLote, piezasDisponibles.length)
+        const idsToUpdate = piezasDisponibles.slice(0, selectCount).map(r => r.id)
+
+        if (!confirm(`¿Desea mover ${selectCount} piezas a Tránsito de forma masiva?`)) return
+
+        setBulkLoading(true)
+        try {
+            await registrarDigitadoMasivo(idsToUpdate, userEmail)
+            toast.success(`${selectCount} piezas movidas a Tránsito`)
+            await loadRegistros()
+            onRefresh()
+        } catch (error) {
+            console.error('Error masivo:', error)
+            toast.error('Error al procesar el lote')
+        } finally {
+            setBulkLoading(false)
+        }
+    }
+
     return (
         <div className="h-full flex flex-col">
             {/* Header: Selected Order info */}
@@ -59,22 +86,47 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex bg-white border-b border-slate-200">
-                <button
-                    onClick={() => setActiveTab('Pulido')}
-                    className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-black uppercase text-xs transition-all ${activeTab === 'Pulido' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                    <Package size={16} />
-                    Pulido
-                </button>
-                <button
-                    onClick={() => setActiveTab('Transito')}
-                    className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-black uppercase text-xs transition-all ${activeTab === 'Transito' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                    <Truck size={16} />
-                    Transito
-                </button>
+            {/* Tabs & Bulk Action */}
+            <div className="bg-white border-b border-slate-200">
+                <div className="flex">
+                    <button
+                        onClick={() => setActiveTab('Pulido')}
+                        className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-black uppercase text-xs transition-all ${activeTab === 'Pulido' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        <Package size={16} />
+                        Pulido ({registros.filter(r => ['Desgelcada', 'Pulido', 'Acabado', 'Empaque'].includes(r.estado || '')).length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('Transito')}
+                        className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-black uppercase text-xs transition-all ${activeTab === 'Transito' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        <Truck size={16} />
+                        Transito ({registros.filter(r => r.estado === 'Transito' || r.estado === 'Digitado').length})
+                    </button>
+                </div>
+
+                {activeTab === 'Pulido' && filteredRegistros.length > 0 && (
+                    <div className="p-2 bg-slate-50 flex items-center justify-between gap-3 border-t border-slate-100">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-400 uppercase">Cantidad Lote:</span>
+                            <input
+                                type="number"
+                                min="1"
+                                max={filteredRegistros.length}
+                                value={cantidadLote}
+                                onChange={(e) => setCantidadLote(Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-16 px-2 py-1 bg-white border border-slate-200 rounded font-black text-blue-600 text-sm"
+                            />
+                        </div>
+                        <button
+                            onClick={handleRegistroMasivo}
+                            disabled={bulkLoading}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm disabled:opacity-50"
+                        >
+                            {bulkLoading ? 'Procesando...' : `Mover ${Math.min(cantidadLote, filteredRegistros.length)} a Tránsito`}
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* List */}
