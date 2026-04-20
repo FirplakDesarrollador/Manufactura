@@ -43,9 +43,17 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     const loadData = async () => {
         setLoading(true)
         try {
+            // Optimized: Fetch active orders and last 1000 traceability records
+            // This prevents loading the entire historical database which was causing lag
             const [ofRes, trazRes] = await Promise.all([
-                supabase.from('query_ordenes_fabricacion').select('*'),
-                supabase.from('query_trazabilidad_ms').select('*')
+                supabase.from('query_ordenes_fabricacion')
+                    .select('*')
+                    .or('programado.gt.0,pintura.gt.0,vaciado.gt.0,digitado.gt.0,transito.gt.0,saldo.gt.0')
+                    .order('fecha_entrega_estimada', { ascending: true }),
+                supabase.from('query_trazabilidad_ms')
+                    .select('*')
+                    .order('pintura_fecha', { ascending: false })
+                    .limit(2000)
             ])
             setOrdenes(ofRes.data || [])
             setRegistros(trazRes.data || [])
@@ -194,6 +202,17 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                     >
                         <Eraser size={20} />
                     </button>
+                </div>
+                {/* Real-time Counter (Requested) */}
+                <div className="max-w-7xl mx-auto mt-3 flex items-center gap-2">
+                    <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
+                        Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
+                    </span>
+                    {(searchText || selectedDate) && (
+                        <span className="text-[10px] font-bold text-slate-400 italic">
+                            (Filtrado aplicado)
+                        </span>
+                    )}
                 </div>
             </div>
 

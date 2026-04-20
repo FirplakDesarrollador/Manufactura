@@ -16,8 +16,10 @@ import {
     Loader2, 
     ArrowUpFromLine,
     BarChart3,
-    Package
+    Package,
+    Download
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 
 interface AdministracionModuleProps {
@@ -33,7 +35,8 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
     const [loading, setLoading] = useState(true)
     const [isSyncing, setIsSyncing] = useState(false)
     const [searchText, setSearchText] = useState('')
-    const [selectedDate, setSelectedDate] = useState<string>('')
+    const [startDate, setStartDate] = useState<string>('')
+    const [endDate, setEndDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
     const [selectedOrder, setSelectedOrder] = useState<OrdenMueble | null>(null)
 
@@ -61,12 +64,14 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
     const handleClearFilters = () => {
         setSearchText('')
-        setSelectedDate('')
+        setStartDate('')
+        setEndDate('')
     }
 
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
         return ordenes.filter((orden) => {
+            // Search filter
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
@@ -74,15 +79,30 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                 (orden.producto_sku || '').toLowerCase().includes(search) ||
                 (orden.cliente || '').toLowerCase().includes(search)
 
-            const ordenDate = dateType === 'entrega' 
+            // Date filter (Single or Range)
+            const ordenDateStr = dateType === 'entrega' 
                 ? orden.fecha_entrega_estimada 
                 : orden.created_at
             
-            const matchesDate = !selectedDate || (ordenDate && ordenDate.includes(selectedDate))
+            const ordenDate = ordenDateStr ? new Date(ordenDateStr).getTime() : 0
+            const start = startDate ? new Date(startDate).getTime() : 0
+            const end = endDate ? new Date(endDate).getTime() : 0
+
+            let matchesDate = true
+            if (start && end) {
+                matchesDate = ordenDate >= start && ordenDate <= end + 86400000 // include full end day
+            } else if (start) {
+                matchesDate = ordenDate >= start
+            } else if (end) {
+                matchesDate = ordenDate <= end + 86400000
+            }
+
+            // Operario filter (Removed per user request)
+            // const matchesOperario = selectedOperario === 'todos' || orden.operario_corte === selectedOperario
 
             return matchesSearch && matchesDate
         })
-    }, [ordenes, searchText, selectedDate, dateType])
+    }, [ordenes, searchText, startDate, endDate, dateType])
 
     const handleSyncSAP = async () => {
         if (!confirm('¿Está seguro(a) que desea cargar las órdenes desde SAP manualmente? This process may take a few minutes.')) {
@@ -103,6 +123,48 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
             toast.error('Error al sincronizar con SAP: ' + (error instanceof Error ? error.message : 'Error desconocido'))
         } finally {
             setIsSyncing(false)
+        }
+    }
+
+    const handleDownloadExcel = () => {
+        if (filteredOrdenes.length === 0) {
+            toast.error('No hay datos para exportar')
+            return
+        }
+
+        try {
+            const dataToExport = filteredOrdenes.map(o => ({
+                'OF': o.orden_fabricacion,
+                'Pedido': o.numero_pedido,
+                'Cliente': o.cliente,
+                'Producto': o.producto_descripcion,
+                'SKU': o.producto_sku,
+                'Cant. Muebles': o.cantidad,
+                'Cant. Piezas': o.piezas,
+                'F. Entrega': o.fecha_entrega_estimada ? new Date(o.fecha_entrega_estimada).toLocaleDateString() : 'N/A',
+                'F. Creación': o.created_at ? new Date(o.created_at).toLocaleDateString() : 'N/A',
+                'Corte (Tot)': o.sum_cortados,
+                'Enchape (Tot)': o.sum_enchapado,
+                'Inspección (Tot)': o.sum_inspeccion,
+                'Empaque (Tot)': o.sum_empacado,
+                'A Reponer': o.por_reponer
+            }))
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport)
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, 'Ordenes Muebles')
+            
+            // Auto size columns
+            const colWidths = Object.keys(dataToExport[0]).map(key => ({
+                wch: Math.max(key.length, ...dataToExport.map(row => String(row[key as keyof typeof row]).length)) + 2
+            }))
+            ws['!cols'] = colWidths
+
+            XLSX.writeFile(wb, `Reporte_Ordenes_Muebles_${new Date().toISOString().split('T')[0]}.xlsx`)
+            toast.success('Excel generado correctamente')
+        } catch (error) {
+            console.error('Error exporting to Excel:', error)
+            toast.error('Error al generar el archivo Excel')
         }
     }
 
@@ -138,24 +200,60 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                         <div className="flex flex-col gap-1">
                             <span className="text-[10px] font-bold text-blue-600 uppercase">Filtrar ordenes:</span>
                             <div className="flex items-center gap-1">
-                                <button 
-                                    onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
-                                    className={`p-2 rounded-lg text-white transition-all ${dateType === 'entrega' ? 'bg-indigo-600' : 'bg-purple-600'}`}
-                                >
-                                    <Calendar size={20} />
-                                </button>
-                                <div className="relative w-48">
-                                    <input
-                                        type="text"
-                                        placeholder="Sku / Of / Pedido / Cliente"
-                                        value={searchText}
-                                        onChange={(e) => setSearchText(e.target.value)}
-                                        className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Rango de Fechas:</span>
+                                    <div className="flex items-center gap-1">
+                                        <button 
+                                            onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
+                                            className={`p-2 rounded-lg text-white transition-all shadow-sm ${dateType === 'entrega' ? 'bg-indigo-600' : 'bg-purple-600'}`}
+                                            title={dateType === 'entrega' ? 'Filtrando por Fecha de Entrega' : 'Filtrando por Fecha de Creación'}
+                                        >
+                                            <Calendar size={18} />
+                                        </button>
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-gray-400 font-bold text-[10px]">A</span>
+                                        <input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                            className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
                                 </div>
+
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Buscar:</span>
+                                    <div className="relative w-48">
+                                        <input
+                                            type="text"
+                                            placeholder="Sku / Of / Pedido / Cliente"
+                                            value={searchText}
+                                            onChange={(e) => setSearchText(e.target.value)}
+                                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-0.5 ml-4">
+                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Exportar:</span>
+                                    <button
+                                        onClick={handleDownloadExcel}
+                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm font-bold text-xs"
+                                    >
+                                        <Download size={18} />
+                                        DESCARGAR EXCEL
+                                    </button>
+                                </div>
+
                                 <button
                                     onClick={handleClearFilters}
-                                    className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                                    className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-sm self-end mb-0.5"
+                                    title="Limpiar filtros"
                                 >
                                     <X size={20} />
                                 </button>

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
-import { getRegistrosTrazabilidad } from '@/lib/supabase/queries/pintura'
+import { getRegistrosTrazabilidad, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
 import { History, Ban, Clock, Package, Hash, Layers, Info } from 'lucide-react'
 
 export default function HistorySection() {
@@ -12,7 +12,7 @@ export default function HistorySection() {
     useEffect(() => {
         const fetchRegistros = async () => {
             setLoading(true)
-            const data = await getRegistrosTrazabilidad()
+            const data = await getRegistrosTrazabilidadHoy()
             setRegistros(data)
             setLoading(false)
         }

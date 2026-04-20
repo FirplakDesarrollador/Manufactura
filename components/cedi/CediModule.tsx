@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getRegistrosTrazabilidad } from '@/lib/supabase/queries/pintura'
+import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
 import { moverTransitoACedi } from '@/lib/supabase/queries/cedi'
 import { Search, Eraser, Loader2, Calendar, Hash, Package, Info, FileSpreadsheet, ArrowLeftRight } from 'lucide-react'
 import CediList from './CediList'
@@ -25,7 +25,7 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
         try {
             const [oData, rData] = await Promise.all([
                 getOrdenesFabricacion(),
-                getRegistrosTrazabilidad()
+                getRegistrosTrazabilidadHoy()
             ])
             setOrdenes(oData)
             setRegistros(rData)
@@ -165,6 +165,9 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                             </button>
                         </div>
                     </div>
+                </div>
+                <div className="mt-2 text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">
+                    Ordenes encontradas: {filteredOrdenes.length}
                 </div>
             </div>
 

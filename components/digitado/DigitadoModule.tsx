@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getRegistrosTrazabilidad } from '@/lib/supabase/queries/pintura'
+import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
+import { getRegistrosParaDigitado } from '@/lib/supabase/queries/digitado'
 import { Search, Eraser, Loader2, Keyboard, Calendar, Hash, Package, Zap, Info, ClipboardList, TrendingUp, Boxes, Truck, Warehouse, Weight, Calculator } from 'lucide-react'
 import DigitadoList from './DigitadoList'
 
@@ -23,7 +24,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
         try {
             const [oData, rData] = await Promise.all([
                 getOrdenesFabricacion(),
-                getRegistrosTrazabilidad()
+                getRegistrosParaDigitado() // Fetch ONLY pieces waiting for digitado (state Empaque)
             ])
             setOrdenes(oData)
             setRegistros(rData)
@@ -108,6 +109,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
             {/* Summary Header */}
             <div className="p-2 bg-white border-b border-slate-200 overflow-x-auto">
                 <div className="flex flex-wrap gap-1 min-w-max">
+                    <SummaryCard label="Ordenes" value={filteredOrdenes.length} color="blue" isPrimary />
                     <SummaryCard label="Cantidad" value={totalCantidad} color="blue" />
                     <SummaryCard label="Programado" value={totalProgramado} color="blue" />
                     <SummaryCard label="Pintura" value={totalPintura} color="blue" />
@@ -125,7 +127,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
             {/* Filter Bar */}
             <div className="p-2 bg-white border-b border-slate-200 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-4 items-center">
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 w-full">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                             <Search size={18} />
                         </div>

@@ -43,23 +43,19 @@ export default function DashboardModule() {
             const [
                 trazabilidad,
                 metricas,
-                pintura,
-                vaciado,
                 pColor,
                 pTamano
             ] = await Promise.all([
                 getTrazabilidadDia(),
                 getMetricasDiaActual(),
-                getPinturaColorHoy(),
-                getVaciadoTamanoHoy(),
                 getProgramacionColores(),
                 getProgramacionTamanos()
             ])
 
             setTrazabilidadData(trazabilidad)
             setMetricasDia(metricas)
-            setPinturaColor(pintura)
-            setVaciadoTamano(vaciado)
+            setPinturaColor(metricas as any) // Reuse metricas as it contains the same daily view data
+            setVaciadoTamano(metricas as any)
             setProgColor(pColor)
             setProgTamano(pTamano)
         } catch (error) {

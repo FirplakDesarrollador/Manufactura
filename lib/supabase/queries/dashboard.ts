@@ -138,94 +138,121 @@ export async function getTrazabilidadDia(): Promise<TrazabilidadDia[]> {
 }
 
 export async function getMetricasDiaActual(): Promise<MetricasDia | null> {
-    const { data, error } = await supabase
+    const now = new Date()
+    const offset = -5 // Colombia
+    const localDate = new Date(now.getTime() + (offset * 3600000))
+    const todayStr = localDate.toISOString().split('T')[0]
+
+    // 1. Fetch current summary from view (for estanteria/legacy fields)
+    const { data: qData } = await supabase
         .from('query_metricas_dia')
         .select('*')
         .order('fecha', { ascending: false })
         .limit(1)
         .single()
 
-    if (error) {
-        console.error('Error fetching metricas_dia:', error)
-        return null
-    }
-
-    // Fetch total_cantidad and total_programado from query_ordenes_fabricacion
-    const { data: oData, error: oError } = await supabase
+    // 2. Fetch ALL orders for summary totals
+    const { data: oData } = await supabase
         .from('query_ordenes_fabricacion')
-        .select('cantidad, programado')
-
-    if (oError) {
-        console.error('Error fetching order totals:', oError)
-    }
+        .select('cantidad, programado, saldo, digitado, transito, estanteria')
+        .limit(3000)
 
     const totalCantidad = oData?.reduce((sum, item) => sum + (item.cantidad || 0), 0) || 0
     const totalProgramado = oData?.reduce((sum, item) => sum + (item.programado || 0), 0) || 0
+    const totalSaldo = oData?.reduce((sum, item) => sum + (item.saldo || 0), 0) || 0
+    const totalDigitado = oData?.reduce((sum, item) => sum + (item.digitado || 0), 0) || 0
+    const totalTransito = oData?.reduce((sum, item) => sum + (item.transito || 0), 0) || 0
+    const totalEstanteria = oData?.reduce((sum, item) => sum + (item.estanteria || 0), 0) || 0
 
-    // Fetch kilograms today from query_vaciado_dia_ms
-    const { data: vData } = await supabase
-        .from('query_vaciado_dia_ms')
-        .select('kilos_vaciados')
-        .order('vaciado_fecha', { ascending: false })
-        .limit(1)
-        .single()
+    // 3. Fetch TODAY'S registries for real-time counts
+    const { data: rData } = await supabase
+        .from('query_trazabilidad_ms')
+        .select('*') 
+        .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr}`)
+        .limit(4000)
 
-    return {
-        ...data,
+    const todayR = rData || []
+    const isTodayStr = (d: string | null) => d && d.startsWith(todayStr)
+
+    // Stage filters
+    const pToday = todayR.filter(r => isTodayStr(r.pintura_fecha))
+    const vToday = todayR.filter(r => isTodayStr(r.vaciado_fecha))
+    const cToday = todayR.filter(r => isTodayStr(r.cedi_fecha) && r.estado === 'Cedi')
+    const aToday = pToday.filter(r => ['Pulido', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || ''))
+
+    // Helper for breakdowns
+    const sumBy = (arr: any[], key: string, val: string) => arr.filter(r => r[key] === val).length
+
+    const metrics: any = {
+        fecha: todayStr,
+        total_pintura: pToday.length,
+        pintura_l1: sumBy(pToday, 'pintura_linea', 'Linea 1'),
+        pintura_l2: sumBy(pToday, 'pintura_linea', 'Linea 2'),
+        pintura_l3: sumBy(pToday, 'pintura_linea', 'Linea 3'),
+        total_vaciado: vToday.length,
+        vaciado_l1: sumBy(vToday, 'vaciado_linea', 'Linea 1'),
+        vaciado_l2: sumBy(vToday, 'vaciado_linea', 'Linea 2'),
+        vaciado_l3: sumBy(vToday, 'vaciado_linea', 'Linea 3'),
+        grandes: sumBy(vToday, 'producto_tamano', 'Grande'),
+        medianas: sumBy(vToday, 'producto_tamano', 'Mediana'),
+        pequenas: sumBy(vToday, 'producto_tamano', 'Pequena'),
+        desgelcada: vToday.filter(r => r.estado === 'Desgelcado').length,
+        acabado: aToday.length,
+        cedi: cToday.length,
+        estanteria: totalEstanteria || qData?.estanteria || 0,
+        saldo: totalSaldo,
+        digitado: totalDigitado,
+        transito: totalTransito,
         total_cantidad: totalCantidad,
         total_programado: totalProgramado,
-        kilos_vaciados: parseFloat(vData?.kilos_vaciados?.toString() || '0')
-    }
-}
-
-export async function getOrdenesFabricacionDetalle(): Promise<OrdenFabricacionDetalle[]> {
-    const { data, error } = await supabase
-        .from('query_ordenes_fabricacion')
-        .select('*')
-        .order('id', { ascending: false })
-
-    if (error) {
-        console.error('Error fetching order details:', error)
-        return []
+        kilos_vaciados: vToday.reduce((acc, r: any) => {
+            const w = parseFloat(r.kilos_vaciados) || parseFloat(r.molde_masa_teorica) || 0
+            return acc + w
+        }, 0)
     }
 
-    return data as OrdenFabricacionDetalle[]
+    // Add colors breakdown (matching UPPERCASE in DB)
+    const colorFields: Record<string, string> = {
+        'BLANCO': 'blancas', 'NATURAL': 'natural', 'MARFIL': 'marfil',
+        'GRIS BRUMA': 'gris_bruma', 'GRIS': 'gris', 'GRIS SOMBRA': 'gris_sombra',
+        'GRIS NIEBLA': 'gris_niebla', 'GRANITO CHAMPANA': 'granito_champana',
+        'GRANITO GRIS': 'granito_gris', 'GRANITO NEGRO': 'granito_negro',
+        'GRANITO PERLA': 'granito_perla', 'GRANITO BLANCO': 'granito_blanco',
+        'GRANITO MARFIL': 'granito_marfil', 'NEGRO': 'negras'
+    }
+
+    Object.entries(colorFields).forEach(([dbVal, field]) => {
+        const filtered = pToday.filter(r => r.producto_color === dbVal)
+        metrics[field] = filtered.length
+        metrics[`${field}_l1`] = sumBy(filtered, 'pintura_linea', 'Linea 1')
+        metrics[`${field}_l2`] = sumBy(filtered, 'pintura_linea', 'Linea 2')
+        metrics[`${field}_l3`] = sumBy(filtered, 'pintura_linea', 'Linea 3')
+    })
+    
+    // Add size line breakdowns
+    const sizes = [
+        { db: 'Grande', key: 'grandes' },
+        { db: 'Mediana', key: 'medianas' },
+        { db: 'Pequena', key: 'pequenas' }
+    ]
+    sizes.forEach(s => {
+        const filtered = vToday.filter(r => r.producto_tamano === s.db)
+        metrics[`${s.key}_l1`] = sumBy(filtered, 'vaciado_linea', 'Linea 1')
+        metrics[`${s.key}_l2`] = sumBy(filtered, 'vaciado_linea', 'Linea 2')
+        metrics[`${s.key}_l3`] = sumBy(filtered, 'vaciado_linea', 'Linea 3')
+    })
+
+    return metrics as MetricasDia
 }
 
 export async function getPinturaColorHoy(): Promise<PinturaColor | null> {
-    // Actually, query_metricas_dia has many more fields than I thought.
-    // To get the full breakdown with lines, I should fetch it either from query_pintura_dia_ms 
-    // or from the direct view if it has it. 
-    // The user's screenshot has "Total, Linea 1, Linea 2, Linea 3"
-
-    const { data, error } = await supabase
-        .from('query_metricas_dia')
-        .select('*')
-        .order('fecha', { ascending: false })
-        .limit(1)
-        .single()
-
-    if (error) return null
-
-    // For the "Piezas pintadas hoy por colores" table
-    // I need color breakdown BY LINE.
-    // query_metricas_dia HAS: blancas, negras, natural... AND blanca_l1, blanca_l2...
-
-    return data
+    return getMetricasDiaActual() as any
 }
 
 export async function getVaciadoTamanoHoy(): Promise<VaciadoTamano | null> {
-    const { data, error } = await supabase
-        .from('query_metricas_dia')
-        .select('*')
-        .order('fecha', { ascending: false })
-        .limit(1)
-        .single()
-
-    if (error) return null
-
-    return data
+    return getMetricasDiaActual() as any
 }
+
 
 export async function getProgramacionColores(): Promise<ProgramacionColor[]> {
     const { data, error } = await supabase

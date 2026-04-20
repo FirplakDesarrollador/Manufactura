@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { OrdenMueble } from '@/types/muebles'
-import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2 } from 'lucide-react'
+import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2, User, ArrowRight, ChevronLeft } from 'lucide-react'
 import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
 import { toast } from 'sonner'
 
@@ -27,6 +27,8 @@ export default function TrazabilidadModal({
     taladro,
     onSuccess 
 }: TrazabilidadModalProps) {
+    const [step, setStep] = useState<'identificacion' | 'registro'>('identificacion')
+    const [identificacion, setIdentificacion] = useState('')
     const [cantidad, setCantidad] = useState(1)
     const [loading, setLoading] = useState(false)
     const [validationError, setValidationError] = useState<string | null>(null)
@@ -81,6 +83,8 @@ export default function TrazabilidadModal({
 
     useEffect(() => {
         if (isOpen) {
+            setStep('identificacion')
+            setIdentificacion('')
             setCantidad(1)
             setValidationError(null)
             validateQuantity(1)
@@ -113,7 +117,7 @@ export default function TrazabilidadModal({
     }
 
     const handleSubmit = async () => {
-        if (validationError || cantidad <= 0) return
+        if (validationError || cantidad <= 0 || !identificacion) return
 
         // Extra business logic from Flutter
         if (proceso === 'Inspeccion' && (orden.por_reponer || 0) > 0 && cantidad >= (orden.enchape || 0)) {
@@ -125,7 +129,7 @@ export default function TrazabilidadModal({
         try {
             await registrarTrazabilidadMueble({
                 orden_fabricacion: orden.orden_fabricacion,
-                creado_por: usuarioNombre,
+                creado_por: `${usuarioNombre} - ID: ${identificacion}`,
                 cantidad: cantidad,
                 proceso: proceso,
                 taladro: taladro
@@ -147,70 +151,130 @@ export default function TrazabilidadModal({
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
             
-            <div className="relative w-full max-w-[360px] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className={`relative w-full max-w-[360px] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 transition-all ${step === 'identificacion' ? 'min-h-[300px]' : ''}`}>
                 {/* Header */}
-                <div className="p-5 flex items-start justify-between">
-                    <div className="flex items-center gap-2 cursor-pointer group" onClick={handleCopy}>
-                        <span className="text-blue-500 font-bold text-lg">{orden.orden_fabricacion}</span>
-                        <Copy size={18} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                <div className="p-5 flex items-start justify-between border-b border-gray-50 bg-gray-50/30">
+                    <div className="flex flex-col">
+                        <div className="flex items-center gap-2 cursor-pointer group" onClick={handleCopy}>
+                            <span className="text-blue-500 font-bold text-lg leading-none">{orden.orden_fabricacion}</span>
+                            <Copy size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">{proceso}</span>
                     </div>
                     <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-                        <X size={28} className="text-gray-500" />
+                        <X size={24} className="text-gray-400 hover:text-gray-600" />
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="px-6 pb-6 space-y-6 flex flex-col items-center">
-                    <p className="text-center text-gray-600 font-medium text-sm leading-relaxed max-w-[300px]">
-                        {orden.producto_descripcion}
-                    </p>
-
-                    <div className="flex justify-center gap-8 w-full border-y border-gray-100 py-3">
-                        <div className="text-center">
-                            <span className="text-blue-500 text-xs font-bold uppercase block">Proceso</span>
-                            <span className="text-gray-800 font-medium">{proceso}</span>
-                        </div>
-                        <div className="text-center">
-                            <span className="text-blue-500 text-xs font-bold uppercase block">Disponible</span>
-                            <span className="text-gray-800 font-medium">{available}</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <button onClick={handleDecrement} className="text-red-500 hover:scale-110 transition-transform">
-                            <MinusSquare size={44} fill="currentColor" stroke="white" />
-                        </button>
-                        
-                        <input 
-                            type="number"
-                            value={cantidad}
-                            onChange={handleInputChange}
-                            className="w-24 h-12 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:border-blue-500 outline-none"
-                        />
-
-                        <button onClick={handleIncrement} className="text-emerald-500 hover:scale-110 transition-transform">
-                            <PlusSquare size={44} fill="currentColor" stroke="white" />
-                        </button>
-                    </div>
-
-                    <div className="w-full">
-                        {validationError ? (
-                            <div className="bg-orange-500 rounded-xl p-4 flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-300">
-                                <AlertTriangle size={32} className="text-white" />
-                                <p className="text-white text-center font-medium leading-tight">{validationError}</p>
+                {/* Body Content */}
+                <div className="p-6">
+                    {step === 'identificacion' ? (
+                        /* Step 1: Identification */
+                        <div className="space-y-6 flex flex-col items-center animate-in slide-in-from-right-4 duration-300">
+                            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner">
+                                <User size={32} />
                             </div>
-                        ) : (
+                            
+                            <div className="text-center space-y-1">
+                                <h3 className="text-lg font-bold text-gray-900">Validar Operario</h3>
+                                <p className="text-xs text-gray-500">Ingrese su número de identificación</p>
+                            </div>
+
+                            <div className="w-full relative">
+                                <input 
+                                    type="text"
+                                    autoFocus
+                                    inputMode="numeric"
+                                    value={identificacion}
+                                    onChange={(e) => setIdentificacion(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="Cédula o ID"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && identificacion.length >= 4) {
+                                            setStep('registro')
+                                        }
+                                    }}
+                                    className="w-full h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all placeholder:text-gray-200 placeholder:text-lg"
+                                />
+                            </div>
+
                             <button
-                                onClick={handleSubmit}
-                                disabled={loading || cantidad <= 0}
-                                className={`w-full h-12 rounded-xl flex items-center justify-center gap-3 font-bold text-white transition-all ${
-                                    loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+                                onClick={() => setStep('registro')}
+                                disabled={identificacion.length < 4}
+                                className={`w-full h-14 rounded-2xl flex items-center justify-center gap-2 font-bold text-white shadow-lg transition-all active:scale-[0.98] ${
+                                    identificacion.length < 4 
+                                        ? 'bg-gray-300 shadow-none cursor-not-allowed' 
+                                        : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 shadow-xl'
                                 }`}
                             >
-                                {loading ? <Loader2 className="animate-spin" size={24} /> : <><Send size={20} /><span>REGISTRAR</span></>}
+                                <span>CONTINUAR</span>
+                                <ArrowRight size={20} />
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    ) : (
+                        /* Step 2: Quantity & Submit */
+                        <div className="space-y-6 flex flex-col items-center animate-in slide-in-from-right-4 duration-300">
+                            <button 
+                                onClick={() => setStep('identificacion')}
+                                className="self-start flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-blue-500 transition-colors uppercase"
+                            >
+                                <ChevronLeft size={14} />
+                                Volver
+                            </button>
+
+                            <p className="text-center text-gray-600 font-medium text-sm leading-relaxed max-w-[280px]">
+                                {orden.producto_descripcion}
+                            </p>
+
+                            <div className="flex justify-center gap-8 w-full border-y border-gray-100 py-3">
+                                <div className="text-center">
+                                    <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Identificado</span>
+                                    <span className="text-gray-800 font-bold text-sm">{identificacion}</span>
+                                </div>
+                                <div className="text-center">
+                                    <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Disponible</span>
+                                    <span className="text-gray-800 font-bold text-sm">{available}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <button onClick={handleDecrement} className="text-red-500 hover:scale-110 active:scale-95 transition-all">
+                                    <MinusSquare size={48} fill="currentColor" stroke="white" />
+                                </button>
+                                
+                                <div className="relative">
+                                    <input 
+                                        type="number"
+                                        value={cantidad}
+                                        onChange={handleInputChange}
+                                        className="w-24 h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 outline-none transition-all shadow-sm"
+                                    />
+                                </div>
+
+                                <button onClick={handleIncrement} className="text-emerald-500 hover:scale-110 active:scale-95 transition-all">
+                                    <PlusSquare size={48} fill="currentColor" stroke="white" />
+                                </button>
+                            </div>
+
+                            <div className="w-full">
+                                {validationError ? (
+                                    <div className="bg-orange-500 rounded-2xl p-4 flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-300">
+                                        <AlertTriangle size={32} className="text-white" />
+                                        <p className="text-white text-center font-bold leading-tight text-sm uppercase">{validationError}</p>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={handleSubmit}
+                                        disabled={loading || cantidad <= 0}
+                                        className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-bold text-white shadow-xl transition-all active:scale-[0.98] ${
+                                            loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+                                        }`}
+                                    >
+                                        {loading ? <Loader2 className="animate-spin" size={24} /> : <><Send size={20} /><span>REGISTRAR</span></>}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

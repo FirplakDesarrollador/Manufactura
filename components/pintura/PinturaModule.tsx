@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes } from '@/lib/supabase/queries/pintura'
+import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
 import MetricCard from './MetricCard'
 import OrdenCard from './OrdenCard'
 import MoldSelector from './MoldSelector'
@@ -41,7 +41,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         try {
             const [ordenesData, trazaData, moldesData] = await Promise.all([
                 getOrdenesFabricacion(),
-                getRegistrosTrazabilidad(),
+                getRegistrosTrazabilidadHoy(), // Usar hoy para métricas rápidas
                 getAllMoldes()
             ])
             setOrdenes(ordenesData)

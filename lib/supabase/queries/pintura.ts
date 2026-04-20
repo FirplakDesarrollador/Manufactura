@@ -5,6 +5,7 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
     const { data, error } = await supabase
         .from('query_ordenes_fabricacion')
         .select('*')
+        .or('programado.gt.0,pintura.gt.0,vaciado.gt.0,digitado.gt.0,transito.gt.0,saldo.gt.0')
         .order('fecha_entrega_estimada', { ascending: true })
 
     if (error) {
@@ -20,9 +21,44 @@ export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]
         .from('query_trazabilidad_ms')
         .select('*')
         .order('pintura_fecha', { ascending: false })
+        .limit(200)
 
     if (error) {
         console.error('Error fetching registros trazabilidad:', error)
+        return []
+    }
+
+    return data || []
+}
+
+export async function getRegistrosTrazabilidadHoy(): Promise<RegistroTrazabilidad[]> {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const { data, error } = await supabase
+        .from('query_trazabilidad_ms')
+        .select('*')
+        .gte('pintura_fecha', today.toISOString())
+        .order('pintura_fecha', { ascending: false })
+
+    if (error) {
+        console.error('Error fetching registros trazabilidad hoy:', error)
+        return []
+    }
+
+    return data || []
+}
+
+export async function getRegistrosTrazabilidadActivos(): Promise<RegistroTrazabilidad[]> {
+    const { data, error } = await supabase
+        .from('query_trazabilidad_ms')
+        .select('*')
+        .not('estado', 'eq', 'Cedi')
+        .order('pintura_fecha', { ascending: false })
+        .limit(500)
+
+    if (error) {
+        console.error('Error fetching registros trazabilidad activos:', error)
         return []
     }
 

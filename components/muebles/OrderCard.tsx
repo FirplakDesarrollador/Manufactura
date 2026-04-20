@@ -90,7 +90,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
                             {orden.producto_descripcion}
                         </p>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs mt-1">
                         <span className="text-gray-500 italic">SKU: {orden.producto_sku}</span>
                         <span className="text-red-500 font-bold uppercase">{orden.planta}</span>
                     </div>
