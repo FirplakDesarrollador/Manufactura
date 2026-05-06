@@ -241,7 +241,7 @@ function OrderCard({ order, isSelected, onClick }: { order: OrdenFabricacion, is
                     {order.estado}
                 </span>
             </div>
-            <h4 className="text-sm font-black text-slate-800 line-clamp-1 mb-1">{order.producto_descripcion}</h4>
+            <h4 className="text-sm font-black text-slate-800 line-clamp-none mb-1">{order.producto_descripcion}</h4>
             <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div className="flex items-center gap-1 font-bold text-slate-500">
                     <Hash size={12} /> {order.pedido}

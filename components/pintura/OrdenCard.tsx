@@ -46,7 +46,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                             📅 Ideal: {new Date(orden.fecha_ideal_produccion).toLocaleDateString('es-ES')}
                         </div>
                     )}
-                    <div className="text-[11px] text-gray-500 mt-1 line-clamp-2 leading-tight h-8">{orden.producto_descripcion}</div>
+                    <div className="text-[11px] text-gray-500 mt-1 line-clamp-none leading-tight">{orden.producto_descripcion}</div>
                     <div className="text-[9px] text-gray-400 italic mt-1 truncate">SKU: {sku || 'No definido'}</div>
                 </div>
                 <div className="flex items-center gap-1 text-cyan-500 mt-2 md:mt-auto">

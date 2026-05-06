@@ -300,7 +300,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                             <div className="text-[10px] text-slate-400 font-bold">P: {item.pedido}</div>
                                         </td>
                                         <td className="p-4">
-                                            <div className="font-bold text-slate-700 max-w-[200px] truncate">{item.producto_descripcion}</div>
+                                            <div className="font-bold text-slate-700">{item.producto_descripcion}</div>
                                             <div className="text-[10px] text-slate-400 font-bold">{item.producto_sku}</div>
                                         </td>
                                         <td className="p-4 text-[11px] font-bold text-slate-400">{item.cliente || '-'}</td>
@@ -338,7 +338,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                             <div className="text-[10px] text-slate-400 font-bold">P: {item.numero_pedido}</div>
                                         </td>
                                         <td className="p-4">
-                                            <div className="font-bold text-slate-700 max-w-[200px] truncate">{item.producto_descripcion}</div>
+                                            <div className="font-bold text-slate-700">{item.producto_descripcion}</div>
                                             <div className="text-[10px] text-slate-400 font-bold">{item.producto_sku}</div>
                                         </td>
                                         <td className="p-4">
