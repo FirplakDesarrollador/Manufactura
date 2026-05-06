@@ -141,92 +141,37 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         })
     }, [ordenes, searchText, selectedDate])
 
-    // Calculate metrics based on Flutter logic
+    // Calculate metrics based on aggregated order data for consistency
     const metrics = useMemo(() => {
-        const todayStr = new Date().toLocaleDateString('es-ES') // matching d/M/y format loosely
-
-        // Sum for filtered orders
-        const total = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0)
-        const programado = filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
-
-        // Filter traceability based on current search
-        const trazaMatchesSearch = trazabilidad.filter(t => {
-            if (!searchText) return true;
-            const search = searchText.toLowerCase();
-            return (t.orden_fabricacion || '').toLowerCase().includes(search) ||
-                   (t.pedido || '').toLowerCase().includes(search) ||
-                   (t.producto_descripcion || '').toLowerCase().includes(search) ||
-                   (t.molde_descripcion || '').toLowerCase().includes(search) ||
-                   (t.producto_sku || '').toLowerCase().includes(search);
-        });
-
-        const isToday = (dateStr: string | undefined) => {
-            if (!dateStr) return false;
-            const d = new Date(dateStr).toLocaleDateString('es-ES');
-            return d === todayStr;
-        };
-
-        const pinturaToday = trazaMatchesSearch.filter(t => isToday(t.pintura_fecha));
+        // Sum values from filtered orders to ensure they match what's on screen
+        const totalCantidad = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0)
+        const totalProgramado = filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
+        const totalPintura = filteredOrdenes.reduce((sum, o) => sum + (o.pintura || 0), 0)
+        const totalVaciado = filteredOrdenes.reduce((sum, o) => sum + (o.vaciado || 0), 0)
+        const totalDigitado = filteredOrdenes.reduce((sum, o) => sum + (o.digitado || 0), 0)
+        const totalTransito = filteredOrdenes.reduce((sum, o) => sum + (o.transito || 0), 0)
+        const totalCedi = filteredOrdenes.reduce((sum, o) => sum + (o.cedi || 0), 0)
         
-        const desgelcado = 0;
-        const vaciado = pinturaToday.filter(t => t.estado !== 'Pintura').length;
-        
-        const today = new Date().toISOString().split('T')[0]
-        const search = (searchText || '').toLowerCase()
-
-        // Filter by today (checking different dates as in Flutter)
-        const recordsToday = trazabilidad.filter(t => {
-            const matchesSearch = !search || 
-                (t.orden_fabricacion || '').toLowerCase().includes(search) ||
-                (t.pedido || '').toLowerCase().includes(search) ||
-                (t.producto_descripcion || '').toLowerCase().includes(search) ||
-                (t.molde_descripcion || '').toLowerCase().includes(search) ||
-                (t.producto_sku || '').toLowerCase().includes(search)
-
-            if (!matchesSearch) return false
-
-            const pDate = (t.pintura_fecha || '').split('T')[0]
-            const cDate = (t.cedi_fecha || '').split('T')[0]
-            const dDate = (t.digitado_fecha || '').split('T')[0]
-            const tDate = (t.transito_fecha || '').split('T')[0]
-
-            return pDate === today || cDate === today || dDate === today || tDate === today
-        })
-
-        const totalKilos = recordsToday
-            .filter(t => {
-                const cDate = (t.cedi_fecha || '').split('T')[0]
-                const dDate = (t.digitado_fecha || '').split('T')[0]
-                const tDate = (t.transito_fecha || '').split('T')[0]
-                const isFinalStatus = ['Digitado', 'Transito', 'Cedi'].includes(t.estado || '')
-                const isTodayFinal = cDate === today || dDate === today || tDate === today
-                return isFinalStatus && isTodayFinal
-            })
-            .reduce((acc, t) => acc + (t.molde_masa_teorica || 0), 0)
-
-        // Count for Pintura and Desgelcada (specifically on pintura_fecha === today)
-        const pinturaCount = recordsToday.filter(t => (t.pintura_fecha || '').split('T')[0] === today).length
-        const desgelcadaCount = recordsToday.filter(t => 
-            (t.pintura_fecha || '').split('T')[0] === today && 
-            t.estado === 'Desgelcada'
-        ).length
+        // Calculate total kilograms based on vaciado progress and theoretical mass
+        const totalKilos = filteredOrdenes.reduce((acc, o) => {
+            // Use mass from order if available, otherwise 0
+            const masa = o.molde_masa_teorica || 0
+            return acc + (masa * (o.vaciado || 0))
+        }, 0)
 
         return {
-            cantidad: filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0),
-            programado: filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0),
-            pintura: pinturaCount,
+            cantidad: totalCantidad,
+            programado: totalProgramado,
+            pintura: totalPintura,
             desgelcado: 0,
-            vaciado: recordsToday.filter(t => 
-                (t.pintura_fecha || '').split('T')[0] === today && 
-                t.estado !== 'Pintura'
-            ).length,
+            vaciado: totalVaciado,
             acabado: 0,
-            digitado: recordsToday.filter(t => (t.digitado_fecha || '').split('T')[0] === today && t.estado === 'Digitado').length,
-            transito: recordsToday.filter(t => (t.transito_fecha || '').split('T')[0] === today && t.estado === 'Transito').length,
-            cedi: recordsToday.filter(t => (t.cedi_fecha || '').split('T')[0] === today && t.estado === 'Cedi').length,
+            digitado: totalDigitado,
+            transito: totalTransito,
+            cedi: totalCedi,
             kilogramos: parseFloat(totalKilos.toFixed(1))
         }
-    }, [filteredOrdenes, trazabilidad, searchText])
+    }, [filteredOrdenes])
 
     const handleClearFilters = () => {
         setSearchText('')
