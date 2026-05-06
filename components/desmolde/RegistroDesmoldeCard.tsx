@@ -15,12 +15,9 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
-        if (!confirm('¿Desea registrar el desmolde para esta pieza?')) return
-
         setLoading(true)
         try {
             await registrarDesmolde(registro.id, usuarioEmail)
-            alert('¡Desmolde registrado exitosamente!')
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
