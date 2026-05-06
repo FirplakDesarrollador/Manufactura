@@ -45,12 +45,14 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
         try {
             // Optimized: Fetch active orders and last 1000 traceability records
             // This prevents loading the entire historical database which was causing lag
+            const todayStr = new Date().toISOString().split('T')[0]
             const [ofRes, trazRes] = await Promise.all([
                 supabase.from('query_ordenes_fabricacion')
                     .select('*')
                     .order('fecha_entrega_estimada', { ascending: true }),
                 supabase.from('query_trazabilidad_ms')
                     .select('*')
+                    .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
                     .order('vaciado_fecha', { ascending: false })
                     .limit(10000)
             ])
@@ -119,8 +121,8 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             vaciado: vaciadoToday.length,
             acabado: acabadoToday.length,
             saldo: filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0),
-            digitado: filteredOrdenes.reduce((acc, o) => acc + (o.digitado || 0), 0),
-            transito: transitoTotal.length,
+            digitado: registros.filter(r => r.estado === 'Digitado').length,
+            transito: registros.filter(r => r.estado === 'Transito').length,
             cedi: cediToday.length,
             kilos: totalKilos
         }
