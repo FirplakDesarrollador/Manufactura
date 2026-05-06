@@ -37,7 +37,7 @@ export async function registrarDesmolde(registroId: number, usuarioEmail: string
     const { data, error } = await supabase
         .from('trazabilidad_ms')
         .update({
-            estado: 'Desgelcada',
+            estado: 'Pulido',
         })
         .eq('id', registroId)
         .select()

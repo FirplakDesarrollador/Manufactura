@@ -156,8 +156,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
 
         const pinturaToday = trazaMatchesSearch.filter(t => isToday(t.pintura_fecha));
         
-        const desgelcado = pinturaToday.filter(t => t.estado === 'Desgelcada').length;
-        const vaciado = pinturaToday.filter(t => t.estado !== 'Pintura' && t.estado !== 'Desgelcado').length;
+        const desgelcado = 0;
+        const vaciado = pinturaToday.filter(t => t.estado !== 'Pintura').length;
         
         const today = new Date().toISOString().split('T')[0]
         const search = (searchText || '').toLowerCase()
@@ -203,10 +203,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             cantidad: filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0),
             programado: filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0),
             pintura: pinturaCount,
-            desgelcado: desgelcadaCount,
+            desgelcado: 0,
             vaciado: recordsToday.filter(t => 
                 (t.pintura_fecha || '').split('T')[0] === today && 
-                !['Pintura', 'Desgelcada'].includes(t.estado || '')
+                t.estado !== 'Pintura'
             ).length,
             acabado: 0,
             digitado: recordsToday.filter(t => (t.digitado_fecha || '').split('T')[0] === today && t.estado === 'Digitado').length,
