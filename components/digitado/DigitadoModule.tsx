@@ -86,22 +86,22 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
         (r.pintura_fecha && new Date(r.pintura_fecha).toLocaleDateString('es-ES') === todayStr)
     ).length
 
-    const totalDigitado = filteredOrdenes.reduce((acc, o) => acc + (o.digitado || 0), 0)
-    const totalTransito = filteredOrdenes.reduce((acc, o) => acc + (o.transito || 0), 0)
-
-    const countCedi = registros.filter(r =>
-        r.estado === 'Cedi' &&
-        (r.cedi_fecha && new Date(r.cedi_fecha).toLocaleDateString('es-ES') === todayStr)
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Global Totals (Dashboard paridad)
+    const totalDigitado = registros.filter(r => r.estado === 'Digitado').length
+    const totalTransito = registros.filter(r => r.estado === 'Transito').length
+    const countCediHoy = registros.filter(r => 
+        r.estado === 'Cedi' && 
+        (r.cedi_fecha || '').split('T')[0] === today
     ).length
 
-    const totalKilogramos = registros.filter(r =>
-        ['Cedi', 'Transito', 'Digitado'].includes(r.estado || '') &&
-        (
-            (r.cedi_fecha && new Date(r.cedi_fecha).toLocaleDateString('es-ES') === todayStr) ||
-            (r.digitado_fecha && new Date(r.digitado_fecha).toLocaleDateString('es-ES') === todayStr) ||
-            (r.transito_fecha && new Date(r.transito_fecha).toLocaleDateString('es-ES') === todayStr)
-        )
-    ).reduce((acc, r) => acc + (r.kilos_vaciados || 0), 0)
+    // Kilogramos: Current Transito + Cedi Today (Matches reference app logic)
+    const transitoRecords = registros.filter(r => r.estado === 'Transito')
+    const cediTodayRecords = registros.filter(r => r.estado === 'Cedi' && (r.cedi_fecha || '').split('T')[0] === today)
+    
+    const totalKilogramos = [...transitoRecords, ...cediTodayRecords]
+        .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
 
     const selectedOrder = ordenes.find(o => o.id === selectedOrderId)
 
@@ -120,7 +120,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                     <SummaryCard label="Acabado" value={countAcabado} color="blue" />
                     <SummaryCard label="Digitado" value={totalDigitado} color="blue" isPrimary />
                     <SummaryCard label="Transito" value={totalTransito} color="orange" isPrimary />
-                    <SummaryCard label="Cedi" value={countCedi} color="green" isPrimary />
+                    <SummaryCard label="Cedi" value={countCediHoy} color="green" isPrimary />
                     <SummaryCard label="Kilogramos" value={totalKilogramos.toFixed(1)} color="slate" isPrimary />
                 </div>
             </div>

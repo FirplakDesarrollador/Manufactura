@@ -107,13 +107,22 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
 
     const todayStr = new Date().toLocaleDateString('es-ES')
 
-    // Totals
-    const totalDigitado = filteredOrdenes.reduce((acc, o) => acc + (o.digitado || 0), 0)
-    const totalTransito = filteredOrdenes.reduce((acc, o) => acc + (o.transito || 0), 0)
-    const countCediHoy = registros.filter(r =>
-        r.estado === 'Cedi' &&
-        r.cedi_fecha && new Date(r.cedi_fecha).toLocaleDateString('es-ES') === todayStr
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Global Totals (Not affected by filters, matching reference app)
+    const totalDigitado = registros.filter(r => r.estado === 'Digitado').length
+    const totalTransito = registros.filter(r => r.estado === 'Transito').length
+    const countCediHoy = registros.filter(r => 
+        r.estado === 'Cedi' && 
+        (r.cedi_fecha || '').split('T')[0] === today
     ).length
+
+    // Kilogramos: Current Transito + Cedi Today (Matches reference app logic)
+    const transitoRecords = registros.filter(r => r.estado === 'Transito')
+    const cediTodayRecords = registros.filter(r => r.estado === 'Cedi' && (r.cedi_fecha || '').split('T')[0] === today)
+    
+    const totalKilogramos = [...transitoRecords, ...cediTodayRecords]
+        .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
 
     const selectedOrder = ordenes.find(o => o.id === selectedOrderId)
 
@@ -143,6 +152,7 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                         <StatCard label="Digitado" value={totalDigitado} color="blue" />
                         <StatCard label="Transito" value={totalTransito} color="orange" />
                         <StatCard label="Cedi" value={countCediHoy} color="green" />
+                        <StatCard label="Kilogramos" value={totalKilogramos.toFixed(1) as any} color="slate" />
                     </div>
 
                     {/* Actions */}
@@ -190,7 +200,7 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                                     <span className="text-[10px] font-black text-slate-400">OF: {o.orden_fabricacion}</span>
                                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[9px] font-black uppercase">Pendiente</span>
                                 </div>
-                                <h4 className="text-sm font-black text-slate-800 line-clamp-1">{o.producto_descripcion}</h4>
+                                <h4 className="text-sm font-black text-slate-800 line-clamp-none">{o.producto_descripcion}</h4>
                                 <div className="mt-2 flex gap-3 text-[10px] font-bold text-slate-500">
                                     <span className="flex items-center gap-1"><Hash size={12} />{o.pedido}</span>
                                     <span className="flex items-center gap-1"><Package size={12} />{o.cantidad} unt</span>
@@ -224,7 +234,8 @@ function StatCard({ label, value, color }: { label: string, value: number, color
     const bgColors: Record<string, string> = {
         blue: 'bg-blue-600',
         orange: 'bg-orange-500',
-        green: 'bg-green-600'
+        green: 'bg-green-600',
+        slate: 'bg-slate-600'
     }
     return (
         <div className={`${bgColors[color]} text-white px-4 py-2 rounded-xl min-w-[80px] flex flex-col items-center shadow-lg border border-black/5`}>

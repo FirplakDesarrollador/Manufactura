@@ -39,8 +39,9 @@ export async function getRegistrosTrazabilidadHoy(): Promise<RegistroTrazabilida
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')
-        .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr}`)
+        .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
         .order('vaciado_fecha', { ascending: false })
+        .limit(10000)
 
     if (error) {
         console.error('Error fetching registros trazabilidad hoy:', error)
