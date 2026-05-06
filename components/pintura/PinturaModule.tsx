@@ -29,6 +29,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     const [moldesDisponibles, setMoldesDisponibles] = useState<Molde[]>([])
     const [debugInfo, setDebugInfo] = useState<string>('')
     const [selectedMolde, setSelectedMolde] = useState<Molde | null>(null)
+    const [moldSearchText, setMoldSearchText] = useState('')
+    const [isMoldDropdownOpen, setIsMoldDropdownOpen] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [view, setView] = useState<'report' | 'history'>('report')
     const [isMoldModalOpen, setIsMoldModalOpen] = useState(false)
@@ -76,6 +78,16 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             return () => clearTimeout(timer)
         }
     }, [notification])
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isMoldDropdownOpen && !(event.target as Element).closest('.relative')) {
+                setIsMoldDropdownOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [isMoldDropdownOpen])
 
     // Load moldes when orden is selected
     useEffect(() => {
@@ -373,40 +385,65 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                             </select>
                         </div>
 
-                        {/* Mold Selector - Simplified for the bar */}
+                        {/* Mold Selector with Search */}
                         <div className="w-full sm:w-1/2">
                             <label className="md:hidden text-xs font-bold text-cyan-600 uppercase mb-1">Molde</label>
-                            <div className="flex flex-col gap-1">
-                                <select
-                                    value={selectedMolde?.id || ''}
-                                    onChange={(e) => {
-                                        const molde = moldesDisponibles.find(m => m.id === parseInt(e.target.value))
-                                        if (molde) {
-                                            setSelectedMolde(molde)
-                                            checkMantenimiento(molde)
-                                        }
-                                    }}
-                                    disabled={!selectedOrden || !selectedLinea}
-                                    className={`w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none transition-all
-                                        ${!selectedOrden ? 'cursor-not-allowed border-dashed bg-gray-50' : 'bg-white shadow-sm'}
+                            <div className="relative">
+                                <div 
+                                    onClick={() => !(!selectedOrden || !selectedLinea) && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
+                                    className={`w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
+                                        ${!selectedOrden || !selectedLinea ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
                                     `}
                                 >
-                                    <option value="">
-                                        {!selectedOrden ? '← Seleccione una orden primero' : 'Elija el molde'}
-                                    </option>
-                                    {moldesDisponibles.map((molde) => (
-                                        <option key={molde.id} value={molde.id}>
-                                            {molde.serial} ({molde.vueltas_actuales}v)
-                                        </option>
-                                    ))}
-                                </select>
+                                    <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
+                                        {selectedMolde 
+                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
+                                            : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
+                                    </span>
+                                    <Search size={18} className="text-gray-400" />
+                                </div>
+
+                                {isMoldDropdownOpen && (
+                                    <div className="absolute bottom-full mb-2 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+                                        <div className="p-2 border-b border-gray-100 bg-gray-50">
+                                            <input
+                                                type="text"
+                                                autoFocus
+                                                placeholder="Buscar molde..."
+                                                value={moldSearchText}
+                                                onChange={(e) => setMoldSearchText(e.target.value)}
+                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                                            />
+                                        </div>
+                                        <div className="max-h-[200px] overflow-y-auto">
+                                            {moldesDisponibles
+                                                .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
+                                                .map((molde) => (
+                                                    <div
+                                                        key={molde.id}
+                                                        onClick={() => {
+                                                            setSelectedMolde(molde)
+                                                            checkMantenimiento(molde)
+                                                            setIsMoldDropdownOpen(false)
+                                                            setMoldSearchText('')
+                                                        }}
+                                                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
+                                                    >
+                                                        <span className="text-sm font-bold">{molde.serial}</span>
+                                                        <span className="text-xs text-cyan-600 font-bold">{molde.vueltas_actuales}v</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 {debugInfo && (
-                                    <div className="text-[10px] text-red-500 font-bold px-1 animate-pulse">
+                                    <div className="text-[10px] text-red-500 font-bold px-1 mt-1 animate-pulse">
                                         {debugInfo}
                                     </div>
                                 )}
                                 {selectedMolde && (
-                                    <div className="text-[10px] text-gray-500 px-1 italic">
+                                    <div className="text-[10px] text-gray-500 px-1 mt-1 italic">
                                         Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}
                                     </div>
                                 )}
