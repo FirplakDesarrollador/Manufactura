@@ -5,7 +5,6 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
     const { data, error } = await supabase
         .from('query_ordenes_fabricacion')
         .select('*')
-        .or('programado.gt.0,pintura.gt.0,vaciado.gt.0,digitado.gt.0,transito.gt.0,saldo.gt.0')
         .order('fecha_entrega_estimada', { ascending: true })
 
     if (error) {
@@ -21,7 +20,7 @@ export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]
         .from('query_trazabilidad_ms')
         .select('*')
         .order('pintura_fecha', { ascending: false })
-        .limit(200)
+        .limit(5000)
 
     if (error) {
         console.error('Error fetching registros trazabilidad:', error)
@@ -35,11 +34,13 @@ export async function getRegistrosTrazabilidadHoy(): Promise<RegistroTrazabilida
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
+    const todayStr = today.toISOString()
+    
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')
-        .gte('pintura_fecha', today.toISOString())
-        .order('pintura_fecha', { ascending: false })
+        .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr}`)
+        .order('vaciado_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros trazabilidad hoy:', error)

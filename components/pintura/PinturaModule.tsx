@@ -135,43 +135,63 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 (orden.fecha_ideal_produccion &&
                     orden.fecha_ideal_produccion.includes(selectedDate))
 
-            const isProgramada = (orden.programado || 0) > 0
-
-            return matchesSearch && matchesDate && isProgramada
+            return matchesSearch && matchesDate
         })
     }, [ordenes, searchText, selectedDate])
 
-    // Calculate metrics based on aggregated order data for consistency
+    // Calculate metrics to match reference app (FlutterFlow)
     const metrics = useMemo(() => {
-        // Sum values from filtered orders to ensure they match what's on screen
-        const totalCantidad = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0)
+        const today = new Date().toISOString().split('T')[0]
+
+        // 1. Quantity & Programmed (Totals for all filtered orders)
+        const totalCantidad = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad_programada || o.cantidad || 0), 0)
         const totalProgramado = filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
-        const totalPintura = filteredOrdenes.reduce((sum, o) => sum + (o.pintura || 0), 0)
-        const totalVaciado = filteredOrdenes.reduce((sum, o) => sum + (o.vaciado || 0), 0)
-        const totalDigitado = filteredOrdenes.reduce((sum, o) => sum + (o.digitado || 0), 0)
-        const totalTransito = filteredOrdenes.reduce((sum, o) => sum + (o.transito || 0), 0)
-        const totalCedi = filteredOrdenes.reduce((sum, o) => sum + (o.cedi || 0), 0)
+
+        // 2. Daily Production (From traceability)
+        // We look for everything processed today in any stage
+        const recordsToday = trazabilidad.filter(t => {
+            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
+            const pDate = (t.pintura_fecha || '').split('T')[0]
+            const aDate = (t.acabado_fecha || '').split('T')[0]
+            const dDate = (t.digitado_fecha || '').split('T')[0]
+            
+            return vDate === today || pDate === today || aDate === today || dDate === today
+        })
+
+        const vaciadoToday = trazabilidad.filter(t => {
+            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
+            return vDate === today
+        })
+
+        const pinturaToday = trazabilidad.filter(t => {
+            const pDate = (t.pintura_fecha || '').split('T')[0]
+            return pDate === today
+        })
+
+        const acabadoToday = trazabilidad.filter(t => {
+            const aDate = (t.acabado_fecha || '').split('T')[0]
+            return aDate === today
+        })
+        // Kilograms: Current Transito + Cedi Today (Matches FF logic for 3407.8kg)
+        const transitoTotal = trazabilidad.filter(t => t.estado === 'Transito')
+        const cediToday = trazabilidad.filter(t => (t.cedi_fecha || '').split('T')[0] === today)
         
-        // Calculate total kilograms based on vaciado progress and theoretical mass
-        const totalKilos = filteredOrdenes.reduce((acc, o) => {
-            // Use mass from order if available, otherwise 0
-            const masa = o.molde_masa_teorica || 0
-            return acc + (masa * (o.vaciado || 0))
-        }, 0)
+        const totalKilos = [...transitoTotal, ...cediToday]
+            .reduce((acc, t) => acc + (Number(t.kilos_vaciados) || 0), 0)
 
         return {
             cantidad: totalCantidad,
             programado: totalProgramado,
-            pintura: totalPintura,
-            desgelcado: 0,
-            vaciado: totalVaciado,
-            acabado: 0,
-            digitado: totalDigitado,
-            transito: totalTransito,
-            cedi: totalCedi,
+            pintura: pinturaToday.length,
+            desgelcada: 0,
+            vaciado: vaciadoToday.length,
+            acabado: acabadoToday.length,
+            digitado: recordsToday.filter(t => (t.digitado_fecha || '').split('T')[0] === today && t.estado === 'Digitado').length,
+            transito: transitoTotal.length,
+            cedi: cediToday.length,
             kilogramos: parseFloat(totalKilos.toFixed(1))
         }
-    }, [filteredOrdenes])
+    }, [filteredOrdenes, trazabilidad])
 
     const handleClearFilters = () => {
         setSearchText('')

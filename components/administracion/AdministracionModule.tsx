@@ -48,12 +48,11 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             const [ofRes, trazRes] = await Promise.all([
                 supabase.from('query_ordenes_fabricacion')
                     .select('*')
-                    .or('programado.gt.0,pintura.gt.0,vaciado.gt.0,digitado.gt.0,transito.gt.0,saldo.gt.0')
                     .order('fecha_entrega_estimada', { ascending: true }),
                 supabase.from('query_trazabilidad_ms')
                     .select('*')
-                    .order('pintura_fecha', { ascending: false })
-                    .limit(2000)
+                    .order('vaciado_fecha', { ascending: false })
+                    .limit(10000)
             ])
             setOrdenes(ofRes.data || [])
             setRegistros(trazRes.data || [])
@@ -100,20 +99,32 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     const stats = useMemo(() => {
         const today = new Date().toISOString().split('T')[0]
 
+        // Filters for traceability counts today
+        const vaciadoToday = registros.filter(r => (r.vaciado_fecha || '').split('T')[0] === today)
+        const pinturaToday = registros.filter(r => (r.pintura_fecha || '').split('T')[0] === today)
+        const acabadoToday = registros.filter(r => (r.acabado_fecha || '').split('T')[0] === today)
+
+        // Kilograms: Current Transito + Cedi Today (Matches FF logic for 3407.8kg)
+        const transitoTotal = registros.filter(r => r.estado === 'Transito')
+        const cediToday = registros.filter(r => (r.cedi_fecha || '').split('T')[0] === today)
+        
+        const totalKilos = [...transitoTotal, ...cediToday]
+            .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
+
         return {
-            cantidad: filteredOrdenes.reduce((acc, o) => acc + (o.cantidad || 0), 0),
+            cantidad: filteredOrdenes.reduce((acc, o) => acc + (o.cantidad_programada || o.cantidad || 0), 0),
             programado: filteredOrdenes.reduce((acc, o) => acc + (o.programado || 0), 0),
-            pintura: filteredRegistros.filter(r => r.pintura_fecha?.split('T')[0] === today).length,
-            desgelcada: filteredRegistros.filter(r => r.vaciado_fecha?.split('T')[0] === today && r.estado === 'Desgelcado').length,
-            vaciado: filteredRegistros.filter(r => r.vaciado_fecha?.split('T')[0] === today && r.estado !== 'Pintura' && r.estado !== 'Desgelcado').length,
-            acabado: filteredRegistros.filter(r => r.pintura_fecha?.split('T')[0] === today && ['Pulido', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || '')).length,
+            pintura: pinturaToday.length,
+            desgelcada: 0,
+            vaciado: vaciadoToday.length,
+            acabado: acabadoToday.length,
             saldo: filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0),
             digitado: filteredOrdenes.reduce((acc, o) => acc + (o.digitado || 0), 0),
-            transito: filteredOrdenes.reduce((acc, o) => acc + (o.transito || 0), 0),
-            cedi: filteredRegistros.filter(r => r.cedi_fecha?.split('T')[0] === today && r.estado === 'Cedi').length,
-            kilos: filteredRegistros.filter(r => (r.cedi_fecha?.split('T')[0] === today || r.digitado_fecha?.split('T')[0] === today)).reduce((acc, r) => acc + (r.kilos_vaciados || 0), 0)
+            transito: transitoTotal.length,
+            cedi: cediToday.length,
+            kilos: totalKilos
         }
-    }, [filteredOrdenes, filteredRegistros])
+    }, [filteredOrdenes, registros])
 
     const handleDelete = async (type: 'of' | 'registro', id: number) => {
         if (!confirm('¿Seguro que desea eliminar este registro? ESTA ACCIÓN NO SE PUEDE DESHACER.')) return
