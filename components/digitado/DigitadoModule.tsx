@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
+    const [registrosGlobales, setRegistrosGlobales] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [fechaFiltro, setFechaFiltro] = useState<string | null>(null)
@@ -23,12 +24,14 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const loadData = async () => {
         setLoading(true)
         try {
-            const [oData, rData] = await Promise.all([
+            const [oData, rData, gData] = await Promise.all([
                 getOrdenesFabricacion(),
-                getRegistrosParaDigitado() // Fetch ONLY pieces waiting for digitado (state Empaque)
+                getRegistrosParaDigitado(),
+                getRegistrosTrazabilidadHoy()
             ])
             setOrdenes(oData)
             setRegistros(rData)
+            setRegistrosGlobales(gData)
         } catch (error) {
             console.error('Error loading data:', error)
         } finally {
@@ -81,7 +84,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const totalPulido = filteredOrdenes.reduce((acc, o) => acc + (o.pulido || 0) + (o.desgelcada || 0), 0)
     const totalSaldo = filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0)
 
-    const countAcabado = registros.filter(r =>
+    const countAcabado = registrosGlobales.filter(r =>
         ['Pulido', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || '') &&
         (r.pintura_fecha && new Date(r.pintura_fecha).toLocaleDateString('es-ES') === todayStr)
     ).length
@@ -89,16 +92,16 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const today = new Date().toISOString().split('T')[0]
     
     // Global Totals (Dashboard paridad)
-    const totalDigitado = registros.filter(r => r.estado === 'Digitado').length
-    const totalTransito = registros.filter(r => r.estado === 'Transito').length
-    const countCediHoy = registros.filter(r => 
+    const totalDigitado = registrosGlobales.filter(r => r.estado === 'Digitado').length
+    const totalTransito = registrosGlobales.filter(r => r.estado === 'Transito').length
+    const countCediHoy = registrosGlobales.filter(r => 
         r.estado === 'Cedi' && 
         (r.cedi_fecha || '').split('T')[0] === today
     ).length
 
     // Kilogramos: Current Transito + Cedi Today (Matches reference app logic)
-    const transitoRecords = registros.filter(r => r.estado === 'Transito')
-    const cediTodayRecords = registros.filter(r => r.estado === 'Cedi' && (r.cedi_fecha || '').split('T')[0] === today)
+    const transitoRecords = registrosGlobales.filter(r => r.estado === 'Transito')
+    const cediTodayRecords = registrosGlobales.filter(r => r.estado === 'Cedi' && (r.cedi_fecha || '').split('T')[0] === today)
     
     const totalKilogramos = [...transitoRecords, ...cediTodayRecords]
         .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
