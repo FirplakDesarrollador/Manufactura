@@ -158,8 +158,22 @@ export async function registrarPintura(pinturaData: {
         throw new Error(`Error al buscar la orden: ${ordenError?.message || 'No encontrada'}`)
     }
 
-    if ((orden.programado || 0) <= 0) {
-        throw new Error('La orden no tiene unidades programadas para pintar.')
+    // 1.1 Verificar piezas ya registradas (conteo real en trazabilidad)
+    const { count, error: countError } = await supabase
+        .from('query_trazabilidad_ms')
+        .select('*', { count: 'exact', head: true })
+        .eq('orden_fabricacion', orden.orden_fabricacion)
+
+    if (countError) {
+        console.error('Error al contar piezas:', countError)
+        // No bloqueamos si falla el conteo por red, pero registramos el error
+    } else {
+        const piezasRegistradas = count || 0
+        const piezasPermitidas = orden.cantidad || orden.cantidad_programada || 0
+
+        if (piezasRegistradas >= piezasPermitidas && piezasPermitidas > 0) {
+            throw new Error(`Acción bloqueada: La orden ${orden.orden_fabricacion} ya completó sus ${piezasPermitidas} piezas (${piezasRegistradas} registradas).`)
+        }
     }
 
     // 2. Obtener masa teórica (kilos_vaciados es requerido)
