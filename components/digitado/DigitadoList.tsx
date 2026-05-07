@@ -35,6 +35,7 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
 
     React.useEffect(() => {
         loadRegistros();
+        setCantidadLote(1); // Reset cantidad al cambiar de orden
     }, [loadRegistros]);
 
     const filteredRegistros = registros.filter(r => {
@@ -117,6 +118,12 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
                                 onChange={(e) => setCantidadLote(Math.max(1, parseInt(e.target.value) || 1))}
                                 className="w-16 px-2 py-1 bg-white border border-slate-200 rounded font-black text-blue-600 text-sm"
                             />
+                            <button
+                                onClick={() => setCantidadLote(filteredRegistros.length)}
+                                className="text-[10px] font-black text-blue-600 uppercase hover:underline ml-1"
+                            >
+                                Seleccionar todo
+                            </button>
                         </div>
                         <button
                             onClick={handleRegistroMasivo}
