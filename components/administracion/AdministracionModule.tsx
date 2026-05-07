@@ -101,16 +101,19 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     const stats = useMemo(() => {
         const today = new Date().toISOString().split('T')[0]
 
+        // Use filteredRegistros to ensure indicators reflect the search
+        const baseRegistros = filteredRegistros
+
         // Filters for traceability counts today
-        const vaciadoToday = registros.filter(r => (r.vaciado_fecha || '').split('T')[0] === today)
-        const pinturaToday = registros.filter(r => (r.pintura_fecha || '').split('T')[0] === today)
-        const acabadoToday = registros.filter(r => (r.acabado_fecha || '').split('T')[0] === today)
+        const vaciadoToday = baseRegistros.filter(r => (r.vaciado_fecha || '').split('T')[0] === today)
+        const pinturaToday = baseRegistros.filter(r => (r.pintura_fecha || '').split('T')[0] === today)
+        const acabadoToday = baseRegistros.filter(r => (r.acabado_fecha || '').split('T')[0] === today)
 
         // Kilograms: Current Transito + Cedi Today (Matches FF logic for 3407.8kg)
-        const transitoTotal = registros.filter(r => r.estado === 'Transito')
-        const cediToday = registros.filter(r => (r.cedi_fecha || '').split('T')[0] === today)
+        const transitoRecords = baseRegistros.filter(r => r.estado === 'Transito')
+        const cediToday = baseRegistros.filter(r => (r.cedi_fecha || '').split('T')[0] === today)
         
-        const totalKilos = [...transitoTotal, ...cediToday]
+        const totalKilos = [...transitoRecords, ...cediToday]
             .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
 
         return {
@@ -121,12 +124,12 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             vaciado: vaciadoToday.length,
             acabado: acabadoToday.length,
             saldo: filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0),
-            digitado: registros.filter(r => r.estado === 'Digitado').length,
-            transito: registros.filter(r => r.estado === 'Transito').length,
+            digitado: baseRegistros.filter(r => r.estado === 'Digitado').length,
+            transito: baseRegistros.filter(r => r.estado === 'Transito').length,
             cedi: cediToday.length,
             kilos: totalKilos
         }
-    }, [filteredOrdenes, registros])
+    }, [filteredOrdenes, filteredRegistros])
 
     const handleDelete = async (type: 'of' | 'registro', id: number) => {
         if (!confirm('¿Seguro que desea eliminar este registro? ESTA ACCIÓN NO SE PUEDE DESHACER.')) return
