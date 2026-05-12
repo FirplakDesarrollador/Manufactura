@@ -1,15 +1,18 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
+import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
+import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from '@/lib/supabase/queries/pintura'
 import { moverTransitoACedi } from '@/lib/supabase/queries/cedi'
-import { Search, Eraser, Loader2, Calendar, Hash, Package, Info, FileSpreadsheet, ArrowLeftRight } from 'lucide-react'
+import { Search, Eraser, Loader2, Calendar, Info, FileSpreadsheet, ArrowLeftRight, FileCode, ArrowLeft } from 'lucide-react'
 import CediList from './CediList'
+import OrdenCard from '../pintura/OrdenCard'
+import * as XLSX from 'xlsx'
 
 export default function CediModule({ userEmail }: { userEmail: string }) {
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
+    const [allMoldes, setAllMoldes] = useState<Molde[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [fechaFiltro, setFechaFiltro] = useState<string | null>(null)
@@ -23,12 +26,14 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
     const loadData = async () => {
         setLoading(true)
         try {
-            const [oData, rData] = await Promise.all([
+            const [oData, rData, mData] = await Promise.all([
                 getOrdenesFabricacion(),
-                getRegistrosTrazabilidadHoy()
+                getRegistrosTrazabilidadHoy(),
+                getAllMoldes()
             ])
             setOrdenes(oData)
             setRegistros(rData)
+            setAllMoldes(mData)
         } catch (error) {
             console.error('Error loading data:', error)
         } finally {
@@ -58,19 +63,31 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
         }
     }
 
-    const handleExportCSV = () => {
-        // Simple CSV export implementation
-        const headers = ['OF', 'Pedido', 'Producto', 'SKU', 'Cantidad', 'Digitado', 'Transito']
+    const getReportData = () => {
+        const headers = ['OF', 'Pedido', 'Producto', 'SKU', 'Cliente', 'Cantidad', 'Saldo', 'Vaciado', 'Pintura', 'Desgelcada', 'Pulido', 'Empaque', 'Acabado', 'Digitado', 'Transito', 'Cedi']
         const rows = filteredOrdenes.map(o => [
-            o.orden_fabricacion,
-            o.pedido,
-            o.producto_descripcion,
-            o.producto_sku,
-            o.cantidad,
-            o.digitado,
-            o.transito
+            o.orden_fabricacion || '',
+            o.pedido || '',
+            o.producto_descripcion || '',
+            o.producto_sku || '',
+            o.cliente || '',
+            o.cantidad || 0,
+            o.saldo || 0,
+            o.vaciado || 0,
+            o.pintura || 0,
+            o.desgelcada || 0,
+            o.pulido || 0,
+            o.empaque || 0,
+            o.acabado || 0,
+            o.digitado || 0,
+            o.transito || 0,
+            o.cedi || 0
         ])
+        return { headers, rows }
+    }
 
+    const handleExportCSV = () => {
+        const { headers, rows } = getReportData()
         const csvContent = "data:text/csv;charset=utf-8,"
             + headers.join(",") + "\n"
             + rows.map(e => e.join(",")).join("\n")
@@ -82,6 +99,15 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+    }
+
+    const handleExportExcel = () => {
+        const { headers, rows } = getReportData()
+        const data = [headers, ...rows]
+        const ws = XLSX.utils.aoa_to_sheet(data)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, "Cedi Report")
+        XLSX.writeFile(wb, `reporte_cedi_${new Date().toISOString().split('T')[0]}.xlsx`)
     }
 
     const filteredOrdenes = ordenes.filter(o => {
@@ -156,23 +182,38 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-4 items-center pl-4 border-l border-slate-200">
                         <button
                             onClick={handleMoveAllToCedi}
                             disabled={moving}
-                            className="flex flex-col items-center justify-center p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="flex flex-col items-center justify-center p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all active:scale-95 border border-blue-100"
                         >
-                            {moving ? <Loader2 className="animate-spin" size={24} /> : <ArrowLeftRight size={24} />}
-                            <span className="text-[10px] font-bold uppercase mt-1">Mover a Cedi</span>
+                            {moving ? <Loader2 className="animate-spin" size={20} /> : <ArrowLeftRight size={20} />}
+                            <span className="text-[9px] font-black uppercase mt-1">Mover a Cedi</span>
                         </button>
-                        <div className="flex flex-col items-center">
-                            <span className="text-[10px] font-bold text-blue-600 uppercase mb-1">Reporte</span>
-                            <button
-                                onClick={handleExportCSV}
-                                className="p-2 border border-blue-200 rounded-lg text-green-600 hover:bg-green-50 transition-colors"
-                            >
-                                <FileSpreadsheet size={24} />
-                            </button>
+                        
+                        <div className="h-10 w-px bg-slate-200 mx-1" />
+
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[9px] font-black text-slate-400 uppercase text-center">Exportar Reporte</span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleExportExcel}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all shadow-md shadow-green-100 active:scale-95 group"
+                                    title="Exportar a Excel"
+                                >
+                                    <FileSpreadsheet size={16} />
+                                    <span className="text-[10px] font-black uppercase">Excel</span>
+                                </button>
+                                <button
+                                    onClick={handleExportCSV}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg transition-all shadow-md shadow-slate-200 active:scale-95 group"
+                                    title="Exportar a CSV"
+                                >
+                                    <FileCode size={16} />
+                                    <span className="text-[10px] font-black uppercase">CSV</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -182,49 +223,63 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
             </div>
 
             {/* Content area */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Panel: Orders List */}
-                <div className="w-1/3 border-r border-slate-200 overflow-y-auto p-4 space-y-3 bg-white">
-                    {loading ? (
-                        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" /></div>
-                    ) : filteredOrdenes.length === 0 ? (
-                        <div className="text-center py-10 text-slate-400 font-bold uppercase text-sm italic">Sin ordenes halladas</div>
-                    ) : (
-                        filteredOrdenes.map(o => (
-                            <div
-                                key={o.id}
-                                onClick={() => setSelectedOrderId(o.id)}
-                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedOrderId === o.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-100 bg-white hover:border-blue-200'}`}
-                            >
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="text-[10px] font-black text-slate-400">OF: {o.orden_fabricacion}</span>
-                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[9px] font-black uppercase">Pendiente</span>
-                                </div>
-                                <h4 className="text-sm font-black text-slate-800 line-clamp-none">{o.producto_descripcion}</h4>
-                                <div className="mt-2 flex gap-3 text-[10px] font-bold text-slate-500">
-                                    <span className="flex items-center gap-1"><Hash size={12} />{o.pedido}</span>
-                                    <span className="flex items-center gap-1"><Package size={12} />{o.cantidad} unt</span>
-                                </div>
+            <div className="flex-1 overflow-hidden relative">
+                {!selectedOrderId || !selectedOrder ? (
+                    // Selection View
+                    <div className="h-full overflow-y-auto p-4 space-y-3 max-w-7xl mx-auto">
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
+                                <Loader2 className="animate-spin text-blue-500" size={48} />
+                                <span className="font-bold uppercase tracking-widest animate-pulse">Cargando órdenes...</span>
                             </div>
-                        ))
-                    )}
-                </div>
-
-                {/* Right Panel: Piece tabs */}
-                <div className="flex-1 overflow-y-auto bg-slate-50">
-                    {!selectedOrder ? (
-                        <div className="h-full flex flex-col items-center justify-center text-red-500 gap-4">
-                            <Info size={48} />
-                            <span className="text-xl font-black uppercase text-center px-4">Debe seleccionar una orden de fabricación</span>
+                        ) : filteredOrdenes.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400 font-bold uppercase text-lg italic bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                                Sin ordenes halladas
+                            </div>
+                        ) : (
+                            filteredOrdenes.map(o => (
+                                <div key={o.id} className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                    <OrdenCard
+                                        orden={o}
+                                        isActive={false}
+                                        onClick={() => setSelectedOrderId(o.id)}
+                                        moldes={allMoldes}
+                                    />
+                                </div>
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    // Detail View
+                    <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300">
+                        <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
+                            <button
+                                onClick={() => setSelectedOrderId(null)}
+                                className="flex items-center gap-2 text-blue-600 font-black uppercase text-[10px] tracking-widest hover:text-blue-700 transition-colors mb-3 w-fit group"
+                            >
+                                <div className="bg-blue-50 p-1 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                    <ArrowLeft size={16} />
+                                </div>
+                                Volver a la lista
+                            </button>
+                            <div className="pointer-events-none opacity-90 scale-[0.98] origin-left">
+                                <OrdenCard
+                                    orden={selectedOrder}
+                                    isActive={true}
+                                    onClick={() => {}}
+                                    moldes={allMoldes}
+                                />
+                            </div>
                         </div>
-                    ) : (
-                        <CediList
-                            order={selectedOrder}
-                            userEmail={userEmail}
-                            onRefresh={loadData}
-                        />
-                    )}
-                </div>
+                        <div className="flex-1 overflow-y-auto bg-slate-50">
+                            <CediList
+                                order={selectedOrder}
+                                userEmail={userEmail}
+                                onRefresh={loadData}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )
