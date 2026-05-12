@@ -2,13 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
+import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import {
     updateOrdenFabricacion,
     deleteOrdenFabricacion,
     updateRegistroTrazabilidad,
     deleteRegistroTrazabilidad
 } from '@/lib/supabase/queries/administracion'
+import { getAllMoldes } from '@/lib/supabase/queries/pintura'
+import OrdenCard from '../pintura/OrdenCard'
 import {
     Search,
     Calendar,
@@ -24,6 +26,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     const [activeTab, setActiveTab] = useState<'of' | 'trazabilidad'>('of')
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
+    const [allMoldes, setAllMoldes] = useState<Molde[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -46,7 +49,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             // Optimized: Fetch active orders and last 1000 traceability records
             // This prevents loading the entire historical database which was causing lag
             const todayStr = new Date().toISOString().split('T')[0]
-            const [ofRes, trazRes] = await Promise.all([
+            const [ofRes, trazRes, moldesData] = await Promise.all([
                 supabase.from('query_ordenes_fabricacion')
                     .select('*')
                     .order('fecha_entrega_estimada', { ascending: true }),
@@ -54,10 +57,12 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                     .select('*')
                     .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
                     .order('vaciado_fecha', { ascending: false })
-                    .limit(10000)
+                    .limit(10000),
+                getAllMoldes()
             ])
             setOrdenes(ofRes.data || [])
             setRegistros(trazRes.data || [])
+            setAllMoldes(moldesData)
         } catch (error) {
             console.error('Error loading data:', error)
         } finally {
@@ -248,122 +253,115 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
 
             {/* Main Table Area */}
             <div className="flex-1 overflow-auto p-4 content-scrollbar">
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-max">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 text-slate-400 font-black text-[10px] uppercase tracking-wider border-b border-slate-100">
-                                <th className="p-4">Acciones</th>
-                                {activeTab === 'of' ? (
-                                    <>
-                                        <th className="p-4">OF / Pedido</th>
-                                        <th className="p-4">Producto</th>
-                                        <th className="p-4">Cliente</th>
-                                        <th className="p-4 text-center">Cant</th>
-                                        <th className="p-4 text-center">Sal.</th>
-                                        <th className="p-4">F. Ideal</th>
-                                    </>
-                                ) : (
-                                    <>
-                                        <th className="p-4">Pieza (Id)</th>
-                                        <th className="p-4">OF / Pedido</th>
-                                        <th className="p-4">Producto</th>
-                                        <th className="p-4">Molde</th>
-                                        <th className="p-4">Estado</th>
-                                        <th className="p-4">Última Fecha</th>
-                                    </>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={10} className="p-20 text-center text-slate-400 font-bold italic">Cargando datos...</td>
+                {activeTab === 'of' ? (
+                    <div className="max-w-7xl mx-auto space-y-3">
+                        {loading ? (
+                            <div className="p-20 text-center text-slate-400 font-bold italic bg-white rounded-2xl border border-slate-200">
+                                Cargando datos...
+                            </div>
+                        ) : filteredOrdenes.length === 0 ? (
+                            <div className="p-20 text-center text-slate-400 font-bold italic bg-white rounded-2xl border border-slate-200">
+                                No se encontraron órdenes
+                            </div>
+                        ) : (
+                            filteredOrdenes.map((item) => (
+                                <div key={item.id} className="flex gap-3 items-stretch animate-in fade-in slide-in-from-left-4 duration-300">
+                                    <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center">
+                                        <button
+                                            onClick={() => setEditModal({ type: 'of', item })}
+                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50"
+                                            title="Editar Orden"
+                                        >
+                                            <Edit2 size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete('of', item.id)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-red-50/50"
+                                            title="Eliminar Orden"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <OrdenCard
+                                            orden={item}
+                                            isActive={false}
+                                            onClick={() => setEditModal({ type: 'of', item })}
+                                            moldes={allMoldes}
+                                        />
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-max">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 text-slate-400 font-black text-[10px] uppercase tracking-wider border-b border-slate-100">
+                                    <th className="p-4">Acciones</th>
+                                    <th className="p-4">Pieza (Id)</th>
+                                    <th className="p-4">OF / Pedido</th>
+                                    <th className="p-4">Producto</th>
+                                    <th className="p-4">Molde</th>
+                                    <th className="p-4">Estado</th>
+                                    <th className="p-4">Última Fecha</th>
                                 </tr>
-                            ) : activeTab === 'of' ? (
-                                filteredOrdenes.length === 0 ? (
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {loading ? (
                                     <tr>
-                                        <td colSpan={10} className="p-20 text-center text-slate-400 font-bold italic">No se encontraron órdenes</td>
+                                        <td colSpan={10} className="p-20 text-center text-slate-400 font-bold italic">Cargando datos...</td>
                                     </tr>
-                                ) : filteredOrdenes.map((item) => (
-                                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="p-4 flex gap-2">
-                                            <button
-                                                onClick={() => setEditModal({ type: 'of', item })}
-                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete('of', item.id)}
-                                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="font-black text-blue-600">{item.orden_fabricacion}</div>
-                                            <div className="text-[10px] text-slate-400 font-bold">P: {item.pedido}</div>
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="font-bold text-slate-700">{item.producto_descripcion}</div>
-                                            <div className="text-[10px] text-slate-400 font-bold">{item.producto_sku}</div>
-                                        </td>
-                                        <td className="p-4 text-[11px] font-bold text-slate-400">{item.cliente || '-'}</td>
-                                        <td className="p-4 text-center font-black text-slate-600">{item.cantidad}</td>
-                                        <td className="p-4 text-center font-black text-orange-600">{item.saldo}</td>
-                                        <td className="p-4 text-[11px] font-bold text-slate-400">
-                                            {item.fecha_ideal_produccion ? new Date(item.fecha_ideal_produccion).toLocaleDateString('es-ES') : '-'}
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                filteredRegistros.length === 0 ? (
+                                ) : filteredRegistros.length === 0 ? (
                                     <tr>
                                         <td colSpan={10} className="p-20 text-center text-slate-400 font-bold italic">No se encontraron registros</td>
                                     </tr>
-                                ) : filteredRegistros.map((item) => (
-                                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="p-4 flex gap-2">
-                                            <button
-                                                onClick={() => setEditModal({ type: 'registro', item })}
-                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete('registro', item.id)}
-                                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                        <td className="p-4 text-[11px] font-black text-blue-600">#{item.id}</td>
-                                        <td className="p-4">
-                                            <div className="font-bold text-slate-700">{item.orden_fabricacion}</div>
-                                            <div className="text-[10px] text-slate-400 font-bold">P: {item.numero_pedido}</div>
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="font-bold text-slate-700">{item.producto_descripcion}</div>
-                                            <div className="text-[10px] text-slate-400 font-bold">{item.producto_sku}</div>
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="font-bold text-slate-700">{item.molde_serial}</div>
-                                            <div className="text-[10px] text-slate-400 font-bold">{item.molde_descripcion}</div>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-black text-[9px] uppercase">
-                                                {item.estado}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-[11px] font-bold text-slate-400">
-                                            {item.pintura_fecha ? new Date(item.pintura_fecha).toLocaleDateString('es-ES') : '-'}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                ) : (
+                                    filteredRegistros.map((item) => (
+                                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                                            <td className="p-4 flex gap-2">
+                                                <button
+                                                    onClick={() => setEditModal({ type: 'registro', item })}
+                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete('registro', item.id)}
+                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                            <td className="p-4 text-[11px] font-black text-blue-600">#{item.id}</td>
+                                            <td className="p-4">
+                                                <div className="font-bold text-slate-700">{item.orden_fabricacion}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold">P: {item.numero_pedido}</div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="font-bold text-slate-700">{item.producto_descripcion}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold">{item.producto_sku}</div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="font-bold text-slate-700">{item.molde_serial}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold">{item.molde_descripcion}</div>
+                                            </td>
+                                            <td className="p-4">
+                                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-black text-[9px] uppercase">
+                                                    {item.estado}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-[11px] font-bold text-slate-400">
+                                                {item.pintura_fecha ? new Date(item.pintura_fecha).toLocaleDateString('es-ES') : '-'}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
             {/* Edit Modal */}
