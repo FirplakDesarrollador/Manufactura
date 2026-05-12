@@ -187,7 +187,13 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                                     <OrdenCard
                                         orden={o}
                                         isActive={false}
-                                        onClick={() => setSelectedOrderId(o.id)}
+                                        onClick={() => {
+                                            setSelectedOrderId(o.id)
+                                            if (o.orden_fabricacion) {
+                                                navigator.clipboard.writeText(o.orden_fabricacion)
+                                                toast.success(`Orden ${o.orden_fabricacion} copiada`)
+                                            }
+                                        }}
                                         moldes={allMoldes}
                                     />
                                 </div>
