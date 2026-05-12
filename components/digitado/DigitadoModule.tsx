@@ -1,17 +1,19 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
+import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
+import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from '@/lib/supabase/queries/pintura'
 import { getRegistrosParaDigitado } from '@/lib/supabase/queries/digitado'
-import { Search, Eraser, Loader2, Keyboard, Calendar, Hash, Package, Zap, Info, ClipboardList, TrendingUp, Boxes, Truck, Warehouse, Weight, Calculator } from 'lucide-react'
+import { Search, Eraser, Loader2, Calendar, Info, ArrowLeft } from 'lucide-react'
 import DigitadoList from './DigitadoList'
+import OrdenCard from '../pintura/OrdenCard'
 import { toast } from 'sonner'
 
 export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [registrosGlobales, setRegistrosGlobales] = useState<RegistroTrazabilidad[]>([])
+    const [allMoldes, setAllMoldes] = useState<Molde[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [fechaFiltro, setFechaFiltro] = useState<string | null>(null)
@@ -24,14 +26,16 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const loadData = async () => {
         setLoading(true)
         try {
-            const [oData, rData, gData] = await Promise.all([
+            const [oData, rData, gData, mData] = await Promise.all([
                 getOrdenesFabricacion(),
                 getRegistrosParaDigitado(),
-                getRegistrosTrazabilidadHoy()
+                getRegistrosTrazabilidadHoy(),
+                getAllMoldes()
             ])
             setOrdenes(oData)
             setRegistros(rData)
             setRegistrosGlobales(gData)
+            setAllMoldes(mData)
         } catch (error) {
             console.error('Error loading data:', error)
         } finally {
@@ -164,46 +168,44 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Panel: Orders List */}
-                <div className="w-64 border-r border-slate-200 overflow-y-auto p-2 space-y-2 bg-white">
-                    {loading ? (
-                        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" /></div>
-                    ) : filteredOrdenes.length === 0 ? (
-                        <div className="text-center py-10 text-slate-400 font-bold uppercase text-sm italic">Sin ordenes halladas</div>
-                    ) : (
-                        filteredOrdenes.map(o => (
-                            <OrderCard
-                                key={o.id}
-                                order={o}
-                                isSelected={o.id === selectedOrderId}
-                                onClick={() => {
-                                    setSelectedOrderId(o.id)
-                                    if (o.orden_fabricacion) {
-                                        navigator.clipboard.writeText(o.orden_fabricacion)
-                                        toast.success(`Orden ${o.orden_fabricacion} copiada`)
-                                    }
-                                }}
-                            />
-                        ))
-                    )}
-                </div>
-
-                {/* Right Panel: Detail View (Tabs) */}
-                <div className="flex-1 overflow-y-auto bg-slate-50 relative">
-                    {!selectedOrderId || !selectedOrder ? (
-                        <div className="h-full flex flex-col items-center justify-center text-red-500 gap-4">
-                            <Info size={48} />
-                            <span className="text-xl font-black uppercase text-center px-4">Debe seleccionar una orden de fabricación</span>
-                        </div>
-                    ) : (
+            <div className="flex-1 overflow-hidden relative">
+                {!selectedOrderId || !selectedOrder ? (
+                    // Selection View
+                    <div className="h-full overflow-y-auto p-4 space-y-3 max-w-7xl mx-auto">
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
+                                <Loader2 className="animate-spin text-blue-500" size={48} />
+                                <span className="font-bold uppercase tracking-widest animate-pulse">Cargando órdenes...</span>
+                            </div>
+                        ) : filteredOrdenes.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400 font-bold uppercase text-lg italic bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                                Sin ordenes halladas
+                            </div>
+                        ) : (
+                            filteredOrdenes.map(o => (
+                                <div key={o.id} className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                    <OrdenCard
+                                        orden={o}
+                                        isActive={false}
+                                        onClick={() => setSelectedOrderId(o.id)}
+                                        moldes={allMoldes}
+                                    />
+                                </div>
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    // Detail View
+                    <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300">
                         <DigitadoList
                             order={selectedOrder}
                             userEmail={userEmail}
                             onRefresh={loadData}
+                            allMoldes={allMoldes}
+                            onBack={() => setSelectedOrderId(null)}
                         />
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -232,33 +234,3 @@ function SummaryCard({ label, value, color, isPrimary = false }: { label: string
     )
 }
 
-function OrderCard({ order, isSelected, onClick }: { order: OrdenFabricacion, isSelected: boolean, onClick: () => void }) {
-    return (
-        <div
-            onClick={onClick}
-            className={`p-2 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100' : 'border-slate-100 bg-white hover:border-blue-200 shadow-sm'}`}
-        >
-            <div className="flex justify-between items-start mb-2">
-                <span className="text-[10px] font-black uppercase text-slate-400">OF: {order.orden_fabricacion}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${order.estado === 'Finalizado' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {order.estado}
-                </span>
-            </div>
-            <h4 className="text-sm font-black text-slate-800 line-clamp-none mb-1">{order.producto_descripcion}</h4>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div className="flex items-center gap-1 font-bold text-slate-500">
-                    <Hash size={12} /> {order.pedido}
-                </div>
-                <div className="flex items-center gap-1 font-bold text-slate-500">
-                    <Package size={12} /> {order.cantidad} un
-                </div>
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-                <div className="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">D:{order.desgelcada || 0}</div>
-                <div className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">P:{order.pulido || 0}</div>
-                <div className="bg-orange-500 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">D:{order.digitado || 0}</div>
-                <div className="bg-orange-600 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">T:{order.transito || 0}</div>
-            </div>
-        </div>
-    )
-}

@@ -1,20 +1,23 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { RegistroTrazabilidad, OrdenFabricacion } from '@/types/pintura'
+import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import RegistroDigitadoCard from './RegistroDigitadoCard'
-import { Truck, Info, Hash, Package } from 'lucide-react'
+import { Truck, Info, Package, ArrowLeft } from 'lucide-react'
 import { getRegistrosTrazabilidadPorOrden } from '@/lib/supabase/queries/pintura'
 import { registrarDigitadoMasivo } from '@/lib/supabase/queries/digitado'
+import OrdenCard from '../pintura/OrdenCard'
 import { toast } from 'sonner'
 
 interface DigitadoListProps {
     order: OrdenFabricacion
     userEmail: string
     onRefresh: () => void
+    allMoldes: Molde[]
+    onBack: () => void
 }
 
-export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoListProps) {
+export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, onBack }: DigitadoListProps) {
     const [activeTab, setActiveTab] = useState<'Pulido' | 'Transito'>('Pulido')
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(false)
@@ -71,19 +74,26 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
     return (
         <div className="h-full flex flex-col">
             {/* Header: Selected Order info */}
-            <div className="p-2 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="bg-blue-50 p-1.5 rounded-lg text-blue-600">
-                        <Hash size={18} />
+            <div className="bg-white border-b border-slate-200 shadow-sm p-4">
+                <div className="max-w-7xl mx-auto flex flex-col gap-3">
+                    <button
+                        onClick={onBack}
+                        className="flex items-center gap-2 text-blue-600 font-black uppercase text-[10px] tracking-widest hover:text-blue-700 transition-colors w-fit group"
+                    >
+                        <div className="bg-blue-50 p-1 rounded-lg group-hover:bg-blue-100 transition-colors">
+                            <ArrowLeft size={16} />
+                        </div>
+                        Volver a la lista
+                    </button>
+                    
+                    <div className="pointer-events-none opacity-90 scale-[0.98] origin-left">
+                        <OrdenCard
+                            orden={order}
+                            isActive={true}
+                            onClick={() => {}}
+                            moldes={allMoldes}
+                        />
                     </div>
-                    <div>
-                        <p className="text-[8px] font-black uppercase text-slate-400 leading-none">Orden Fabricación (OF)</p>
-                        <h4 className="text-lg font-black text-slate-800 tracking-tighter">{order.orden_fabricacion}</h4>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <p className="text-[9px] font-black uppercase text-slate-400 leading-none">Producto</p>
-                    <p className="text-sm font-bold text-slate-600 line-clamp-1 max-w-sm">{order.producto_descripcion}</p>
                 </div>
             </div>
 
