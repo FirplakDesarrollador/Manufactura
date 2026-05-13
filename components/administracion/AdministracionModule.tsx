@@ -12,6 +12,7 @@ import {
 import { getAllMoldes } from '@/lib/supabase/queries/pintura'
 import OrdenCard from '../pintura/OrdenCard'
 import {
+    RefreshCw,
     Search,
     Calendar,
     Eraser,
@@ -19,6 +20,7 @@ import {
     Trash2,
     X
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function AdministracionModule({ userEmail }: { userEmail?: string }) {
     // userEmail available for future use
@@ -38,6 +40,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
         item: any
     } | null>(null)
     const [saving, setSaving] = useState(false)
+    const [syncing, setSyncing] = useState(false)
 
     useEffect(() => {
         loadData()
@@ -167,6 +170,36 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
         }
     }
 
+    const handleCargarOrdenes = async () => {
+        if (!confirm('¿Desea iniciar el proceso de carga de órdenes de fabricación?')) return
+
+        setSyncing(true)
+        const toastId = toast.loading('Iniciando carga de órdenes...')
+
+        try {
+            const response = await fetch('https://8c18912a4169ec67aa9b39bdfb7cc3.10.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/209bd2c1fefe4fac97b142dab760392a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_0nsCYV7aVRcw4vzIujDaHNRUU7oSekKPqE7f3_gsxY', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+
+            if (response.ok) {
+                toast.success('Proceso de carga iniciado correctamente', { id: toastId })
+                // Wait 3 seconds for the flow to process before reloading
+                setTimeout(() => loadData(), 3000)
+            } else {
+                throw new Error('Error al iniciar el flujo')
+            }
+        } catch (error) {
+            console.error('Error al cargar órdenes:', error)
+            toast.error('Error al iniciar el proceso de carga', { id: toastId })
+        } finally {
+            setSyncing(false)
+        }
+    }
+
     return (
         <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
             {/* Summary Cards */}
@@ -222,6 +255,16 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                         title="Limpiar filtros"
                     >
                         <Eraser size={20} />
+                    </button>
+
+                    <button
+                        onClick={handleCargarOrdenes}
+                        disabled={syncing}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300"
+                        title="Cargar Órdenes de Fabricación"
+                    >
+                        <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
+                        <span className="font-black text-[10px] uppercase tracking-wider">Cargar Órdenes</span>
                     </button>
                 </div>
                 {/* Real-time Counter (Requested) */}
