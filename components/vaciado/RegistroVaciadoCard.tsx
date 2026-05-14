@@ -9,15 +9,16 @@ interface RegistroVaciadoCardProps {
     registro: RegistroTrazabilidad
     usuarioEmail: string
     onRefresh: () => void
+    selectedMaquina: string
 }
 
-export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh }: RegistroVaciadoCardProps) {
+export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh, selectedMaquina }: RegistroVaciadoCardProps) {
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
         setLoading(true)
         try {
-            await registrarVaciado(registro.id, usuarioEmail)
+            await registrarVaciado(registro.id, usuarioEmail, selectedMaquina)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -91,8 +92,11 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh 
                 <div className="pt-4 xl:pt-0 shrink-0">
                     <button
                         onClick={handleRegister}
-                        disabled={loading}
-                        className="w-full xl:w-auto bg-[#254153] hover:bg-[#1a2e3b] text-white px-10 py-5 rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-xl hover:shadow-amber-900/20 active:scale-95 transition-all disabled:bg-gray-400 uppercase tracking-widest"
+                        disabled={loading || !selectedMaquina}
+                        className={`w-full xl:w-auto text-white px-10 py-5 rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all uppercase tracking-widest ${!selectedMaquina
+                            ? 'bg-gray-300 cursor-not-allowed grayscale'
+                            : 'bg-[#254153] hover:bg-[#1a2e3b] active:scale-95 shadow-amber-900/10'
+                            } disabled:opacity-50`}
                     >
                         {loading ? (
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/30 border-t-white" />

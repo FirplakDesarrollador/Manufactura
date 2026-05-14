@@ -12,6 +12,18 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
+    const [selectedMaquina, setSelectedMaquina] = useState<string>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('vaciado_maquina') || ''
+        }
+        return ''
+    })
+
+    useEffect(() => {
+        if (selectedMaquina) {
+            localStorage.setItem('vaciado_maquina', selectedMaquina)
+        }
+    }, [selectedMaquina])
 
     const loadRegistros = async () => {
         setLoading(true)
@@ -99,18 +111,38 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
                                         className="w-full pl-11 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all shadow-sm font-bold text-base"
                                     />
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex flex-col min-w-[200px]">
+                                        <select
+                                            value={selectedMaquina}
+                                            onChange={(e) => setSelectedMaquina(e.target.value)}
+                                            className={`h-full px-4 py-4 rounded-xl border-2 font-black uppercase tracking-widest text-sm transition-all outline-none ${!selectedMaquina
+                                                ? 'border-red-300 bg-red-50 text-red-500 animate-pulse'
+                                                : 'border-amber-200 bg-amber-50 text-amber-700'
+                                                }`}
+                                        >
+                                            <option value="" disabled>-- SELECCIONAR MÁQUINA --</option>
+                                            <option value="ADM">ADM</option>
+                                            <option value="Ultracaster">ULTRACASTER</option>
+                                        </select>
+                                        {!selectedMaquina && (
+                                            <span className="text-[10px] font-black text-red-500 mt-1 ml-1 uppercase animate-bounce">
+                                                * Máquina obligatoria
+                                            </span>
+                                        )}
+                                    </div>
+
                                     <button
                                         onClick={() => setSearchText('')}
-                                        className="bg-orange-500 hover:bg-orange-600 text-white px-8 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
+                                        className="bg-orange-500 hover:bg-orange-600 text-white px-6 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
                                     >
                                         <Eraser size={22} />
                                         <span className="text-sm font-black uppercase tracking-widest">Limpiar</span>
                                     </button>
-                                    <div className="bg-amber-50 px-8 flex items-center border border-amber-100 rounded-xl">
+                                    <div className="bg-[#254153] text-white px-8 flex items-center border border-[#254153] rounded-xl shadow-lg">
                                         <div className="text-right">
-                                            <p className="text-xs font-black text-amber-500 uppercase tracking-tighter leading-none">Pendientes</p>
-                                            <p className="text-2xl font-black text-amber-700 leading-none mt-1">{registros.length}</p>
+                                            <p className="text-xs font-black text-amber-400 uppercase tracking-tighter leading-none">Pendientes</p>
+                                            <p className="text-2xl font-black leading-none mt-1">{registros.length}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -146,6 +178,7 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
                                             registro={registro}
                                             usuarioEmail={userEmail}
                                             onRefresh={loadRegistros}
+                                            selectedMaquina={selectedMaquina}
                                         />
                                     ))}
                                 </div>

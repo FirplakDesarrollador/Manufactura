@@ -31,7 +31,7 @@ export async function getKilosReferencia(): Promise<KilosReferencia[]> {
     return data || []
 }
 
-export async function registrarVaciado(registroId: number, usuarioEmail: string) {
+export async function registrarVaciado(registroId: number, usuarioEmail: string, maquina: string) {
     // Vaciado = UPDATE trazabilidad_ms: vaciado_fecha, vaciado_user_id, estado -> 'Vaciado'
     const userId = await requireUserId(usuarioEmail)
 
@@ -40,7 +40,8 @@ export async function registrarVaciado(registroId: number, usuarioEmail: string)
         .update({
             estado: 'Vaciado',
             vaciado_fecha: new Date().toISOString(),
-            vaciado_user_id: userId
+            vaciado_user_id: userId,
+            vaciado_maquina: maquina
         })
         .eq('id', registroId)
         .select()
