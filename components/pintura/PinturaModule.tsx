@@ -135,7 +135,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 (orden.fecha_ideal_produccion &&
                     orden.fecha_ideal_produccion.includes(selectedDate))
 
-            return matchesSearch && matchesDate
+            // En Pintura, solo mostramos lo que realmente tiene piezas pendientes por iniciar
+            const hasProgramado = (orden.programado || 0) > 0
+
+            return matchesSearch && matchesDate && hasProgramado
         })
     }, [ordenes, searchText, selectedDate])
 
