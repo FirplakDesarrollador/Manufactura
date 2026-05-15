@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
-import { registrarVaciado } from '@/lib/supabase/queries/vaciado'
-import { Package, Hash, Layers, Info, CheckCircle, Clock } from 'lucide-react'
+import { registrarVaciado, registrarDesgelcado } from '@/lib/supabase/queries/vaciado'
+import { Package, Hash, Layers, Info, CheckCircle, Clock, AlertTriangle, X } from 'lucide-react'
 
 interface RegistroVaciadoCardProps {
     registro: RegistroTrazabilidad
@@ -14,6 +14,7 @@ interface RegistroVaciadoCardProps {
 
 export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh, selectedMaquina }: RegistroVaciadoCardProps) {
     const [loading, setLoading] = useState(false)
+    const [confirmingDesgelcar, setConfirmingDesgelcar] = useState(false)
 
     const handleRegister = async () => {
         setLoading(true)
@@ -25,6 +26,20 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
             alert('Hubo un error al registrar el vaciado.')
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleDesgelcar = async () => {
+        setLoading(true)
+        try {
+            await registrarDesgelcado(registro.id, usuarioEmail)
+            onRefresh()
+        } catch (error) {
+            console.error('Error:', error)
+            alert('Hubo un error al registrar el desgelcado.')
+        } finally {
+            setLoading(false)
+            setConfirmingDesgelcar(false)
         }
     }
 
@@ -88,25 +103,60 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
                     </div>
                 </div>
 
-                {/* Action Button */}
-                <div className="pt-4 xl:pt-0 shrink-0">
+                {/* Action Buttons */}
+                <div className="pt-4 xl:pt-0 shrink-0 flex flex-col gap-3 min-w-[280px]">
                     <button
                         onClick={handleRegister}
-                        disabled={loading || !selectedMaquina}
-                        className={`w-full xl:w-auto text-white px-10 py-5 rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all uppercase tracking-widest ${!selectedMaquina
+                        disabled={loading || !selectedMaquina || confirmingDesgelcar}
+                        className={`w-full text-white px-8 py-4 rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all uppercase tracking-widest ${!selectedMaquina || confirmingDesgelcar
                             ? 'bg-gray-300 cursor-not-allowed grayscale'
                             : 'bg-[#254153] hover:bg-[#1a2e3b] active:scale-95 shadow-amber-900/10'
                             } disabled:opacity-50`}
                     >
-                        {loading ? (
+                        {loading && !confirmingDesgelcar ? (
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/30 border-t-white" />
                         ) : (
-                            <CheckCircle size={24} />
+                            <CheckCircle size={22} />
                         )}
                         REGISTRAR VACIADO
                     </button>
+
+                    {!confirmingDesgelcar ? (
+                        <button
+                            onClick={() => setConfirmingDesgelcar(true)}
+                            disabled={loading}
+                            className="w-full bg-white border-2 border-red-100 text-red-500 hover:bg-red-50 px-8 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all uppercase tracking-widest active:scale-95"
+                        >
+                            <AlertTriangle size={18} />
+                            Desgelcar Pieza
+                        </button>
+                    ) : (
+                        <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <button
+                                onClick={handleDesgelcar}
+                                disabled={loading}
+                                className="w-full bg-red-600 text-white hover:bg-red-700 px-8 py-4 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all uppercase tracking-widest shadow-lg shadow-red-200 active:scale-95"
+                            >
+                                {loading ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />
+                                ) : (
+                                    <AlertTriangle size={18} />
+                                )}
+                                ¿ESTÁ SEGURO DE DESGELCAR?
+                            </button>
+                            <button
+                                onClick={() => setConfirmingDesgelcar(false)}
+                                disabled={loading}
+                                className="w-full bg-gray-100 text-gray-500 hover:bg-gray-200 px-8 py-2 rounded-lg font-bold text-[10px] flex items-center justify-center gap-2 transition-all uppercase tracking-widest"
+                            >
+                                <X size={14} />
+                                Cancelar
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
     )
 }
+

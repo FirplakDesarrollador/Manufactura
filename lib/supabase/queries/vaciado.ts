@@ -54,3 +54,24 @@ export async function registrarVaciado(registroId: number, usuarioEmail: string,
 
     return data
 }
+
+export async function registrarDesgelcado(registroId: number, usuarioEmail: string) {
+    const userId = await requireUserId(usuarioEmail)
+
+    const { data, error } = await supabase
+        .from('trazabilidad_ms')
+        .update({
+            estado: 'Desgelcada'
+        })
+        .eq('id', registroId)
+        .select()
+        .single()
+
+    if (error) {
+        console.error('Error registrando desgelcado:', error)
+        throw new Error(`Error al registrar desgelcado: [${error.code}] ${error.message}`)
+    }
+
+    return data
+}
+
