@@ -1,33 +1,41 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
 import { getOrdenesMuebles, getMetricasMueblesHoy, registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
+import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
-import { Search, X, Calendar, RefreshCw, Filter } from 'lucide-react'
+import { Search, X, Calendar, RefreshCw, Filter, Wifi } from 'lucide-react'
 
 interface CorteModuleProps {
     userEmail: string
     turno: string
     usuarioNombre: string
     plantaMuebles: string
+    onStartTask?: (tarea: any) => void
 }
 
-export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMuebles }: CorteModuleProps) {
+export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMuebles, onStartTask }: CorteModuleProps) {
     const [ordenes, setOrdenes] = useState<OrdenMueble[]>([])
     const [metricas, setMetricas] = useState<MetricasMuebles | null>(null)
     const [loading, setLoading] = useState(true)
+    const [syncing, setSyncing] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
     const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
-    const loadData = React.useCallback(async () => {
-        setLoading(true)
+    const loadData = useCallback(async (soft = false) => {
+        if (soft) {
+            setSyncing(true)
+        } else {
+            setLoading(true)
+        }
         try {
             const [ordenesData, metricasData] = await Promise.all([
                 getOrdenesMuebles(plantaMuebles),
@@ -41,11 +49,41 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
             console.error('Error loading Muebles data:', error)
         } finally {
             setLoading(false)
+            setSyncing(false)
         }
     }, [turno, plantaMuebles])
 
     useEffect(() => {
         loadData()
+    }, [loadData])
+
+    // Realtime subscription — auto-refresh on new traceability records
+    useEffect(() => {
+        const channel = supabase
+            .channel('corte-realtime')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'trazabilidad_muebles'
+            }, () => {
+                // Debounce rapid successive events
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'ordenes_fabricacion_muebles'
+            }, () => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+            if (debounceRef.current) clearTimeout(debounceRef.current)
+        }
     }, [loadData])
 
     const handleClearFilters = () => {
@@ -114,8 +152,9 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
                             </button>
                             
                             <button
-                                onClick={loadData}
+                                onClick={() => loadData()}
                                 className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                                title="Actualizar datos"
                             >
                                 <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                             </button>
@@ -141,6 +180,12 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
                             <Filter size={14} />
                             Ordenes para corte: {filteredOrdenes.length}
                         </div>
+                        {syncing && (
+                            <div className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold uppercase tracking-widest animate-in fade-in duration-300">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping inline-block" />
+                                Actualizando...
+                            </div>
+                        )}
                     </div>
 
                     {loading ? (
@@ -183,6 +228,11 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
                     proceso="Corte"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
+                    onStartTask={(tarea) => {
+                        setIsModalOpen(false)
+                        onStartTask?.(tarea)
+                    }}
                     onSuccess={() => {
                         setIsModalOpen(false)
                         loadData()

@@ -98,7 +98,10 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                     orden_fabricacion: o.orden_fabricacion || '',
                     cantidad: o.transito || 0,
                     creado_por: usuarioNombre,
-                    proceso: 'Cedi'
+                    proceso: 'Cedi',
+                    cedula_operario: 'CEDI_BULK',
+                    nombre_operario: usuarioNombre,
+                    fecha_inicio: new Date().toISOString()
                 })
             }
             toast.success('Muebles movidos a Cedi correctamente')

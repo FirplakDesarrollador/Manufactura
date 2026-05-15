@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react'
 import { OrdenMueble } from '@/types/muebles'
-import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2, User, ArrowRight, ChevronLeft } from 'lucide-react'
+import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2, User, ArrowRight, ChevronLeft, Play } from 'lucide-react'
 import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
+import { getEmpleadoById } from '@/lib/supabase/queries/talento_humano'
+import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
 import { toast } from 'sonner'
 
 interface TrazabilidadModalProps {
@@ -14,7 +16,9 @@ interface TrazabilidadModalProps {
     usuarioNombre: string
     turno: string
     taladro?: string
+    userEmail: string
     onSuccess: () => void
+    onStartTask?: (tarea: any) => void
 }
 
 export default function TrazabilidadModal({ 
@@ -25,7 +29,9 @@ export default function TrazabilidadModal({
     usuarioNombre, 
     turno,
     taladro,
-    onSuccess 
+    userEmail,
+    onSuccess,
+    onStartTask
 }: TrazabilidadModalProps) {
     const [step, setStep] = useState<'identificacion' | 'registro'>('identificacion')
     const [identificacion, setIdentificacion] = useState('')
@@ -33,6 +39,9 @@ export default function TrazabilidadModal({
     const [loading, setLoading] = useState(false)
     const [validationError, setValidationError] = useState<string | null>(null)
     const [available, setAvailable] = useState<number>(0)
+    const [empleado, setEmpleado] = useState<{ nombreCompleto: string, foto: string } | null>(null)
+    const [isSearching, setIsSearching] = useState(false)
+    const [startTime, setStartTime] = useState<string>('')
 
     const validateQuantity = React.useCallback((val: number) => {
         let error = null
@@ -83,15 +92,41 @@ export default function TrazabilidadModal({
 
     useEffect(() => {
         if (isOpen) {
+            setStartTime(new Date().toISOString())
             setStep('identificacion')
             setIdentificacion('')
+            setEmpleado(null)
             setCantidad(1)
             setValidationError(null)
             validateQuantity(1)
         }
     }, [isOpen, validateQuantity])
 
+    const handleValidarOperario = async () => {
+        if (identificacion.length < 4) return
+
+        setIsSearching(true)
+        try {
+            const data = await getEmpleadoById(identificacion)
+            if (data) {
+                setEmpleado({
+                    nombreCompleto: data.nombreCompleto,
+                    foto: data.foto
+                })
+                setStep('registro')
+            } else {
+                toast.error('Por favor valida tu cédula')
+            }
+        } catch (error) {
+            console.error('Error validating operator:', error)
+            toast.error('Error al validar operario')
+        } finally {
+            setIsSearching(false)
+        }
+    }
+
     const handleIncrement = () => {
+        if (available > 0 && cantidad >= available) return
         const next = cantidad + 1
         setCantidad(next)
         validateQuantity(next)
@@ -106,10 +141,40 @@ export default function TrazabilidadModal({
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = parseInt(e.target.value) || 0
+        let val = parseInt(e.target.value) || 0
+        if (available > 0 && val > available) val = available
         setCantidad(val)
         validateQuantity(val)
     }
+
+    // Real-time search effect
+    useEffect(() => {
+        const searchEmpleado = async () => {
+            if (identificacion.length >= 5) { // Search only when enough digits are typed
+                setIsSearching(true)
+                try {
+                    const data = await getEmpleadoById(identificacion)
+                    if (data) {
+                        setEmpleado({
+                            nombreCompleto: data.nombreCompleto,
+                            foto: data.foto
+                        })
+                    } else {
+                        setEmpleado(null)
+                    }
+                } catch (error) {
+                    console.error('Error searching operator:', error)
+                } finally {
+                    setIsSearching(false)
+                }
+            } else {
+                setEmpleado(null)
+            }
+        }
+
+        const debounceTimer = setTimeout(searchEmpleado, 500)
+        return () => clearTimeout(debounceTimer)
+    }, [identificacion])
 
     const handleCopy = () => {
         navigator.clipboard.writeText(orden.orden_fabricacion?.toString() || '')
@@ -117,7 +182,37 @@ export default function TrazabilidadModal({
     }
 
     const handleSubmit = async () => {
-        if (validationError || cantidad <= 0 || !identificacion) return
+        if (validationError || !identificacion) return
+
+        // Si es Corte, iniciamos la tarea en lugar de registrar inmediatamente
+        if (proceso === 'Corte') {
+            setLoading(true)
+            try {
+                const nuevaTarea = {
+                    of: orden.orden_fabricacion,
+                    proceso: proceso,
+                    inicio: startTime,
+                    operario_nombre: empleado?.nombreCompleto || 'Desconocido',
+                    operario_cedula: identificacion,
+                    producto_descripcion: orden.producto_descripcion,
+                    available: available
+                }
+                
+                await setTareaActiva(userEmail, nuevaTarea)
+                toast.success('¡Proceso de corte iniciado!')
+                
+                if (onStartTask) onStartTask(nuevaTarea)
+                onClose()
+            } catch (error) {
+                console.error('Error starting task:', error)
+                toast.error('Error al iniciar el proceso')
+            } finally {
+                setLoading(false)
+            }
+            return
+        }
+
+        if (cantidad <= 0) return
 
         // Extra business logic from Flutter
         if (proceso === 'Inspeccion' && (orden.por_reponer || 0) > 0 && cantidad >= (orden.enchape || 0)) {
@@ -132,6 +227,9 @@ export default function TrazabilidadModal({
                 creado_por: `${usuarioNombre} - ID: ${identificacion}`,
                 cantidad: cantidad,
                 proceso: proceso,
+                cedula_operario: identificacion,
+                nombre_operario: empleado?.nombreCompleto || 'Desconocido',
+                fecha_inicio: startTime,
                 taladro: taladro
             })
             toast.success('Registro exitoso')
@@ -171,13 +269,25 @@ export default function TrazabilidadModal({
                     {step === 'identificacion' ? (
                         /* Step 1: Identification */
                         <div className="space-y-6 flex flex-col items-center animate-in slide-in-from-right-4 duration-300">
-                            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner">
-                                <User size={32} />
+                            <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner overflow-hidden border-2 border-white">
+                                {empleado?.foto ? (
+                                    <img 
+                                        src={empleado.foto} 
+                                        alt={empleado.nombreCompleto}
+                                        className="w-full h-full object-cover animate-in fade-in zoom-in duration-500"
+                                    />
+                                ) : (
+                                    <User size={32} />
+                                )}
                             </div>
                             
-                            <div className="text-center space-y-1">
-                                <h3 className="text-lg font-bold text-gray-900">Validar Operario</h3>
-                                <p className="text-xs text-gray-500">Ingrese su número de identificación</p>
+                            <div className="text-center space-y-1 h-14 flex flex-col justify-center">
+                                <h3 className="text-lg font-bold text-gray-900 leading-tight uppercase">
+                                    {empleado ? empleado.nombreCompleto : 'Validar Operario'}
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                    {isSearching ? 'Buscando operario...' : 'Ingrese su número de identificación'}
+                                </p>
                             </div>
 
                             <div className="w-full relative">
@@ -190,7 +300,7 @@ export default function TrazabilidadModal({
                                     placeholder="Cédula o ID"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && identificacion.length >= 4) {
-                                            setStep('registro')
+                                            handleValidarOperario()
                                         }
                                     }}
                                     className="w-full h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all placeholder:text-gray-200 placeholder:text-lg"
@@ -198,16 +308,28 @@ export default function TrazabilidadModal({
                             </div>
 
                             <button
-                                onClick={() => setStep('registro')}
-                                disabled={identificacion.length < 4}
+                                onClick={() => {
+                                    if (empleado) {
+                                        setStep('registro')
+                                    } else {
+                                        handleValidarOperario()
+                                    }
+                                }}
+                                disabled={identificacion.length < 4 || isSearching}
                                 className={`w-full h-14 rounded-2xl flex items-center justify-center gap-2 font-bold text-white shadow-lg transition-all active:scale-[0.98] ${
-                                    identificacion.length < 4 
+                                    identificacion.length < 4 || isSearching
                                         ? 'bg-gray-300 shadow-none cursor-not-allowed' 
                                         : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 shadow-xl'
                                 }`}
                             >
-                                <span>CONTINUAR</span>
-                                <ArrowRight size={20} />
+                                {isSearching ? (
+                                    <Loader2 className="animate-spin" size={20} />
+                                ) : (
+                                    <>
+                                        <span>CONTINUAR</span>
+                                        <ArrowRight size={20} />
+                                    </>
+                                )}
                             </button>
                         </div>
                     ) : (
@@ -221,7 +343,26 @@ export default function TrazabilidadModal({
                                 Volver
                             </button>
 
-                            <p className="text-center text-gray-600 font-medium text-sm leading-relaxed max-w-[280px]">
+                            {empleado && (
+                                <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-300">
+                                    <div className="w-20 h-20 rounded-full border-4 border-blue-50 overflow-hidden shadow-md bg-gray-100 flex items-center justify-center">
+                                        {empleado.foto ? (
+                                            <img 
+                                                src={empleado.foto} 
+                                                alt={empleado.nombreCompleto}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <User size={40} className="text-gray-300" />
+                                        )}
+                                    </div>
+                                    <span className="text-sm font-bold text-gray-800 text-center px-4 leading-tight">
+                                        {empleado.nombreCompleto}
+                                    </span>
+                                </div>
+                            )}
+
+                            <p className="text-center text-gray-400 font-bold text-[10px] leading-relaxed max-w-[280px] uppercase tracking-wider">
                                 {orden.producto_descripcion}
                             </p>
 
@@ -234,26 +375,38 @@ export default function TrazabilidadModal({
                                     <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Disponible</span>
                                     <span className="text-gray-800 font-bold text-sm">{available}</span>
                                 </div>
-                            </div>
+                            </div>                             {proceso !== 'Corte' && (
+                                <div className="flex items-center gap-4">
+                                    <button 
+                                        onClick={handleDecrement} 
+                                        disabled={cantidad <= 1}
+                                        className={`transition-all ${cantidad <= 1 ? 'text-gray-200 cursor-not-allowed' : 'text-red-500 hover:scale-110 active:scale-95'}`}
+                                    >
+                                        <MinusSquare size={48} fill="currentColor" stroke="white" />
+                                    </button>
+                                    
+                                    <div className="relative flex flex-col items-center">
+                                        <input 
+                                            type="number"
+                                            value={cantidad}
+                                            onChange={handleInputChange}
+                                            className="w-24 h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 outline-none transition-all shadow-sm"
+                                        />
+                                        {available > 0 && (
+                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">máx. {available}</span>
+                                        )}
+                                    </div>
 
-                            <div className="flex items-center gap-4">
-                                <button onClick={handleDecrement} className="text-red-500 hover:scale-110 active:scale-95 transition-all">
-                                    <MinusSquare size={48} fill="currentColor" stroke="white" />
-                                </button>
-                                
-                                <div className="relative">
-                                    <input 
-                                        type="number"
-                                        value={cantidad}
-                                        onChange={handleInputChange}
-                                        className="w-24 h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 outline-none transition-all shadow-sm"
-                                    />
+                                    <button 
+                                        onClick={handleIncrement} 
+                                        disabled={available > 0 && cantidad >= available}
+                                        className={`transition-all ${available > 0 && cantidad >= available ? 'text-gray-200 cursor-not-allowed' : 'text-emerald-500 hover:scale-110 active:scale-95'}`}
+                                    >
+                                        <PlusSquare size={48} fill="currentColor" stroke="white" />
+                                    </button>
                                 </div>
+                             )}
 
-                                <button onClick={handleIncrement} className="text-emerald-500 hover:scale-110 active:scale-95 transition-all">
-                                    <PlusSquare size={48} fill="currentColor" stroke="white" />
-                                </button>
-                            </div>
 
                             <div className="w-full">
                                 {validationError ? (
@@ -264,12 +417,18 @@ export default function TrazabilidadModal({
                                 ) : (
                                     <button
                                         onClick={handleSubmit}
-                                        disabled={loading || cantidad <= 0}
+                                        disabled={loading}
                                         className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-bold text-white shadow-xl transition-all active:scale-[0.98] ${
                                             loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                         }`}
                                     >
-                                        {loading ? <Loader2 className="animate-spin" size={24} /> : <><Send size={20} /><span>REGISTRAR</span></>}
+                                        {loading ? <Loader2 className="animate-spin" size={24} /> : (
+                                            proceso === 'Corte' ? (
+                                                <><Play size={20} /><span>INICIAR PROCESO</span></>
+                                            ) : (
+                                                <><Send size={20} /><span>REGISTRAR</span></>
+                                            )
+                                        )}
                                     </button>
                                 )}
                             </div>

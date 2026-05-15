@@ -40,6 +40,9 @@ export async function registrarTrazabilidadMueble(payload: {
     cantidad: number,
     creado_por: string,
     proceso: string,
+    cedula_operario: string,
+    nombre_operario: string,
+    fecha_inicio: string,
     taladro?: string
 }) {
     const { data, error } = await supabase
@@ -49,6 +52,9 @@ export async function registrarTrazabilidadMueble(payload: {
             cantidad: payload.cantidad,
             creado_por: payload.creado_por,
             proceso: payload.proceso,
+            cedula_operario: payload.cedula_operario,
+            nombre_operario: payload.nombre_operario,
+            fecha_inicio: payload.fecha_inicio,
             taladro: payload.taladro || 'NO APLICA',
             created_at: new Date().toISOString()
         }])
