@@ -14,6 +14,7 @@ import AdministracionModule from '@/components/muebles/AdministracionModule'
 import DefectosModule from '@/components/muebles/DefectosModule'
 import PanelDefectosModule from '@/components/muebles/PanelDefectosModule'
 import DashboardModule from '@/components/muebles/DashboardModule'
+import SeguimientoModule from '@/components/muebles/SeguimientoModule'
 import ConfigurarTurnosModal from '@/components/muebles/ConfigurarTurnosModal'
 import ConfigurarSupervisoresModal from '@/components/muebles/ConfigurarSupervisoresModal'
 import CambiarPlantaModal from '@/components/muebles/CambiarPlantaModal'
@@ -164,6 +165,11 @@ export default function MueblesPage() {
         { id: 'dashboard', label: 'Dashboard', permission: 'dashboard', icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            </svg>
+        )},
+        { id: 'seguimiento', label: 'Seguimiento', permission: 'seguimiento', icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
         )}
     ]
@@ -365,6 +371,10 @@ export default function MueblesPage() {
                             />
                         ) : activeModule === 'dashboard' ? (
                             <DashboardModule 
+                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                            />
+                        ) : activeModule === 'seguimiento' ? (
+                            <SeguimientoModule
                                 plantaMuebles={profile?.planta_muebles || 'Muebles'}
                             />
                         ) : (
