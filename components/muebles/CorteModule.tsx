@@ -93,7 +93,7 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
 
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
-        return ordenes.filter((orden) => {
+        const filtered = ordenes.filter((orden) => {
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
@@ -111,6 +111,15 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
             const needsCutting = (orden.por_cortar || 0) > 0 || (orden.reponer_corte || 0) > 0
 
             return matchesSearch && matchesDate && needsCutting
+        })
+
+        // Sort: reposición orders first, then by date
+        return filtered.sort((a, b) => {
+            const aReponer = (a.reponer_corte || 0) + (a.por_reponer || 0)
+            const bReponer = (b.reponer_corte || 0) + (b.por_reponer || 0)
+            if (aReponer > 0 && bReponer === 0) return -1
+            if (bReponer > 0 && aReponer === 0) return 1
+            return 0
         })
     }, [ordenes, searchText, selectedDate, dateType])
 

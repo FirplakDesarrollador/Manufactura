@@ -354,10 +354,10 @@ export default function SeguimientoModule({ plantaMuebles }: SeguimientoModulePr
                                 <p className="text-gray-500 font-medium text-lg">No se encontraron órdenes para la fecha seleccionada.</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            <div className="flex flex-col gap-4">
                                 {filteredOrdenes.map((ord, idx) => (
-                                    <div key={idx} className="bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group flex flex-col">
-                                        <div className="p-5 flex items-center gap-4 border-b border-gray-50 bg-gradient-to-br from-purple-50/80 via-white to-white relative overflow-hidden">
+                                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col lg:flex-row items-stretch">
+                                        <div className="p-5 lg:w-[30%] flex items-center gap-4 border-b lg:border-b-0 lg:border-r border-gray-100 bg-gradient-to-br from-purple-50/50 to-white relative overflow-hidden shrink-0">
                                             <div className="absolute top-0 right-0 w-24 h-24 bg-purple-100 rounded-full blur-2xl -mr-10 -mt-10 opacity-60"></div>
                                             
                                             <div className="w-14 h-14 rounded-xl shadow-sm overflow-hidden bg-white flex-shrink-0 flex items-center justify-center relative z-10 border border-gray-100">
@@ -371,37 +371,37 @@ export default function SeguimientoModule({ plantaMuebles }: SeguimientoModulePr
                                             </div>
                                         </div>
 
-                                        <div className="p-5 border-b border-dashed border-gray-200 flex justify-between items-center bg-gray-50/50">
+                                        <div className="p-5 lg:w-[25%] flex flex-row items-center justify-around border-b lg:border-b-0 lg:border-r border-gray-100 bg-gray-50/30 shrink-0">
                                             <div className="text-center">
                                                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Total Piezas</span>
-                                                <span className="font-bold text-gray-800">{ord.piezasCortadas}</span>
+                                                <span className="text-xl font-bold text-gray-800">{ord.piezasCortadas}</span>
                                             </div>
-                                            <div className="w-px h-8 bg-gray-200"></div>
+                                            <div className="w-px h-10 bg-gray-200"></div>
                                             <div className="text-center">
                                                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Tiempo Total</span>
-                                                <span className="font-bold text-gray-800">{formatTime(ord.tiempoTotalMs)}</span>
+                                                <span className="text-xl font-bold text-gray-800">{formatTime(ord.tiempoTotalMs)}</span>
                                             </div>
                                         </div>
 
-                                        <div className="p-4 flex-1 flex flex-col">
+                                        <div className="p-5 flex-1 flex flex-col justify-center bg-white overflow-hidden">
                                             <div className="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-3">Detalle por Operario</div>
-                                            <div className="space-y-3 flex-1 overflow-y-auto max-h-[160px] pr-2 custom-scrollbar">
+                                            <div className="flex flex-row flex-nowrap overflow-x-auto gap-3 pb-2 custom-scrollbar">
                                                 {Array.from(ord.operarios.values()).map((op) => (
-                                                    <div key={op.cedula} className="flex items-center gap-3 bg-white border border-gray-100 p-2 rounded-lg">
-                                                        <div className="w-8 h-8 rounded-full shadow-sm overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                                                    <div key={op.cedula} className="flex items-center gap-3 bg-gray-50 border border-gray-100 p-2.5 rounded-lg min-w-[220px] max-w-[280px] flex-shrink-0 transition-colors hover:bg-gray-100">
+                                                        <div className="w-10 h-10 rounded-full shadow-sm overflow-hidden bg-white flex-shrink-0 flex items-center justify-center border border-gray-200">
                                                             {fotos[op.cedula] ? (
                                                                 <img src={fotos[op.cedula]} alt={op.nombre} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <User size={14} className="text-gray-300" />
+                                                                <User size={16} className="text-gray-300" />
                                                             )}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="font-bold text-xs text-gray-800 truncate" title={op.nombre}>{op.nombre}</div>
-                                                            <div className="text-[10px] text-gray-500">CC: {op.cedula}</div>
+                                                            <div className="text-[10px] text-gray-500 mt-0.5">CC: {op.cedula}</div>
                                                         </div>
                                                         <div className="text-right flex-shrink-0">
-                                                            <div className="font-bold text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{op.piezasCortadas} pz</div>
-                                                            <div className="text-[10px] text-gray-500 mt-0.5">{formatTime(op.tiempoTotalMs)}</div>
+                                                            <div className="font-bold text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{op.piezasCortadas} pz</div>
+                                                            <div className="text-[10px] font-medium text-gray-600 mt-1">{formatTime(op.tiempoTotalMs)}</div>
                                                         </div>
                                                     </div>
                                                 ))}
