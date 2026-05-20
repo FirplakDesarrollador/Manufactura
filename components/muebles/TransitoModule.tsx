@@ -196,6 +196,7 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
                     proceso="Transito"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
                     onSuccess={() => {
                         setIsModalOpen(false)
                         loadData()

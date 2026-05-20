@@ -282,6 +282,7 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                     proceso="Cedi"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
                     onSuccess={() => {
                         setIsModalOpen(false)
                         loadData()

@@ -129,6 +129,12 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
         const hasPieces = (o.transito || 0) > 0 || (o.cedi || 0) > 0
 
         return matchesSearch && matchesFecha && hasPieces
+    }).sort((a, b) => {
+        const dateA = a.fecha_ideal_produccion ? new Date(a.fecha_ideal_produccion).getTime() : Infinity
+        const dateB = b.fecha_ideal_produccion ? new Date(b.fecha_ideal_produccion).getTime() : Infinity
+        const valA = isNaN(dateA) ? Infinity : dateA
+        const valB = isNaN(dateB) ? Infinity : dateB
+        return valA - valB
     })
 
     const todayStr = new Date().toLocaleDateString('es-ES')

@@ -184,6 +184,7 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
                     proceso="Digitado"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
                     onSuccess={() => {
                         setIsModalOpen(false)
                         loadData()

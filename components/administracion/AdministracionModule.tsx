@@ -55,7 +55,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             const [ofRes, trazRes, moldesData] = await Promise.all([
                 supabase.from('query_ordenes_fabricacion')
                     .select('*')
-                    .order('fecha_entrega_estimada', { ascending: true }),
+                    .order('fecha_ideal_produccion', { ascending: true }),
                 supabase.from('query_trazabilidad_ms')
                     .select('*')
                     .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
@@ -75,7 +75,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
 
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
-        return ordenes.filter(o => {
+        const filtered = ordenes.filter(o => {
             const matchesSearch = !search ||
                 (o.orden_fabricacion?.toLowerCase() || '').includes(search) ||
                 (o.pedido?.toLowerCase() || '').includes(search) ||
@@ -87,6 +87,14 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             const matchesDate = !selectedDate || (o.fecha_ideal_produccion && o.fecha_ideal_produccion.split('T')[0] === selectedDate)
 
             return matchesSearch && matchesDate
+        })
+
+        return filtered.sort((a, b) => {
+            const dateA = a.fecha_ideal_produccion ? new Date(a.fecha_ideal_produccion).getTime() : Infinity
+            const dateB = b.fecha_ideal_produccion ? new Date(b.fecha_ideal_produccion).getTime() : Infinity
+            const valA = isNaN(dateA) ? Infinity : dateA
+            const valB = isNaN(dateB) ? Infinity : dateB
+            return valA - valB
         })
     }, [ordenes, searchText, selectedDate])
 

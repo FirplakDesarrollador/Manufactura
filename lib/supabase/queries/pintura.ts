@@ -5,7 +5,7 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
     const { data, error } = await supabase
         .from('query_ordenes_fabricacion')
         .select('*')
-        .order('fecha_entrega_estimada', { ascending: true })
+        .order('fecha_ideal_produccion', { ascending: true })
 
     if (error) {
         console.error('Error fetching ordenes fabricacion:', error)

@@ -118,10 +118,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         }
     }, [selectedOrden, allMoldes])
 
-    // Filter ordenes based on search and date (Safe from null/undefined)
+    // Filter and sort ordenes based on search and date (Safe from null/undefined)
     const filteredOrdenes = useMemo(() => {
         const search = (searchText || '').toLowerCase()
-        return ordenes.filter((orden) => {
+        const filtered = ordenes.filter((orden) => {
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
@@ -139,6 +139,14 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             const hasProgramado = (orden.programado || 0) > 0
 
             return matchesSearch && matchesDate && hasProgramado
+        })
+
+        return filtered.sort((a, b) => {
+            const dateA = a.fecha_ideal_produccion ? new Date(a.fecha_ideal_produccion).getTime() : Infinity
+            const dateB = b.fecha_ideal_produccion ? new Date(b.fecha_ideal_produccion).getTime() : Infinity
+            const valA = isNaN(dateA) ? Infinity : dateA
+            const valB = isNaN(dateB) ? Infinity : dateB
+            return valA - valB
         })
     }, [ordenes, searchText, selectedDate])
 
@@ -295,7 +303,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                     <MetricCard title="Cantidad" value={metrics.cantidad} bgColor="bg-cyan-500" />
                     <MetricCard title="Programado" value={metrics.programado} bgColor="bg-orange-500" />
                     <MetricCard title="Pintura" value={metrics.pintura} bgColor="bg-teal-600" />
-                    <MetricCard title="Desgelcado" value={metrics.desgelcado} bgColor="bg-pink-500" />
+                    <MetricCard title="Desgelcado" value={metrics.desgelcada} bgColor="bg-pink-500" />
                     <MetricCard title="Vaciado" value={metrics.vaciado} bgColor="bg-blue-100" textColor="text-gray-900" />
                     <MetricCard title="Acabado" value={metrics.acabado} bgColor="bg-white" textColor="text-gray-900" />
                     <MetricCard title="Digitado" value={metrics.digitado} bgColor="bg-white" textColor="text-gray-900" />

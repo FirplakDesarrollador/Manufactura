@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from '@/lib/supabase/queries/pintura'
 import { getRegistrosParaDigitado } from '@/lib/supabase/queries/digitado'
-import { Search, Eraser, Loader2, Calendar, Info, ArrowLeft } from 'lucide-react'
+import { Search, Eraser, Loader2, Calendar } from 'lucide-react'
 import DigitadoList from './DigitadoList'
 import OrdenCard from '../pintura/OrdenCard'
 import { toast } from 'sonner'
@@ -75,6 +75,12 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
         )
 
         return matchesSearch && matchesFecha && hasRelevantPieces
+    }).sort((a, b) => {
+        const dateA = a.fecha_ideal_produccion ? new Date(a.fecha_ideal_produccion).getTime() : Infinity
+        const dateB = b.fecha_ideal_produccion ? new Date(b.fecha_ideal_produccion).getTime() : Infinity
+        const valA = isNaN(dateA) ? Infinity : dateA
+        const valB = isNaN(dateB) ? Infinity : dateB
+        return valA - valB
     })
 
     const todayStr = new Date().toLocaleDateString('es-ES')
@@ -110,12 +116,10 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const totalKilogramos = [...transitoRecords, ...cediTodayRecords]
         .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
 
-    const selectedOrder = ordenes.find(o => o.id === selectedOrderId)
-
     return (
-        <div className="h-full flex flex-col bg-slate-50/30">
+        <div className="w-full min-h-full flex flex-col bg-slate-50/30 pb-12">
             {/* Summary Header */}
-            <div className="p-2 bg-white border-b border-slate-200 overflow-x-auto">
+            <div className="p-2 bg-white border-b border-slate-200 overflow-x-auto sticky top-0 z-10 shadow-sm">
                 <div className="flex flex-wrap gap-1 min-w-max">
                     <SummaryCard label="Ordenes" value={filteredOrdenes.length} color="blue" isPrimary />
                     <SummaryCard label="Cantidad" value={totalCantidad} color="blue" />
@@ -167,50 +171,50 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                 </div>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-hidden relative">
-                {!selectedOrderId || !selectedOrder ? (
-                    // Selection View
-                    <div className="h-full overflow-y-auto p-4 space-y-3 max-w-7xl mx-auto">
-                        {loading ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
-                                <Loader2 className="animate-spin text-blue-500" size={48} />
-                                <span className="font-bold uppercase tracking-widest animate-pulse">Cargando órdenes...</span>
-                            </div>
-                        ) : filteredOrdenes.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 font-bold uppercase text-lg italic bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                                Sin ordenes halladas
-                            </div>
-                        ) : (
-                            filteredOrdenes.map(o => (
-                                <div key={o.id} className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                                    <OrdenCard
-                                        orden={o}
-                                        isActive={false}
-                                        onClick={() => {
-                                            setSelectedOrderId(o.id)
-                                            if (o.orden_fabricacion) {
-                                                navigator.clipboard.writeText(o.orden_fabricacion)
-                                                toast.success(`Orden ${o.orden_fabricacion} copiada`)
-                                            }
-                                        }}
-                                        moldes={allMoldes}
-                                    />
-                                </div>
-                            ))
-                        )}
+            {/* Content Area - Natural scrolling container */}
+            <div className="p-4 space-y-3 max-w-7xl mx-auto w-full">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
+                        <Loader2 className="animate-spin text-blue-500" size={48} />
+                        <span className="font-bold uppercase tracking-widest animate-pulse">Cargando órdenes...</span>
+                    </div>
+                ) : filteredOrdenes.length === 0 ? (
+                    <div className="text-center py-20 text-slate-400 font-bold uppercase text-lg italic bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                        Sin ordenes halladas
                     </div>
                 ) : (
-                    // Detail View
-                    <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300">
-                        <DigitadoList
-                            order={selectedOrder}
-                            userEmail={userEmail}
-                            onRefresh={loadData}
-                            allMoldes={allMoldes}
-                            onBack={() => setSelectedOrderId(null)}
-                        />
-                    </div>
+                    filteredOrdenes.map(o => (
+                        <div key={o.id} className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <OrdenCard
+                                orden={o}
+                                isActive={o.id === selectedOrderId}
+                                onClick={() => {
+                                    if (selectedOrderId === o.id) {
+                                        setSelectedOrderId(null)
+                                    } else {
+                                        setSelectedOrderId(o.id)
+                                        if (o.orden_fabricacion) {
+                                            navigator.clipboard.writeText(o.orden_fabricacion)
+                                            toast.success(`Orden ${o.orden_fabricacion} copiada`)
+                                        }
+                                    }
+                                }}
+                                moldes={allMoldes}
+                            />
+                            {o.id === selectedOrderId && (
+                                <div className="border-2 border-t-0 border-cyan-500 rounded-b-lg overflow-hidden -mt-2 bg-slate-50 shadow-inner">
+                                    <DigitadoList
+                                        order={o}
+                                        userEmail={userEmail}
+                                        onRefresh={loadData}
+                                        allMoldes={allMoldes}
+                                        onBack={() => setSelectedOrderId(null)}
+                                        isInline={true}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    ))
                 )}
             </div>
         </div>
@@ -239,4 +243,3 @@ function SummaryCard({ label, value, color, isPrimary = false }: { label: string
         </div>
     )
 }
-

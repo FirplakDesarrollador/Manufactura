@@ -184,6 +184,7 @@ export default function EmpaqueModule({ userEmail, turno, usuarioNombre, plantaM
                     proceso="Empaque"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
                     onSuccess={() => {
                         setIsModalOpen(false)
                         loadData()

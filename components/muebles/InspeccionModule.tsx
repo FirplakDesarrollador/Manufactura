@@ -217,6 +217,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                     proceso="Inspeccion"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
                     taladro={taladro}
                     onSuccess={() => {
                         setIsModalOpen(false)
