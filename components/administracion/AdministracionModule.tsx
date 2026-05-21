@@ -18,7 +18,8 @@ import {
     Eraser,
     Edit2,
     Trash2,
-    X
+    X,
+    ChevronsUpDown
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -32,6 +33,8 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [expandedRegistros, setExpandedRegistros] = useState<Set<number>>(new Set())
+    const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
 
     // Modal State
     const [editModal, setEditModal] = useState<{
@@ -58,7 +61,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                     .order('fecha_ideal_produccion', { ascending: true }),
                 supabase.from('query_trazabilidad_ms')
                     .select('*')
-                    .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
+                    .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},pulido_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Pulido,estado.eq.Digitado,estado.eq.Transito`)
                     .order('vaciado_fecha', { ascending: false })
                     .limit(10000),
                 getAllMoldes()
@@ -178,6 +181,38 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
         }
     }
 
+    const toggleRegistro = (id: number) => {
+        setExpandedRegistros(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const toggleOrden = (id: number) => {
+        setExpandedOrdenes(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const allRegistrosExpanded = filteredRegistros.length > 0 &&
+        filteredRegistros.every(registro => expandedRegistros.has(registro.id))
+    const allOrdenesExpanded = filteredOrdenes.length > 0 &&
+        filteredOrdenes.every(orden => expandedOrdenes.has(orden.id))
+
+    const toggleAllVisible = () => {
+        if (activeTab === 'trazabilidad') {
+            setExpandedRegistros(allRegistrosExpanded ? new Set() : new Set(filteredRegistros.map(registro => registro.id)))
+            return
+        }
+
+        setExpandedOrdenes(allOrdenesExpanded ? new Set() : new Set(filteredOrdenes.map(orden => orden.id)))
+    }
+
     const handleCargarOrdenes = async () => {
         if (!confirm('¿Desea iniciar el proceso de carga de órdenes de fabricación?')) return
 
@@ -285,6 +320,25 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                             (Filtrado aplicado)
                         </span>
                     )}
+                    <button
+                        onClick={toggleAllVisible}
+                        disabled={activeTab === 'of' ? filteredOrdenes.length === 0 : filteredRegistros.length === 0}
+                        className={`ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${
+                            activeTab === 'of'
+                                ? allOrdenesExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
+                                : allRegistrosExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
+                        }`}
+                        title={activeTab === 'of'
+                            ? allOrdenesExpanded ? 'Cerrar todas las ordenes' : 'Abrir todas las ordenes'
+                            : allRegistrosExpanded ? 'Cerrar todos los registros' : 'Abrir todos los registros'}
+                    >
+                        <ChevronsUpDown size={16} />
+                        <span>
+                            {activeTab === 'of'
+                                ? allOrdenesExpanded ? 'Cerrar todas' : 'Abrir todas'
+                                : allRegistrosExpanded ? 'Cerrar todos' : 'Abrir todos'}
+                        </span>
+                    </button>
                 </div>
             </div>
 
@@ -316,8 +370,16 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                             </div>
                         ) : (
                             filteredOrdenes.map((item) => (
-                                <div key={item.id} className="flex gap-3 items-stretch animate-in fade-in slide-in-from-left-4 duration-300">
+                                <div key={item.id} className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
+                                <div className="flex gap-3 items-stretch">
                                     <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center">
+                                        <button
+                                            onClick={() => toggleOrden(item.id)}
+                                            className={`p-2 rounded-lg transition-colors ${expandedOrdenes.has(item.id) ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'}`}
+                                            title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
+                                        >
+                                            <ChevronsUpDown size={18} />
+                                        </button>
                                         <button
                                             onClick={() => setEditModal({ type: 'of', item })}
                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50"
@@ -341,6 +403,15 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                             moldes={allMoldes}
                                         />
                                     </div>
+                                </div>
+                                {expandedOrdenes.has(item.id) && (
+                                    <OrderProcessesPanel
+                                        orden={item}
+                                        registros={getRegistrosByOrden(registros, item.orden_fabricacion)}
+                                        onEdit={(registro) => setEditModal({ type: 'registro', item: registro })}
+                                        onDelete={(registro) => handleDelete('registro', registro.id)}
+                                    />
+                                )}
                                 </div>
                             ))
                         )}
@@ -370,8 +441,16 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                     </tr>
                                 ) : (
                                     filteredRegistros.map((item) => (
-                                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                                        <React.Fragment key={item.id}>
+                                        <tr className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="p-4 flex gap-2">
+                                                <button
+                                                    onClick={() => toggleRegistro(item.id)}
+                                                    className={`p-1.5 rounded transition-colors ${expandedRegistros.has(item.id) ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50'}`}
+                                                    title={expandedRegistros.has(item.id) ? 'Ocultar procesos' : 'Ver procesos'}
+                                                >
+                                                    <ChevronsUpDown size={16} />
+                                                </button>
                                                 <button
                                                     onClick={() => setEditModal({ type: 'registro', item })}
                                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -407,6 +486,14 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                                 {item.pintura_fecha ? new Date(item.pintura_fecha).toLocaleDateString('es-ES') : '-'}
                                             </td>
                                         </tr>
+                                        {expandedRegistros.has(item.id) && (
+                                            <tr>
+                                                <td colSpan={10} className="bg-slate-50/70 p-4">
+                                                    <TraceProcessTimeline registro={item} />
+                                                </td>
+                                            </tr>
+                                        )}
+                                        </React.Fragment>
                                     ))
                                 )}
                             </tbody>
@@ -533,4 +620,157 @@ function TabButton({ active, label, onClick }: { active: boolean, label: string,
             {label}
         </button>
     )
+}
+
+const TRACE_STAGES: Array<{
+    label: string
+    dateKey: keyof RegistroTrazabilidad
+    userKey: keyof RegistroTrazabilidad
+}> = [
+    { label: 'Pintura', dateKey: 'pintura_fecha', userKey: 'pintura_user_name' },
+    { label: 'Vaciado', dateKey: 'vaciado_fecha', userKey: 'vaciado_user_name' },
+    { label: 'Contramolde', dateKey: 'contramolde_fecha', userKey: 'contramolde_user_name' },
+    { label: 'Pulido', dateKey: 'pulido_fecha', userKey: 'pulido_user_name' },
+    { label: 'Acabado', dateKey: 'acabado_fecha', userKey: 'acabado_user_name' },
+    { label: 'Reparacion', dateKey: 'reparacion_fecha', userKey: 'reparacion_user_name' },
+    { label: 'Empaque', dateKey: 'empaque_fecha', userKey: 'empaque_user_name' },
+    { label: 'Digitado', dateKey: 'digitado_fecha', userKey: 'digitado_user_name' },
+    { label: 'Transito', dateKey: 'transito_fecha', userKey: 'transito_user_name' },
+    { label: 'Cedi', dateKey: 'cedi_fecha', userKey: 'cedi_user_name' },
+    { label: 'Saldo', dateKey: 'saldo_fecha', userKey: 'saldo_user_name' },
+    { label: 'Destruccion', dateKey: 'destruccion_fecha', userKey: 'destruccion_user_name' }
+]
+
+function OrderProcessesPanel({
+    orden,
+    registros,
+    onEdit,
+    onDelete
+}: {
+    orden: OrdenFabricacion
+    registros: RegistroTrazabilidad[]
+    onEdit: (registro: RegistroTrazabilidad) => void
+    onDelete: (registro: RegistroTrazabilidad) => void
+}) {
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+                <div>
+                    <div className="text-[11px] font-black uppercase tracking-widest text-blue-600">Procesos de la orden</div>
+                    <div className="text-[12px] font-semibold text-slate-500">
+                        OF {orden.orden_fabricacion} · {registros.length} registro{registros.length === 1 ? '' : 's'} encontrado{registros.length === 1 ? '' : 's'}
+                    </div>
+                </div>
+            </div>
+            {registros.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-[12px] font-bold text-slate-400">
+                    No hay registros de trazabilidad cargados para esta orden.
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {registros.map(registro => (
+                        <div key={registro.id} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 text-[12px]">
+                                <div className="flex flex-wrap gap-4">
+                                    <InfoPill label="ID" value={registro.id} />
+                                    <InfoPill label="Estado" value={registro.estado || '-'} />
+                                    <InfoPill label="Pedido" value={registro.numero_pedido || registro.pedido || '-'} />
+                                    <InfoPill label="Molde" value={registro.molde_serial || '-'} />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => onEdit(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button onClick={() => onDelete(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                            <TraceProcessTimeline registro={registro} />
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function TraceProcessTimeline({ registro }: { registro: RegistroTrazabilidad }) {
+    const stages = getVisibleStages(registro)
+
+    return (
+        <div className="flex flex-wrap justify-center gap-2">
+            {stages.length === 0 ? (
+                <div className="text-[12px] font-semibold text-slate-400 py-4">Sin fechas de proceso registradas</div>
+            ) : stages.map(stage => (
+                <StageBadge
+                    key={stage.label}
+                    label={stage.label}
+                    date={stage.date}
+                    user={stage.user}
+                    active={stage.label === registro.estado}
+                />
+            ))}
+        </div>
+    )
+}
+
+function InfoPill({ label, value }: { label: string, value: string | number }) {
+    return (
+        <div className="font-semibold text-slate-700">
+            <span className="text-sky-600">{label}: </span>{value}
+        </div>
+    )
+}
+
+function StageBadge({ label, date, user, active }: { label: string, date: string, user?: string, active: boolean }) {
+    return (
+        <div className={`w-[174px] min-h-[64px] rounded-lg border px-3 py-2 text-center shadow-sm ${active ? 'bg-teal-100 border-teal-200' : 'bg-white border-slate-200'}`}>
+            <div className="text-[12px] leading-none text-sky-600 font-semibold">{label}</div>
+            <div className="text-[12px] leading-tight text-slate-700 mt-1">{formatProcessDate(date)}</div>
+            <div className="text-[11px] leading-tight text-slate-600 truncate" title={user || ''}>{user || 'Sin operario'}</div>
+        </div>
+    )
+}
+
+function getVisibleStages(item: RegistroTrazabilidad) {
+    return TRACE_STAGES
+        .map(stage => {
+            const date = item[stage.dateKey]
+            const user = item[stage.userKey]
+
+            return {
+                label: stage.label,
+                date: typeof date === 'string' ? date : '',
+                user: typeof user === 'string' ? user : undefined
+            }
+        })
+        .filter(stage => stage.date.length > 0)
+}
+
+function getRegistrosByOrden(registros: RegistroTrazabilidad[], ordenFabricacion?: string) {
+    if (!ordenFabricacion) return []
+
+    return registros
+        .filter(registro => registro.orden_fabricacion === ordenFabricacion)
+        .sort((a, b) => {
+            const aDate = getVisibleStages(a)[0]?.date || ''
+            const bDate = getVisibleStages(b)[0]?.date || ''
+            return aDate.localeCompare(bDate)
+        })
+}
+
+function formatProcessDate(value: string) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+    const milliseconds = String(date.getMilliseconds()).padStart(3, '0')
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
 }

@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
 import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
-import MetricCard from './MetricCard'
 import OrdenCard from './OrdenCard'
 import MoldSelector from './MoldSelector'
 import { Search, X, Calendar, History, ClipboardList } from 'lucide-react'
@@ -197,7 +196,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             desgelcada: 0,
             vaciado: vaciadoToday.length,
             acabado: acabadoToday.length,
-            digitado: recordsToday.filter(t => (t.digitado_fecha || '').split('T')[0] === today && t.estado === 'Digitado').length,
+            saldo: filteredOrdenes.reduce((sum, o) => sum + (o.saldo || 0), 0),
+            digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
             transito: transitoTotal.length,
             cedi: cediToday.length,
             kilogramos: parseFloat(totalKilos.toFixed(1))
@@ -274,42 +274,61 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     }
 
     return (
-        <div className="h-full flex flex-col bg-white">
-            {/* Search and Metric Section Container */}
-            <div className="bg-gray-50 p-2 flex flex-col md:flex-row md:items-center gap-4 border-b border-gray-200">
-                {/* Top Controls */}
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <button className="p-2 bg-cyan-500 text-white rounded-lg flex-shrink-0">
-                        <Calendar size={20} />
-                    </button>
-                    <div className="relative flex-1 md:w-64">
-                        <input
-                            type="text"
-                            placeholder="Producto / OF / Pedido / ..."
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            className="w-full pl-3 pr-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none"
-                        />
+        <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
+            {/* Summary Cards */}
+            <div className="p-4 bg-white border-b border-slate-200">
+                <div className="flex flex-nowrap gap-3 overflow-x-auto pb-2 no-scrollbar">
+                    <StatCard label="Cantidad" value={metrics.cantidad} color="bg-blue-50 text-blue-600" />
+                    <StatCard label="Programado" value={metrics.programado} color="bg-indigo-50 text-indigo-600" />
+                    <StatCard label="Pintura Hoy" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
+                    <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-yellow-50 text-yellow-600" />
+                    <StatCard label="Vaciado Hoy" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
+                    <StatCard label="Acabado Hoy" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
+                    <StatCard label="Saldo" value={metrics.saldo} color="bg-rose-50 text-rose-600" />
+                    <StatCard label="Digitado" value={metrics.digitado} color="bg-slate-50 text-slate-600" />
+                    <StatCard label="Transito" value={metrics.transito} color="bg-amber-50 text-amber-600" />
+                    <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-green-50 text-green-600" />
+                    <StatCard label="Kg Hoy" value={metrics.kilogramos.toFixed(1)} color="bg-blue-600 text-white" />
+                </div>
+            </div>
+
+            {/* Controls */}
+            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-4">
+                    <div className="flex-1 min-w-[300px]">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Búsqueda Global</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Producto / OF / Pedido / ..."
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                            />
+                        </div>
                     </div>
+
+                    <div className="w-48">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Filtrar Fecha</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="date"
+                                value={selectedDate || ''}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                            />
+                        </div>
+                    </div>
+
                     <button
                         onClick={handleClearFilters}
-                        className="p-2 bg-orange-400 text-white rounded-lg flex-shrink-0"
+                        className="p-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
+                        title="Limpiar filtros"
                     >
                         <X size={20} />
                     </button>
-                </div>
-                {/* Metrics Bar */}
-                <div className="flex w-full gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0">
-                    <MetricCard title="Cantidad" value={metrics.cantidad} bgColor="bg-cyan-500" />
-                    <MetricCard title="Programado" value={metrics.programado} bgColor="bg-orange-500" />
-                    <MetricCard title="Pintura" value={metrics.pintura} bgColor="bg-teal-600" />
-                    <MetricCard title="Desgelcado" value={metrics.desgelcada} bgColor="bg-pink-500" />
-                    <MetricCard title="Vaciado" value={metrics.vaciado} bgColor="bg-blue-100" textColor="text-gray-900" />
-                    <MetricCard title="Acabado" value={metrics.acabado} bgColor="bg-white" textColor="text-gray-900" />
-                    <MetricCard title="Digitado" value={metrics.digitado} bgColor="bg-white" textColor="text-gray-900" />
-                    <MetricCard title="Transito" value={metrics.transito} bgColor="bg-white" textColor="text-gray-900" />
-                    <MetricCard title="CEDI" value={metrics.cedi} bgColor="bg-[#2b2d42]" textColor="text-white" />
-                    <MetricCard title="Kilogramos" value={metrics.kilogramos} bgColor="bg-[#4a4e69]" textColor="text-white" />
                 </div>
             </div>
 
@@ -494,6 +513,15 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 isOpen={isMoldModalOpen}
                 onClose={() => setIsMoldModalOpen(false)}
             />
+        </div>
+    )
+}
+
+function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
+    return (
+        <div className={`shrink-0 p-3 rounded-xl border border-slate-100 shadow-sm min-w-[100px] flex flex-col items-center justify-center ${color}`}>
+            <span className="text-[9px] font-black uppercase opacity-70 mb-1">{label}</span>
+            <span className="text-sm font-black tracking-tight">{value}</span>
         </div>
     )
 }

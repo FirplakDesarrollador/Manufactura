@@ -4,18 +4,11 @@ import React, { useState, useEffect } from 'react'
 import { Timer, CheckCircle2, AlertCircle, Loader2, Play, User } from 'lucide-react'
 import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
 import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
+import { TareaMuebleActiva, TareaMuebleActivaOrden } from '@/types/muebles'
 import { toast } from 'sonner'
 
 interface ActiveTaskOverlayProps {
-    tarea: {
-        of: string
-        proceso: string
-        inicio: string
-        operario_nombre: string
-        operario_cedula: string
-        producto_descripcion?: string
-        available?: number
-    }
+    tarea: TareaMuebleActiva
     userEmail: string
     usuarioNombre: string
     onFinished: () => void
@@ -24,8 +17,25 @@ interface ActiveTaskOverlayProps {
 export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onFinished }: ActiveTaskOverlayProps) {
     const [elapsedTime, setElapsedTime] = useState('')
     const [isFinishing, setIsFinishing] = useState(false)
-    const [cantidad, setCantidad] = useState(1)
+    const [cantidades, setCantidades] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(false)
+
+    const taskOrders = React.useMemo<TareaMuebleActivaOrden[]>(() => {
+        if (tarea.ordenes?.length) return tarea.ordenes
+        return [{
+            of: tarea.of,
+            producto_descripcion: tarea.producto_descripcion,
+            available: tarea.available
+        }]
+    }, [tarea])
+
+    useEffect(() => {
+        const initialQuantities = taskOrders.reduce<Record<string, number>>((acc, item) => {
+            acc[item.of] = item.available && item.available > 0 ? 1 : 0
+            return acc
+        }, {})
+        setCantidades(initialQuantities)
+    }, [taskOrders])
 
     // Cronometro
     useEffect(() => {
@@ -46,32 +56,50 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
         return () => clearInterval(interval)
     }, [tarea.inicio])
 
+    const setCantidadForOrder = (of: string, value: number, max?: number) => {
+        let next = Number.isFinite(value) ? value : 0
+        if (next < 0) next = 0
+        if (max !== undefined && next > max) next = max
+        setCantidades((current) => ({ ...current, [of]: next }))
+    }
+
+    const totalCantidad = taskOrders.reduce((sum, item) => sum + (cantidades[item.of] || 0), 0)
+    const totalDisponible = taskOrders.reduce((sum, item) => sum + (item.available || 0), 0)
+
     const handleFinalizar = async () => {
-        if (tarea.available && cantidad > tarea.available) {
-            toast.error(`La cantidad no puede exceder el disponible (${tarea.available})`)
+        const invalidOrder = taskOrders.find((item) => {
+            const cantidad = cantidades[item.of] || 0
+            return item.available !== undefined && cantidad > item.available
+        })
+
+        if (invalidOrder) {
+            toast.error(`La cantidad de la OF ${invalidOrder.of} no puede exceder el disponible (${invalidOrder.available})`)
             return
         }
 
         setLoading(true)
         try {
-            if (cantidad > 0) {
-                // Register traceability only if pieces were cut
-                await registrarTrazabilidadMueble({
-                    orden_fabricacion: tarea.of,
-                    cantidad: cantidad,
-                    creado_por: `${usuarioNombre} - ID: ${tarea.operario_cedula}`,
-                    proceso: tarea.proceso,
-                    cedula_operario: tarea.operario_cedula,
-                    nombre_operario: tarea.operario_nombre,
-                    fecha_inicio: tarea.inicio
-                })
-                toast.success('¡Proceso finalizado con éxito!')
+            const registros = taskOrders
+                .map((item) => ({ item, cantidad: cantidades[item.of] || 0 }))
+                .filter(({ cantidad }) => cantidad > 0)
+
+            if (registros.length > 0) {
+                await Promise.all(registros.map(({ item, cantidad }) =>
+                    registrarTrazabilidadMueble({
+                        orden_fabricacion: item.of,
+                        cantidad,
+                        creado_por: `${usuarioNombre} - ID: ${tarea.operario_cedula}`,
+                        proceso: tarea.proceso,
+                        cedula_operario: tarea.operario_cedula,
+                        nombre_operario: tarea.operario_nombre,
+                        fecha_inicio: tarea.inicio
+                    })
+                ))
+                toast.success('Proceso finalizado con exito')
             } else {
-                // 0 pieces: just release the lock, no record created
                 toast.info('Proceso liberado sin registrar piezas')
             }
 
-            // Always clear the active task
             await setTareaActiva(userEmail, null)
             onFinished()
         } catch (error) {
@@ -84,15 +112,7 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
 
     return (
         <div className="fixed inset-0 z-[200] bg-[#254153] flex items-center justify-center p-4 md:p-8 overflow-hidden">
-            {/* Background Decorative Elements */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-            </div>
-
-            <div className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-500">
-                
-                {/* Left Side: Status Info */}
+            <div className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-500">
                 <div className="w-full md:w-5/12 bg-gray-50 p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-gray-100">
                     <div className="space-y-6">
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
@@ -105,7 +125,7 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                 {tarea.proceso}
                             </h2>
                             <p className="text-blue-600 font-bold text-lg">
-                                OF #{tarea.of}
+                                {taskOrders.length > 1 ? `${taskOrders.length} OF seleccionadas` : `OF #${taskOrders[0].of}`}
                             </p>
                         </div>
 
@@ -124,7 +144,7 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                     <Timer size={16} />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Tiempo Transcurrido</span>
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Tiempo transcurrido</span>
                                     <span className="text-xl font-black text-blue-600 tabular-nums">{elapsedTime}</span>
                                 </div>
                             </div>
@@ -132,13 +152,24 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-gray-100">
+                        {taskOrders.length > 1 && (
+                            <div className="mb-4 max-h-32 overflow-y-auto rounded-xl bg-white border border-gray-100 divide-y divide-gray-100">
+                                {taskOrders.map((item) => (
+                                    <div key={item.of} className="px-3 py-2 text-left">
+                                        <div className="flex justify-between gap-2 text-[10px] font-black">
+                                            <span className="text-blue-600">OF #{item.of}</span>
+                                            <span className="text-gray-400">{item.available || 0} disp.</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <p className="text-[10px] text-gray-400 font-medium leading-relaxed uppercase tracking-tighter">
-                            La aplicación permanecerá bloqueada hasta que finalices este proceso para garantizar la precisión de los tiempos.
+                            La aplicacion permanecera bloqueada hasta que finalices este proceso para garantizar la precision de los tiempos.
                         </p>
                     </div>
                 </div>
 
-                {/* Right Side: Action Area */}
                 <div className="w-full md:w-7/12 p-8 flex flex-col justify-center items-center text-center space-y-8 bg-white">
                     {!isFinishing ? (
                         <>
@@ -146,16 +177,15 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                 <Play size={40} className="animate-pulse" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-gray-900">Proceso en Marcha</h3>
-                                <p className="text-gray-500 text-sm max-w-[240px] mx-auto">
-                                    {tarea.producto_descripcion || 'Corta las piezas indicadas en la hoja de ruta antes de registrar.'}
+                                <h3 className="text-2xl font-bold text-gray-900">Proceso en marcha</h3>
+                                <p className="text-gray-500 text-sm max-w-[260px] mx-auto">
+                                    {taskOrders.length > 1 ? 'Corta las piezas de cada orden seleccionada antes de registrar.' : taskOrders[0].producto_descripcion || 'Corta las piezas indicadas en la hoja de ruta antes de registrar.'}
                                 </p>
                             </div>
                             <button
                                 onClick={() => setIsFinishing(true)}
                                 className="group relative w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 overflow-hidden"
                             >
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
                                 <span>FINALIZAR CORTE</span>
                                 <CheckCircle2 size={24} />
                             </button>
@@ -163,53 +193,63 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                     ) : (
                         <div className="w-full space-y-6 animate-in slide-in-from-bottom-4 duration-300">
                             <div className="space-y-1">
-                                <h3 className="text-xl font-bold text-gray-900">¿Cuántas piezas terminaste?</h3>
-                                <p className="text-xs text-gray-400 uppercase font-bold tracking-widest">Registrar cantidad final</p>
+                                <h3 className="text-xl font-bold text-gray-900">Cuantas piezas terminaste?</h3>
+                                <p className="text-xs text-gray-400 uppercase font-bold tracking-widest">Registrar cantidad por orden</p>
                             </div>
 
-                            <div className="flex items-center justify-center gap-6">
-                                <button 
-                                    onClick={() => setCantidad(prev => Math.max(0, prev - 1))}
-                                    className={`w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center transition-colors ${cantidad <= 0 ? 'text-gray-200 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
-                                    disabled={cantidad <= 0}
-                                >
-                                    <span className="text-2xl font-bold">−</span>
-                                </button>
-                                <input 
-                                    type="number"
-                                    value={cantidad}
-                                    onChange={(e) => {
-                                        let val = parseInt(e.target.value) || 0;
-                                        if (tarea.available && val > tarea.available) val = tarea.available;
-                                        setCantidad(val);
-                                    }}
-                                    className="w-24 h-16 text-center text-3xl font-black text-gray-900 border-b-4 border-blue-500 focus:outline-none bg-blue-50/30 rounded-t-xl"
-                                />
-                                <button 
-                                    onClick={() => setCantidad(prev => {
-                                        const next = prev + 1;
-                                        if (tarea.available && next > tarea.available) return prev;
-                                        return next;
-                                    })}
-                                    className={`w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-colors ${tarea.available && cantidad >= tarea.available ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={tarea.available !== undefined && cantidad >= tarea.available}
-                                >
-                                    <span className="text-2xl font-bold">+</span>
-                                </button>
+                            <div className="w-full max-h-[300px] overflow-y-auto pr-1 space-y-3">
+                                {taskOrders.map((item) => {
+                                    const cantidad = cantidades[item.of] || 0
+                                    return (
+                                        <div key={item.of} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-3">
+                                            <div className="flex items-start justify-between gap-3 mb-3 text-left">
+                                                <div className="min-w-0">
+                                                    <div className="text-blue-600 text-xs font-black">OF #{item.of}</div>
+                                                    <p className="text-[10px] text-gray-500 font-bold uppercase leading-tight line-clamp-2">
+                                                        {item.producto_descripcion || 'Sin descripcion'}
+                                                    </p>
+                                                </div>
+                                                <span className="shrink-0 text-[10px] text-gray-400 font-black uppercase">{item.available || 0} disp.</span>
+                                            </div>
+                                            <div className="flex items-center justify-center gap-4">
+                                                <button
+                                                    onClick={() => setCantidadForOrder(item.of, cantidad - 1, item.available)}
+                                                    className={`w-11 h-11 bg-white rounded-xl flex items-center justify-center transition-colors ${cantidad <= 0 ? 'text-gray-200 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
+                                                    disabled={cantidad <= 0}
+                                                >
+                                                    <span className="text-xl font-bold">-</span>
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    value={cantidad}
+                                                    onChange={(e) => setCantidadForOrder(item.of, parseInt(e.target.value) || 0, item.available)}
+                                                    className="w-20 h-12 text-center text-2xl font-black text-gray-900 border-b-4 border-blue-500 focus:outline-none bg-white rounded-t-xl"
+                                                />
+                                                <button
+                                                    onClick={() => setCantidadForOrder(item.of, cantidad + 1, item.available)}
+                                                    className={`w-11 h-11 bg-white rounded-xl flex items-center justify-center text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-colors ${item.available !== undefined && cantidad >= item.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    disabled={item.available !== undefined && cantidad >= item.available}
+                                                >
+                                                    <span className="text-xl font-bold">+</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
                             </div>
 
-                            {tarea.available && (
+                            {totalDisponible > 0 && (
                                 <p className="text-[10px] text-gray-400 font-bold">
-                                    DISPONIBLE: {tarea.available} PIEZAS
+                                    TOTAL DISPONIBLE: {totalDisponible} PIEZAS
                                 </p>
                             )}
 
-                            {cantidad === 0 && (
+                            {totalCantidad === 0 && (
                                 <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5 animate-in fade-in duration-200">
-                                    <span className="text-orange-500 text-lg">⚠️</span>
+                                    <AlertCircle size={18} className="text-orange-500 shrink-0" />
                                     <p className="text-orange-700 text-xs font-bold leading-tight">
                                         Con 0 piezas solo se libera el bloqueo.<br />
-                                        <span className="font-normal text-orange-500">No se registrará ningún movimiento.</span>
+                                        <span className="font-normal text-orange-500">No se registrara ningun movimiento.</span>
                                     </p>
                                 </div>
                             )}
@@ -219,13 +259,13 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                     onClick={handleFinalizar}
                                     disabled={loading}
                                     className={`w-full h-16 text-white rounded-2xl font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 ${
-                                        cantidad === 0
+                                        totalCantidad === 0
                                             ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200'
                                             : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                     }`}
                                 >
                                     {loading ? <Loader2 className="animate-spin" /> : (
-                                        cantidad === 0 ? (
+                                        totalCantidad === 0 ? (
                                             <><span>LIBERAR SIN REGISTRAR</span><CheckCircle2 size={24} /></>
                                         ) : (
                                             <><span>REGISTRAR Y LIBERAR</span><CheckCircle2 size={24} /></>
@@ -244,12 +284,6 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                     )}
                 </div>
             </div>
-
-            <style jsx>{`
-                @keyframes shimmer {
-                    100% { transform: translateX(100%); }
-                }
-            `}</style>
         </div>
     )
 }

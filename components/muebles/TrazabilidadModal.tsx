@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { OrdenMueble } from '@/types/muebles'
+import { OrdenMueble, TareaMuebleActiva } from '@/types/muebles'
 import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2, User, ArrowRight, ChevronLeft, Play } from 'lucide-react'
 import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
 import { getEmpleadoById } from '@/lib/supabase/queries/talento_humano'
@@ -12,19 +12,21 @@ interface TrazabilidadModalProps {
     isOpen: boolean
     onClose: () => void
     orden: OrdenMueble
+    ordenes?: OrdenMueble[]
     proceso: string
     usuarioNombre: string
     turno: string
     taladro?: string
     userEmail: string
     onSuccess: () => void
-    onStartTask?: (tarea: any) => void
+    onStartTask?: (tarea: TareaMuebleActiva) => void
 }
 
 export default function TrazabilidadModal({ 
     isOpen, 
     onClose, 
-    orden, 
+    orden,
+    ordenes,
     proceso, 
     usuarioNombre, 
     turno,
@@ -42,6 +44,10 @@ export default function TrazabilidadModal({
     const [empleado, setEmpleado] = useState<{ nombreCompleto: string, foto: string } | null>(null)
     const [isSearching, setIsSearching] = useState(false)
     const [startTime, setStartTime] = useState<string>('')
+    const ordenesSeleccionadas = React.useMemo(
+        () => proceso === 'Corte' && ordenes?.length ? ordenes : [orden],
+        [orden, ordenes, proceso]
+    )
 
     const validateQuantity = React.useCallback((val: number) => {
         let error = null
@@ -60,7 +66,7 @@ export default function TrazabilidadModal({
 
         switch (proceso) {
             case 'Corte':
-                avail = orden.por_cortar || 0
+                avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.por_cortar || 0), 0)
                 break
             case 'Enchape':
                 avail = (orden.corte || 0) + (orden.reponer_enchape || 0)
@@ -88,7 +94,7 @@ export default function TrazabilidadModal({
 
         setAvailable(avail)
         setValidationError(error)
-    }, [orden, proceso])
+    }, [orden, ordenesSeleccionadas, proceso])
 
     useEffect(() => {
         if (isOpen) {
@@ -188,14 +194,21 @@ export default function TrazabilidadModal({
         if (proceso === 'Corte') {
             setLoading(true)
             try {
+                const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
+                    of: item.orden_fabricacion,
+                    producto_descripcion: item.producto_descripcion,
+                    available: item.por_cortar || 0
+                }))
+
                 const nuevaTarea = {
-                    of: orden.orden_fabricacion,
+                    of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
                     proceso: proceso,
                     inicio: startTime,
                     operario_nombre: empleado?.nombreCompleto || 'Desconocido',
                     operario_cedula: identificacion,
-                    producto_descripcion: orden.producto_descripcion,
-                    available: available
+                    producto_descripcion: tareasOrdenes.length === 1 ? tareasOrdenes[0].producto_descripcion : 'Corte de varias ordenes',
+                    available: available,
+                    ordenes: tareasOrdenes
                 }
                 
                 await setTareaActiva(userEmail, nuevaTarea)
@@ -254,7 +267,9 @@ export default function TrazabilidadModal({
                 <div className="p-5 flex items-start justify-between border-b border-gray-50 bg-gray-50/30">
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2 cursor-pointer group" onClick={handleCopy}>
-                            <span className="text-blue-500 font-bold text-lg leading-none">{orden.orden_fabricacion}</span>
+                            <span className="text-blue-500 font-bold text-lg leading-none">
+                                {ordenesSeleccionadas.length > 1 ? `${ordenesSeleccionadas.length} ordenes` : orden.orden_fabricacion}
+                            </span>
                             <Copy size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
                         </div>
                         <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">{proceso}</span>
@@ -362,9 +377,25 @@ export default function TrazabilidadModal({
                                 </div>
                             )}
 
-                            <p className="text-center text-gray-400 font-bold text-[10px] leading-relaxed max-w-[280px] uppercase tracking-wider">
-                                {orden.producto_descripcion}
-                            </p>
+                            {proceso === 'Corte' && ordenesSeleccionadas.length > 1 ? (
+                                <div className="w-full max-h-36 overflow-y-auto rounded-2xl border border-gray-100 divide-y divide-gray-100">
+                                    {ordenesSeleccionadas.map((item) => (
+                                        <div key={item.id} className="p-3 text-left">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-blue-600 font-black text-xs">OF #{item.orden_fabricacion}</span>
+                                                <span className="text-gray-400 font-bold text-[10px]">{item.por_cortar || 0} disp.</span>
+                                            </div>
+                                            <p className="text-gray-500 font-bold text-[10px] uppercase leading-tight mt-1 line-clamp-2">
+                                                {item.producto_descripcion}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-center text-gray-400 font-bold text-[10px] leading-relaxed max-w-[280px] uppercase tracking-wider">
+                                    {orden.producto_descripcion}
+                                </p>
+                            )}
 
                             <div className="flex justify-center gap-8 w-full border-y border-gray-100 py-3">
                                 <div className="text-center">

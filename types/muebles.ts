@@ -38,6 +38,23 @@ export interface OrdenMueble {
     taladro?: string;
 }
 
+export interface TareaMuebleActivaOrden {
+    of: string;
+    producto_descripcion?: string;
+    available?: number;
+}
+
+export interface TareaMuebleActiva {
+    of: string;
+    proceso: string;
+    inicio: string;
+    operario_nombre: string;
+    operario_cedula: string;
+    producto_descripcion?: string;
+    available?: number;
+    ordenes?: TareaMuebleActivaOrden[];
+}
+
 export interface MetricasMuebles {
     fecha: string;
     turno: string;
