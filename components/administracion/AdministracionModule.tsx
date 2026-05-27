@@ -627,6 +627,64 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                     </div>
                 </div>
             )}
+
+            {/* Transfer Modal */}
+            {transferModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                            <div>
+                                <h2 className="text-lg font-black text-slate-800">Transferir Pieza #{transferModal.id}</h2>
+                                <p className="text-xs text-slate-500 font-bold mt-1">Órdenes compatibles para transferir</p>
+                            </div>
+                            <button onClick={() => setTransferModal(null)} className="text-slate-400 hover:text-slate-600">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-4 flex-1 overflow-y-auto bg-slate-50">
+                            {(() => {
+                                const compatibles = ordenes.filter(o =>
+                                    o.producto_sku === transferModal.producto_sku &&
+                                    (o.programado || o.cantidad_programada || 0) > 0 &&
+                                    o.orden_fabricacion !== transferModal.orden_fabricacion
+                                );
+
+                                if (compatibles.length === 0) {
+                                    return (
+                                        <div className="text-center p-8 text-slate-400 font-bold text-sm bg-white rounded-xl border border-slate-200 shadow-sm">
+                                            No se encontraron órdenes compatibles.
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="space-y-2">
+                                        {compatibles.map(o => (
+                                            <div key={o.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 hover:border-emerald-200 transition-colors">
+                                                <div className="min-w-0">
+                                                    <div className="text-[10px] text-slate-400 font-black uppercase truncate">{o.producto_descripcion || o.producto_sku}</div>
+                                                    <div className="flex items-center gap-3 mt-1">
+                                                        <span className="font-bold text-sm text-slate-800">{o.orden_fabricacion}</span>
+                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">P: {o.numero_pedido || o.pedido}</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleTransfer(transferModal, o)}
+                                                    disabled={saving}
+                                                    className="shrink-0 p-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:text-emerald-800 rounded-lg transition-colors disabled:opacity-50"
+                                                    title="Transferir a esta orden"
+                                                >
+                                                    <ArrowRightLeft size={18} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -723,64 +781,6 @@ function OrderProcessesPanel({
                             <TraceProcessTimeline registro={registro} />
                         </div>
                     ))}
-                </div>
-            )}
-
-            {/* Transfer Modal */}
-            {transferModal && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                            <div>
-                                <h2 className="text-lg font-black text-slate-800">Transferir Pieza #{transferModal.id}</h2>
-                                <p className="text-xs text-slate-500 font-bold mt-1">Órdenes compatibles para transferir</p>
-                            </div>
-                            <button onClick={() => setTransferModal(null)} className="text-slate-400 hover:text-slate-600">
-                                <X size={24} />
-                            </button>
-                        </div>
-                        <div className="p-4 flex-1 overflow-y-auto bg-slate-50">
-                            {(() => {
-                                const compatibles = ordenes.filter(o =>
-                                    o.producto_sku === transferModal.producto_sku &&
-                                    (o.programado || o.cantidad_programada || 0) > 0 &&
-                                    o.orden_fabricacion !== transferModal.orden_fabricacion
-                                );
-
-                                if (compatibles.length === 0) {
-                                    return (
-                                        <div className="text-center p-8 text-slate-400 font-bold text-sm bg-white rounded-xl border border-slate-200 shadow-sm">
-                                            No se encontraron órdenes compatibles.
-                                        </div>
-                                    );
-                                }
-
-                                return (
-                                    <div className="space-y-2">
-                                        {compatibles.map(o => (
-                                            <div key={o.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 hover:border-emerald-200 transition-colors">
-                                                <div className="min-w-0">
-                                                    <div className="text-[10px] text-slate-400 font-black uppercase truncate">{o.producto_descripcion || o.producto_sku}</div>
-                                                    <div className="flex items-center gap-3 mt-1">
-                                                        <span className="font-bold text-sm text-slate-800">{o.orden_fabricacion}</span>
-                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">P: {o.numero_pedido || o.pedido}</span>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => handleTransfer(transferModal, o)}
-                                                    disabled={saving}
-                                                    className="shrink-0 p-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:text-emerald-800 rounded-lg transition-colors disabled:opacity-50"
-                                                    title="Transferir a esta orden"
-                                                >
-                                                    <ArrowRightLeft size={18} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                );
-                            })()}
-                        </div>
-                    </div>
                 </div>
             )}
         </div>
