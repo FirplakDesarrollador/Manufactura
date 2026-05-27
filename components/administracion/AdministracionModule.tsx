@@ -19,7 +19,8 @@ import {
     Edit2,
     Trash2,
     X,
-    ChevronsUpDown
+    ChevronsUpDown,
+    ArrowRightLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -42,6 +43,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         item: any
     } | null>(null)
+    const [transferModal, setTransferModal] = useState<RegistroTrazabilidad | null>(null)
     const [saving, setSaving] = useState(false)
     const [syncing, setSyncing] = useState(false)
 
@@ -176,6 +178,24 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             loadData()
         } catch {
             alert('Error al actualizar')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleTransfer = async (registro: RegistroTrazabilidad, targetOrden: OrdenFabricacion) => {
+        if (!confirm(`¿Está seguro que desea transferir esta pieza a la orden ${targetOrden.orden_fabricacion}?`)) return
+
+        setSaving(true)
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await updateRegistroTrazabilidad(registro.id, { orden_fabricacion_id: targetOrden.id } as any)
+            toast.success(`Pieza transferida a la orden ${targetOrden.orden_fabricacion}`)
+            setTransferModal(null)
+            loadData()
+        } catch (error) {
+            console.error('Error al transferir:', error)
+            toast.error('Error al transferir la pieza')
         } finally {
             setSaving(false)
         }
@@ -410,6 +430,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                         registros={getRegistrosByOrden(registros, item.orden_fabricacion)}
                                         onEdit={(registro) => setEditModal({ type: 'registro', item: registro })}
                                         onDelete={(registro) => handleDelete('registro', registro.id)}
+                                        onTransfer={(registro) => setTransferModal(registro)}
                                     />
                                 )}
                                 </div>
@@ -454,8 +475,16 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                                 <button
                                                     onClick={() => setEditModal({ type: 'registro', item })}
                                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                    title="Editar registro"
                                                 >
                                                     <Edit2 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setTransferModal(item)}
+                                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                                    title="Transferir a otra orden"
+                                                >
+                                                    <ArrowRightLeft size={16} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete('registro', item.id)}
@@ -645,12 +674,14 @@ function OrderProcessesPanel({
     orden,
     registros,
     onEdit,
-    onDelete
+    onDelete,
+    onTransfer
 }: {
     orden: OrdenFabricacion
     registros: RegistroTrazabilidad[]
     onEdit: (registro: RegistroTrazabilidad) => void
     onDelete: (registro: RegistroTrazabilidad) => void
+    onTransfer: (registro: RegistroTrazabilidad) => void
 }) {
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -681,6 +712,9 @@ function OrderProcessesPanel({
                                     <button onClick={() => onEdit(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
                                         <Edit2 size={16} />
                                     </button>
+                                    <button onClick={() => onTransfer(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
+                                        <ArrowRightLeft size={16} />
+                                    </button>
                                     <button onClick={() => onDelete(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
                                         <Trash2 size={16} />
                                     </button>
@@ -689,6 +723,64 @@ function OrderProcessesPanel({
                             <TraceProcessTimeline registro={registro} />
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Transfer Modal */}
+            {transferModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                            <div>
+                                <h2 className="text-lg font-black text-slate-800">Transferir Pieza #{transferModal.id}</h2>
+                                <p className="text-xs text-slate-500 font-bold mt-1">Órdenes compatibles para transferir</p>
+                            </div>
+                            <button onClick={() => setTransferModal(null)} className="text-slate-400 hover:text-slate-600">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-4 flex-1 overflow-y-auto bg-slate-50">
+                            {(() => {
+                                const compatibles = ordenes.filter(o =>
+                                    o.producto_sku === transferModal.producto_sku &&
+                                    (o.programado || o.cantidad_programada || 0) > 0 &&
+                                    o.orden_fabricacion !== transferModal.orden_fabricacion
+                                );
+
+                                if (compatibles.length === 0) {
+                                    return (
+                                        <div className="text-center p-8 text-slate-400 font-bold text-sm bg-white rounded-xl border border-slate-200 shadow-sm">
+                                            No se encontraron órdenes compatibles.
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="space-y-2">
+                                        {compatibles.map(o => (
+                                            <div key={o.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 hover:border-emerald-200 transition-colors">
+                                                <div className="min-w-0">
+                                                    <div className="text-[10px] text-slate-400 font-black uppercase truncate">{o.producto_descripcion || o.producto_sku}</div>
+                                                    <div className="flex items-center gap-3 mt-1">
+                                                        <span className="font-bold text-sm text-slate-800">{o.orden_fabricacion}</span>
+                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">P: {o.numero_pedido || o.pedido}</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleTransfer(transferModal, o)}
+                                                    disabled={saving}
+                                                    className="shrink-0 p-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:text-emerald-800 rounded-lg transition-colors disabled:opacity-50"
+                                                    title="Transferir a esta orden"
+                                                >
+                                                    <ArrowRightLeft size={18} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
