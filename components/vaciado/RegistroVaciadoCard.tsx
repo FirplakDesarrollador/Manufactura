@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { registrarVaciado, registrarDesgelcado } from '@/lib/supabase/queries/vaciado'
-import { Hash, Layers, Info, CheckCircle, Clock, AlertTriangle, X } from 'lucide-react'
+import { Hash, Layers, Info, CheckCircle, Clock, AlertTriangle, X, Package } from 'lucide-react'
 
 interface RegistroVaciadoCardProps {
     registro: RegistroTrazabilidad
@@ -48,7 +48,7 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div className="flex-1 space-y-2">
                     {/* Secondary Info Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="flex items-center gap-3">
                             <div className="bg-gray-50 p-2 rounded-lg text-amber-600">
                                 <Hash size={22} />
@@ -74,6 +74,15 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
                             <div>
                                 <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Línea</p>
                                 <p className="text-base font-bold text-gray-900">{registro.linea}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="bg-gray-50 p-2 rounded-lg text-amber-600">
+                                <Package size={18} />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Referencia</p>
+                                <p className="text-sm font-bold text-gray-900 leading-tight line-clamp-2" title={registro.producto_descripcion}>{registro.producto_descripcion || registro.producto_sku}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
