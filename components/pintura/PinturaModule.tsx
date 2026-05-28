@@ -255,9 +255,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
             setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
             
-            // Limpia los campos del formulario
-            setSelectedOrden(null)
-            setSelectedLinea('')
+            // Limpia los campos del formulario (mantiene orden y línea seleccionadas para agilizar procesos)
             setSelectedMolde(null)
 
             // Recargar datos para actualizar métricas y caché
