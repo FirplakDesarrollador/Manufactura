@@ -7,7 +7,7 @@ export async function getRegistrosParaEmpaque(): Promise<RegistroTrazabilidad[]>
         .from('query_trazabilidad_ms')
         .select('*')
         .eq('estado', 'Acabado')
-        .order('acabado_fecha', { ascending: true })
+        .order('acabado_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros para empaque:', error)

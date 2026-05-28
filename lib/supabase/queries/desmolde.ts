@@ -8,7 +8,7 @@ export async function getRegistrosParaDesmolde(): Promise<RegistroTrazabilidad[]
         .select('*')
         .eq('estado', 'Vaciado')
         .eq('contramolde', true)
-        .order('pintura_fecha', { ascending: true })
+        .order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros para desmolde:', error)

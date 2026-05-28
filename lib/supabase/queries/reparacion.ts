@@ -15,7 +15,7 @@ export async function getRegistrosReparacion(tab: ReparacionTab): Promise<Regist
         query = query.eq('estado', tab)
     }
 
-    const { data, error } = await query.order('pintura_fecha', { ascending: true })
+    const { data, error } = await query.order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error(`Error fetching registros para ${tab}:`, error)

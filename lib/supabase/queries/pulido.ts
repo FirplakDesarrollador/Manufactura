@@ -7,7 +7,7 @@ export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> 
         .from('query_trazabilidad_ms')
         .select('*')
         .eq('estado', 'Pulido')
-        .order('pintura_fecha', { ascending: true })
+        .order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros para pulido:', error)
