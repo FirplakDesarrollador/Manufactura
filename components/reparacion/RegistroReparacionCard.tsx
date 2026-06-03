@@ -1,3 +1,4 @@
+import { parseDBDate } from '@/lib/utils/date';
 'use client'
 
 import React, { useState } from 'react'
@@ -76,7 +77,7 @@ export default function RegistroReparacionCard({ registro, usuarioEmail, onRefre
                             <div className="flex items-center gap-2 mt-2">
                                 <Clock size={16} className="text-slate-400" />
                                 <p className="text-sm font-bold text-slate-400">
-                                    Vaciado: {new Date(registro.pintura_fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                                    Vaciado: {parseDBDate(registro.pintura_fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>

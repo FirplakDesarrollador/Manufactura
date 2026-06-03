@@ -1,3 +1,4 @@
+import { parseDBDate } from '@/lib/utils/date';
 'use client'
 
 import React, { useState } from 'react'
@@ -80,7 +81,7 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
                             <div>
                                 <p className="text-[11px] text-gray-400 uppercase font-black tracking-tighter">Fecha Pintura</p>
                                 <p className="text-sm font-bold text-gray-900">
-                                    {new Date(registro.pintura_fecha).toLocaleString()}
+                                    {parseDBDate(registro.pintura_fecha).toLocaleString()}
                                 </p>
                             </div>
                         </div>
@@ -92,7 +93,7 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
                                 <div>
                                     <p className="text-[11px] text-orange-400 uppercase font-black tracking-tighter text-[10px]">Fecha Ideal</p>
                                     <p className="text-sm font-bold text-gray-900">
-                                        {new Date(registro.fecha_ideal_produccion).toLocaleDateString('es-ES')}
+                                        {parseDBDate(registro.fecha_ideal_produccion).toLocaleDateString('es-ES')}
                                     </p>
                                 </div>
                             </div>

@@ -1,3 +1,4 @@
+import { parseDBDate } from '@/lib/utils/date';
 'use client'
 
 import React, { useState } from 'react'
@@ -50,7 +51,7 @@ export default function RegistroPulidoCard({ registro, usuarioEmail, onRefresh }
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <Clock size={12} className="text-slate-400" />
                                 <p className="text-[10px] font-bold text-slate-400">
-                                    {new Date(registro.pintura_fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                    {parseDBDate(registro.pintura_fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>

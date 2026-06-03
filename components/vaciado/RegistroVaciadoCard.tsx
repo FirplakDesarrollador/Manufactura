@@ -1,3 +1,4 @@
+import { parseDBDate } from '@/lib/utils/date';
 'use client'
 
 import React, { useState } from 'react'
@@ -92,7 +93,7 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
                             <div>
                                 <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Fecha Pintura</p>
                                 <p className="text-base font-bold text-gray-900">
-                                    {new Date(registro.pintura_fecha).toLocaleString()}
+                                    {parseDBDate(registro.pintura_fecha).toLocaleString()}
                                 </p>
                             </div>
                         </div>

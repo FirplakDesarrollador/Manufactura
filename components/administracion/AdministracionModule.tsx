@@ -853,7 +853,11 @@ function getRegistrosByOrden(registros: RegistroTrazabilidad[], ordenFabricacion
 }
 
 function formatProcessDate(value: string) {
-    const date = new Date(value)
+    let dateStr = value;
+    if (dateStr.includes('T') && !dateStr.endsWith('Z') && !/(?:\+|-)\d{2}:\d{2}$/.test(dateStr)) {
+        dateStr += 'Z';
+    }
+    const date = new Date(dateStr)
     if (Number.isNaN(date.getTime())) return value
 
     const year = date.getFullYear()

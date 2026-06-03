@@ -1,3 +1,4 @@
+import { parseDBDate } from '@/lib/utils/date';
 'use client'
 
 import React, { useState } from 'react'
@@ -70,7 +71,7 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
                             <div>
                                 <p className="text-xs text-slate-400 uppercase font-black tracking-tighter">Fecha Vaciado</p>
                                 <p className="text-lg font-bold text-slate-900">
-                                    {new Date(registro.pintura_fecha).toLocaleDateString()}
+                                    {parseDBDate(registro.pintura_fecha).toLocaleDateString()}
                                 </p>
                             </div>
                         </div>
