@@ -117,10 +117,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         }
     }, [selectedOrden, allMoldes])
 
-    // Filter and sort ordenes based on search and date (Safe from null/undefined)
-    const filteredOrdenes = useMemo(() => {
+    // Base filter for metrics (matches Administration)
+    const baseFilteredOrdenes = useMemo(() => {
         const search = (searchText || '').toLowerCase()
-        const filtered = ordenes.filter((orden) => {
+        return ordenes.filter((orden) => {
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
@@ -134,10 +134,16 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 (orden.fecha_ideal_produccion &&
                     orden.fecha_ideal_produccion.includes(selectedDate))
 
+            return matchesSearch && matchesDate
+        })
+    }, [ordenes, searchText, selectedDate])
+
+    // Filter and sort ordenes based on search and date (Safe from null/undefined)
+    const filteredOrdenes = useMemo(() => {
+        const filtered = baseFilteredOrdenes.filter((orden) => {
             // En Pintura, solo mostramos lo que realmente tiene piezas pendientes por iniciar
             const hasProgramado = (orden.programado || 0) > 0
-
-            return matchesSearch && matchesDate && hasProgramado
+            return hasProgramado
         })
 
         return filtered.sort((a, b) => {
@@ -154,8 +160,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         const today = new Date().toISOString().split('T')[0]
 
         // 1. Quantity & Programmed (Totals for all filtered orders)
-        const totalCantidad = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad_programada || o.cantidad || 0), 0)
-        const totalProgramado = filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
+        const totalCantidad = baseFilteredOrdenes.reduce((sum, o) => sum + (o.cantidad_programada || o.cantidad || 0), 0)
+        const totalProgramado = baseFilteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
 
         // 2. Daily Production (From traceability)
         // We look for everything processed today in any stage
@@ -196,13 +202,13 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             desgelcada: 0,
             vaciado: vaciadoToday.length,
             acabado: acabadoToday.length,
-            saldo: filteredOrdenes.reduce((sum, o) => sum + (o.saldo || 0), 0),
+            saldo: baseFilteredOrdenes.reduce((sum, o) => sum + (o.saldo || 0), 0),
             digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
             transito: transitoTotal.length,
             cedi: cediToday.length,
             kilogramos: parseFloat(totalKilos.toFixed(1))
         }
-    }, [filteredOrdenes, trazabilidad])
+    }, [baseFilteredOrdenes, trazabilidad])
 
     const handleClearFilters = () => {
         setSearchText('')
