@@ -1,5 +1,5 @@
-import { parseDBDate } from '@/lib/utils/date';
 'use client'
+import { parseDBDate } from '@/lib/utils/date';
 
 import React, { useEffect, useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
