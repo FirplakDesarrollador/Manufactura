@@ -19,11 +19,20 @@ import TrazabilidadTable from './TrazabilidadTable'
 import ProductionCharts from './ProductionCharts'
 import { MetricCards } from './MetricCards'
 import { DetailedCharts } from './DetailedCharts'
+import CargaMoldesTable from './CargaMoldesTable'
+import CargaProductosTable from './CargaProductosTable'
+import OrdenesTable from './OrdenesTable'
+import BIViewer from './BIViewer'
+import KilosReferenciaTable from './KilosReferenciaTable'
 import {
     LayoutDashboard,
     Table as TableIcon,
     BarChart3,
-    RefreshCw
+    RefreshCw,
+    Inbox,
+    Package,
+    FileText,
+    PieChart
 } from 'lucide-react'
 
 export default function DashboardModule() {
@@ -36,6 +45,7 @@ export default function DashboardModule() {
 
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<'charts' | 'table'>('charts')
+    const [activeSubModule, setActiveSubModule] = useState<'estadisticas' | 'cargaMoldes' | 'cargaProductos' | 'ordenes' | 'bi' | 'kilosReferencia'>('estadisticas')
 
     const loadData = async () => {
         setLoading(true)
@@ -125,50 +135,159 @@ export default function DashboardModule() {
 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-2 lg:p-2 animate-in fade-in duration-300">
-                <div className="max-w-full mx-auto">
-                    {activeTab === 'charts' ? (
-                        <div className="animate-in fade-in duration-500">
-                            {/* Layout Grid: Squares on Left, Tables on Right */}
-                            <div className="flex flex-col lg:flex-row gap-4">
-                                {/* Left Side: The Squares */}
-                                <div className="w-fit shrink-0 mx-auto lg:mx-0">
-                                    <MetricCards data={metricasDia} loading={loading} />
-                                </div>
+                {activeSubModule === 'estadisticas' && (
+                    <div className="max-w-full mx-auto">
+                        {activeTab === 'charts' ? (
+                            <div className="animate-in fade-in duration-500">
+                                {/* Layout Grid: Squares on Left, Tables on Right */}
+                                <div className="flex flex-col lg:flex-row gap-4">
+                                    {/* Left Side: The Squares */}
+                                    <div className="w-fit shrink-0 mx-auto lg:mx-0">
+                                        <MetricCards data={metricasDia} loading={loading} />
+                                    </div>
 
-                                {/* Right Side: Detailed Breakdowns */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="space-y-4">
-                                        <DetailedCharts
-                                            pinturaColor={pinturaColor}
-                                            vaciadoTamano={vaciadoTamano}
-                                            progColor={progColor}
-                                            progTamano={progTamano}
-                                            loading={loading}
-                                        />
+                                    {/* Right Side: Detailed Breakdowns */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="space-y-4">
+                                            <DetailedCharts
+                                                pinturaColor={pinturaColor}
+                                                vaciadoTamano={vaciadoTamano}
+                                                progColor={progColor}
+                                                progTamano={progTamano}
+                                                loading={loading}
+                                            />
 
-                                        {/* Keep the hourly trend chart at the bottom */}
-                                        <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
-                                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tendencia de Producción (Hoy)</h3>
-                                            <ProductionCharts data={trazabilidadData} />
-                                        </div>
-
-                                        <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
-                                            <div className="p-2 bg-gray-50 border-b border-gray-100">
-                                                <h3 className="text-sm font-bold text-[#254153]">Trazabilidad Día</h3>
+                                            {/* Keep the hourly trend chart at the bottom */}
+                                            <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+                                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tendencia de Producción (Hoy)</h3>
+                                                <ProductionCharts data={trazabilidadData} />
                                             </div>
-                                            <TrazabilidadTable data={trazabilidadData} loading={loading} />
+
+                                            <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
+                                                <div className="p-2 bg-gray-50 border-b border-gray-100">
+                                                    <h3 className="text-sm font-bold text-[#254153]">Trazabilidad Día</h3>
+                                                </div>
+                                                <TrazabilidadTable data={trazabilidadData} loading={loading} />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="animate-in fade-in duration-500">
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                <TrazabilidadTable data={trazabilidadData} loading={loading} />
+                        ) : (
+                            <div className="animate-in fade-in duration-500">
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <TrazabilidadTable data={trazabilidadData} loading={loading} />
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+                )}
+                
+                {activeSubModule === 'cargaMoldes' && (
+                    <div className="max-w-full mx-auto h-full">
+                        <CargaMoldesTable />
+                    </div>
+                )}
+
+                {activeSubModule === 'cargaProductos' && (
+                    <div className="max-w-full mx-auto h-full">
+                        <CargaProductosTable />
+                    </div>
+                )}
+                
+                {activeSubModule === 'ordenes' && (
+                    <div className="max-w-full mx-auto h-full">
+                        <OrdenesTable />
+                    </div>
+                )}
+
+                {activeSubModule === 'bi' && (
+                    <div className="max-w-full mx-auto h-full">
+                        <BIViewer />
+                    </div>
+                )}
+
+                {activeSubModule === 'kilosReferencia' && (
+                    <div className="max-w-full mx-auto h-full">
+                        <KilosReferenciaTable />
+                    </div>
+                )}
+            </div>
+
+            {/* Bottom Navigation */}
+            <div className="bg-white w-full shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] border-t border-gray-200 overflow-x-auto">
+                <div className="flex flex-row min-w-max md:min-w-0 md:justify-center">
+                    <button
+                        onClick={() => setActiveSubModule('estadisticas')}
+                        className={`flex-1 min-w-[120px] px-4 flex flex-col items-center justify-center gap-1.5 py-2.5 border-t-2 transition-colors ${
+                            activeSubModule === 'estadisticas' 
+                                ? 'border-[#00bcd4] text-[#254153] bg-[#00bcd4]/5 font-bold' 
+                                : 'border-transparent text-gray-500 hover:text-[#254153] hover:bg-gray-50 font-medium'
+                        }`}
+                    >
+                        <BarChart3 size={20} className={activeSubModule === 'estadisticas' ? "text-[#00bcd4]" : ""} />
+                        <span className="text-[11px] whitespace-nowrap">Estadísticas</span>
+                    </button>
+                    
+                    <button
+                        onClick={() => setActiveSubModule('cargaMoldes')}
+                        className={`flex-1 min-w-[120px] px-4 flex flex-col items-center justify-center gap-1.5 py-2.5 border-t-2 transition-colors ${
+                            activeSubModule === 'cargaMoldes' 
+                                ? 'border-[#00bcd4] text-[#254153] bg-[#00bcd4]/5 font-bold' 
+                                : 'border-transparent text-gray-500 hover:text-[#254153] hover:bg-gray-50 font-medium'
+                        }`}
+                    >
+                        <Inbox size={20} className={activeSubModule === 'cargaMoldes' ? "text-[#00bcd4]" : ""} />
+                        <span className="text-[11px] whitespace-nowrap">Carga moldes</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveSubModule('cargaProductos')}
+                        className={`flex-1 min-w-[120px] px-4 flex flex-col items-center justify-center gap-1.5 py-2.5 border-t-2 transition-colors ${
+                            activeSubModule === 'cargaProductos' 
+                                ? 'border-[#00bcd4] text-[#254153] bg-[#00bcd4]/5 font-bold' 
+                                : 'border-transparent text-gray-500 hover:text-[#254153] hover:bg-gray-50 font-medium'
+                        }`}
+                    >
+                        <Package size={20} className={activeSubModule === 'cargaProductos' ? "text-[#00bcd4]" : ""} />
+                        <span className="text-[11px] whitespace-nowrap">Carga productos</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveSubModule('ordenes')}
+                        className={`flex-1 min-w-[120px] px-4 flex flex-col items-center justify-center gap-1.5 py-2.5 border-t-2 transition-colors ${
+                            activeSubModule === 'ordenes' 
+                                ? 'border-[#00bcd4] text-[#254153] bg-[#00bcd4]/5 font-bold' 
+                                : 'border-transparent text-gray-500 hover:text-[#254153] hover:bg-gray-50 font-medium'
+                        }`}
+                    >
+                        <FileText size={20} className={activeSubModule === 'ordenes' ? "text-[#00bcd4]" : ""} />
+                        <span className="text-[11px] whitespace-nowrap">Órdenes</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveSubModule('bi')}
+                        className={`flex-1 min-w-[120px] px-4 flex flex-col items-center justify-center gap-1.5 py-2.5 border-t-2 transition-colors ${
+                            activeSubModule === 'bi' 
+                                ? 'border-[#00bcd4] text-[#254153] bg-[#00bcd4]/5 font-bold' 
+                                : 'border-transparent text-gray-500 hover:text-[#254153] hover:bg-gray-50 font-medium'
+                        }`}
+                    >
+                        <PieChart size={20} className={activeSubModule === 'bi' ? "text-[#00bcd4]" : ""} />
+                        <span className="text-[11px] whitespace-nowrap">BI</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveSubModule('kilosReferencia')}
+                        className={`flex-1 min-w-[120px] px-4 flex flex-col items-center justify-center gap-1.5 py-2.5 border-t-2 transition-colors ${
+                            activeSubModule === 'kilosReferencia' 
+                                ? 'border-[#00bcd4] text-[#254153] bg-[#00bcd4]/5 font-bold' 
+                                : 'border-transparent text-gray-500 hover:text-[#254153] hover:bg-gray-50 font-medium'
+                        }`}
+                    >
+                        <TableIcon size={20} className={activeSubModule === 'kilosReferencia' ? "text-[#00bcd4]" : ""} />
+                        <span className="text-[11px] whitespace-nowrap">Kilos ref.</span>
+                    </button>
                 </div>
             </div>
         </div>
