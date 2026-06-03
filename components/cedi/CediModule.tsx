@@ -130,8 +130,8 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
 
         return matchesSearch && matchesFecha && hasPieces
     }).sort((a, b) => {
-        const dateA = a.fecha_ideal_produccion ? new Date(a.fecha_ideal_produccion).getTime() : Infinity
-        const dateB = b.fecha_ideal_produccion ? new Date(b.fecha_ideal_produccion).getTime() : Infinity
+        const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
+        const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
         const valA = isNaN(dateA) ? Infinity : dateA
         const valB = isNaN(dateB) ? Infinity : dateB
         return valA - valB
