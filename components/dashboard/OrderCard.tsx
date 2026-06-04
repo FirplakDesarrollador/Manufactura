@@ -37,9 +37,7 @@ export function OrderCard({ order }: OrderCardProps) {
             <div className="flex-1 min-w-[300px]">
                 <div className="flex items-center gap-2 mb-2">
                     <span className="text-sm font-bold text-[#254153]">OF: {order.orden_fabricacion}</span>
-                    {order.ensayo && (
-                        <span className="bg-[#2196f3] text-white text-[10px] px-2 py-0.5 rounded font-black uppercase">ENSAYO</span>
-                    )}
+
                 </div>
                 <div className="mb-2">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-tight">Pedido: {order.numero_pedido}</p>

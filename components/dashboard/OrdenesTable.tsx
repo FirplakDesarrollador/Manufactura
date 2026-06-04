@@ -88,7 +88,7 @@ export default function OrdenesTable() {
                                 <th className="px-4 py-3 border-b">Pedido</th>
                                 <th className="px-4 py-3 border-b">Cliente</th>
                                 <th className="px-4 py-3 border-b">Producto</th>
-                                <th className="px-4 py-3 border-b text-center">Ensayo</th>
+
                                 <th className="px-4 py-3 border-b text-center">Fecha Prod.</th>
                                 <th className="px-4 py-3 border-b hidden md:table-cell">Molde Asignado</th>
                             </tr>
@@ -118,15 +118,7 @@ export default function OrdenesTable() {
                                         <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]" title={row.productoDescripcion || row.producto_descripcion}>
                                             {row.productoDescripcion || row.producto_descripcion || '-'}
                                         </td>
-                                        <td className="px-4 py-2.5 text-center">
-                                            {(row.ensayo !== undefined ? row.ensayo : false) ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">
-                                                    Ensayo
-                                                </span>
-                                            ) : (
-                                                <span className="text-gray-300">-</span>
-                                            )}
-                                        </td>
+
                                         <td className="px-4 py-2.5 text-center text-gray-600">
                                             {row.fechaIdealProduccion || row.fecha_ideal_produccion 
                                                 ? new Date(row.fechaIdealProduccion || row.fecha_ideal_produccion).toLocaleDateString()

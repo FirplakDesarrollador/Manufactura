@@ -39,7 +39,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                     <div className="flex items-center gap-1 text-cyan-600 mb-1">
                         <Clipboard size={14} className="shrink-0" />
                         <span className="text-xs font-bold text-gray-900 truncate">OF: {orden.orden_fabricacion}</span>
-                        <span className="bg-blue-200 text-blue-800 text-[10px] px-1 rounded font-bold ml-auto shrink-0">ENSAYO</span>
+
                     </div>
                     <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido}</div>
                     <div className="flex flex-wrap gap-1 mt-1">

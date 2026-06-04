@@ -67,11 +67,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
                         <div className="flex items-center gap-2">
                             <FileText size={16} className={`${isReponer ? 'text-red-600' : 'text-blue-600'}`} />
                             <span className={`font-bold text-sm ${isReponer ? 'text-red-700' : 'text-gray-900'}`}>OF: {orden.orden_fabricacion}</span>
-                            {orden.ensayo && (
-                                <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                    Ensayo
-                                </span>
-                            )}
+
                         </div>
                     <div className="text-xs flex flex-col gap-1">
                         <div className="flex justify-between items-center bg-gray-50 px-2 py-1 rounded">

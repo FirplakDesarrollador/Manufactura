@@ -54,38 +54,38 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
     return (
         <div className="h-full flex flex-col bg-gray-50/50">
             {/* Main Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-6 shadow-sm">
+            <div className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-2xl font-extrabold text-[#254153] flex items-center gap-2 uppercase tracking-tight">
-                            <Database size={28} className="text-amber-600" />
+                        <h2 className="text-base font-extrabold text-[#254153] flex items-center gap-2 uppercase tracking-tight">
+                            <Database size={20} className="text-amber-600" />
                             Módulo de Vaciado
                         </h2>
-                        <p className="text-sm text-gray-500 font-bold mt-1 uppercase tracking-widest opacity-80">
+                        <p className="text-xs text-gray-500 font-bold mt-0.5 uppercase tracking-widest opacity-80">
                             Registro de piezas y consulta de pesos estándar.
                         </p>
                     </div>
 
                     {/* Tab Navigation */}
-                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 shadow-inner">
+                    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner">
                         <button
                             onClick={() => setActiveTab('reportar')}
-                            className={`flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${activeTab === 'reportar'
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'reportar'
                                 ? 'bg-[#254153] text-white shadow-lg scale-105'
                                 : 'text-gray-500 hover:text-[#254153] hover:bg-white/50'
                                 }`}
                         >
-                            <ClipboardList size={20} />
+                            <ClipboardList size={16} />
                             Reportar
                         </button>
                         <button
                             onClick={() => setActiveTab('kilos')}
-                            className={`flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${activeTab === 'kilos'
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'kilos'
                                 ? 'bg-[#254153] text-white shadow-lg scale-105'
                                 : 'text-gray-500 hover:text-[#254153] hover:bg-white/50'
                                 }`}
                         >
-                            <TableProperties size={20} />
+                            <TableProperties size={16} />
                             Tabla Kilos
                         </button>
                     </div>
@@ -93,22 +93,22 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
                 <div className="max-w-6xl mx-auto h-full">
                     {activeTab === 'reportar' ? (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                             {/* Search and Stats bar for Reporting */}
-                            <div className="bg-white p-4 rounded-2xl border-2 border-gray-100 shadow-sm flex flex-col md:flex-row gap-4">
+                            <div className="bg-white p-3 rounded-xl border-2 border-gray-100 shadow-sm flex flex-col md:flex-row gap-3">
                                 <div className="relative flex-1 group">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-amber-500 transition-colors">
-                                        <Search size={22} />
+                                        <Search size={18} />
                                     </div>
                                     <input
                                         type="text"
                                         placeholder="Buscar por OF, Producto, Pedido o Molde..."
                                         value={searchText}
                                         onChange={(e) => setSearchText(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all shadow-sm font-bold text-base"
+                                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-2 border-transparent rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all shadow-sm font-bold text-sm"
                                     />
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2">
@@ -116,7 +116,7 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
                                         <select
                                             value={selectedMaquina}
                                             onChange={(e) => setSelectedMaquina(e.target.value)}
-                                            className={`h-full px-4 py-4 rounded-xl border-2 font-black uppercase tracking-widest text-sm transition-all outline-none ${!selectedMaquina
+                                            className={`h-full px-3 py-2.5 rounded-xl border-2 font-black uppercase tracking-widest text-xs transition-all outline-none ${!selectedMaquina
                                                 ? 'border-red-300 bg-red-50 text-red-500 animate-pulse'
                                                 : 'border-amber-200 bg-amber-50 text-amber-700'
                                                 }`}
@@ -136,13 +136,13 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
                                         onClick={() => setSearchText('')}
                                         className="bg-orange-500 hover:bg-orange-600 text-white px-6 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
                                     >
-                                        <Eraser size={22} />
+                                        <Eraser size={18} />
                                         <span className="text-sm font-black uppercase tracking-widest">Limpiar</span>
                                     </button>
-                                    <div className="bg-[#254153] text-white px-8 flex items-center border border-[#254153] rounded-xl shadow-lg">
+                                    <div className="bg-[#254153] text-white px-5 flex items-center border border-[#254153] rounded-xl shadow-lg">
                                         <div className="text-right">
-                                            <p className="text-xs font-black text-amber-400 uppercase tracking-tighter leading-none">Pendientes</p>
-                                            <p className="text-2xl font-black leading-none mt-1">{registros.length}</p>
+                                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-tighter leading-none">Pendientes</p>
+                                            <p className="text-xl font-black leading-none mt-0.5">{registros.length}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -167,7 +167,7 @@ export default function VaciadoModule({ userEmail }: { userEmail: string }) {
                                     </p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 gap-6">
+                                <div className="grid grid-cols-1 gap-4">
                                     <div className="text-xs font-black text-[#254153]/40 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
                                         <div className="h-1 w-10 bg-amber-200 rounded-full" />
                                         Piezas para Vaciado: {filteredRegistros.length}
