@@ -52,7 +52,6 @@ export async function registrarDesmolde(registroId: number, usuarioEmail: string
         .from('moldes')
         .update({
             estado: 'Disponible',
-            vueltas_actuales: 0,
             modificado_por: usuarioEmail,
             modified_at: new Date().toISOString()
         })
