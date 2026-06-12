@@ -14,7 +14,12 @@ export default function HistorySection() {
         const fetchRegistros = async () => {
             setLoading(true)
             const data = await getRegistrosTrazabilidadHoy()
-            setRegistros(data)
+            const sortedData = [...data].sort((a, b) => {
+                const dateA = new Date(a.pintura_fecha || 0).getTime()
+                const dateB = new Date(b.pintura_fecha || 0).getTime()
+                return dateB - dateA
+            })
+            setRegistros(sortedData)
             setLoading(false)
         }
         fetchRegistros()

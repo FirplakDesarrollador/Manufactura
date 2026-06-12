@@ -135,13 +135,13 @@ export default function CargaMoldesTable() {
                                             {row.moldesEnFabricacion ?? row.moldes_en_fabricacion ?? row.fabricacion ?? '-'}
                                         </td>
                                         <td className="px-4 py-2.5 text-center text-blue-600 font-bold bg-blue-50/30">
-                                            {row.ordenes ?? '-'}
+                                            {row.ordenes ?? row.total_ordenes ?? '-'}
                                         </td>
                                         <td className="px-4 py-2.5 text-center text-[#00bcd4] font-bold bg-[#00bcd4]/5">
-                                            {row.programado ?? '-'}
+                                            {row.programado ?? row.piezas_programadas ?? '-'}
                                         </td>
                                         <td className="px-4 py-2.5 text-center text-purple-600 font-bold">
-                                            {row.vueltas ?? '-'}
+                                            {row.vueltas ?? row.promedio_vueltas ?? '-'}
                                         </td>
                                     </tr>
                                 ))

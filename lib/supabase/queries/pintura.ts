@@ -159,10 +159,13 @@ export async function registrarPintura(pinturaData: {
     }
 
     // 1.1 Verificar piezas ya registradas (conteo real en trazabilidad)
+    // Se excluyen las piezas 'Desgelcada' y 'Destrucción' ya que son daños y se deben repetir.
     const { count, error: countError } = await supabase
         .from('query_trazabilidad_ms')
         .select('*', { count: 'exact', head: true })
         .eq('orden_fabricacion', orden.orden_fabricacion)
+        .neq('estado', 'Desgelcada')
+        .neq('estado', 'Destrucción')
 
     if (countError) {
         console.error('Error al contar piezas:', countError)
