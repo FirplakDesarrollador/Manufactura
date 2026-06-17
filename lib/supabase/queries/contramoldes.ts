@@ -8,7 +8,7 @@ export async function getRegistrosSinContramolde(): Promise<RegistroTrazabilidad
         .select('*')
         .eq('contramolde', false) // Only show if contramolde is not yet processed (matches Flutter logic)
         .is('contramolde_fecha', null) // And not yet processed
-        .order('pintura_fecha', { ascending: false })
+        .order('pintura_fecha', { ascending: true })
 
     if (error) {
         console.error('Error fetching registros sin contramolde:', error)
