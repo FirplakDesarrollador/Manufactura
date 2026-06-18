@@ -2,12 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { PlusCircle, BarChart2, FolderClock, RotateCw, BookOpen, LogOut } from "lucide-react";
+import { PlusCircle, BarChart2, FolderClock, RotateCw, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { createExternalClient } from "@/lib/supabase/external";
-import { logout } from "@/app/hora-a-hora/login/actions";
 
 export default function Home() {
   const [userName, setUserName] = useState("");
@@ -69,15 +68,6 @@ export default function Home() {
           <div className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center text-sm font-bold shrink-0">
             {initials || "?"}
           </div>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"
-              title="Cerrar sesión"
-            >
-              <LogOut size={16} />
-            </button>
-          </form>
         </div>
       </header>
 
