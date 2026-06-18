@@ -7,7 +7,7 @@ export async function getRegistrosParaVaciado(): Promise<RegistroTrazabilidad[]>
         .from('query_trazabilidad_ms')
         .select('*')
         .eq('estado', 'Pintura')
-        .order('pintura_fecha', { ascending: false })
+        .order('pintura_fecha', { ascending: true })
 
     if (error) {
         console.error('Error fetching registros para vaciado:', error)
