@@ -83,14 +83,17 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
                     <button
                         onClick={handleRegister}
                         disabled={loading}
-                        className="w-full xl:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl font-black text-base flex items-center justify-center gap-3 shadow-xl hover:shadow-indigo-900/20 active:scale-95 transition-all disabled:bg-slate-400 uppercase tracking-widest"
+                        className="w-full xl:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow-md hover:shadow-indigo-900/20 active:scale-95 transition-all disabled:bg-slate-400 uppercase tracking-wide"
                     >
                         {loading ? (
-                            <div className="animate-spin rounded-full h-7 w-7 border-3 border-white/30 border-t-white" />
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/30 border-t-white shrink-0" />
                         ) : (
-                            <CheckCircle size={28} />
+                            <CheckCircle size={24} className="shrink-0" />
                         )}
-                        REGISTRAR DESMOLDE
+                        <div className="flex flex-col items-start leading-tight text-left">
+                            <span>REGISTRAR</span>
+                            <span>DESMOLDE</span>
+                        </div>
                     </button>
                 </div>
             </div>
