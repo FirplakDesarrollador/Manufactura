@@ -247,6 +247,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             alert('Error: Debe seleccionar un Molde.')
             return
         }
+        if ((selectedOrden.programado || 0) <= 0) {
+            alert('Esta orden ya completó las piezas programadas.')
+            return
+        }
 
         setSubmitting(true)
         try {
@@ -260,6 +264,9 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
 
             // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
             setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
+            
+            // Actualizar localmente la orden para prevenir spam rápido
+            setSelectedOrden(prev => prev ? { ...prev, programado: (prev.programado || 0) - 1 } : null)
             
             // Limpia los campos del formulario (mantiene orden y línea seleccionadas para agilizar procesos)
             setSelectedMolde(null)
@@ -454,7 +461,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                         {/* Submit Button */}
                         <button
                             onClick={handleSubmit}
-                            disabled={!selectedOrden || !selectedLinea || !selectedMolde || submitting}
+                            disabled={!selectedOrden || !selectedLinea || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
                             className="flex-1 lg:min-w-[150px] py-3 bg-cyan-600 text-white rounded-lg font-bold text-lg hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
