@@ -19,7 +19,7 @@ import {
     PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
 
-const COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#fbbf24'];
+const COLORS = ['#254153', '#3b82f6', '#0ea5e9', '#0284c7', '#0369a1', '#075985', '#0f172a', '#334155'];
 const MONTHS = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 export default function Estadisticas() {
