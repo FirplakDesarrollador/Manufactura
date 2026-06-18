@@ -200,9 +200,9 @@ export default function Estadisticas() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center">
-            <header className="w-full bg-primary text-primary-foreground shadow-md p-4 sticky top-0 z-50">
+            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/"><Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white"><ArrowLeft size={20} /><span className="hidden sm:inline font-bold text-lg">Estadísticas</span></Button></Link>
+                    <Link href="/hora-a-hora"><Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white"><ArrowLeft size={20} /><span className="hidden sm:inline font-bold text-lg">Estadísticas</span></Button></Link>
                     <div className="flex flex-col items-end">
                         <div className="font-bold text-2xl tracking-widest leading-none">FIRPLAK</div>
                         <div className="text-[10px] opacity-80 uppercase tracking-widest">inspiring homes</div>
@@ -393,9 +393,9 @@ export default function Estadisticas() {
                                 <CardContent className="h-72">
                                     {puestoData.length > 0 ? (
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={puestoData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                            <BarChart data={puestoData} margin={{ top: 5, right: 20, left: 30, bottom: 20 }}>
                                                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                                                <XAxis dataKey="name" fontSize={10} angle={-20} textAnchor="end" height={50} />
+                                                <XAxis dataKey="name" fontSize={10} angle={-25} tick={{ textAnchor: 'end' }} dx={-2} dy={5} height={60} />
                                                 <YAxis domain={[0, 100]} fontSize={11} />
                                                 <Tooltip formatter={(v: any) => `${v?.toFixed(1)}%`} />
                                                 <Bar dataKey="calidad" name="Calidad %" fill="#f59e0b" radius={[4, 4, 0, 0]}>

@@ -7,8 +7,8 @@ export default function GuiaPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       {/* Header */}
-      <header className="w-full bg-primary text-primary-foreground h-20 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <Link href="/" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
+      <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+        <Link href="/hora-a-hora" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-6 h-6" />
         </Link>
         

@@ -53,7 +53,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white flex flex-col relative font-sans">
       {/* Header */}
-      <header className="w-full bg-primary text-primary-foreground h-20 px-6 flex items-center justify-between">
+      <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between">
         <div className="w-10"></div> {/* Spacer for centering */}
         
         <div className="flex flex-col items-center justify-center text-center">

@@ -62,7 +62,7 @@ export default function NuevaEvaluacion() {
     const handleSave = () => {
         cerrarEvaluacion();
         toast.success("Evaluación guardada exitosamente");
-        router.push("/historico");
+        router.push("/hora-a-hora/historico");
     };
 
     const progress = ((currentStep + 1) / STEPS.length) * 100;
@@ -70,9 +70,9 @@ export default function NuevaEvaluacion() {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center">
             {/* Top Navbar */}
-            <header className="w-full bg-primary text-primary-foreground shadow-md p-4 sticky top-0 z-50">
+            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white" onClick={() => router.push("/")}>
+                    <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white" onClick={() => router.push("/hora-a-hora")}>
                         <ArrowLeft size={20} />
                         <span className="font-bold text-base md:text-lg">Nueva Evaluación</span>
                     </Button>

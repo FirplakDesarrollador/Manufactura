@@ -31,7 +31,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden animate-in zoom-in-95 fade-in duration-300">
 
                 {/* Header */}
-                <div className="bg-primary text-white px-6 py-5 flex items-start justify-between">
+                <div className="bg-[#254153] text-white px-6 py-5 flex items-start justify-between">
                     <div>
                         <div className="flex items-center gap-3 mb-1">
                             <p className="text-xs font-bold uppercase tracking-widest opacity-70">Detalle Hora Hora</p>
@@ -57,7 +57,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                     {/* Realizado por */}
                     {item.creadoPor && (
                         <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                            <User size={16} className="text-primary shrink-0" />
+                            <User size={16} className="text-[#254153] shrink-0" />
                             <div>
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hora Hora realizado por</p>
                                 <p className="text-sm font-bold text-slate-800">{resolveUserName(item.creadoPor)}</p>
@@ -188,7 +188,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                 </div>
 
                 <div className="px-6 pb-6">
-                    <Button onClick={onClose} className="w-full bg-primary hover:bg-primary/90 font-bold">
+                    <Button onClick={onClose} className="w-full bg-[#254153] hover:bg-[#254153]/90 font-bold text-white">
                         Cerrar
                     </Button>
                 </div>
@@ -356,7 +356,7 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
                         </div>
                         {piezasTotales > 0 && (
                             <p className="text-xs text-slate-500 mt-2">
-                                Calidad: <span className="font-bold text-primary">{((piezasBuenas / piezasTotales) * 100).toFixed(1)}%</span> · Defectos: <span className="font-bold">{Math.max(piezasTotales - piezasBuenas, 0)}</span>
+                                Calidad: <span className="font-bold text-[#254153]">{((piezasBuenas / piezasTotales) * 100).toFixed(1)}%</span> · Defectos: <span className="font-bold">{Math.max(piezasTotales - piezasBuenas, 0)}</span>
                             </p>
                         )}
                     </div>
@@ -559,9 +559,9 @@ export default function Historico() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center">
-            <header className="w-full bg-primary text-primary-foreground shadow-md p-4 sticky top-0 z-50">
+            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/">
+                    <Link href="/hora-a-hora">
                         <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
                             <ArrowLeft size={20} />
                             <span className="hidden sm:inline font-bold text-lg">Histórico Hora-Hora</span>
@@ -577,7 +577,7 @@ export default function Historico() {
             <main className="flex-1 w-full max-w-6xl p-4 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                 <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between mt-6">
-                    <h2 className="text-2xl font-bold text-primary">Observaciones Guardadas</h2>
+                    <h2 className="text-2xl font-bold text-[#254153]">Observaciones Guardadas</h2>
 
                     <div className="flex-1 w-full max-w-lg relative mx-auto">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -596,8 +596,8 @@ export default function Historico() {
                 <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader className="bg-primary hover:bg-primary">
-                                <TableRow className="hover:bg-primary border-none">
+                            <TableHeader className="bg-[#254153] hover:bg-[#254153]">
+                                <TableRow className="hover:bg-[#254153] border-none">
                                     <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider rounded-tl-lg w-12">#</TableHead>
                                     <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider">Fecha</TableHead>
                                     <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider">Planta / Puesto</TableHead>
@@ -619,7 +619,7 @@ export default function Historico() {
                                     return (
                                         <TableRow key={item.id} className="hover:bg-slate-50 transition-colors">
                                             <TableCell className="py-4">
-                                                <span className="font-black text-primary text-sm">{item.consecutivo || "—"}</span>
+                                                <span className="font-black text-[#254153] text-sm">{item.consecutivo || "—"}</span>
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <div className="font-medium text-slate-800">{format(new Date(item.tiempoInicio), "dd/MM/yyyy")}</div>

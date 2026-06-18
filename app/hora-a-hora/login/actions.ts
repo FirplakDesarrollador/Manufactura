@@ -15,11 +15,11 @@ export async function login(formData: FormData) {
     const { error } = await supabase.auth.signInWithPassword(data)
 
     if (error) {
-        redirect('/error')
+        redirect('/hora-a-hora/error')
     }
 
-    revalidatePath('/', 'layout')
-    redirect('/')
+    revalidatePath('/hora-a-hora', 'layout')
+    redirect('/hora-a-hora')
 }
 
 export async function signup(formData: FormData) {
@@ -33,16 +33,16 @@ export async function signup(formData: FormData) {
     const { error } = await supabase.auth.signUp(data)
 
     if (error) {
-        redirect('/error')
+        redirect('/hora-a-hora/error')
     }
 
-    revalidatePath('/', 'layout')
-    redirect('/')
+    revalidatePath('/hora-a-hora', 'layout')
+    redirect('/hora-a-hora')
 }
 
 export async function logout() {
     const supabase = await createClient()
     await supabase.auth.signOut()
-    revalidatePath('/', 'layout')
-    redirect('/login')
+    revalidatePath('/hora-a-hora', 'layout')
+    redirect('/hora-a-hora/login')
 }
