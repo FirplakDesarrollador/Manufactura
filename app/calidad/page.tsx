@@ -100,7 +100,7 @@ export default function CalidadPage() {
 
             {/* Footer */}
             <footer className="py-6 text-center text-gray-400 text-sm">
-                &copy; {new Date().getFullYear()} ImpacSoft. Todos los derechos reservados.
+                &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
             </footer>
         </div>
     )

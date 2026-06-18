@@ -99,7 +99,7 @@ export default function HomePage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
-                        <h1 className="text-2xl font-bold text-white">ImpacSoft</h1>
+                        <h1 className="text-2xl font-bold text-white">Firplak</h1>
                     </div>
 
                     <div className="flex items-center space-x-4">
@@ -131,7 +131,7 @@ export default function HomePage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                 </svg>
                             </div>
-                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300">Manufactura</span>
+                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300">Control de piso</span>
                         </button>
                     )}
 
@@ -192,7 +192,7 @@ export default function HomePage() {
 
             {/* Footer */}
             <footer className="py-6 text-center text-gray-400 text-sm">
-                &copy; {new Date().getFullYear()} ImpacSoft. Todos los derechos reservados.
+                &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
             </footer>
         </div>
     )
