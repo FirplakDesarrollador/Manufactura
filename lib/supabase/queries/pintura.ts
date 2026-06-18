@@ -311,3 +311,33 @@ export async function registrarPintura(pinturaData: {
 
     return data
 }
+
+export async function eliminarRegistroPintura(registroId: number, moldeSerial: string) {
+    // 1. Obtener info del molde para restarle vueltas y cambiar a Disponible
+    const { data: molde, error: moldeError } = await supabase
+        .from('moldes')
+        .select('vueltas_actuales, vueltas_acumuladas')
+        .eq('serial', moldeSerial)
+        .single()
+        
+    if (!moldeError && molde) {
+        await supabase
+            .from('moldes')
+            .update({ 
+                estado: 'Disponible',
+                vueltas_actuales: Math.max(0, (molde.vueltas_actuales || 0) - 1),
+                vueltas_acumuladas: Math.max(0, (molde.vueltas_acumuladas || 0) - 1)
+            })
+            .eq('serial', moldeSerial)
+    }
+
+    // 2. Eliminar el registro
+    const { error: deleteError } = await supabase
+        .from('trazabilidad_ms')
+        .delete()
+        .eq('id', registroId)
+
+    if (deleteError) {
+        throw new Error(`Error al eliminar registro: ${deleteError.message}`)
+    }
+}

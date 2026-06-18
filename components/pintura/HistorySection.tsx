@@ -3,7 +3,7 @@ import { parseDBDate } from '@/lib/utils/date';
 
 import React, { useEffect, useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
-import { getRegistrosTrazabilidad, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
+import { getRegistrosTrazabilidad, getRegistrosTrazabilidadHoy, eliminarRegistroPintura } from '@/lib/supabase/queries/pintura'
 import { History, Ban, Clock, Package, Hash, Layers, Info } from 'lucide-react'
 
 export default function HistorySection() {
@@ -32,6 +32,27 @@ export default function HistorySection() {
 
         // Only allow deletion if less than 10 minutes and NOT "vaciado" (or other final states)
         return diffMinutes <= 10 && estado === 'Pintura'
+    }
+
+    const handleDelete = async (registroId: number, moldeSerial: string) => {
+        if (!confirm('¿Seguro que deseas eliminar este registro de pintura?')) return
+        
+        setLoading(true)
+        try {
+            await eliminarRegistroPintura(registroId, moldeSerial)
+            const data = await getRegistrosTrazabilidadHoy()
+            const sortedData = [...data].sort((a, b) => {
+                const dateA = new Date(a.pintura_fecha || 0).getTime()
+                const dateB = new Date(b.pintura_fecha || 0).getTime()
+                return dateB - dateA
+            })
+            setRegistros(sortedData)
+        } catch (error) {
+            console.error(error)
+            alert('Hubo un error al eliminar el registro.')
+        } finally {
+            setLoading(false)
+        }
     }
 
     if (loading) {
@@ -118,7 +139,10 @@ export default function HistorySection() {
                                         <span className="text-[10px] font-bold text-red-500 leading-tight">Ya no puedes eliminar este registro</span>
                                     </div>
                                 ) : (
-                                    <button className="flex flex-col items-center hover:opacity-80 text-red-600">
+                                    <button 
+                                        onClick={() => handleDelete(registro.id, registro.molde_serial)}
+                                        className="flex flex-col items-center hover:opacity-80 text-red-600"
+                                    >
                                         <Ban size={24} className="mb-1" />
                                         <span className="text-[10px] font-bold leading-tight underline">Eliminar registro</span>
                                     </button>
