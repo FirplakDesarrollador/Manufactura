@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { PlusCircle, BarChart2, FolderClock, RotateCw, BookOpen } from "lucide-react";
+import { PlusCircle, BarChart2, FolderClock, RotateCw, BookOpen, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -53,7 +53,11 @@ export default function Home() {
     <div className="min-h-screen bg-white flex flex-col relative font-sans">
       {/* Header */}
       <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between">
-        <div className="w-10"></div> {/* Spacer for centering */}
+        <Link href="/home">
+          <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors" title="Volver al menú principal">
+            <ArrowLeft size={24} />
+          </button>
+        </Link>
         
         <div className="flex flex-col items-center justify-center text-center">
           <div className="font-bold text-2xl tracking-widest leading-none">FIRPLAK</div>
