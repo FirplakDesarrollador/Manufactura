@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { PlusCircle, BarChart2, FolderClock, RotateCw, BookOpen, ArrowLeft } from "lucide-react";
+import { PlusCircle, BarChart2, FolderClock, RotateCw, BookOpen, ArrowLeft, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -120,6 +120,13 @@ export default function Home() {
             <div className="w-36 h-36 md:w-48 md:h-48 bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-slate-100 flex flex-col items-center justify-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-300">
               <BookOpen className="w-10 h-10 text-primary opacity-80" strokeWidth={1.5} />
               <span className="text-sm font-medium text-slate-600">Guía</span>
+            </div>
+          </Link>
+
+          <Link href="/hora-a-hora/ensayo" className="group">
+            <div className="w-36 h-36 md:w-48 md:h-48 bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-slate-100 flex flex-col items-center justify-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-300">
+              <FlaskConical className="w-10 h-10 text-primary opacity-80" strokeWidth={1.5} />
+              <span className="text-sm font-medium text-slate-600">Ensayo</span>
             </div>
           </Link>
 
