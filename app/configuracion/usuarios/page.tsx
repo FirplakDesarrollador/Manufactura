@@ -35,6 +35,10 @@ export default function UsuariosConfiguracionPage() {
     const [isEditing, setIsEditing] = useState(false)
     const [editedPermisos, setEditedPermisos] = useState<any>({})
     const [isSaving, setIsSaving] = useState(false)
+    
+    // Estados para Contraseña
+    const [isChangingPassword, setIsChangingPassword] = useState(false)
+    const [newPassword, setNewPassword] = useState('')
 
     const fetchUsuarios = useCallback(async () => {
         setLoading(true)
@@ -80,6 +84,8 @@ export default function UsuariosConfiguracionPage() {
         if (!isSaving) {
             setSelectedUser(null)
             setIsEditing(false)
+            setIsChangingPassword(false)
+            setNewPassword('')
         }
     }
 
@@ -118,6 +124,28 @@ export default function UsuariosConfiguracionPage() {
             setUsuarios(prev => prev.map(u => u.id === selectedUser.id ? { ...u, permisos: editedPermisos } : u));
             setSelectedUser({ ...selectedUser, permisos: editedPermisos });
             setIsEditing(false);
+        }
+    }
+
+    const changePassword = async () => {
+        if (!newPassword || newPassword.length < 6) {
+            alert('La contraseña debe tener al menos 6 caracteres.')
+            return
+        }
+        setIsSaving(true)
+        const { error } = await supabase.rpc('admin_change_password', {
+            target_email: selectedUser?.correo,
+            new_password: newPassword
+        })
+        setIsSaving(false)
+        
+        if (error) {
+            console.error('Error al cambiar contraseña:', error)
+            alert('Hubo un error al cambiar la contraseña: ' + error.message)
+        } else {
+            alert('Contraseña actualizada exitosamente.')
+            setIsChangingPassword(false)
+            setNewPassword('')
         }
     }
 
@@ -308,6 +336,49 @@ export default function UsuariosConfiguracionPage() {
                                             <p className="text-sm text-gray-900 font-medium">{formatDate(selectedUser.created_at)}</p>
                                         </div>
                                     </div>
+
+                                    {/* Cambiar Contraseña Section */}
+                                    {!isChangingPassword ? (
+                                        <button
+                                            onClick={() => setIsChangingPassword(true)}
+                                            className="w-full mt-6 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#254153] rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                                            Cambiar Contraseña
+                                        </button>
+                                    ) : (
+                                        <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2">
+                                            <label className="block text-sm font-bold text-[#254153]">Nueva Contraseña</label>
+                                            <input 
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                placeholder="Mínimo 6 caracteres"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#254153]/50 focus:border-[#254153]"
+                                            />
+                                            <div className="flex gap-2 pt-2">
+                                                <button 
+                                                    onClick={() => setIsChangingPassword(false)}
+                                                    className="flex-1 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                                                    disabled={isSaving}
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button 
+                                                    onClick={changePassword}
+                                                    className="flex-1 px-3 py-2 bg-[#254153] text-white rounded-lg text-sm font-medium hover:bg-[#1a2e3b] transition-colors flex justify-center items-center"
+                                                    disabled={isSaving}
+                                                >
+                                                    {isSaving ? (
+                                                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                    ) : 'Guardar'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Columna Derecha: Permisos */}
