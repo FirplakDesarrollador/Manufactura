@@ -21,6 +21,9 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
     calidad: ['ms'],
+    hora_a_hora: true,
+    ficha_rcc: true,
+    opt: true,
     configuracion: true
 };
 
