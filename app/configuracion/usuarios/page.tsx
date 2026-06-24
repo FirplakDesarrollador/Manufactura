@@ -24,7 +24,8 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     hora_a_hora: true,
     ficha_rcc: true,
     opt: true,
-    configuracion: true
+    configuracion: true,
+    tarjetas_excelencia: true
 };
 
 export default function UsuariosConfiguracionPage() {

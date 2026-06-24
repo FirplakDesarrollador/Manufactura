@@ -112,8 +112,7 @@ export default function HomePage() {
     }
 
     const hasTarjetasExcelencia = () => {
-        // TODO: Mapear desde permisos cuando esté implementado en BD. Mostramos por defecto o según permiso si existe.
-        return user?.permisos?.tarjetas_excelencia !== false; 
+        return !!user?.permisos?.tarjetas_excelencia; 
     }
 
     return (
