@@ -67,7 +67,7 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
         ergonomia: "¿El trabajador mantiene una postura adecuada? ¿Las alturas de trabajo son correctas? ¿Tiene los apoyos necesarios?",
         ordenAseo: "¿El área está libre de obstáculos? ¿Los materiales están en su lugar? ¿Se evidencia limpieza en la zona de trabajo?",
         planControl: "¿Se realizaron los ajustes previos? ¿Se están siguiendo los parámetros definidos en el plan de control?",
-        hdt: "¿Se cuenta con la Hoja de Datos Técnicos o documentación necesaria? ¿Está actualizada y disponible?",
+        hdt: "¿Se cuenta con la Hoja de División de Trabajo o documentación necesaria? ¿Está actualizada y disponible?",
         s5: "¿Se aplica Sentido de Utilización, Orden, Limpieza, Estandarización y Disciplina en el puesto?",
         herramientas: "¿Las herramientas están limpias y funcionales? ¿Cuentan con sus protecciones? ¿Se evidencia algún daño que represente riesgo?",
         defectos: "¿El operario puede identificar los defectos más comunes? ¿Sabe cómo actuar al detectarlos?",
@@ -99,13 +99,10 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
         </div>
     )
 
-    // Helper to handle toggle changes with auto-clear
+    // Helper to handle toggle changes without auto-clear
     const handleToggleChange = (setter: (v: boolean) => void, clearObs: () => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
         const checked = e.target.checked
         setter(checked)
-        if (checked) {
-            clearObs()
-        }
     }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -361,8 +358,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_seguridad"
                             value={obsSeguridad}
                             onChange={(e) => setObsSeguridad(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${elementosSeguridad || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={elementosSeguridad || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!elementosSeguridad && !isReadOnly}
                         />
                     </div>
@@ -395,8 +392,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_ergonomia"
                             value={obsErgonomia}
                             onChange={(e) => setObsErgonomia(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${puestoErgonomia || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={puestoErgonomia || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!puestoErgonomia && !isReadOnly}
                         />
                     </div>
@@ -427,8 +424,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_orden_aseo"
                             value={obsOrdenAseo}
                             onChange={(e) => setObsOrdenAseo(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${puestoOrdenado || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={puestoOrdenado || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!puestoOrdenado && !isReadOnly}
                         />
                     </div>
@@ -483,8 +480,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_hdt"
                             value={obsHdt}
                             onChange={(e) => setObsHdt(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${cumpleHdt || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={cumpleHdt || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!cumpleHdt && !isReadOnly}
                         />
                     </div>
@@ -514,8 +511,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_5s"
                             value={obs5s}
                             onChange={(e) => setObs5s(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${cumple5s || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={cumple5s || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!cumple5s && !isReadOnly}
                         />
                     </div>
@@ -545,8 +542,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_plan_control"
                             value={obsPlanControl}
                             onChange={(e) => setObsPlanControl(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${cumplePuestaPunto || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={cumplePuestaPunto || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!cumplePuestaPunto && !isReadOnly}
                         />
                     </div>
@@ -577,8 +574,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_herramientas"
                             value={obsHerramientas}
                             onChange={(e) => setObsHerramientas(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${herramientasEstado || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={herramientasEstado || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!herramientasEstado && !isReadOnly}
                         />
                     </div>
@@ -608,8 +605,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_defectos"
                             value={obsDefectos}
                             onChange={(e) => setObsDefectos(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${conoceDefectos || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={conoceDefectos || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!conoceDefectos && !isReadOnly}
                         />
                     </div>
@@ -640,8 +637,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_indicadores"
                             value={obsIndicadores}
                             onChange={(e) => setObsIndicadores(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${conoceIndicadores || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={conoceIndicadores || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!conoceIndicadores && !isReadOnly}
                         />
                     </div>
@@ -671,8 +668,8 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                             name="observaciones_producto_conforme"
                             value={obsProductoConforme}
                             onChange={(e) => setObsProductoConforme(e.target.value)}
-                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${productoConforme || isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
-                            disabled={productoConforme || isReadOnly}
+                            className={`w-full h-32 border-2 border-[#254153] rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-[#749094] text-lg resize-none ${isReadOnly ? 'bg-gray-100 opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isReadOnly}
                             required={!productoConforme && !isReadOnly}
                         />
                     </div>

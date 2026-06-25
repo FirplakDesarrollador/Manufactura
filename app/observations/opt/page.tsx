@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Home, ChevronLeft, Calendar, User, Briefcase, ChevronUp, ChevronDown, UserCheck, Search } from 'lucide-react'
+import { Home, ChevronLeft, Calendar, User, Briefcase, ArrowUp, ArrowDown, ArrowUpDown, UserCheck, Search, ArrowLeft } from 'lucide-react'
 
 export default function OPTHistoryPage() {
     const [observations, setObservations] = useState<any[]>([])
@@ -47,7 +47,7 @@ export default function OPTHistoryPage() {
     const filteredAndSortedData = useMemo(() => {
         let filteredItems = [...observations]
         
-        // Apply search filter
+        // Apply general search filter
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase()
             filteredItems = filteredItems.filter(obs => {
@@ -57,11 +57,22 @@ export default function OPTHistoryPage() {
                 const puesto = (obs.Puesto || obs.puesto || '').toLowerCase()
                 const creador = (obs['Created By'] || obs['Creado por'] || '').toLowerCase()
                 
+                let fechaStr = ''
+                if (obs.Create_at) {
+                    fechaStr = new Date(obs.Create_at).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    })
+                }
+                const fecha = fechaStr.toLowerCase()
+                
                 return id.includes(lowerSearch) || 
                        titulo.includes(lowerSearch) || 
                        operario.includes(lowerSearch) || 
                        puesto.includes(lowerSearch) || 
-                       creador.includes(lowerSearch)
+                       creador.includes(lowerSearch) ||
+                       fecha.includes(lowerSearch)
             })
         }
 
@@ -96,27 +107,31 @@ export default function OPTHistoryPage() {
     }, [observations, sortConfig, searchTerm])
 
     const SortIcon = ({ columnKey }: { columnKey: string }) => {
-        if (sortConfig.key !== columnKey) return <ChevronDown size={14} className="opacity-20" />
-        return sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+        if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="opacity-30 ml-1 flex-shrink-0" />
+        return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="ml-1 text-white flex-shrink-0" /> : <ArrowDown size={14} className="ml-1 text-white flex-shrink-0" />
     }
 
     return (
         <main className="flex min-h-screen flex-col bg-background">
             {/* Header */}
-            <header className="bg-primary w-full text-white py-4 px-6 flex justify-between items-center shadow-md">
-                <div className="flex items-center gap-3">
-                    <Link href="/" className="hover:opacity-80 transition-opacity">
-                        <ChevronLeft size={32} />
+            <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+                <div className="w-32 flex items-center">
+                    <Link href="/opt" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" title="Volver al menú OPT">
+                        <ArrowLeft className="w-6 h-6" />
                     </Link>
-                    <h1 className="text-xl font-bold">Histórico OPT</h1>
                 </div>
-                <Image
-                    src="/firplak-logo.png"
-                    alt="Firplak Logo"
-                    width={120}
-                    height={40}
-                    className="brightness-0 invert object-contain"
-                />
+                
+                <h1 className="font-bold text-base sm:text-lg md:text-xl uppercase tracking-wider text-center flex-1 truncate px-2">
+                    Histórico OPT
+                </h1>
+                
+                <div className="w-32 flex justify-end">
+                    <img
+                        src="/firplak-logo.png"
+                        alt="Firplak Logo"
+                        className="brightness-0 invert object-contain max-h-[32px]"
+                    />
+                </div>
             </header>
 
             <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
@@ -128,7 +143,7 @@ export default function OPTHistoryPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
-                                placeholder="Buscar por ID, Título, Operario..."
+                                placeholder="Buscar por ID, Título, Operario, Puesto, Creador o Fecha (DD/MM/AAAA)..."
                                 className="w-full pl-10 pr-4 py-2 border-2 border-gray-100 rounded-lg focus:border-secondary focus:outline-none transition-colors"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -162,7 +177,7 @@ export default function OPTHistoryPage() {
                             <thead>
                                 <tr className="bg-primary text-white">
                                     <th 
-                                        className="px-4 py-4 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="px-4 py-3 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
                                         onClick={() => requestSort('ID_COL')}
                                     >
                                         <div className="flex items-center gap-2 text-nowrap">
@@ -170,7 +185,7 @@ export default function OPTHistoryPage() {
                                         </div>
                                     </th>
                                     <th
-                                        className="px-4 py-4 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="px-4 py-3 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
                                         onClick={() => requestSort('Título')}
                                     >
                                         <div className="flex items-center gap-2 text-nowrap">
@@ -178,7 +193,7 @@ export default function OPTHistoryPage() {
                                         </div>
                                     </th>
                                     <th
-                                        className="px-4 py-4 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="px-4 py-3 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
                                         onClick={() => requestSort('Operario')}
                                     >
                                         <div className="flex items-center gap-2 text-nowrap">
@@ -186,7 +201,7 @@ export default function OPTHistoryPage() {
                                         </div>
                                     </th>
                                     <th
-                                        className="px-4 py-4 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="px-4 py-3 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
                                         onClick={() => requestSort('Puesto')}
                                     >
                                         <div className="flex items-center gap-2 text-nowrap">
@@ -194,7 +209,7 @@ export default function OPTHistoryPage() {
                                         </div>
                                     </th>
                                     <th
-                                        className="px-4 py-4 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="px-4 py-3 font-bold uppercase text-xs cursor-pointer hover:bg-[#3b5998] transition-colors"
                                         onClick={() => requestSort('Created By')}
                                     >
                                         <div className="flex items-center gap-2 text-nowrap">
@@ -202,7 +217,7 @@ export default function OPTHistoryPage() {
                                         </div>
                                     </th>
                                     <th
-                                        className="px-4 py-4 font-bold uppercase text-xs cursor-pointer hover:bg-secondary transition-colors"
+                                        className="px-4 py-3 font-bold uppercase text-xs cursor-pointer hover:bg-secondary transition-colors"
                                         onClick={() => requestSort('Create_at')}
                                     >
                                         <div className="flex items-center gap-2 text-nowrap">
