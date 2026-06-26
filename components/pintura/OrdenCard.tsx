@@ -76,23 +76,23 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
 
             {/* Right Section: Process Grid */}
             <div className="flex-1 md:pl-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1">
-                <MiniMetric label="Cantidad" value={orden.cantidad || orden.cantidad_programada} color="bg-cyan-50 border-cyan-200" />
-                <MiniMetric label="Pintura" value={orden.pintura || 0} />
-                <MiniMetric label="Desgelcada" value={orden.desgelcada || 0} />
-                <MiniMetric label="Pulido" value={orden.pulido || 0} />
-                <MiniMetric label="Reparación" value={orden.reparacion || 0} />
-                <MiniMetric label="Saldo" value={orden.saldo || 0} />
-                <MiniMetric label="Empaque" value={orden.empaque || 0} />
-                <MiniMetric label="Transito" value={orden.transito || 0} />
+                <MiniMetric label="Cantidad" value={Math.max(0, orden.cantidad || orden.cantidad_programada || 0)} color="bg-cyan-50 border-cyan-200" />
+                <MiniMetric label="Pintura" value={Math.max(0, orden.pintura || 0)} />
+                <MiniMetric label="Desgelcada" value={Math.max(0, orden.desgelcada || 0)} />
+                <MiniMetric label="Pulido" value={Math.max(0, orden.pulido || 0)} />
+                <MiniMetric label="Reparación" value={Math.max(0, orden.reparacion || 0)} />
+                <MiniMetric label="Saldo" value={Math.max(0, orden.saldo || 0)} />
+                <MiniMetric label="Empaque" value={Math.max(0, orden.empaque || 0)} />
+                <MiniMetric label="Transito" value={Math.max(0, orden.transito || 0)} />
 
-                <MiniMetric label="Programado" value={orden.programado || 0} color="bg-orange-50 border-orange-200" />
-                <MiniMetric label="Vaciado" value={orden.vaciado || 0} />
-                <MiniMetric label="Estanteria" value={orden.estanteria || 0} />
-                <MiniMetric label="Acabado" value={orden.acabado || 0} />
-                <MiniMetric label="Rep. Larga" value={orden.reparacion_larga || 0} />
-                <MiniMetric label="Destrucción" value={orden.destruccion || 0} />
-                <MiniMetric label="Digitado" value={orden.digitado || 0} />
-                <MiniMetric label="CEDI" value={orden.cedi || 0} color="bg-cyan-50 border-cyan-200" />
+                <MiniMetric label="Programado" value={Math.max(0, orden.programado || 0)} color="bg-orange-50 border-orange-200" />
+                <MiniMetric label="Vaciado" value={Math.max(0, orden.vaciado || 0)} />
+                <MiniMetric label="Estanteria" value={Math.max(0, orden.estanteria || 0)} />
+                <MiniMetric label="Acabado" value={Math.max(0, orden.acabado || 0)} />
+                <MiniMetric label="Rep. Larga" value={Math.max(0, orden.reparacion_larga || 0)} />
+                <MiniMetric label="Destrucción" value={Math.max(0, orden.destruccion || 0)} />
+                <MiniMetric label="Digitado" value={Math.max(0, orden.digitado || 0)} />
+                <MiniMetric label="CEDI" value={Math.max(0, orden.cedi || 0)} color="bg-cyan-50 border-cyan-200" />
             </div>
         </button>
     )
