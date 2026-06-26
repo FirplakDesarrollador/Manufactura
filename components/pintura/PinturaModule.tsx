@@ -160,8 +160,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         const today = new Date().toISOString().split('T')[0]
 
         // 1. Quantity & Programmed (Totals for all filtered orders)
-        const totalCantidad = baseFilteredOrdenes.reduce((sum, o) => sum + (o.cantidad_programada || o.cantidad || 0), 0)
-        const totalProgramado = baseFilteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
+        const totalCantidad = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.cantidad_programada || o.cantidad || 0), 0)
+        const totalProgramado = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.programado || 0), 0)
 
         // 2. Daily Production (From traceability)
         // We look for everything processed today in any stage
@@ -202,7 +202,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             desgelcada: 0,
             vaciado: vaciadoToday.length,
             acabado: acabadoToday.length,
-            saldo: baseFilteredOrdenes.reduce((sum, o) => sum + (o.saldo || 0), 0),
+            saldo: baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.saldo || 0), 0),
             digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
             transito: transitoTotal.length,
             cedi: cediToday.length,
