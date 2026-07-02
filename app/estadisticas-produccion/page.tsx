@@ -330,10 +330,10 @@ export default function EstadisticasSistemaProduccion() {
             {/* Header */}
             <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/">
+                    <Link href="/sistema-produccion">
                         <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
                             <ArrowLeft size={20} />
-                            <span className="hidden sm:inline font-bold">Volver al Home</span>
+                            <span className="hidden sm:inline font-bold">Volver a Producción</span>
                         </Button>
                     </Link>
                     <h1 className="font-bold text-lg md:text-xl uppercase tracking-wider">
@@ -721,8 +721,9 @@ export default function EstadisticasSistemaProduccion() {
             {/* Sticky Home Button */}
             <div className="fixed bottom-6 right-6 z-50">
                 <Link
-                    href="/"
+                    href="/home"
                     className="w-14 h-14 bg-[#254153] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                    title="Volver al Menú Principal"
                 >
                     <Home size={28} />
                 </Link>

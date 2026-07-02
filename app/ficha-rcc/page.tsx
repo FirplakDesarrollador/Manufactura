@@ -50,6 +50,30 @@ export default function LandingPage() {
   return (
     <div className="home-container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '40px', padding: '40px 20px' }}>
       
+      {/* Botón Volver a Calidad */}
+      <div style={{ width: '100%', maxWidth: '1100px', display: 'flex', justifyContent: 'flex-start', margin: '0 0 -20px 0' }}>
+        <Link href="/calidad" style={{ textDecoration: 'none' }}>
+          <button style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            padding: '12px 24px', 
+            background: 'var(--header-bg)', 
+            color: '#fff', 
+            border: 'none', 
+            borderRadius: '12px', 
+            cursor: 'pointer', 
+            fontWeight: 'bold',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+            transition: 'transform 0.2s'
+          }}
+          onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}>
+            &larr; Volver a Calidad
+          </button>
+        </Link>
+      </div>
+      
       {/* Logo Firplak Estetizado */}
       <div style={{ 
         background: 'var(--header-bg)', 
