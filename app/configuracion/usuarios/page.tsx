@@ -25,7 +25,10 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     ficha_rcc: true,
     opt: true,
     configuracion: true,
-    tarjetas_excelencia: true
+    tarjetas_excelencia: true,
+    estadisticas_produccion: true,
+    indicadores_productividad: true,
+    asistencia: true
 };
 
 export default function UsuariosConfiguracionPage() {
