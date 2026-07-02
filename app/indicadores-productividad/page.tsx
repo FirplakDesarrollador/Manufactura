@@ -11,7 +11,7 @@ export default function IndicadoresProductividadPage() {
             {/* Header */}
             <header className="w-full bg-[#254153] text-white shadow-md p-4">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/">
+                    <Link href="/home">
                         <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 text-white font-bold text-sm transition">
                             <ArrowLeft size={18} />
                             <span>Volver al Home</span>
@@ -59,7 +59,7 @@ export default function IndicadoresProductividadPage() {
                 </div>
 
                 <div className="flex gap-4">
-                    <Link href="/">
+                    <Link href="/home">
                         <button className="px-6 py-3 bg-[#254153] hover:bg-[#1c3241] text-white font-bold rounded-xl shadow-lg transition duration-200">
                             Volver al Inicio
                         </button>
