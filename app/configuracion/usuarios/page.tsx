@@ -31,6 +31,21 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     asistencia: true
 };
 
+const PERMISSION_LABELS: Record<string, string> = {
+    fibra: 'Control de Piso (Fibra)',
+    modulos: 'Control de Piso (Mármol)',
+    muebles: 'Control de Piso (Muebles)',
+    calidad: 'Calidad',
+    hora_a_hora: 'Hora a Hora',
+    ficha_rcc: 'Ficha RRC', // Corrección del nombre solicitada por el usuario
+    opt: 'OPT',
+    configuracion: 'Configuración',
+    tarjetas_excelencia: 'Tarjetas Excelencia',
+    estadisticas_produccion: 'Estadísticas Sistema',
+    indicadores_productividad: 'Indicadores Productividad',
+    asistencia: 'Asistencia'
+};
+
 export default function UsuariosConfiguracionPage() {
     const router = useRouter()
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -419,7 +434,7 @@ export default function UsuariosConfiguracionPage() {
                                                 Object.entries(selectedUser.permisos).map(([modulo, accesos]) => (
                                                     <div key={modulo} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                                                         <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                                                            <h5 className="text-sm font-bold text-[#254153] uppercase tracking-wider">{modulo}</h5>
+                                                            <h5 className="text-sm font-bold text-[#254153] uppercase tracking-wider">{PERMISSION_LABELS[modulo] || modulo}</h5>
                                                         </div>
                                                         <div className="p-4">
                                                             {typeof accesos === 'boolean' ? (
@@ -456,7 +471,7 @@ export default function UsuariosConfiguracionPage() {
                                                     return (
                                                         <div key={modulo} className="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm">
                                                             <div className="bg-blue-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
-                                                                <h5 className="text-sm font-bold text-[#254153] uppercase tracking-wider">{modulo}</h5>
+                                                                <h5 className="text-sm font-bold text-[#254153] uppercase tracking-wider">{PERMISSION_LABELS[modulo] || modulo}</h5>
                                                                 {isBooleanModule && (
                                                                     <label className="relative inline-flex items-center cursor-pointer">
                                                                         <input 

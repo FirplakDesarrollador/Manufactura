@@ -51,11 +51,11 @@ const APP_SUMMARIES = [
     },
     {
         id: "ficha-rcc",
-        title: "Ficha RCC (Control y Corrección)",
+        title: "Ficha RRC (Control y Corrección)",
         icon: FileText,
         color: "border-l-orange-500 text-orange-600",
         description: "Reporte estructurado para acciones de control y corrección ante incidentes de calidad, fallas de máquinas, problemas de materia prima o desviaciones en el proceso.",
-        tips: ["Registra las Fichas RCC tan pronto identifiques un incidente.", "Asigna responsables claros para el plan de acción."]
+        tips: ["Registra las Fichas RRC tan pronto identifiques un incidente.", "Asigna responsables claros para el plan de acción."]
     },
     {
         id: "opt",
@@ -85,15 +85,15 @@ const APP_SUMMARIES = [
 
 // Chatbot Knowledge Base
 const KNOWLEDGE_BASE: Record<string, string> = {
-    hola: "¡Hola! Soy tu **Asistente de Manufactura Firplak**. Estoy entrenado para resolver tus dudas sobre el entorno de Manufactura y nuestras aplicaciones (Control de Piso, Calidad, Hora a Hora, OPT, Fichas RCC, etc.). ¿En qué te puedo colaborar hoy?",
+    hola: "¡Hola! Soy tu **Asistente de Manufactura Firplak**. Estoy entrenado para resolver tus dudas sobre el entorno de Manufactura y nuestras aplicaciones (Control de Piso, Calidad, Hora a Hora, OPT, Fichas RRC, etc.). ¿En qué te puedo colaborar hoy?",
     "control de piso": "El módulo de **Control de Piso** sirve para reportar la producción diaria por estación. \n\n* **¿Cómo registrar?** Ve al módulo, selecciona tu planta (Mármol, Muebles o Fibra), elige tu área (por ejemplo, Pulido o Pintura) y registra las piezas procesadas.\n* **Importante:** Recuerda registrar con tu usuario asignado para que las métricas queden grabadas a tu nombre.",
     calidad: "El módulo de **Calidad** se utiliza para registrar inspecciones y no conformidades.\n\n* Permite documentar los defectos hallados en piezas.\n* Ayuda a separar el producto conforme del no conforme para reprocesar o desechar.\n* Asegura la trazabilidad de la calidad de la planta.",
     "hora a hora": "El módulo **Hora a Hora** permite monitorear el pulso de la producción:\n\n* **Registro:** Cada hora del turno, debes registrar la cantidad de piezas producidas y compararlas contra la meta teórica.\n* **Desperdicios:** Si se generan paradas de línea o fallas de calidad, regístralas en la sección de desperdicios.\n* **Rendimiento:** El sistema calcula automáticamente el rendimiento. La meta estándar es mantenerlo arriba del **90%**.",
     opt: "El módulo **OPT** (Observación Preventiva de Trabajo) evalúa la conducta y seguridad en planta:\n\n* **¿Qué mide?** Seguridad (EPP), ergonomía, 5S (orden y aseo), plan de control y herramientas.\n* **Calificación:** Se calcula una calificación de 0% a 100% en base a los criterios cumplidos y al nivel de detalle registrado en comentarios.\n* **Frecuencia:** Se recomienda realizar observaciones semanales a los operarios de cada línea.",
-    rcc: "La **Ficha RCC** es una tarjeta de control y corrección:\n\n* Se abre cuando ocurre un incidente de calidad grave, una desviación del proceso o una falla recurrente.\n* Permite documentar el problema, analizar la causa raíz y proponer un plan de acción correctivo con fecha límite y responsable.",
+    rcc: "La **Ficha RRC** es una tarjeta de control y corrección:\n\n* Se abre cuando ocurre un incidente de calidad grave, una desviación del proceso o una falla recurrente.\n* Permite documentar el problema, analizar la causa raíz y proponer un plan de acción correctivo con fecha límite y responsable.",
     excelencia: "Las **Tarjetas de Excelencia** son para proponer ideas de mejora:\n\n* Cualquier colaborador puede crear una tarjeta detallando una oportunidad de mejora en ergonomía, 5S, seguridad o procesos.\n* Las mejores propuestas son evaluadas por el comité de manufactura para su implementación y reconocimiento al creador.",
     "5s": "Las **5S** son el estándar de orden y limpieza en la planta de Firplak:\n\n1. **Seiri (Clasificar):** Separar lo necesario de lo innecesario.\n2. **Seiton (Ordenar):** Un lugar para cada cosa y cada cosa en su lugar.\n3. **Seiso (Limpiar):** Identificar y eliminar fuentes de suciedad.\n4. **Seiketsu (Estandarizar):** Mantener las 3 primeras S mediante instrucciones visuales.\n5. **Shitsuke (Disciplina):** Seguir mejorando continuamente y realizar auditorías (evaluadas en OPT).",
-    seguridad: "La seguridad es nuestra máxima prioridad en Firplak:\n\n* **EPP Obligatorio:** Casco, gafas de seguridad, botas con puntera, y protección auditiva según el área (especialmente en vaciado, pulido y corte).\n* **Reportes:** Si ves una condición insegura, repórtala inmediatamente mediante una Ficha RCC o una Tarjeta de Excelencia en seguridad.\n* **OPT:** Recuerda que las observaciones preventivas evalúan siempre el uso de EPP.",
+    seguridad: "La seguridad es nuestra máxima prioridad en Firplak:\n\n* **EPP Obligatorio:** Casco, gafas de seguridad, botas con puntera, y protección auditiva según el área (especialmente en vaciado, pulido y corte).\n* **Reportes:** Si ves una condición insegura, repórtala inmediatamente mediante una Ficha RRC o una Tarjeta de Excelencia en seguridad.\n* **OPT:** Recuerda que las observaciones preventivas evalúan siempre el uso de EPP.",
     desperdicios: "Los desperdicios o paros en **Hora a Hora** deben detallarse:\n\n* Registra el tipo de desperdicio (ej. daño máquina, falta material, re-procesos).\n* Escribe un comentario claro para que el supervisor pueda gestionar la solución.\n* El registro exacto de desperdicios alimenta los planes de mantenimiento y abastecimiento.",
     permisos: "Si no puedes ver un módulo en tu pantalla de inicio, se debe a la configuración de tus **Permisos**:\n\n* Un administrador del sistema debe activar tu permiso en el panel de **Configuración de Usuarios**.\n* Los permisos son granulares (puedes tener acceso a Muebles pero no a Mármol, o solo a OPT y Asistencia).",
     error: "Si el sistema presenta fallas de carga o problemas de red:\n\n1. Asegúrate de tener conexión a Internet.\n2. Si estás reportando datos y falla la red, el sistema Hora a Hora tiene almacenamiento local temporal (Local Storage) para no perder tus datos.\n3. Si el error persiste, contacta al administrador del sistema con una captura de pantalla."
@@ -140,7 +140,7 @@ function getBotResponse(userMsg: string): string {
         return KNOWLEDGE_BASE.error;
     }
 
-    return "No estoy seguro de haber entendido tu consulta. Puedo ayudarte con información sobre:\n\n* **Control de Piso**\n* **Calidad**\n* **Hora a Hora** (rendimiento, desperdicios)\n* **OPT** (observaciones de conducta)\n* **Fichas RCC**\n* **Tarjetas Excelencia**\n* **Las 5S y Seguridad**\n* **Permisos o errores del sistema**\n\n¿Podrías reformular tu pregunta o seleccionar uno de los botones rápidos de sugerencia?";
+    return "No estoy seguro de haber entendido tu consulta. Puedo ayudarte con información sobre:\n\n* **Control de Piso**\n* **Calidad**\n* **Hora a Hora** (rendimiento, desperdicios)\n* **OPT** (observaciones de conducta)\n* **Fichas RRC**\n* **Tarjetas Excelencia**\n* **Las 5S y Seguridad**\n* **Permisos o errores del sistema**\n\n¿Podrías reformular tu pregunta o seleccionar uno de los botones rápidos de sugerencia?";
 }
 
 interface Message {
