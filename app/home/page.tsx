@@ -12,6 +12,14 @@ interface User {
         muebles?: any;
         fibra?: any;
         calidad?: any;
+        configuracion?: any;
+        hora_a_hora?: any;
+        ficha_rcc?: any;
+        opt?: any;
+        tarjetas_excelencia?: any;
+        estadisticas_produccion?: any;
+        indicadores_productividad?: any;
+        asistencia?: any;
     }
 }
 
@@ -48,7 +56,12 @@ export default function HomePage() {
             modulos: '/marmol',
             muebles: '/muebles',
             calidad: '/calidad',
-            fibra: '/fibra'
+            fibra: '/fibra',
+            configuracion: '/configuracion',
+            tarjetas_excelencia: '/tarjetas-excelencia',
+            estadisticas_produccion: '/estadisticas-produccion',
+            indicadores_productividad: '/indicadores-productividad',
+            asistencia: '/asistencia'
         };
 
         const availableApps = Object.keys(combinedUser.permisos || {}).filter(key => 
@@ -88,6 +101,43 @@ export default function HomePage() {
         return !!user?.permisos?.calidad;
     }
 
+    const hasConfiguracion = () => {
+        return !!user?.permisos?.configuracion;
+    }
+
+    const hasHoraAHora = () => {
+        return !!user?.permisos?.hora_a_hora;
+    }
+
+    const hasFichaRcc = () => {
+        return !!user?.permisos?.ficha_rcc;
+    }
+
+    const hasOpt = () => {
+        return !!user?.permisos?.opt;
+    }
+
+    const hasTarjetasExcelencia = () => {
+        return !!user?.permisos?.tarjetas_excelencia; 
+    }
+    
+    const hasEstadisticasProduccion = () => {
+        return !!user?.permisos?.estadisticas_produccion;
+    }
+    
+    const hasIndicadoresProductividad = () => {
+        return !!user?.permisos?.indicadores_productividad;
+    }
+    
+    const hasAsistencia = () => {
+        return !!user?.permisos?.asistencia;
+    }
+
+    const hasSistemaProduccion = () => {
+        const p = user?.permisos;
+        return !!(p?.hora_a_hora || p?.opt || p?.tarjetas_excelencia || p?.estadisticas_produccion);
+    }
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Header */}
@@ -99,7 +149,7 @@ export default function HomePage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
-                        <h1 className="text-2xl font-bold text-white">ImpacSoft</h1>
+                        <h1 className="text-2xl font-bold text-white">Firplak</h1>
                     </div>
 
                     <div className="flex items-center space-x-4">
@@ -119,19 +169,19 @@ export default function HomePage() {
 
             {/* Main Content */}
             <main className="flex-1 flex items-center justify-center p-4">
-                <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="w-full max-w-6xl flex flex-wrap justify-center gap-8">
                     {/* Control de Piso Button */}
                     {hasManufactura() && (
                         <button
                             onClick={() => router.push('/home/selection')}
-                            className="w-full flex flex-col items-center justify-center p-12 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
                         >
                             <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
                                 <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                 </svg>
                             </div>
-                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300">Manufactura</span>
+                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300">Control de piso</span>
                         </button>
                     )}
 
@@ -139,7 +189,7 @@ export default function HomePage() {
                     {hasCalidad() && (
                         <button
                             onClick={() => router.push('/calidad')}
-                            className="w-full flex flex-col items-center justify-center p-12 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
                         >
                             <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
                                 <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +200,68 @@ export default function HomePage() {
                         </button>
                     )}
 
-                    {!hasManufactura() && !hasCalidad() && (
+                    {/* Sistema de Producción Button */}
+                    {hasSistemaProduccion() && (
+                        <button
+                            onClick={() => router.push('/sistema-produccion')}
+                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                        >
+                            <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                                <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                            </div>
+                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Sistema de<br/>Producción</span>
+                        </button>
+                    )}
+
+                    {/* Configuración Button */}
+                    {hasConfiguracion() && (
+                        <button
+                            onClick={() => router.push('/configuracion')}
+                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                        >
+                            <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                                <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300">Configuración</span>
+                        </button>
+                    )}
+
+                    {/* Indicadores Productividad Button */}
+                    {hasIndicadoresProductividad() && (
+                        <button
+                            onClick={() => router.push('/indicadores-productividad')}
+                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                        >
+                            <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                                <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
+                            </div>
+                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Indicadores<br/>Productividad</span>
+                        </button>
+                    )}
+
+                    {/* Asistencia Button */}
+                    {hasAsistencia() && (
+                        <button
+                            onClick={() => router.push('/asistencia')}
+                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                        >
+                            <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                                <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                </svg>
+                            </div>
+                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Asistencia</span>
+                        </button>
+                    )}
+
+                    {!hasManufactura() && !hasCalidad() && !hasConfiguracion() && !hasSistemaProduccion() && !hasIndicadoresProductividad() && !hasAsistencia() && (
                         <div className="col-span-full py-20 text-center">
                             <div className="inline-flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full mb-4">
                                 <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +277,7 @@ export default function HomePage() {
 
             {/* Footer */}
             <footer className="py-6 text-center text-gray-400 text-sm">
-                &copy; {new Date().getFullYear()} ImpacSoft. Todos los derechos reservados.
+                &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
             </footer>
         </div>
     )

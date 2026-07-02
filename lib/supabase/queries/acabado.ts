@@ -7,7 +7,7 @@ export async function getRegistrosAcabado(estado: 'Pulido' | 'Acabado'): Promise
         .from('query_trazabilidad_ms')
         .select('*')
         .eq('estado', estado)
-        .order('pintura_fecha', { ascending: true })
+        .order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error(`Error fetching registros para ${estado}:`, error)

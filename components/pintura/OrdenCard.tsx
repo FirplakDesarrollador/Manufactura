@@ -1,3 +1,4 @@
+import { parseDBDate } from '@/lib/utils/date';
 import React from 'react'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
 import { Box, Clipboard, Users } from 'lucide-react'
@@ -38,15 +39,22 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                     <div className="flex items-center gap-1 text-cyan-600 mb-1">
                         <Clipboard size={14} className="shrink-0" />
                         <span className="text-xs font-bold text-gray-900 truncate">OF: {orden.orden_fabricacion}</span>
-                        <span className="bg-blue-200 text-blue-800 text-[10px] px-1 rounded font-bold ml-auto shrink-0">ENSAYO</span>
+
                     </div>
                     <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido}</div>
-                    {orden.fecha_ideal_produccion && (
-                        <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-1 inline-block">
-                            📅 Ideal: {new Date(orden.fecha_ideal_produccion).toLocaleDateString('es-ES')}
-                        </div>
-                    )}
-                    <div className="text-[11px] text-gray-500 mt-1 line-clamp-2 leading-tight h-8">{orden.producto_descripcion}</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                        {orden.fecha_ideal_produccion && (
+                            <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
+                                📅 Ideal: {parseDBDate(orden.fecha_ideal_produccion).toLocaleDateString('es-ES')}
+                            </div>
+                        )}
+                        {orden.fecha_entrega_estimada && (
+                            <div className="text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded inline-block">
+                                📦 Entrega: {parseDBDate(orden.fecha_entrega_estimada).toLocaleDateString('es-ES')}
+                            </div>
+                        )}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1 line-clamp-none leading-tight">{orden.producto_descripcion}</div>
                     <div className="text-[9px] text-gray-400 italic mt-1 truncate">SKU: {sku || 'No definido'}</div>
                 </div>
                 <div className="flex items-center gap-1 text-cyan-500 mt-2 md:mt-auto">
@@ -68,23 +76,23 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
 
             {/* Right Section: Process Grid */}
             <div className="flex-1 md:pl-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1">
-                <MiniMetric label="Cantidad" value={orden.cantidad || orden.cantidad_programada} color="bg-cyan-50 border-cyan-200" />
-                <MiniMetric label="Pintura" value={orden.pintura || 0} />
-                <MiniMetric label="Desgelcada" value={orden.desgelcada || 0} />
-                <MiniMetric label="Pulido" value={orden.pulido || 0} />
-                <MiniMetric label="Reparación" value={orden.reparacion || 0} />
-                <MiniMetric label="Saldo" value={orden.saldo || 0} />
-                <MiniMetric label="Empaque" value={orden.empaque || 0} />
-                <MiniMetric label="Transito" value={orden.transito || 0} />
+                <MiniMetric label="Cantidad" value={Math.max(0, orden.cantidad || orden.cantidad_programada || 0)} color="bg-cyan-50 border-cyan-200" />
+                <MiniMetric label="Pintura" value={Math.max(0, orden.pintura || 0)} />
+                <MiniMetric label="Desgelcada" value={Math.max(0, orden.desgelcada || 0)} />
+                <MiniMetric label="Pulido" value={Math.max(0, orden.pulido || 0)} />
+                <MiniMetric label="Reparación" value={Math.max(0, orden.reparacion || 0)} />
+                <MiniMetric label="Saldo" value={Math.max(0, orden.saldo || 0)} />
+                <MiniMetric label="Empaque" value={Math.max(0, orden.empaque || 0)} />
+                <MiniMetric label="Transito" value={Math.max(0, orden.transito || 0)} />
 
-                <MiniMetric label="Programado" value={orden.programado || 0} color="bg-orange-50 border-orange-200" />
-                <MiniMetric label="Vaciado" value={orden.vaciado || 0} />
-                <MiniMetric label="Estanteria" value={orden.estanteria || 0} />
-                <MiniMetric label="Acabado" value={orden.acabado || 0} />
-                <MiniMetric label="Rep. Larga" value={orden.reparacion_larga || 0} />
-                <MiniMetric label="Destrucción" value={orden.destruccion || 0} />
-                <MiniMetric label="Digitado" value={orden.digitado || 0} />
-                <MiniMetric label="CEDI" value={orden.cedi || 0} color="bg-cyan-50 border-cyan-200" />
+                <MiniMetric label="Programado" value={Math.max(0, orden.programado || 0)} color="bg-orange-50 border-orange-200" />
+                <MiniMetric label="Vaciado" value={Math.max(0, orden.vaciado || 0)} />
+                <MiniMetric label="Estanteria" value={Math.max(0, orden.estanteria || 0)} />
+                <MiniMetric label="Acabado" value={Math.max(0, orden.acabado || 0)} />
+                <MiniMetric label="Rep. Larga" value={Math.max(0, orden.reparacion_larga || 0)} />
+                <MiniMetric label="Destrucción" value={Math.max(0, orden.destruccion || 0)} />
+                <MiniMetric label="Digitado" value={Math.max(0, orden.digitado || 0)} />
+                <MiniMetric label="CEDI" value={Math.max(0, orden.cedi || 0)} color="bg-cyan-50 border-cyan-200" />
             </div>
         </button>
     )

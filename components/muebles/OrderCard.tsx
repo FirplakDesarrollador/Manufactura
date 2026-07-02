@@ -31,6 +31,8 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
     }
 
     const currentReposiciones = reposicionCount()
+    const piecesToReponer = currentReposiciones > 0 ? currentReposiciones : (orden.por_reponer || 0)
+    const isReponer = piecesToReponer > 0
 
     return (
         <div 
@@ -38,31 +40,35 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
             className={`w-full bg-white rounded-xl border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col ${
                 isActive 
                     ? 'border-blue-500 ring-4 ring-blue-500/10 shadow-lg' 
-                    : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    : isReponer
+                        ? 'border-red-400 bg-red-50/10 hover:border-red-500 hover:shadow-md'
+                        : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
             }`}
         >
             {/* Process Badge / Status indicator */}
-            {currentReposiciones > 0 && (
+            {isReponer && (
                 <div className="absolute top-0 right-0 z-10">
                     <div className="bg-red-600 text-white px-3 py-1 rounded-bl-xl font-bold text-xs flex items-center gap-1 shadow-sm">
                         <AlertCircle size={14} />
-                        REPOSICIÓN: {currentReposiciones}
+                        REPOSICIÓN
                     </div>
                 </div>
             )}
 
             <div className="p-4 flex flex-wrap gap-4 items-center justify-between">
                 {/* Column 1: Identificación */}
-                <div className="w-full sm:w-[275px] space-y-2">
-                    <div className="flex items-center gap-2">
-                        <FileText size={16} className="text-blue-600" />
-                        <span className="font-bold text-gray-900 text-sm">OF: {orden.orden_fabricacion}</span>
-                        {orden.ensayo && (
-                            <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                Ensayo
-                            </span>
-                        )}
-                    </div>
+                <div className="w-full sm:w-[275px] flex items-start gap-3">
+                    {isReponer && (
+                        <div className="w-12 h-12 shrink-0 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex flex-col items-center justify-center text-white font-black shadow-md border-2 border-red-200" title="Piezas por reponer">
+                            <span className="text-lg leading-none">{piecesToReponer}</span>
+                        </div>
+                    )}
+                    <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                            <FileText size={16} className={`${isReponer ? 'text-red-600' : 'text-blue-600'}`} />
+                            <span className={`font-bold text-sm ${isReponer ? 'text-red-700' : 'text-gray-900'}`}>OF: {orden.orden_fabricacion}</span>
+
+                        </div>
                     <div className="text-xs flex flex-col gap-1">
                         <div className="flex justify-between items-center bg-gray-50 px-2 py-1 rounded">
                             <span className="text-gray-500 font-medium uppercase text-[10px]">Liberación:</span>
@@ -77,6 +83,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
                             <span className="text-gray-500">Cliente:</span>
                             <span className="text-gray-900 font-medium truncate max-w-[180px]">{orden.cliente}</span>
                         </div>
+                    </div>
                     </div>
                 </div>
 

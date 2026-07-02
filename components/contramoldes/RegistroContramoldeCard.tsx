@@ -1,4 +1,5 @@
 'use client'
+import { parseDBDate } from '@/lib/utils/date';
 
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
@@ -28,71 +29,71 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
     }
 
     return (
-        <div className="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-                <div className="flex-1 space-y-4">
+        <div className="bg-white border-2 border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                <div className="flex-1 space-y-2">
                     {/* Header: Product Description */}
-                    <div className="flex items-start gap-5">
-                        <div className="bg-cyan-100 p-3 rounded-xl text-cyan-700 shrink-0">
-                            <Package size={28} />
+                    <div className="flex items-center gap-3">
+                        <div className="bg-cyan-100 p-2 rounded-lg text-cyan-700 shrink-0">
+                            <Package size={20} />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-xs uppercase font-bold text-gray-400 tracking-widest">Producto</p>
-                            <h3 className="text-lg font-extrabold text-[#254153] leading-tight">
+                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Producto</p>
+                            <h3 className="text-sm font-extrabold text-[#254153] leading-tight">
                                 {registro.producto_descripcion.toUpperCase()}
                             </h3>
                         </div>
                     </div>
 
                     {/* Secondary Info Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-cyan-600">
-                                <Hash size={22} />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-gray-50 p-1.5 rounded-lg text-cyan-600">
+                                <Hash size={16} />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400 uppercase font-black tracking-widest leading-none">OF:</p>
-                                <p className="text-lg font-black text-gray-900 mt-0.5">{registro.orden_fabricacion}</p>
+                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-wider leading-none">OF:</p>
+                                <p className="text-sm font-black text-gray-900">{registro.orden_fabricacion}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-cyan-600">
-                                <Layers size={22} />
+                        <div className="flex items-center gap-2">
+                            <div className="bg-gray-50 p-1.5 rounded-lg text-cyan-600">
+                                <Layers size={16} />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400 uppercase font-black tracking-widest leading-none mb-0.5">Serial:</p>
-                                <p className="text-2xl font-black text-cyan-600 tracking-tight leading-none">{registro.molde_serial}</p>
+                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-wider leading-none">Serial:</p>
+                                <p className="text-lg font-black text-cyan-600 tracking-tight leading-none">{registro.molde_serial}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-cyan-600">
-                                <Info size={18} />
+                        <div className="flex items-center gap-2">
+                            <div className="bg-gray-50 p-1.5 rounded-lg text-cyan-600">
+                                <Info size={14} />
                             </div>
                             <div>
-                                <p className="text-[11px] text-gray-400 uppercase font-black tracking-tighter">Línea</p>
-                                <p className="text-sm font-bold text-gray-900">{registro.linea}</p>
+                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Línea</p>
+                                <p className="text-xs font-bold text-gray-900">{registro.linea}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-cyan-600">
-                                <Clock size={18} />
+                        <div className="flex items-center gap-2">
+                            <div className="bg-gray-50 p-1.5 rounded-lg text-cyan-600">
+                                <Clock size={14} />
                             </div>
                             <div>
-                                <p className="text-[11px] text-gray-400 uppercase font-black tracking-tighter">Fecha Pintura</p>
-                                <p className="text-sm font-bold text-gray-900">
-                                    {new Date(registro.pintura_fecha).toLocaleString()}
+                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Fecha Pintura</p>
+                                <p className="text-xs font-bold text-gray-900">
+                                    {parseDBDate(registro.pintura_fecha).toLocaleString()}
                                 </p>
                             </div>
                         </div>
                         {registro.fecha_ideal_produccion && (
-                            <div className="flex items-center gap-3">
-                                <div className="bg-orange-50 p-2 rounded-lg text-orange-600">
-                                    <Clock size={18} />
+                            <div className="flex items-center gap-2">
+                                <div className="bg-orange-50 p-1.5 rounded-lg text-orange-600">
+                                    <Clock size={14} />
                                 </div>
                                 <div>
-                                    <p className="text-[11px] text-orange-400 uppercase font-black tracking-tighter text-[10px]">Fecha Ideal</p>
-                                    <p className="text-sm font-bold text-gray-900">
-                                        {new Date(registro.fecha_ideal_produccion).toLocaleDateString('es-ES')}
+                                    <p className="text-[10px] text-orange-400 uppercase font-black tracking-tighter">Fecha Ideal</p>
+                                    <p className="text-xs font-bold text-gray-900">
+                                        {parseDBDate(registro.fecha_ideal_produccion).toLocaleDateString('es-ES')}
                                     </p>
                                 </div>
                             </div>
@@ -105,7 +106,7 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
                     <button
                         onClick={handleRegister}
                         disabled={loading}
-                        className="w-full xl:w-auto bg-[#254153] hover:bg-[#1a2e3b] text-white px-8 py-4 rounded-xl font-black text-xs flex items-center justify-center gap-3 shadow-xl hover:shadow-cyan-900/20 active:scale-95 transition-all disabled:bg-gray-400 uppercase tracking-widest"
+                        className="w-full xl:w-auto bg-[#254153] hover:bg-[#1a2e3b] text-white px-6 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-xl hover:shadow-cyan-900/20 active:scale-95 transition-all disabled:bg-gray-400 uppercase tracking-widest"
                     >
                         {loading ? (
                             <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white" />

@@ -7,7 +7,7 @@ export async function getRegistrosParaDigitado(): Promise<RegistroTrazabilidad[]
         .from('query_trazabilidad_ms')
         .select('*')
         .eq('estado', 'Empaque')
-        .order('pintura_fecha', { ascending: true })
+        .order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros para digitado:', error)

@@ -5,8 +5,7 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
     const { data, error } = await supabase
         .from('query_ordenes_fabricacion')
         .select('*')
-        .or('programado.gt.0,pintura.gt.0,vaciado.gt.0,digitado.gt.0,transito.gt.0,saldo.gt.0')
-        .order('fecha_entrega_estimada', { ascending: true })
+        .order('fecha_ideal_produccion', { ascending: true })
 
     if (error) {
         console.error('Error fetching ordenes fabricacion:', error)
@@ -21,7 +20,7 @@ export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]
         .from('query_trazabilidad_ms')
         .select('*')
         .order('pintura_fecha', { ascending: false })
-        .limit(200)
+        .limit(5000)
 
     if (error) {
         console.error('Error fetching registros trazabilidad:', error)
@@ -35,11 +34,14 @@ export async function getRegistrosTrazabilidadHoy(): Promise<RegistroTrazabilida
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
+    const todayStr = today.toISOString()
+    
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')
-        .gte('pintura_fecha', today.toISOString())
-        .order('pintura_fecha', { ascending: false })
+        .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
+        .order('vaciado_fecha', { ascending: false })
+        .limit(10000)
 
     if (error) {
         console.error('Error fetching registros trazabilidad hoy:', error)
@@ -156,8 +158,25 @@ export async function registrarPintura(pinturaData: {
         throw new Error(`Error al buscar la orden: ${ordenError?.message || 'No encontrada'}`)
     }
 
-    if ((orden.programado || 0) <= 0) {
-        throw new Error('La orden no tiene unidades programadas para pintar.')
+    // 1.1 Verificar piezas ya registradas (conteo real en trazabilidad)
+    // Se excluyen las piezas 'Desgelcada' y 'Destrucción' ya que son daños y se deben repetir.
+    const { count, error: countError } = await supabase
+        .from('trazabilidad_ms')
+        .select('*', { count: 'exact', head: true })
+        .eq('orden_fabricacion_id', pinturaData.orden_fabricacion_id)
+        .neq('estado', 'Desgelcada')
+        .neq('estado', 'Destrucción')
+
+    if (countError) {
+        console.error('Error al contar piezas:', countError)
+        // No bloqueamos si falla el conteo por red, pero registramos el error
+    } else {
+        const piezasRegistradas = count || 0
+        const piezasPermitidas = orden.cantidad || orden.cantidad_programada || 0
+
+        if (piezasRegistradas >= piezasPermitidas && piezasPermitidas > 0) {
+            throw new Error(`Acción bloqueada: La orden ${orden.orden_fabricacion} ya completó sus ${piezasPermitidas} piezas (${piezasRegistradas} registradas).`)
+        }
     }
 
     // 2. Obtener masa teórica (kilos_vaciados es requerido)
@@ -291,4 +310,34 @@ export async function registrarPintura(pinturaData: {
     }
 
     return data
+}
+
+export async function eliminarRegistroPintura(registroId: number, moldeSerial: string) {
+    // 1. Obtener info del molde para restarle vueltas y cambiar a Disponible
+    const { data: molde, error: moldeError } = await supabase
+        .from('moldes')
+        .select('vueltas_actuales, vueltas_acumuladas')
+        .eq('serial', moldeSerial)
+        .single()
+        
+    if (!moldeError && molde) {
+        await supabase
+            .from('moldes')
+            .update({ 
+                estado: 'Disponible',
+                vueltas_actuales: Math.max(0, (molde.vueltas_actuales || 0) - 1),
+                vueltas_acumuladas: Math.max(0, (molde.vueltas_acumuladas || 0) - 1)
+            })
+            .eq('serial', moldeSerial)
+    }
+
+    // 2. Eliminar el registro
+    const { error: deleteError } = await supabase
+        .from('trazabilidad_ms')
+        .delete()
+        .eq('id', registroId)
+
+    if (deleteError) {
+        throw new Error(`Error al eliminar registro: ${deleteError.message}`)
+    }
 }

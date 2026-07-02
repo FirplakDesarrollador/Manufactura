@@ -261,7 +261,7 @@ export default function CalidadMsReportPage() {
             </main>
 
             <footer className="py-4 px-4 bg-[#254153] text-[9px] font-bold text-white/30 uppercase tracking-[0.5em] flex justify-between items-center">
-                <span>© {new Date().getFullYear()} ImpacSoft Engineering</span>
+                <span>© {new Date().getFullYear()} Firplak Engineering</span>
                 <span>Secure Terminal v4.0.2</span>
             </footer>
         </div>

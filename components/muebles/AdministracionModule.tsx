@@ -361,6 +361,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                     orden={selectedOrder} 
                     usuarioNombre={usuarioNombre}
                     turno={turno}
+                    userEmail={userEmail}
                     onClose={() => setSelectedOrder(null)}
                     onSuccess={loadData}
                 />

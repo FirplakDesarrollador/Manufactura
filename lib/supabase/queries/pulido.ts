@@ -6,8 +6,8 @@ export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> 
     const { data, error } = await supabase
         .from('query_trazabilidad_ms')
         .select('*')
-        .eq('estado', 'Desgelcada')
-        .order('pintura_fecha', { ascending: true })
+        .eq('estado', 'Pulido')
+        .order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros para pulido:', error)

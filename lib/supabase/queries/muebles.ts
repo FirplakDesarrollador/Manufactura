@@ -40,6 +40,9 @@ export async function registrarTrazabilidadMueble(payload: {
     cantidad: number,
     creado_por: string,
     proceso: string,
+    cedula_operario: string,
+    nombre_operario: string,
+    fecha_inicio: string,
     taladro?: string
 }) {
     const { data, error } = await supabase
@@ -49,6 +52,9 @@ export async function registrarTrazabilidadMueble(payload: {
             cantidad: payload.cantidad,
             creado_por: payload.creado_por,
             proceso: payload.proceso,
+            cedula_operario: payload.cedula_operario,
+            nombre_operario: payload.nombre_operario,
+            fecha_inicio: payload.fecha_inicio,
             taladro: payload.taladro || 'NO APLICA',
             created_at: new Date().toISOString()
         }])
@@ -222,4 +228,33 @@ export async function updateUserPlant(userUuid: string, newPlant: string) {
 
     if (error) throw error
     return data
+}
+
+export interface TrazabilidadRecord {
+    id: number;
+    created_at: string;
+    fecha_inicio: string;
+    cedula_operario: string;
+    nombre_operario: string;
+    cantidad: number;
+    orden_fabricacion: string;
+    proceso: string;
+}
+
+export async function getTrazabilidadOperarios(proceso: string, fecha: string) {
+    // fecha parameter should be 'YYYY-MM-DD'
+    const nextDay = new Date(fecha)
+    nextDay.setDate(nextDay.getDate() + 1)
+    const nextDayStr = nextDay.toISOString().split('T')[0]
+
+    const { data, error } = await supabase
+        .from('trazabilidad_muebles')
+        .select('*')
+        .eq('proceso', proceso)
+        .gte('created_at', `${fecha}T00:00:00`)
+        .lt('created_at', `${nextDayStr}T00:00:00`)
+        .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data as TrazabilidadRecord[]
 }

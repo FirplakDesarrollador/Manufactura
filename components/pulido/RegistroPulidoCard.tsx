@@ -1,4 +1,5 @@
 'use client'
+import { parseDBDate } from '@/lib/utils/date';
 
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
@@ -21,12 +22,9 @@ export default function RegistroPulidoCard({ registro, usuarioEmail, onRefresh }
             return
         }
 
-        if (!confirm(`¿Desea mover esta pieza a "${selectedStatus}"?`)) return
-
         setLoading(true)
         try {
             await registrarPulido(registro.id, usuarioEmail, selectedStatus)
-            alert('¡Pieza movida exitosamente!')
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -53,7 +51,7 @@ export default function RegistroPulidoCard({ registro, usuarioEmail, onRefresh }
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <Clock size={12} className="text-slate-400" />
                                 <p className="text-[10px] font-bold text-slate-400">
-                                    {new Date(registro.pintura_fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                    {parseDBDate(registro.pintura_fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>

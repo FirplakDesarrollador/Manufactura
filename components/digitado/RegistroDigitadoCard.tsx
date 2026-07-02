@@ -16,8 +16,6 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
-        if (!confirm(`¿Desea completar el digitado de esta pieza y moverla a Tránsito?`)) return
-
         setLoading(true)
         try {
             await registrarDigitado(registro.id, usuarioEmail)

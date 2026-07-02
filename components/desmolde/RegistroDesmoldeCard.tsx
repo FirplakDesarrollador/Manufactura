@@ -1,9 +1,10 @@
 'use client'
+import { parseDBDate } from '@/lib/utils/date';
 
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { registrarDesmolde } from '@/lib/supabase/queries/desmolde'
-import { Package, Hash, Layers, Info, CheckCircle, Clock } from 'lucide-react'
+import { Hash, Layers, Info, CheckCircle, Clock } from 'lucide-react'
 
 interface RegistroDesmoldeCardProps {
     registro: RegistroTrazabilidad
@@ -15,12 +16,9 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
-        if (!confirm('¿Desea registrar el desmolde para esta pieza?')) return
-
         setLoading(true)
         try {
             await registrarDesmolde(registro.id, usuarioEmail)
-            alert('¡Desmolde registrado exitosamente!')
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -31,24 +29,12 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
     }
 
     return (
-        <div className="bg-white border-2 border-slate-100 rounded-3xl p-8 shadow-sm hover:shadow-md transition-all">
+        <div className="bg-white border-2 border-slate-100 rounded-3xl p-4 shadow-sm hover:shadow-md transition-all">
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8">
-                <div className="flex-1 space-y-6">
-                    {/* Header: Product Description */}
-                    <div className="flex items-start gap-6">
-                        <div className="bg-indigo-100 p-4 rounded-2xl text-indigo-700 shrink-0">
-                            <Package size={32} />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm uppercase font-bold text-slate-400 tracking-widest">Producto / Pieza</p>
-                            <h3 className="text-2xl font-black text-slate-800 leading-tight">
-                                {registro.producto_descripcion.toUpperCase()}
-                            </h3>
-                        </div>
-                    </div>
+                <div className="flex-1 space-y-2">
 
                     {/* Info Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="flex items-center gap-4">
                             <div className="bg-slate-50 p-3 rounded-xl text-indigo-600">
                                 <Hash size={24} />
@@ -85,7 +71,7 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
                             <div>
                                 <p className="text-xs text-slate-400 uppercase font-black tracking-tighter">Fecha Vaciado</p>
                                 <p className="text-lg font-bold text-slate-900">
-                                    {new Date(registro.pintura_fecha).toLocaleDateString()}
+                                    {parseDBDate(registro.pintura_fecha).toLocaleDateString()}
                                 </p>
                             </div>
                         </div>
@@ -93,18 +79,21 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
                 </div>
 
                 {/* Action Button */}
-                <div className="pt-6 xl:pt-0 shrink-0">
+                <div className="pt-2 xl:pt-0 shrink-0">
                     <button
                         onClick={handleRegister}
                         disabled={loading}
-                        className="w-full xl:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-6 rounded-2xl font-black text-base flex items-center justify-center gap-4 shadow-xl hover:shadow-indigo-900/20 active:scale-95 transition-all disabled:bg-slate-400 uppercase tracking-widest"
+                        className="w-full xl:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow-md hover:shadow-indigo-900/20 active:scale-95 transition-all disabled:bg-slate-400 uppercase tracking-wide"
                     >
                         {loading ? (
-                            <div className="animate-spin rounded-full h-7 w-7 border-3 border-white/30 border-t-white" />
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/30 border-t-white shrink-0" />
                         ) : (
-                            <CheckCircle size={28} />
+                            <CheckCircle size={24} className="shrink-0" />
                         )}
-                        REGISTRAR DESMOLDE
+                        <div className="flex flex-col items-start leading-tight text-left">
+                            <span>REGISTRAR</span>
+                            <span>DESMOLDE</span>
+                        </div>
                     </button>
                 </div>
             </div>

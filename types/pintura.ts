@@ -62,6 +62,7 @@ export interface RegistroTrazabilidad {
     linea: string
     usuario_email: string
     contramolde: boolean
+    contramolde_fecha?: string
     vaciado_fecha?: string
     fecha_vaciado?: string
     acabado_fecha?: string
@@ -78,6 +79,21 @@ export interface RegistroTrazabilidad {
     producto_tamano?: string
     molde_masa_teorica?: number
     fecha_ideal_produccion?: string
+    pintura_user_name?: string
+    vaciado_user_name?: string
+    contramolde_user_name?: string
+    pulido_user_name?: string
+    acabado_user_name?: string
+    reparacion_fecha?: string
+    reparacion_user_name?: string
+    empaque_user_name?: string
+    digitado_user_name?: string
+    transito_user_name?: string
+    cedi_user_name?: string
+    saldo_fecha?: string
+    saldo_user_name?: string
+    destruccion_fecha?: string
+    destruccion_user_name?: string
 }
 
 export interface KilosReferencia {

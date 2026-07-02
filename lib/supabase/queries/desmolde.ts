@@ -8,7 +8,7 @@ export async function getRegistrosParaDesmolde(): Promise<RegistroTrazabilidad[]
         .select('*')
         .eq('estado', 'Vaciado')
         .eq('contramolde', true)
-        .order('pintura_fecha', { ascending: true })
+        .order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros para desmolde:', error)
@@ -37,7 +37,7 @@ export async function registrarDesmolde(registroId: number, usuarioEmail: string
     const { data, error } = await supabase
         .from('trazabilidad_ms')
         .update({
-            estado: 'Desgelcada',
+            estado: 'Pulido',
         })
         .eq('id', registroId)
         .select()
@@ -52,7 +52,6 @@ export async function registrarDesmolde(registroId: number, usuarioEmail: string
         .from('moldes')
         .update({
             estado: 'Disponible',
-            vueltas_actuales: 0,
             modificado_por: usuarioEmail,
             modified_at: new Date().toISOString()
         })

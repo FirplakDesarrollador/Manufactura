@@ -24,12 +24,9 @@ export default function RegistroAcabadoCard({ registro, usuarioEmail, onRefresh 
             return
         }
 
-        if (!confirm(`¿Desea mover esta pieza a "${selectedStatus}"?`)) return
-
         setLoading(true)
         try {
             await registrarAcabado(registro.id, usuarioEmail, selectedStatus)
-            alert('¡Pieza movida exitosamente!')
             onRefresh()
         } catch (error) {
             console.error('Error:', error)

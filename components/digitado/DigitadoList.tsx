@@ -1,20 +1,24 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { RegistroTrazabilidad, OrdenFabricacion } from '@/types/pintura'
+import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import RegistroDigitadoCard from './RegistroDigitadoCard'
-import { Truck, Info, Hash, Package } from 'lucide-react'
+import { Truck, Info, Package, ArrowLeft } from 'lucide-react'
 import { getRegistrosTrazabilidadPorOrden } from '@/lib/supabase/queries/pintura'
 import { registrarDigitadoMasivo } from '@/lib/supabase/queries/digitado'
+import OrdenCard from '../pintura/OrdenCard'
 import { toast } from 'sonner'
 
 interface DigitadoListProps {
     order: OrdenFabricacion
     userEmail: string
     onRefresh: () => void
+    allMoldes: Molde[]
+    onBack: () => void
+    isInline?: boolean
 }
 
-export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoListProps) {
+export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, onBack, isInline = false }: DigitadoListProps) {
     const [activeTab, setActiveTab] = useState<'Pulido' | 'Transito'>('Pulido')
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(false)
@@ -35,6 +39,7 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
 
     React.useEffect(() => {
         loadRegistros();
+        setCantidadLote(1); // Reset cantidad al cambiar de orden
     }, [loadRegistros]);
 
     const filteredRegistros = registros.filter(r => {
@@ -68,23 +73,32 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
     }
 
     return (
-        <div className="h-full flex flex-col">
-            {/* Header: Selected Order info */}
-            <div className="p-2 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="bg-blue-50 p-1.5 rounded-lg text-blue-600">
-                        <Hash size={18} />
-                    </div>
-                    <div>
-                        <p className="text-[8px] font-black uppercase text-slate-400 leading-none">Orden Fabricación (OF)</p>
-                        <h4 className="text-lg font-black text-slate-800 tracking-tighter">{order.orden_fabricacion}</h4>
+        <div className={isInline ? "w-full flex flex-col bg-slate-50/50" : "h-full flex flex-col"}>
+            {/* Header: Selected Order info (hidden when inline) */}
+            {!isInline && (
+                <div className="bg-white border-b border-slate-200 shadow-sm p-4">
+                    <div className="max-w-7xl mx-auto flex flex-col gap-3">
+                        <button
+                            onClick={onBack}
+                            className="flex items-center gap-2 text-blue-600 font-black uppercase text-[10px] tracking-widest hover:text-blue-700 transition-colors w-fit group"
+                        >
+                            <div className="bg-blue-50 p-1 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                <ArrowLeft size={16} />
+                            </div>
+                            Cerrar Detalle
+                        </button>
+                        
+                        <div className="pointer-events-none opacity-90 scale-[0.98] origin-left">
+                            <OrdenCard
+                                orden={order}
+                                isActive={true}
+                                onClick={() => {}}
+                                moldes={allMoldes}
+                            />
+                        </div>
                     </div>
                 </div>
-                <div className="text-right">
-                    <p className="text-[9px] font-black uppercase text-slate-400 leading-none">Producto</p>
-                    <p className="text-sm font-bold text-slate-600 line-clamp-1 max-w-sm">{order.producto_descripcion}</p>
-                </div>
-            </div>
+            )}
 
             {/* Tabs & Bulk Action */}
             <div className="bg-white border-b border-slate-200">
@@ -117,6 +131,12 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
                                 onChange={(e) => setCantidadLote(Math.max(1, parseInt(e.target.value) || 1))}
                                 className="w-16 px-2 py-1 bg-white border border-slate-200 rounded font-black text-blue-600 text-sm"
                             />
+                            <button
+                                onClick={() => setCantidadLote(filteredRegistros.length)}
+                                className="text-[10px] font-black text-blue-600 uppercase hover:underline ml-1"
+                            >
+                                Seleccionar todo
+                            </button>
                         </div>
                         <button
                             onClick={handleRegistroMasivo}
@@ -130,15 +150,15 @@ export default function DigitadoList({ order, userEmail, onRefresh }: DigitadoLi
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            <div className={isInline ? "p-2 space-y-2 bg-slate-50/50" : "flex-1 overflow-y-auto p-2 space-y-2"}>
                 {loading ? (
                     <div className="flex justify-center items-center h-40">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                     </div>
                 ) : filteredRegistros.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2 border-2 border-dashed border-slate-200 rounded-3xl">
-                        <Info size={32} />
-                        <span className="font-bold uppercase text-xs tracking-widest text-center px-4">Sin piezas en {activeTab} para OF {order.orden_fabricacion}</span>
+                    <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2 border-2 border-dashed border-slate-200 rounded-3xl bg-white m-2">
+                        <Info size={24} />
+                        <span className="font-bold uppercase text-[10px] tracking-widest text-center px-4">Sin piezas en {activeTab} para OF {order.orden_fabricacion}</span>
                     </div>
                 ) : (
                     filteredRegistros.map(r => (

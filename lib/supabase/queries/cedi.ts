@@ -7,7 +7,7 @@ export async function getRegistrosTransito(): Promise<RegistroTrazabilidad[]> {
         .from('query_trazabilidad_ms')
         .select('*')
         .eq('estado', 'Transito')
-        .order('pintura_fecha', { ascending: true })
+        .order('pintura_fecha', { ascending: false })
 
     if (error) {
         console.error('Error fetching registros en transito:', error)

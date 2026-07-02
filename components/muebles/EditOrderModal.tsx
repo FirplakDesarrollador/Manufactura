@@ -18,11 +18,12 @@ interface EditOrderModalProps {
     orden: OrdenMueble
     usuarioNombre: string
     turno: string
+    userEmail: string
     onClose: () => void
     onSuccess: () => void
 }
 
-export default function EditOrderModal({ orden, usuarioNombre, turno, onClose, onSuccess }: EditOrderModalProps) {
+export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail, onClose, onSuccess }: EditOrderModalProps) {
     const [cantidad, setCantidad] = useState(orden.cantidad || 0)
     const [ensayo, setEnsayo] = useState(orden.ensayo || false)
     const [loading, setLoading] = useState(false)
@@ -87,6 +88,7 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, onClose, o
                 proceso="Corte" // Basic entry point
                 usuarioNombre={usuarioNombre}
                 turno={turno}
+                userEmail={userEmail}
                 onSuccess={() => {
                     onSuccess()
                     setShowTraceability(false)

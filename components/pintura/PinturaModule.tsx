@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
 import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
-import MetricCard from './MetricCard'
 import OrdenCard from './OrdenCard'
 import MoldSelector from './MoldSelector'
 import { Search, X, Calendar, History, ClipboardList } from 'lucide-react'
@@ -29,6 +28,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     const [moldesDisponibles, setMoldesDisponibles] = useState<Molde[]>([])
     const [debugInfo, setDebugInfo] = useState<string>('')
     const [selectedMolde, setSelectedMolde] = useState<Molde | null>(null)
+    const [moldSearchText, setMoldSearchText] = useState('')
+    const [isMoldDropdownOpen, setIsMoldDropdownOpen] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [view, setView] = useState<'report' | 'history'>('report')
     const [isMoldModalOpen, setIsMoldModalOpen] = useState(false)
@@ -77,6 +78,16 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         }
     }, [notification])
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isMoldDropdownOpen && !(event.target as Element).closest('.relative')) {
+                setIsMoldDropdownOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [isMoldDropdownOpen])
+
     // Load moldes when orden is selected
     useEffect(() => {
         if (selectedOrden) {
@@ -106,8 +117,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         }
     }, [selectedOrden, allMoldes])
 
-    // Filter ordenes based on search and date (Safe from null/undefined)
-    const filteredOrdenes = useMemo(() => {
+    // Base filter for metrics (matches Administration)
+    const baseFilteredOrdenes = useMemo(() => {
         const search = (searchText || '').toLowerCase()
         return ordenes.filter((orden) => {
             const matchesSearch = !search ||
@@ -123,98 +134,81 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 (orden.fecha_ideal_produccion &&
                     orden.fecha_ideal_produccion.includes(selectedDate))
 
-            const isProgramada = (orden.programado || 0) > 0
-
-            return matchesSearch && matchesDate && isProgramada
+            return matchesSearch && matchesDate
         })
     }, [ordenes, searchText, selectedDate])
 
-    // Calculate metrics based on Flutter logic
-    const metrics = useMemo(() => {
-        const todayStr = new Date().toLocaleDateString('es-ES') // matching d/M/y format loosely
-
-        // Sum for filtered orders
-        const total = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0)
-        const programado = filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0)
-
-        // Filter traceability based on current search
-        const trazaMatchesSearch = trazabilidad.filter(t => {
-            if (!searchText) return true;
-            const search = searchText.toLowerCase();
-            return (t.orden_fabricacion || '').toLowerCase().includes(search) ||
-                   (t.pedido || '').toLowerCase().includes(search) ||
-                   (t.producto_descripcion || '').toLowerCase().includes(search) ||
-                   (t.molde_descripcion || '').toLowerCase().includes(search) ||
-                   (t.producto_sku || '').toLowerCase().includes(search);
-        });
-
-        const isToday = (dateStr: string | undefined) => {
-            if (!dateStr) return false;
-            const d = new Date(dateStr).toLocaleDateString('es-ES');
-            return d === todayStr;
-        };
-
-        const pinturaToday = trazaMatchesSearch.filter(t => isToday(t.pintura_fecha));
-        
-        const desgelcado = pinturaToday.filter(t => t.estado === 'Desgelcada').length;
-        const vaciado = pinturaToday.filter(t => t.estado !== 'Pintura' && t.estado !== 'Desgelcado').length;
-        
-        const today = new Date().toISOString().split('T')[0]
-        const search = (searchText || '').toLowerCase()
-
-        // Filter by today (checking different dates as in Flutter)
-        const recordsToday = trazabilidad.filter(t => {
-            const matchesSearch = !search || 
-                (t.orden_fabricacion || '').toLowerCase().includes(search) ||
-                (t.pedido || '').toLowerCase().includes(search) ||
-                (t.producto_descripcion || '').toLowerCase().includes(search) ||
-                (t.molde_descripcion || '').toLowerCase().includes(search) ||
-                (t.producto_sku || '').toLowerCase().includes(search)
-
-            if (!matchesSearch) return false
-
-            const pDate = (t.pintura_fecha || '').split('T')[0]
-            const cDate = (t.cedi_fecha || '').split('T')[0]
-            const dDate = (t.digitado_fecha || '').split('T')[0]
-            const tDate = (t.transito_fecha || '').split('T')[0]
-
-            return pDate === today || cDate === today || dDate === today || tDate === today
+    // Filter and sort ordenes based on search and date (Safe from null/undefined)
+    const filteredOrdenes = useMemo(() => {
+        const filtered = baseFilteredOrdenes.filter((orden) => {
+            // En Pintura, solo mostramos lo que realmente tiene piezas pendientes por iniciar
+            const hasProgramado = (orden.programado || 0) > 0
+            return hasProgramado
         })
 
-        const totalKilos = recordsToday
-            .filter(t => {
-                const cDate = (t.cedi_fecha || '').split('T')[0]
-                const dDate = (t.digitado_fecha || '').split('T')[0]
-                const tDate = (t.transito_fecha || '').split('T')[0]
-                const isFinalStatus = ['Digitado', 'Transito', 'Cedi'].includes(t.estado || '')
-                const isTodayFinal = cDate === today || dDate === today || tDate === today
-                return isFinalStatus && isTodayFinal
-            })
-            .reduce((acc, t) => acc + (t.molde_masa_teorica || 0), 0)
+        return filtered.sort((a, b) => {
+            const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
+            const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
+            const valA = isNaN(dateA) ? Infinity : dateA
+            const valB = isNaN(dateB) ? Infinity : dateB
+            return valA - valB
+        })
+    }, [ordenes, searchText, selectedDate])
 
-        // Count for Pintura and Desgelcada (specifically on pintura_fecha === today)
-        const pinturaCount = recordsToday.filter(t => (t.pintura_fecha || '').split('T')[0] === today).length
-        const desgelcadaCount = recordsToday.filter(t => 
-            (t.pintura_fecha || '').split('T')[0] === today && 
-            t.estado === 'Desgelcada'
-        ).length
+    // Calculate metrics to match reference app (FlutterFlow)
+    const metrics = useMemo(() => {
+        const today = new Date().toISOString().split('T')[0]
+
+        // 1. Quantity & Programmed (Totals for all filtered orders)
+        const totalCantidad = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.cantidad_programada || o.cantidad || 0), 0)
+        const totalProgramado = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.programado || 0), 0)
+
+        // 2. Daily Production (From traceability)
+        // We look for everything processed today in any stage
+        const recordsToday = trazabilidad.filter(t => {
+            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
+            const pDate = (t.pintura_fecha || '').split('T')[0]
+            const aDate = (t.acabado_fecha || '').split('T')[0]
+            const dDate = (t.digitado_fecha || '').split('T')[0]
+            
+            return vDate === today || pDate === today || aDate === today || dDate === today
+        })
+
+        const vaciadoToday = trazabilidad.filter(t => {
+            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
+            return vDate === today
+        })
+
+        const pinturaToday = trazabilidad.filter(t => {
+            const pDate = (t.pintura_fecha || '').split('T')[0]
+            return pDate === today
+        })
+
+        const acabadoToday = trazabilidad.filter(t => {
+            const aDate = (t.acabado_fecha || '').split('T')[0]
+            return aDate === today
+        })
+        // Kilograms: Current Transito + Cedi Today (Matches FF logic for 3407.8kg)
+        const transitoTotal = trazabilidad.filter(t => t.estado === 'Transito')
+        const cediToday = trazabilidad.filter(t => (t.cedi_fecha || '').split('T')[0] === today)
+        
+        const totalKilos = [...transitoTotal, ...cediToday]
+            .reduce((acc, t) => acc + (Number(t.kilos_vaciados) || 0), 0)
 
         return {
-            cantidad: filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0),
-            programado: filteredOrdenes.reduce((sum, o) => sum + (o.programado || 0), 0),
-            pintura: pinturaCount,
-            desgelcado: desgelcadaCount,
-            vaciado: recordsToday.filter(t => 
-                (t.pintura_fecha || '').split('T')[0] === today && 
-                !['Pintura', 'Desgelcada'].includes(t.estado || '')
-            ).length,
-            acabado: 0,
-            digitado: recordsToday.filter(t => (t.digitado_fecha || '').split('T')[0] === today && t.estado === 'Digitado').length,
-            transito: recordsToday.filter(t => (t.transito_fecha || '').split('T')[0] === today && t.estado === 'Transito').length,
-            cedi: recordsToday.filter(t => (t.cedi_fecha || '').split('T')[0] === today && t.estado === 'Cedi').length,
+            cantidad: totalCantidad,
+            programado: totalProgramado,
+            pintura: pinturaToday.length,
+            desgelcada: 0,
+            vaciado: vaciadoToday.length,
+            acabado: acabadoToday.length,
+            saldo: baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.saldo || 0), 0),
+            digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
+            transito: transitoTotal.length,
+            cedi: cediToday.length,
             kilogramos: parseFloat(totalKilos.toFixed(1))
         }
-    }, [filteredOrdenes, trazabilidad, searchText])
+    }, [baseFilteredOrdenes, trazabilidad])
 
     const handleClearFilters = () => {
         setSearchText('')
@@ -253,6 +247,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             alert('Error: Debe seleccionar un Molde.')
             return
         }
+        if ((selectedOrden.programado || 0) <= 0) {
+            alert('Esta orden ya completó las piezas programadas.')
+            return
+        }
 
         setSubmitting(true)
         try {
@@ -267,9 +265,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
             setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
             
-            // Limpia los campos del formulario
-            setSelectedOrden(null)
-            setSelectedLinea('')
+            // Actualizar localmente la orden para prevenir spam rápido
+            setSelectedOrden(prev => prev ? { ...prev, programado: (prev.programado || 0) - 1 } : null)
+            
+            // Limpia los campos del formulario (mantiene orden y línea seleccionadas para agilizar procesos)
             setSelectedMolde(null)
 
             // Recargar datos para actualizar métricas y caché
@@ -286,42 +285,61 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     }
 
     return (
-        <div className="h-full flex flex-col bg-white">
-            {/* Search and Metric Section Container */}
-            <div className="bg-gray-50 p-2 flex flex-col md:flex-row md:items-center gap-4 border-b border-gray-200">
-                {/* Top Controls */}
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <button className="p-2 bg-cyan-500 text-white rounded-lg flex-shrink-0">
-                        <Calendar size={20} />
-                    </button>
-                    <div className="relative flex-1 md:w-64">
-                        <input
-                            type="text"
-                            placeholder="Producto / OF / Pedido / ..."
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            className="w-full pl-3 pr-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none"
-                        />
+        <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
+            {/* Summary Cards */}
+            <div className="p-4 bg-white border-b border-slate-200">
+                <div className="flex flex-nowrap gap-3 overflow-x-auto pb-2 no-scrollbar">
+                    <StatCard label="Cantidad" value={metrics.cantidad} color="bg-blue-50 text-blue-600" />
+                    <StatCard label="Programado" value={metrics.programado} color="bg-indigo-50 text-indigo-600" />
+                    <StatCard label="Pintura Hoy" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
+                    <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-yellow-50 text-yellow-600" />
+                    <StatCard label="Vaciado Hoy" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
+                    <StatCard label="Acabado Hoy" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
+                    <StatCard label="Saldo" value={metrics.saldo} color="bg-rose-50 text-rose-600" />
+                    <StatCard label="Digitado" value={metrics.digitado} color="bg-slate-50 text-slate-600" />
+                    <StatCard label="Transito" value={metrics.transito} color="bg-amber-50 text-amber-600" />
+                    <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-green-50 text-green-600" />
+                    <StatCard label="Kg Hoy" value={metrics.kilogramos.toFixed(1)} color="bg-blue-600 text-white" />
+                </div>
+            </div>
+
+            {/* Controls */}
+            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-4">
+                    <div className="flex-1 min-w-[300px]">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Búsqueda Global</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Producto / OF / Pedido / ..."
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                            />
+                        </div>
                     </div>
+
+                    <div className="w-48">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Filtrar Fecha</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="date"
+                                value={selectedDate || ''}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                            />
+                        </div>
+                    </div>
+
                     <button
                         onClick={handleClearFilters}
-                        className="p-2 bg-orange-400 text-white rounded-lg flex-shrink-0"
+                        className="p-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
+                        title="Limpiar filtros"
                     >
                         <X size={20} />
                     </button>
-                </div>
-                {/* Metrics Bar */}
-                <div className="flex w-full gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0">
-                    <MetricCard title="Cantidad" value={metrics.cantidad} bgColor="bg-cyan-500" />
-                    <MetricCard title="Programado" value={metrics.programado} bgColor="bg-orange-500" />
-                    <MetricCard title="Pintura" value={metrics.pintura} bgColor="bg-teal-600" />
-                    <MetricCard title="Desgelcado" value={metrics.desgelcado} bgColor="bg-pink-500" />
-                    <MetricCard title="Vaciado" value={metrics.vaciado} bgColor="bg-blue-100" textColor="text-gray-900" />
-                    <MetricCard title="Acabado" value={metrics.acabado} bgColor="bg-white" textColor="text-gray-900" />
-                    <MetricCard title="Digitado" value={metrics.digitado} bgColor="bg-white" textColor="text-gray-900" />
-                    <MetricCard title="Transito" value={metrics.transito} bgColor="bg-white" textColor="text-gray-900" />
-                    <MetricCard title="CEDI" value={metrics.cedi} bgColor="bg-[#2b2d42]" textColor="text-white" />
-                    <MetricCard title="Kilogramos" value={metrics.kilogramos} bgColor="bg-[#4a4e69]" textColor="text-white" />
                 </div>
             </div>
 
@@ -373,40 +391,65 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                             </select>
                         </div>
 
-                        {/* Mold Selector - Simplified for the bar */}
+                        {/* Mold Selector with Search */}
                         <div className="w-full sm:w-1/2">
                             <label className="md:hidden text-xs font-bold text-cyan-600 uppercase mb-1">Molde</label>
-                            <div className="flex flex-col gap-1">
-                                <select
-                                    value={selectedMolde?.id || ''}
-                                    onChange={(e) => {
-                                        const molde = moldesDisponibles.find(m => m.id === parseInt(e.target.value))
-                                        if (molde) {
-                                            setSelectedMolde(molde)
-                                            checkMantenimiento(molde)
-                                        }
-                                    }}
-                                    disabled={!selectedOrden || !selectedLinea}
-                                    className={`w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none transition-all
-                                        ${!selectedOrden ? 'cursor-not-allowed border-dashed bg-gray-50' : 'bg-white shadow-sm'}
+                            <div className="relative">
+                                <div 
+                                    onClick={() => !(!selectedOrden || !selectedLinea) && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
+                                    className={`w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
+                                        ${!selectedOrden || !selectedLinea ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
                                     `}
                                 >
-                                    <option value="">
-                                        {!selectedOrden ? '← Seleccione una orden primero' : 'Elija el molde'}
-                                    </option>
-                                    {moldesDisponibles.map((molde) => (
-                                        <option key={molde.id} value={molde.id}>
-                                            {molde.serial} ({molde.vueltas_actuales}v)
-                                        </option>
-                                    ))}
-                                </select>
+                                    <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
+                                        {selectedMolde 
+                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
+                                            : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
+                                    </span>
+                                    <Search size={18} className="text-gray-400" />
+                                </div>
+
+                                {isMoldDropdownOpen && (
+                                    <div className="absolute bottom-full mb-2 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+                                        <div className="p-2 border-b border-gray-100 bg-gray-50">
+                                            <input
+                                                type="text"
+                                                autoFocus
+                                                placeholder="Buscar molde..."
+                                                value={moldSearchText}
+                                                onChange={(e) => setMoldSearchText(e.target.value)}
+                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                                            />
+                                        </div>
+                                        <div className="max-h-[200px] overflow-y-auto">
+                                            {moldesDisponibles
+                                                .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
+                                                .map((molde) => (
+                                                    <div
+                                                        key={molde.id}
+                                                        onClick={() => {
+                                                            setSelectedMolde(molde)
+                                                            checkMantenimiento(molde)
+                                                            setIsMoldDropdownOpen(false)
+                                                            setMoldSearchText('')
+                                                        }}
+                                                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
+                                                    >
+                                                        <span className="text-sm font-bold">{molde.serial}</span>
+                                                        <span className="text-xs text-cyan-600 font-bold">{molde.vueltas_actuales}v</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 {debugInfo && (
-                                    <div className="text-[10px] text-red-500 font-bold px-1 animate-pulse">
+                                    <div className="text-[10px] text-red-500 font-bold px-1 mt-1 animate-pulse">
                                         {debugInfo}
                                     </div>
                                 )}
                                 {selectedMolde && (
-                                    <div className="text-[10px] text-gray-500 px-1 italic">
+                                    <div className="text-[10px] text-gray-500 px-1 mt-1 italic">
                                         Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}
                                     </div>
                                 )}
@@ -418,7 +461,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                         {/* Submit Button */}
                         <button
                             onClick={handleSubmit}
-                            disabled={!selectedOrden || !selectedLinea || !selectedMolde || submitting}
+                            disabled={!selectedOrden || !selectedLinea || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
                             className="flex-1 lg:min-w-[150px] py-3 bg-cyan-600 text-white rounded-lg font-bold text-lg hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -481,6 +524,15 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 isOpen={isMoldModalOpen}
                 onClose={() => setIsMoldModalOpen(false)}
             />
+        </div>
+    )
+}
+
+function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
+    return (
+        <div className={`shrink-0 p-3 rounded-xl border border-slate-100 shadow-sm min-w-[100px] flex flex-col items-center justify-center ${color}`}>
+            <span className="text-[9px] font-black uppercase opacity-70 mb-1">{label}</span>
+            <span className="text-sm font-black tracking-tight">{value}</span>
         </div>
     )
 }

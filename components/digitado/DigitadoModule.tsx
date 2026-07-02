@@ -1,16 +1,19 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
+import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
+import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from '@/lib/supabase/queries/pintura'
 import { getRegistrosParaDigitado } from '@/lib/supabase/queries/digitado'
-import { Search, Eraser, Loader2, Keyboard, Calendar, Hash, Package, Zap, Info, ClipboardList, TrendingUp, Boxes, Truck, Warehouse, Weight, Calculator } from 'lucide-react'
+import { Search, Eraser, Loader2, Calendar } from 'lucide-react'
 import DigitadoList from './DigitadoList'
+import OrdenCard from '../pintura/OrdenCard'
 import { toast } from 'sonner'
 
 export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
+    const [registrosGlobales, setRegistrosGlobales] = useState<RegistroTrazabilidad[]>([])
+    const [allMoldes, setAllMoldes] = useState<Molde[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [fechaFiltro, setFechaFiltro] = useState<string | null>(null)
@@ -23,12 +26,16 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const loadData = async () => {
         setLoading(true)
         try {
-            const [oData, rData] = await Promise.all([
+            const [oData, rData, gData, mData] = await Promise.all([
                 getOrdenesFabricacion(),
-                getRegistrosParaDigitado() // Fetch ONLY pieces waiting for digitado (state Empaque)
+                getRegistrosParaDigitado(),
+                getRegistrosTrazabilidadHoy(),
+                getAllMoldes()
             ])
             setOrdenes(oData)
             setRegistros(rData)
+            setRegistrosGlobales(gData)
+            setAllMoldes(mData)
         } catch (error) {
             console.error('Error loading data:', error)
         } finally {
@@ -68,6 +75,12 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
         )
 
         return matchesSearch && matchesFecha && hasRelevantPieces
+    }).sort((a, b) => {
+        const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
+        const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
+        const valA = isNaN(dateA) ? Infinity : dateA
+        const valB = isNaN(dateB) ? Infinity : dateB
+        return valA - valB
     })
 
     const todayStr = new Date().toLocaleDateString('es-ES')
@@ -81,34 +94,32 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const totalPulido = filteredOrdenes.reduce((acc, o) => acc + (o.pulido || 0) + (o.desgelcada || 0), 0)
     const totalSaldo = filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0)
 
-    const countAcabado = registros.filter(r =>
+    const countAcabado = registrosGlobales.filter(r =>
         ['Pulido', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || '') &&
         (r.pintura_fecha && new Date(r.pintura_fecha).toLocaleDateString('es-ES') === todayStr)
     ).length
 
-    const totalDigitado = filteredOrdenes.reduce((acc, o) => acc + (o.digitado || 0), 0)
-    const totalTransito = filteredOrdenes.reduce((acc, o) => acc + (o.transito || 0), 0)
-
-    const countCedi = registros.filter(r =>
-        r.estado === 'Cedi' &&
-        (r.cedi_fecha && new Date(r.cedi_fecha).toLocaleDateString('es-ES') === todayStr)
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Global Totals (Dashboard paridad)
+    const totalDigitado = registrosGlobales.filter(r => r.estado === 'Digitado').length
+    const totalTransito = registrosGlobales.filter(r => r.estado === 'Transito').length
+    const countCediHoy = registrosGlobales.filter(r => 
+        r.estado === 'Cedi' && 
+        (r.cedi_fecha || '').split('T')[0] === today
     ).length
 
-    const totalKilogramos = registros.filter(r =>
-        ['Cedi', 'Transito', 'Digitado'].includes(r.estado || '') &&
-        (
-            (r.cedi_fecha && new Date(r.cedi_fecha).toLocaleDateString('es-ES') === todayStr) ||
-            (r.digitado_fecha && new Date(r.digitado_fecha).toLocaleDateString('es-ES') === todayStr) ||
-            (r.transito_fecha && new Date(r.transito_fecha).toLocaleDateString('es-ES') === todayStr)
-        )
-    ).reduce((acc, r) => acc + (r.kilos_vaciados || 0), 0)
-
-    const selectedOrder = ordenes.find(o => o.id === selectedOrderId)
+    // Kilogramos: Current Transito + Cedi Today (Matches reference app logic)
+    const transitoRecords = registrosGlobales.filter(r => r.estado === 'Transito')
+    const cediTodayRecords = registrosGlobales.filter(r => r.estado === 'Cedi' && (r.cedi_fecha || '').split('T')[0] === today)
+    
+    const totalKilogramos = [...transitoRecords, ...cediTodayRecords]
+        .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
 
     return (
-        <div className="h-full flex flex-col bg-slate-50/30">
+        <div className="w-full min-h-full flex flex-col bg-slate-50/30 pb-12">
             {/* Summary Header */}
-            <div className="p-2 bg-white border-b border-slate-200 overflow-x-auto">
+            <div className="p-2 bg-white border-b border-slate-200 overflow-x-auto sticky top-0 z-10 shadow-sm">
                 <div className="flex flex-wrap gap-1 min-w-max">
                     <SummaryCard label="Ordenes" value={filteredOrdenes.length} color="blue" isPrimary />
                     <SummaryCard label="Cantidad" value={totalCantidad} color="blue" />
@@ -120,7 +131,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                     <SummaryCard label="Acabado" value={countAcabado} color="blue" />
                     <SummaryCard label="Digitado" value={totalDigitado} color="blue" isPrimary />
                     <SummaryCard label="Transito" value={totalTransito} color="orange" isPrimary />
-                    <SummaryCard label="Cedi" value={countCedi} color="green" isPrimary />
+                    <SummaryCard label="Cedi" value={countCediHoy} color="green" isPrimary />
                     <SummaryCard label="Kilogramos" value={totalKilogramos.toFixed(1)} color="slate" isPrimary />
                 </div>
             </div>
@@ -160,47 +171,51 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                 </div>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Panel: Orders List */}
-                <div className="w-64 border-r border-slate-200 overflow-y-auto p-2 space-y-2 bg-white">
-                    {loading ? (
-                        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" /></div>
-                    ) : filteredOrdenes.length === 0 ? (
-                        <div className="text-center py-10 text-slate-400 font-bold uppercase text-sm italic">Sin ordenes halladas</div>
-                    ) : (
-                        filteredOrdenes.map(o => (
-                            <OrderCard
-                                key={o.id}
-                                order={o}
-                                isSelected={o.id === selectedOrderId}
+            {/* Content Area - Natural scrolling container */}
+            <div className="p-4 space-y-3 max-w-7xl mx-auto w-full">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
+                        <Loader2 className="animate-spin text-blue-500" size={48} />
+                        <span className="font-bold uppercase tracking-widest animate-pulse">Cargando órdenes...</span>
+                    </div>
+                ) : filteredOrdenes.length === 0 ? (
+                    <div className="text-center py-20 text-slate-400 font-bold uppercase text-lg italic bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                        Sin ordenes halladas
+                    </div>
+                ) : (
+                    filteredOrdenes.map(o => (
+                        <div key={o.id} className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <OrdenCard
+                                orden={o}
+                                isActive={o.id === selectedOrderId}
                                 onClick={() => {
-                                    setSelectedOrderId(o.id)
-                                    if (o.orden_fabricacion) {
-                                        navigator.clipboard.writeText(o.orden_fabricacion)
-                                        toast.success(`Orden ${o.orden_fabricacion} copiada`)
+                                    if (selectedOrderId === o.id) {
+                                        setSelectedOrderId(null)
+                                    } else {
+                                        setSelectedOrderId(o.id)
+                                        if (o.orden_fabricacion) {
+                                            navigator.clipboard.writeText(o.orden_fabricacion)
+                                            toast.success(`Orden ${o.orden_fabricacion} copiada`)
+                                        }
                                     }
                                 }}
+                                moldes={allMoldes}
                             />
-                        ))
-                    )}
-                </div>
-
-                {/* Right Panel: Detail View (Tabs) */}
-                <div className="flex-1 overflow-y-auto bg-slate-50 relative">
-                    {!selectedOrderId || !selectedOrder ? (
-                        <div className="h-full flex flex-col items-center justify-center text-red-500 gap-4">
-                            <Info size={48} />
-                            <span className="text-xl font-black uppercase text-center px-4">Debe seleccionar una orden de fabricación</span>
+                            {o.id === selectedOrderId && (
+                                <div className="border-2 border-t-0 border-cyan-500 rounded-b-lg overflow-hidden -mt-2 bg-slate-50 shadow-inner">
+                                    <DigitadoList
+                                        order={o}
+                                        userEmail={userEmail}
+                                        onRefresh={loadData}
+                                        allMoldes={allMoldes}
+                                        onBack={() => setSelectedOrderId(null)}
+                                        isInline={true}
+                                    />
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <DigitadoList
-                            order={selectedOrder}
-                            userEmail={userEmail}
-                            onRefresh={loadData}
-                        />
-                    )}
-                </div>
+                    ))
+                )}
             </div>
         </div>
     )
@@ -225,37 +240,6 @@ function SummaryCard({ label, value, color, isPrimary = false }: { label: string
         <div className={`flex flex-col items-center justify-center min-w-[75px] h-[60px] rounded-lg border shadow-sm ${colorClasses[color] || colorClasses.blue}`}>
             <span className="text-[9px] font-bold uppercase opacity-80 text-center px-1 leading-tight mb-0.5">{label}</span>
             <span className="text-base font-black tracking-tight">{value}</span>
-        </div>
-    )
-}
-
-function OrderCard({ order, isSelected, onClick }: { order: OrdenFabricacion, isSelected: boolean, onClick: () => void }) {
-    return (
-        <div
-            onClick={onClick}
-            className={`p-2 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100' : 'border-slate-100 bg-white hover:border-blue-200 shadow-sm'}`}
-        >
-            <div className="flex justify-between items-start mb-2">
-                <span className="text-[10px] font-black uppercase text-slate-400">OF: {order.orden_fabricacion}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${order.estado === 'Finalizado' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {order.estado}
-                </span>
-            </div>
-            <h4 className="text-sm font-black text-slate-800 line-clamp-1 mb-1">{order.producto_descripcion}</h4>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div className="flex items-center gap-1 font-bold text-slate-500">
-                    <Hash size={12} /> {order.pedido}
-                </div>
-                <div className="flex items-center gap-1 font-bold text-slate-500">
-                    <Package size={12} /> {order.cantidad} un
-                </div>
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-                <div className="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">D:{order.desgelcada || 0}</div>
-                <div className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">P:{order.pulido || 0}</div>
-                <div className="bg-orange-500 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">D:{order.digitado || 0}</div>
-                <div className="bg-orange-600 text-white px-1.5 py-0.5 rounded text-[8px] font-bold">T:{order.transito || 0}</div>
-            </div>
         </div>
     )
 }

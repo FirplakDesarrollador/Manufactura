@@ -1,33 +1,41 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
-import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
-import { getOrdenesMuebles, getMetricasMueblesHoy, registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { OrdenMueble, MetricasMuebles, TareaMuebleActiva } from '@/types/muebles'
+import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
+import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
-import { Search, X, Calendar, RefreshCw, Filter } from 'lucide-react'
+import { Search, X, Calendar, RefreshCw, Filter, CheckSquare, Play } from 'lucide-react'
 
 interface CorteModuleProps {
     userEmail: string
     turno: string
     usuarioNombre: string
     plantaMuebles: string
+    onStartTask?: (tarea: TareaMuebleActiva) => void
 }
 
-export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMuebles }: CorteModuleProps) {
+export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMuebles, onStartTask }: CorteModuleProps) {
     const [ordenes, setOrdenes] = useState<OrdenMueble[]>([])
     const [metricas, setMetricas] = useState<MetricasMuebles | null>(null)
     const [loading, setLoading] = useState(true)
+    const [syncing, setSyncing] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
-    const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
+    const [selectedOrdenes, setSelectedOrdenes] = useState<OrdenMueble[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
-    const loadData = React.useCallback(async () => {
-        setLoading(true)
+    const loadData = useCallback(async (soft = false) => {
+        if (soft) {
+            setSyncing(true)
+        } else {
+            setLoading(true)
+        }
         try {
             const [ordenesData, metricasData] = await Promise.all([
                 getOrdenesMuebles(plantaMuebles),
@@ -41,6 +49,7 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
             console.error('Error loading Muebles data:', error)
         } finally {
             setLoading(false)
+            setSyncing(false)
         }
     }, [turno, plantaMuebles])
 
@@ -48,14 +57,56 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
         loadData()
     }, [loadData])
 
+    // Realtime subscription — auto-refresh on new traceability records
+    useEffect(() => {
+        const channel = supabase
+            .channel('corte-realtime')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'trazabilidad_muebles'
+            }, () => {
+                // Debounce rapid successive events
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'ordenes_fabricacion_muebles'
+            }, () => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+            if (debounceRef.current) clearTimeout(debounceRef.current)
+        }
+    }, [loadData])
+
     const handleClearFilters = () => {
         setSearchText('')
         setSelectedDate('')
     }
 
+    const toggleOrden = (orden: OrdenMueble) => {
+        setSelectedOrdenes((current) => {
+            const exists = current.some((item) => item.id === orden.id)
+            if (exists) return current.filter((item) => item.id !== orden.id)
+            return [...current, orden]
+        })
+    }
+
+    const clearSelection = () => {
+        setSelectedOrdenes([])
+        setIsModalOpen(false)
+    }
+
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
-        return ordenes.filter((orden) => {
+        const filtered = ordenes.filter((orden) => {
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
@@ -73,6 +124,15 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
             const needsCutting = (orden.por_cortar || 0) > 0 || (orden.reponer_corte || 0) > 0
 
             return matchesSearch && matchesDate && needsCutting
+        })
+
+        // Sort: reposición orders first, then by date
+        return filtered.sort((a, b) => {
+            const aReponer = (a.reponer_corte || 0) + (a.por_reponer || 0)
+            const bReponer = (b.reponer_corte || 0) + (b.por_reponer || 0)
+            if (aReponer > 0 && bReponer === 0) return -1
+            if (bReponer > 0 && aReponer === 0) return 1
+            return 0
         })
     }, [ordenes, searchText, selectedDate, dateType])
 
@@ -114,8 +174,9 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
                             </button>
                             
                             <button
-                                onClick={loadData}
+                                onClick={() => loadData()}
                                 className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                                title="Actualizar datos"
                             >
                                 <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                             </button>
@@ -141,7 +202,44 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
                             <Filter size={14} />
                             Ordenes para corte: {filteredOrdenes.length}
                         </div>
+                        {syncing && (
+                            <div className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold uppercase tracking-widest animate-in fade-in duration-300">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping inline-block" />
+                                Actualizando...
+                            </div>
+                        )}
                     </div>
+
+                    {selectedOrdenes.length > 0 && (
+                        <div className="sticky top-2 z-20 mb-4 bg-white border border-blue-100 rounded-xl shadow-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                    <CheckSquare size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-black text-gray-900">{selectedOrdenes.length} orden{selectedOrdenes.length === 1 ? '' : 'es'} seleccionada{selectedOrdenes.length === 1 ? '' : 's'}</p>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">
+                                        Total disponible: {selectedOrdenes.reduce((sum, item) => sum + (item.por_cortar || 0), 0)} piezas
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={clearSelection}
+                                    className="px-3 py-2 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold text-xs uppercase"
+                                >
+                                    Limpiar
+                                </button>
+                                <button
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold text-xs uppercase flex items-center gap-2 shadow-lg shadow-blue-100"
+                                >
+                                    <Play size={16} />
+                                    Iniciar corte
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -161,11 +259,8 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
                                 <OrderCard
                                     key={orden.id}
                                     orden={orden}
-                                    isActive={selectedOrden?.id === orden.id}
-                                    onClick={() => {
-                                        setSelectedOrden(orden)
-                                        setIsModalOpen(true)
-                                    }}
+                                    isActive={selectedOrdenes.some((item) => item.id === orden.id)}
+                                    onClick={() => toggleOrden(orden)}
                                     proceso="Corte"
                                 />
                             ))}
@@ -175,16 +270,22 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
             </div>
 
             {/* Trazabilidad Modal */}
-            {selectedOrden && (
+            {selectedOrdenes.length > 0 && (
                 <TrazabilidadModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    orden={selectedOrden}
+                    orden={selectedOrdenes[0]}
+                    ordenes={selectedOrdenes}
                     proceso="Corte"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
+                    onStartTask={(tarea) => {
+                        clearSelection()
+                        onStartTask?.(tarea)
+                    }}
                     onSuccess={() => {
-                        setIsModalOpen(false)
+                        clearSelection()
                         loadData()
                     }}
                 />

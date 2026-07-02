@@ -196,7 +196,7 @@ export async function getMetricasDiaActual(): Promise<MetricasDia | null> {
         grandes: sumBy(vToday, 'producto_tamano', 'Grande'),
         medianas: sumBy(vToday, 'producto_tamano', 'Mediana'),
         pequenas: sumBy(vToday, 'producto_tamano', 'Pequena'),
-        desgelcada: vToday.filter(r => r.estado === 'Desgelcado').length,
+        desgelcada: 0, // Eliminado por reestructuración de flujo
         acabado: aToday.length,
         cedi: cToday.length,
         estanteria: totalEstanteria || qData?.estanteria || 0,

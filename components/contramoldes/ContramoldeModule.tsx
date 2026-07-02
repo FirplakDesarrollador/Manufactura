@@ -39,12 +39,12 @@ export default function ContramoldeModule({ userEmail }: { userEmail: string }) 
     return (
         <div className="h-full flex flex-col bg-gray-50/50">
             {/* Search Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-6 shadow-sm">
-                <div className="max-w-6xl mx-auto space-y-4">
+            <div className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
+                <div className="max-w-6xl mx-auto space-y-2">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-xl font-bold text-[#254153] flex items-center gap-2">
-                                <Database size={24} className="text-cyan-600" />
+                            <h2 className="text-base font-bold text-[#254153] flex items-center gap-2">
+                                <Database size={20} className="text-cyan-600" />
                                 Módulo de Contramoldes
                             </h2>
                             <p className="text-xs text-gray-500 font-medium mt-1">
@@ -70,7 +70,7 @@ export default function ContramoldeModule({ userEmail }: { userEmail: string }) 
                                 placeholder="Buscar por Serial, Descripción u OF..."
                                 value={searchText}
                                 onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all shadow-sm group-hover:border-gray-200"
+                                className="w-full pl-10 pr-4 py-2 bg-gray-50 border-2 border-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all shadow-sm group-hover:border-gray-200 text-sm"
                             />
                         </div>
                         <button
@@ -86,7 +86,7 @@ export default function ContramoldeModule({ userEmail }: { userEmail: string }) 
             </div>
 
             {/* List Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
                 <div className="max-w-6xl mx-auto">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-32 space-y-4">

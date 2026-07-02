@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
 import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
+import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
@@ -13,20 +14,27 @@ interface EnchapeModuleProps {
     turno: string
     usuarioNombre: string
     plantaMuebles: string
+    onStartTask?: (tarea: any) => void
 }
 
-export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaMuebles }: EnchapeModuleProps) {
+export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaMuebles, onStartTask }: EnchapeModuleProps) {
     const [ordenes, setOrdenes] = useState<OrdenMueble[]>([])
     const [metricas, setMetricas] = useState<MetricasMuebles | null>(null)
     const [loading, setLoading] = useState(true)
+    const [syncing, setSyncing] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
     const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
-    const loadData = React.useCallback(async () => {
-        setLoading(true)
+    const loadData = useCallback(async (soft = false) => {
+        if (soft) {
+            setSyncing(true)
+        } else {
+            setLoading(true)
+        }
         try {
             const [ordenesData, metricasData] = await Promise.all([
                 getOrdenesMuebles(plantaMuebles),
@@ -40,11 +48,40 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
             console.error('Error loading Enchape data:', error)
         } finally {
             setLoading(false)
+            setSyncing(false)
         }
     }, [turno, plantaMuebles])
 
     useEffect(() => {
         loadData()
+    }, [loadData])
+
+    // Realtime subscription — auto-refresh when records are inserted/updated
+    useEffect(() => {
+        const channel = supabase
+            .channel('enchape-realtime')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'trazabilidad_muebles'
+            }, () => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'ordenes_fabricacion_muebles'
+            }, () => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+            if (debounceRef.current) clearTimeout(debounceRef.current)
+        }
     }, [loadData])
 
     const handleClearFilters = () => {
@@ -118,8 +155,9 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
                             </button>
                             
                             <button
-                                onClick={loadData}
+                                onClick={() => loadData()}
                                 className="p-2 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                                title="Actualizar datos"
                             >
                                 <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                             </button>
@@ -143,6 +181,12 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
                             <Layers size={14} />
                             ORDENES EN ENCHAPE: {filteredOrdenes.length}
                         </div>
+                        {syncing && (
+                            <div className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold uppercase tracking-widest animate-in fade-in duration-300">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping inline-block" />
+                                Actualizando...
+                            </div>
+                        )}
                     </div>
 
                     {loading ? (
@@ -185,6 +229,11 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
                     proceso="Enchape"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
+                    userEmail={userEmail}
+                    onStartTask={(tarea) => {
+                        setIsModalOpen(false)
+                        onStartTask?.(tarea)
+                    }}
                     onSuccess={() => {
                         setIsModalOpen(false)
                         loadData()
