@@ -251,7 +251,7 @@ export default function AsistenciaPage() {
             {/* Header */}
             <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/">
+                    <Link href="/home">
                         <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
                             <ArrowLeft size={20} />
                             <span className="hidden sm:inline font-bold">Volver al Home</span>
