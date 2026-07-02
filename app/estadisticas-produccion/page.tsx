@@ -652,15 +652,15 @@ export default function EstadisticasSistemaProduccion() {
                                     <CardTitle className="text-lg font-bold text-[#254153]">Desempeño de Evaluaciones por Persona</CardTitle>
                                     <CardDescription>Cantidad de herramientas (Hora a Hora vs OPT) realizadas por registrador</CardDescription>
                                 </CardHeader>
-                                <CardContent className="h-80">
+                                <CardContent className="h-[450px]">
                                     {chartPersonaData.length === 0 ? (
                                         <div className="h-full flex items-center justify-center text-slate-400">Sin datos</div>
                                     ) : (
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={chartPersonaData} layout="vertical" margin={{ top: 20, right: 20, left: 30, bottom: 5 }}>
+                                            <BarChart data={chartPersonaData} layout="vertical" margin={{ top: 20, right: 20, left: 10, bottom: 5 }}>
                                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} />
                                                 <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} />
-                                                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} tickLine={false} width={110} />
+                                                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} width={150} interval={0} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
                                                 <Legend iconSize={12} iconType="circle" />
                                                 <Bar dataKey="Hora a Hora" stackId="a" fill="#254153" radius={[0, 4, 4, 0]} />
@@ -677,7 +677,7 @@ export default function EstadisticasSistemaProduccion() {
                                     <CardTitle className="text-lg font-bold text-[#254153]">Rendimiento y Calidad Promedio por Planta</CardTitle>
                                     <CardDescription>Comparativa agregada de desempeño y calidad de procesos</CardDescription>
                                 </CardHeader>
-                                <CardContent className="h-80">
+                                <CardContent className="h-[450px]">
                                     {chartPlantaPerfData.length === 0 ? (
                                         <div className="h-full flex items-center justify-center text-slate-400">Sin datos</div>
                                     ) : (
