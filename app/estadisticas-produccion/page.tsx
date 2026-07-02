@@ -36,6 +36,25 @@ import {
 const COLORS = ['#254153', '#749094', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 const MONTHS = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
+function getWeekNumber(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+const getWeekNumberSafe = (dateVal: any) => {
+    if (!dateVal) return 0;
+    try {
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return 0;
+        return getWeekNumber(d);
+    } catch {
+        return 0;
+    }
+};
+
 interface OPTRecord {
     ID: number;
     Título: string;
@@ -68,6 +87,8 @@ export default function EstadisticasSistemaProduccion() {
     const [filterYear, setFilterYear] = useState<string>("all");
     const [filterMonth, setFilterMonth] = useState<string>("all");
     const [filterPlanta, setFilterPlanta] = useState<string>("all");
+    const [filterWeek, setFilterWeek] = useState<string>("all");
+    const [filterPersona, setFilterPersona] = useState<string>("all");
     const [showFilters, setShowFilters] = useState(true);
 
     useEffect(() => {
@@ -109,24 +130,38 @@ export default function EstadisticasSistemaProduccion() {
         loadData();
     }, []);
 
-    // Extraer años y plantas únicos combinando ambos datasets
+    // Extraer años, plantas, semanas y personas únicos combinando ambos datasets
     const filterOptions = useMemo(() => {
         const yearsSet = new Set<string>();
         const plantasSet = new Set<string>();
+        const weeksSet = new Set<string>();
+        const personasSet = new Set<string>();
 
         hhData.forEach(d => {
-            if (d.tiempoInicio) yearsSet.add(new Date(d.tiempoInicio).getFullYear().toString());
+            if (d.tiempoInicio) {
+                const dt = new Date(d.tiempoInicio);
+                yearsSet.add(dt.getFullYear().toString());
+                weeksSet.add(getWeekNumberSafe(d.tiempoInicio).toString());
+            }
             if (d.planta) plantasSet.add(d.planta);
+            if (d.creadoPor) personasSet.add(d.creadoPor.trim());
         });
 
         optData.forEach(d => {
-            if (d.Create_at) yearsSet.add(new Date(d.Create_at).getFullYear().toString());
+            if (d.Create_at) {
+                const dt = new Date(d.Create_at);
+                yearsSet.add(dt.getFullYear().toString());
+                weeksSet.add(getWeekNumberSafe(d.Create_at).toString());
+            }
             if (d.Planta) plantasSet.add(d.Planta);
+            if (d["Created By"]) personasSet.add(d["Created By"].trim());
         });
 
         return {
             years: Array.from(yearsSet).sort().reverse(),
-            plantas: Array.from(plantasSet).sort()
+            plantas: Array.from(plantasSet).sort(),
+            weeks: Array.from(weeksSet).sort((a, b) => parseInt(a) - parseInt(b)),
+            personas: Array.from(personasSet).sort()
         };
     }, [hhData, optData]);
 
@@ -134,6 +169,8 @@ export default function EstadisticasSistemaProduccion() {
         setFilterYear("all");
         setFilterMonth("all");
         setFilterPlanta("all");
+        setFilterWeek("all");
+        setFilterPersona("all");
     };
 
     // Aplicar filtros a Hora a Hora
@@ -143,9 +180,11 @@ export default function EstadisticasSistemaProduccion() {
             if (filterYear !== "all" && dt.getFullYear().toString() !== filterYear) return false;
             if (filterMonth !== "all" && (dt.getMonth() + 1).toString() !== filterMonth) return false;
             if (filterPlanta !== "all" && d.planta?.toLowerCase() !== filterPlanta.toLowerCase()) return false;
+            if (filterWeek !== "all" && getWeekNumberSafe(d.tiempoInicio).toString() !== filterWeek) return false;
+            if (filterPersona !== "all" && d.creadoPor?.trim() !== filterPersona) return false;
             return true;
         });
-    }, [hhData, filterYear, filterMonth, filterPlanta]);
+    }, [hhData, filterYear, filterMonth, filterPlanta, filterWeek, filterPersona]);
 
     // Aplicar filtros a OPT
     const filteredOPT = useMemo(() => {
@@ -155,9 +194,11 @@ export default function EstadisticasSistemaProduccion() {
             if (filterYear !== "all" && dt.getFullYear().toString() !== filterYear) return false;
             if (filterMonth !== "all" && (dt.getMonth() + 1).toString() !== filterMonth) return false;
             if (filterPlanta !== "all" && d.Planta?.toLowerCase() !== filterPlanta.toLowerCase()) return false;
+            if (filterWeek !== "all" && getWeekNumberSafe(d.Create_at).toString() !== filterWeek) return false;
+            if (filterPersona !== "all" && d["Created By"]?.trim() !== filterPersona) return false;
             return true;
         });
-    }, [optData, filterYear, filterMonth, filterPlanta]);
+    }, [optData, filterYear, filterMonth, filterPlanta, filterWeek, filterPersona]);
 
     // KPIs Unificados
     const kpis = useMemo(() => {
@@ -298,6 +339,54 @@ export default function EstadisticasSistemaProduccion() {
 
     const estadoColors: Record<string, string> = { Verde: '#10b981', Amarillo: '#f59e0b', Rojo: '#ef4444' };
 
+    // Gráfica por Persona: cantidad de herramientas Hora a Hora y OPT realizadas por persona
+    const chartPersonaData = useMemo(() => {
+        const counts: Record<string, { name: string, "Hora a Hora": number, OPT: number, Total: number }> = {};
+        
+        filteredHH.forEach(d => {
+            const creator = d.creadoPor?.trim() || "Desconocido";
+            if (!counts[creator]) counts[creator] = { name: creator, "Hora a Hora": 0, OPT: 0, Total: 0 };
+            counts[creator]["Hora a Hora"]++;
+            counts[creator].Total++;
+        });
+        
+        filteredOPT.forEach(d => {
+            const creator = d["Created By"]?.trim() || "Desconocido";
+            if (!counts[creator]) counts[creator] = { name: creator, "Hora a Hora": 0, OPT: 0, Total: 0 };
+            counts[creator].OPT++;
+            counts[creator].Total++;
+        });
+        
+        return Object.values(counts).sort((a, b) => b.Total - a.Total);
+    }, [filteredHH, filteredOPT]);
+
+    // Desempeño Promedio por Planta: Rendimiento, Calidad HH y Calificación OPT
+    const chartPlantaPerfData = useMemo(() => {
+        const stats: Record<string, { name: string, hhCount: number, hhRendTotal: number, hhCalTotal: number, optCount: number, optCalificTotal: number }> = {};
+        
+        filteredHH.forEach(d => {
+            const p = d.planta || "N/A";
+            if (!stats[p]) stats[p] = { name: p, hhCount: 0, hhRendTotal: 0, hhCalTotal: 0, optCount: 0, optCalificTotal: 0 };
+            stats[p].hhRendTotal += (d.rendimiento || 0);
+            stats[p].hhCalTotal += (d.calidad || 0);
+            stats[p].hhCount++;
+        });
+
+        filteredOPT.forEach(d => {
+            const p = d.Planta || "N/A";
+            if (!stats[p]) stats[p] = { name: p, hhCount: 0, hhRendTotal: 0, hhCalTotal: 0, optCount: 0, optCalificTotal: 0 };
+            stats[p].optCalificTotal += (d.Calificación || 0);
+            stats[p].optCount++;
+        });
+
+        return Object.values(stats).map(s => ({
+            name: s.name,
+            "Rendimiento Prom. HH (%)": s.hhCount > 0 ? Math.round(s.hhRendTotal / s.hhCount) : 0,
+            "Calidad Prom. HH (%)": s.hhCount > 0 ? Math.round(s.hhCalTotal / s.hhCount) : 0,
+            "Calificación Prom. OPT (%)": s.optCount > 0 ? Math.round(s.optCalificTotal / s.optCount) : 0
+        }));
+    }, [filteredHH, filteredOPT]);
+
     // Gráfico de Desperdicios Hora a Hora (Top 5)
     const wastesData = useMemo(() => {
         const count: Record<string, number> = {};
@@ -373,7 +462,7 @@ export default function EstadisticasSistemaProduccion() {
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                         <div className="space-y-1">
                             <Label className="text-xs text-slate-500 font-semibold">Año</Label>
                             <Select value={filterYear} onValueChange={(val) => setFilterYear(val || "all")}>
@@ -411,6 +500,34 @@ export default function EstadisticasSistemaProduccion() {
                                 <SelectContent>
                                     <SelectItem value="all">Todas</SelectItem>
                                     {filterOptions.plantas.map(p => (
+                                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-slate-500 font-semibold">Semana</Label>
+                            <Select value={filterWeek} onValueChange={(val) => setFilterWeek(val || "all")}>
+                                <SelectTrigger className="h-10 bg-slate-50 border-slate-200">
+                                    <SelectValue placeholder="Todas" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas</SelectItem>
+                                    {filterOptions.weeks.map(w => (
+                                        <SelectItem key={w} value={w}>Semana {w}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-slate-500 font-semibold">Persona</Label>
+                            <Select value={filterPersona} onValueChange={(val) => setFilterPersona(val || "all")}>
+                                <SelectTrigger className="h-10 bg-slate-50 border-slate-200">
+                                    <SelectValue placeholder="Todas" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas</SelectItem>
+                                    {filterOptions.personas.map(p => (
                                         <SelectItem key={p} value={p}>{p}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -521,6 +638,60 @@ export default function EstadisticasSistemaProduccion() {
                                                 <Line type="monotone" dataKey="Rendimiento (Hora a Hora)" stroke="#254153" strokeWidth={3} activeDot={{ r: 6 }} connectNulls />
                                                 <Line type="monotone" dataKey="Calificación (OPT)" stroke="#10b981" strokeWidth={3} activeDot={{ r: 6 }} connectNulls />
                                             </LineChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Nuevas Estadísticas */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Gráfica por Persona */}
+                            <Card className="shadow-sm border border-slate-200">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-lg font-bold text-[#254153]">Desempeño de Evaluaciones por Persona</CardTitle>
+                                    <CardDescription>Cantidad de herramientas (Hora a Hora vs OPT) realizadas por registrador</CardDescription>
+                                </CardHeader>
+                                <CardContent className="h-80">
+                                    {chartPersonaData.length === 0 ? (
+                                        <div className="h-full flex items-center justify-center text-slate-400">Sin datos</div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={chartPersonaData} layout="vertical" margin={{ top: 20, right: 20, left: 30, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} />
+                                                <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} />
+                                                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} tickLine={false} width={110} />
+                                                <Tooltip contentStyle={{ borderRadius: '8px' }} />
+                                                <Legend iconSize={12} iconType="circle" />
+                                                <Bar dataKey="Hora a Hora" stackId="a" fill="#254153" radius={[0, 4, 4, 0]} />
+                                                <Bar dataKey="OPT" stackId="a" fill="#749094" radius={[0, 4, 4, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Desempeño Promedio por Planta */}
+                            <Card className="shadow-sm border border-slate-200">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-lg font-bold text-[#254153]">Rendimiento y Calidad Promedio por Planta</CardTitle>
+                                    <CardDescription>Comparativa agregada de desempeño y calidad de procesos</CardDescription>
+                                </CardHeader>
+                                <CardContent className="h-80">
+                                    {chartPlantaPerfData.length === 0 ? (
+                                        <div className="h-full flex items-center justify-center text-slate-400">Sin datos</div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={chartPlantaPerfData} margin={{ top: 20, right: 10, left: -10, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
+                                                <YAxis stroke="#64748b" fontSize={11} tickLine={false} domain={[0, 100]} />
+                                                <Tooltip contentStyle={{ borderRadius: '8px' }} />
+                                                <Legend iconSize={12} iconType="circle" />
+                                                <Bar dataKey="Rendimiento Prom. HH (%)" fill="#254153" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="Calidad Prom. HH (%)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="Calificación Prom. OPT (%)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
                                         </ResponsiveContainer>
                                     )}
                                 </CardContent>
