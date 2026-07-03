@@ -210,7 +210,7 @@ export default function CrearFichaPage() {
             <FirplakLogo height="70px" />
           </div>
         </div>
-        <Link href="/" style={{ textDecoration: 'none' }}>
+        <Link href="/home" style={{ textDecoration: 'none' }}>
            <button className="btn-secondary">Volver al Panel</button>
         </Link>
       </div>

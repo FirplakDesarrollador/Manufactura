@@ -218,7 +218,7 @@ export default function AdminPage() {
         <div style={{ background: 'var(--header-bg)', padding: '15px 30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
           <FirplakLogo height="50px" />
         </div>
-        <Link href="/" style={{ textDecoration: 'none' }}>
+        <Link href="/home" style={{ textDecoration: 'none' }}>
            <button className="btn-secondary">Volver al Menú</button>
         </Link>
       </div>

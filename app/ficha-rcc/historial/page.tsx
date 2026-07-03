@@ -139,7 +139,7 @@ export default function HomePage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '16px' }}>
-          <Link href="/" style={{ textDecoration: 'none' }}>
+          <Link href="/home" style={{ textDecoration: 'none' }}>
             <button className="btn-secondary">
                Volver al Menú
             </button>

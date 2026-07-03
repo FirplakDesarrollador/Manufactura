@@ -8,7 +8,7 @@ export default function BackButton() {
     return (
         <button
             type="button"
-            onClick={() => router.back()}
+            onClick={() => router.push('/home')}
             className="text-white hover:opacity-70 transition-opacity flex items-center"
             aria-label="Atrás"
         >

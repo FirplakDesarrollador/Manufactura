@@ -52,7 +52,7 @@ export default function OptMenuPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col relative font-sans">
       {/* Header */}
       <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between shadow-sm">
-        <Link href="/sistema-produccion">
+        <Link href="/home">
           <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors" title="Volver al menú de producción">
             <ArrowLeft size={24} />
           </button>

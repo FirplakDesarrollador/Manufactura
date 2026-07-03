@@ -194,7 +194,7 @@ export default function AsistenciaPage() {
           <Link href="/ficha-rcc/asistencia/indicadores" style={{ textDecoration: 'none' }}>
              <button className="btn-primary" style={{ padding: '10px 20px', background: 'var(--accent)' }}>📊 Indicadores</button>
           </Link>
-          <Link href="/" style={{ textDecoration: 'none' }}>
+          <Link href="/home" style={{ textDecoration: 'none' }}>
              <button className="btn-secondary">Volver al Panel</button>
           </Link>
         </div>

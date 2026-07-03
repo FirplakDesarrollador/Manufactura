@@ -409,7 +409,7 @@ export default function AsistenciaPage() {
             {/* Sticky Home Button */}
             <div className="fixed bottom-6 right-6 z-50">
                 <Link
-                    href="/"
+                    href="/home"
                     className="w-14 h-14 bg-[#254153] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
                 >
                     <Home size={28} />

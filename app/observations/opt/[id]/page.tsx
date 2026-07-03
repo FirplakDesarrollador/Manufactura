@@ -112,7 +112,7 @@ export default async function OPTDetailPage({ params }: PageProps) {
                     </Link>
                 </div>
                 <div className="flex items-center gap-6">
-                    <Link href="/" className="hover:opacity-80 transition-opacity flex items-center gap-1">
+                    <Link href="/home" className="hover:opacity-80 transition-opacity flex items-center gap-1">
                         <Home size={28} />
                         <span className="font-semibold hidden sm:inline">Inicio</span>
                     </Link>

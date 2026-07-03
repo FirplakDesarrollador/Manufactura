@@ -11,7 +11,7 @@ export default function NewObservationPage() {
                     Esta es la página para crear una nueva observación (Placeholder).
                 </p>
                 <Link
-                    href="/"
+                    href="/home"
                     className="rounded-full border border-solid border-gray-300 transition-colors flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 text-sm sm:text-base h-10 sm:h-12 px-8 py-2 font-medium"
                 >
                     Volver al Inicio

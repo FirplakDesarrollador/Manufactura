@@ -10,7 +10,7 @@ export default function Header() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <div className="flex items-center space-x-3 gap-2">
-                        <Link href="/sistema-produccion">
+                        <Link href="/home">
                             <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white" title="Volver a Producción">
                                 <ArrowLeft size={24} />
                             </button>

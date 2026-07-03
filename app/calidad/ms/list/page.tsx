@@ -217,7 +217,7 @@ export default function ReportedDefectsListPage() {
             <header className="bg-[#254153] text-white px-4 h-14 flex items-center justify-between sticky top-0 z-50">
                 <div className="flex items-center space-x-4">
                     <button
-                        onClick={() => router.back()}
+                        onClick={() => router.push('/home')}
                         className="p-1 hover:bg-white/10 transition-colors"
                     >
                         <ChevronLeft className="w-6 h-6" />
