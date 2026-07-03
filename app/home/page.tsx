@@ -19,6 +19,7 @@ interface User {
         tarjetas_excelencia?: any;
         estadisticas_produccion?: any;
         indicadores_productividad?: any;
+        opt_sistemica?: any;
         asistencia?: any;
     }
 }
@@ -60,6 +61,7 @@ export default function HomePage() {
             configuracion: '/configuracion',
             tarjetas_excelencia: '/tarjetas-excelencia',
             estadisticas_produccion: '/estadisticas-produccion',
+            opt_sistemica: '/opt-sistemica',
             indicadores_productividad: '/indicadores-productividad',
             asistencia: '/asistencia'
         };
@@ -117,6 +119,10 @@ export default function HomePage() {
         return !!user?.permisos?.opt;
     }
 
+    const hasOptSistemica = () => {
+        return !!user?.permisos?.opt_sistemica || !!user?.permisos?.opt;
+    }
+
     const hasTarjetasExcelencia = () => {
         return !!user?.permisos?.tarjetas_excelencia; 
     }
@@ -166,7 +172,7 @@ export default function HomePage() {
 
             {/* Main Content */}
             <main className="flex-1 flex items-center justify-center p-4 md:p-8 lg:p-12">
-                <div className="w-full max-w-[1600px] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 lg:gap-8 justify-items-center mx-auto">
+                <div className="w-full max-w-[1800px] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6 lg:gap-8 justify-items-center mx-auto">
                     {/* Control de Piso Button */}
                     {hasManufactura() && (
                         <button
@@ -257,6 +263,21 @@ export default function HomePage() {
                         </button>
                     )}
 
+                    {/* OPT Sistemica Button */}
+                    {hasOptSistemica() && (
+                        <button
+                            onClick={() => router.push('/opt-sistemica')}
+                            className="w-full aspect-square flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                        >
+                            <div className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-4 lg:mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                                <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                </svg>
+                            </div>
+                            <span className="text-xl md:text-2xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">OPT<br/>Sistémica</span>
+                        </button>
+                    )}
+
                     {/* Tarjetas Excelencia Button */}
                     {hasTarjetasExcelencia() && (
                         <button
@@ -318,7 +339,7 @@ export default function HomePage() {
                         </button>
                     )}
 
-                    {!hasManufactura() && !hasCalidad() && !hasConfiguracion() && !hasEstadisticasProduccion() && !hasIndicadoresProductividad() && !hasAsistencia() && !hasHoraAHora() && !hasFichaRcc() && !hasOpt() && !hasTarjetasExcelencia() && (
+                    {!hasManufactura() && !hasCalidad() && !hasConfiguracion() && !hasEstadisticasProduccion() && !hasIndicadoresProductividad() && !hasAsistencia() && !hasHoraAHora() && !hasFichaRcc() && !hasOpt() && !hasOptSistemica() && !hasTarjetasExcelencia() && (
                         <div className="col-span-full py-20 text-center">
                             <div className="inline-flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full mb-4">
                                 <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
