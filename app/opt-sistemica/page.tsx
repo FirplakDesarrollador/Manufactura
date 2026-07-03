@@ -54,7 +54,7 @@ export default function HomePage() {
     );
   }
 
-  const allowedAdminEmails = ['coordinacioncalidad@firplak.com', 'estiven.londono@firplak.com'];
+  const allowedAdminEmails = ['coordinacioncalidad@firplak.com', 'estiven.londono@firplak.com', 'jakeline.chaverra@firplak.com'];
   const isAdmin = session && session.user.email && allowedAdminEmails.includes(session.user.email);
 
   return (

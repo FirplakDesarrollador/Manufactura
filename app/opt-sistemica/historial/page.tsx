@@ -16,7 +16,7 @@ interface OPTRecord {
   action_plans: string;
 }
 
-const AUTHORIZED_ADMINS = ['coordinacioncalidad@firplak.com', 'estiven.londono@firplak.com'];
+const AUTHORIZED_ADMINS = ['coordinacioncalidad@firplak.com', 'estiven.londono@firplak.com', 'jakeline.chaverra@firplak.com'];
 
 const QUESTION_MAPPING: Record<string, Record<string, string>> = {
   'GI': {

@@ -139,6 +139,11 @@ export default function HomePage() {
         return !!user?.permisos?.asistencia;
     }
 
+    const hasMttoAutonomo = () => {
+        // Por ahora lo habilitamos si tiene el permiso o si tiene opt
+        return !!user?.permisos?.mtto_autonomo || !!user?.permisos?.opt;
+    }
+
 
 
     return (
@@ -305,7 +310,7 @@ export default function HomePage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             </div>
-                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300">Configuración</span>
+                            <span className="text-xl md:text-2xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300">Configuración</span>
                         </button>
                     )}
 
@@ -313,14 +318,14 @@ export default function HomePage() {
                     {hasIndicadoresProductividad() && (
                         <button
                             onClick={() => router.push('/indicadores-productividad')}
-                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                            className="w-full aspect-square flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
                         >
-                            <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                            <div className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-4 lg:mb-6 group-hover:bg-[#254153] transition-all duration-300">
                                 <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                                 </svg>
                             </div>
-                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Indicadores<br/>Productividad</span>
+                            <span className="text-xl md:text-2xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Indicadores<br/>Productividad</span>
                         </button>
                     )}
 
@@ -328,18 +333,33 @@ export default function HomePage() {
                     {hasAsistencia() && (
                         <button
                             onClick={() => router.push('/asistencia')}
-                            className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                            className="w-full aspect-square flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
                         >
-                            <div className="w-24 h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                            <div className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-4 lg:mb-6 group-hover:bg-[#254153] transition-all duration-300">
                                 <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                                 </svg>
                             </div>
-                            <span className="text-3xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Asistencia</span>
+                            <span className="text-xl md:text-2xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Asistencia</span>
                         </button>
                     )}
 
-                    {!hasManufactura() && !hasCalidad() && !hasConfiguracion() && !hasEstadisticasProduccion() && !hasIndicadoresProductividad() && !hasAsistencia() && !hasHoraAHora() && !hasFichaRcc() && !hasOpt() && !hasOptSistemica() && !hasTarjetasExcelencia() && (
+                    {/* Mtto Autonomo Button */}
+                    {hasMttoAutonomo() && (
+                        <button
+                            onClick={() => router.push('/mtto-autonomo')}
+                            className="w-full aspect-square flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#254153] hover:shadow-2xl transition-all duration-300 group"
+                        >
+                            <div className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#254153]/10 rounded-full flex items-center justify-center mb-4 lg:mb-6 group-hover:bg-[#254153] transition-all duration-300">
+                                <svg className="w-12 h-12 text-[#254153] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                                </svg>
+                            </div>
+                            <span className="text-xl md:text-2xl font-bold text-[#254153] group-hover:text-[#1a2e3b] transition-colors duration-300 text-center">Mtto Autónomo</span>
+                        </button>
+                    )}
+
+                    {!hasManufactura() && !hasCalidad() && !hasConfiguracion() && !hasEstadisticasProduccion() && !hasIndicadoresProductividad() && !hasAsistencia() && !hasHoraAHora() && !hasFichaRcc() && !hasOpt() && !hasOptSistemica() && !hasTarjetasExcelencia() && !hasMttoAutonomo() && (
                         <div className="col-span-full py-20 text-center">
                             <div className="inline-flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full mb-4">
                                 <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

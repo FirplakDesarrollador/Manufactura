@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 
-const allowedAdminEmails = ['coordinacioncalidad@firplak.com', 'estiven.londono@firplak.com'];
+const allowedAdminEmails = ['coordinacioncalidad@firplak.com', 'estiven.londono@firplak.com', 'jakeline.chaverra@firplak.com'];
 
 interface Responsable {
   id: string;
