@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/mtto-autonomo/supabase';
-import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
+import { supabase } from '../../../../../lib/supabase';
+import { supabaseTH } from '../../../../../lib/supabaseTH';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -219,7 +219,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
         const { error: e2 } = await supabase.from('puestas_a_punto_detalle').insert(rows);
         if (e2) throw e2;
         setMsg({ t: 's', m: `Nueva versión creada.` });
-        setTimeout(() => router.push(`/mtto-autonomo/puestas-a-punto/${encodeURIComponent(planta)}/ver/${newEnc.id_puesta_a_punto}`), 1500);
+        setTimeout(() => router.push(`/puestas-a-punto/${encodeURIComponent(planta)}/ver/${newEnc.id_puesta_a_punto}`), 1500);
       } else {
         const dataToUpdate = { 
           nombre_puesta_a_punto: enc.nombre_puesta_a_punto, 
@@ -239,7 +239,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
         const { error: e3 } = await supabase.from('puestas_a_punto_detalle').insert(rows);
         if (e3) throw e3;
         setMsg({ t: 's', m: "Base de datos actualizada." });
-        setTimeout(() => router.push(`/mtto-autonomo/puestas-a-punto/${encodeURIComponent(planta)}/ver/${id}`), 1500);
+        setTimeout(() => router.push(`/puestas-a-punto/${encodeURIComponent(planta)}/ver/${id}`), 1500);
       }
     } catch (e: any) { setMsg({ t: 'e', m: e.message }); }
     finally { setLoading(false); }
@@ -513,4 +513,3 @@ function SortableItemRow({ item, iIdx, gId, rowSpan, equipo, updateGroupEquipo, 
     </tr>
   );
 }
-

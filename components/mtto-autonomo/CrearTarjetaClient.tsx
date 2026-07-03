@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/mtto-autonomo/supabase';
-import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
+import { supabase } from '@/lib/supabase';
+import { supabaseTalentoHumano as supabaseTH } from '@/lib/supabase_talento_humano';
 import SearchableSelect from './SearchableSelect';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -127,7 +127,7 @@ export default function CrearTarjetaClient() {
       if (error) throw error;
 
       alert('✅ Tarjeta creada correctamente');
-      router.push('/mtto-autonomo/tarjetas-falla');
+      router.push('/tarjetas-falla');
       router.refresh();
     } catch (err: any) {
       console.error(err);
@@ -622,4 +622,3 @@ export default function CrearTarjetaClient() {
     </form>
   );
 }
-

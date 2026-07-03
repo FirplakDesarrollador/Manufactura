@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '../../../../../lib/supabase';
 import React from 'react';
 import ModificarPuestaClient from './ModificarPuestaClient';
 

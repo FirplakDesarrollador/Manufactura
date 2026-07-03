@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '../../../../../lib/supabase';
 import React from 'react';
 import Link from 'next/link';
 import { PrintActions } from '@/components/mtto-autonomo/PrintActions';
@@ -40,7 +40,7 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
       <div style={{ padding: '4rem', textAlign: 'center', color: '#1A435B' }}>
         <h2>No se encontraron datos</h2>
         <p style={{ margin: '1rem 0', color: '#667A85' }}>{encError?.message}</p>
-        <Link href={`/mtto-autonomo/puestas-a-punto/${planta}`} style={{ padding: '0.8rem 1.5rem', backgroundColor: '#1A435B', color: 'white', textDecoration: 'none', borderRadius: '8px' }}>
+        <Link href={`/puestas-a-punto/${planta}`} style={{ padding: '0.8rem 1.5rem', backgroundColor: '#1A435B', color: 'white', textDecoration: 'none', borderRadius: '8px' }}>
           Regresar
         </Link>
       </div>
@@ -126,7 +126,7 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
       <div className="screen-only">
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.8rem', marginBottom: '0.8rem', alignItems: 'center' }}>
           {tieneHistorial && (
-            <Link href={`/mtto-autonomo/puestas-a-punto/${encodeURIComponent(planta)}/ver/${id}/historial`} style={{ padding: '0.5rem 1rem', backgroundColor: '#F8FAFB', color: '#1A435B', border: '1px solid #1A435B', borderRadius: '8px', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600 }}>
+            <Link href={`/puestas-a-punto/${encodeURIComponent(planta)}/ver/${id}/historial`} style={{ padding: '0.5rem 1rem', backgroundColor: '#F8FAFB', color: '#1A435B', border: '1px solid #1A435B', borderRadius: '8px', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600 }}>
               📜 Historial
             </Link>
           )}
@@ -251,4 +251,3 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import VerPuestasClient from '@/components/mtto-autonomo/VerPuestasClient';
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '../../../../lib/supabase';
 
 export const revalidate = 0;
 

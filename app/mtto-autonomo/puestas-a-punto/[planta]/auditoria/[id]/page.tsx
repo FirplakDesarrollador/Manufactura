@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '../../../../../lib/supabase';
 import React from 'react';
 import BackButton from '@/components/mtto-autonomo/BackButton';
 import AuditTableClient from '@/components/mtto-autonomo/AuditTableClient';

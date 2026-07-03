@@ -32,7 +32,7 @@ export default function BackButton({ currentPlanta, showHome = false }: { curren
 
       {showHome && (
         <Link 
-          href="/mtto-autonomo/home" 
+          href="/home" 
           title="Inicio"
           style={{ 
             width: '42px', 
@@ -57,4 +57,3 @@ export default function BackButton({ currentPlanta, showHome = false }: { curren
     </div>
   );
 }
-

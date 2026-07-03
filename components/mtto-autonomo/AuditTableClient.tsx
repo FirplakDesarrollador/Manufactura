@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/mtto-autonomo/supabase';
-import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
+import { supabase } from '@/lib/supabase';
+import { supabaseTalentoHumano as supabaseTH } from '@/lib/supabase_talento_humano';
 import SearchableSelect from './SearchableSelect';
 
 type GroupedItem = {

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '../../../../lib/supabase';
 import BackButton from '@/components/mtto-autonomo/BackButton';
 import Link from 'next/link';
 
@@ -51,7 +51,7 @@ export default async function TarjetaDetailPage({ params }: { params: { id: stri
       <div style={{ width: '92%', maxWidth: '1450px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3.5rem', padding: '0 1rem' }}>
         <BackButton />
         <Link 
-          href={`/mtto-autonomo/tarjetas-falla/modificar/${tarjeta.id}`}
+          href={`/tarjetas-falla/modificar/${tarjeta.id}`}
           style={{ padding: '10px 20px', backgroundColor: '#1B2B41', color: 'white', borderRadius: '10px', fontWeight: 700, textDecoration: 'none', fontSize: '0.9rem', fontFamily: "'Inter', sans-serif" }}
         >
           Editar Tarjeta
@@ -217,4 +217,3 @@ export default async function TarjetaDetailPage({ params }: { params: { id: stri
     </div>
   );
 }
-

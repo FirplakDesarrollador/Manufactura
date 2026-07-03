@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 type PuestaAPunto = {
@@ -141,7 +141,7 @@ export default function VerPuestasClient({ planta, datosDb, actionLabel = "Ver",
 
             {showCreateButton && (
               <Link 
-                href={`/mtto-autonomo/puestas-a-punto/${encodeURIComponent(planta)}/crear`}
+                href={`/puestas-a-punto/${encodeURIComponent(planta)}/crear`}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#1A445B', color: 'white', textDecoration: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.95rem', boxShadow: '0 4px 12px rgba(26,68,91,0.2)', transition: '0.2s' }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v88a8,8,0,0,1-16,0V136H32a8,8,0,0,1,0-16h88V32a8,8,0,0,1,16,0v88h88A8,8,0,0,1,224,128Z"></path></svg>
@@ -202,7 +202,7 @@ export default function VerPuestasClient({ planta, datosDb, actionLabel = "Ver",
                       return (
                         <Link 
                           key={idx} 
-                          href={`/mtto-autonomo/puestas-a-punto/${encodeURIComponent(planta)}/${actionBaseRoute}/${item.id_puesta_a_punto || item.id}`}
+                          href={`/puestas-a-punto/${encodeURIComponent(planta)}/${actionBaseRoute}/${item.id_puesta_a_punto || item.id}`}
                           style={{ 
                             display: 'flex', 
                             alignItems: 'center', 
@@ -296,4 +296,3 @@ export default function VerPuestasClient({ planta, datosDb, actionLabel = "Ver",
     </div>
   );
 }
-

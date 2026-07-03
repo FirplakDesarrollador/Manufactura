@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '../../../../../lib/supabase';
 import DailyChecklistClient from '@/components/mtto-autonomo/DailyChecklistClient';
 import BackButton from '@/components/mtto-autonomo/BackButton';
 

@@ -1,0 +1,261 @@
+/* HDT App Variables - scoped */
+:root {
+  --brand-primary: #1b4154;
+  --brand-secondary: #2d414d;
+  --brand-accent: #87a4ac;
+  --brand-background: #f8fafc;
+  --brand-border: #1b4154;
+}
+
+/* Ocultar iconos nativos del navegador que causan duplicidad */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}
+
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+
+/* Estilos de impresión - Consolidado y estrictamente B/N */
+@media print {
+  @page {
+    margin: 0.5cm;
+    size: portrait;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Ocultar elementos de UI no deseados */
+  .fixed,
+  .hidden-print,
+  .print\:hidden,
+  button,
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Ajustar contenedor principal */
+  .max-w-7xl,
+  .max-w-5xl,
+  .mx-auto {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Header de impresión */
+  .print-header {
+    display: flex !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    border: 2px solid black !important;
+    margin-bottom: 5px !important;
+    background: white !important;
+  }
+
+  .print-header-logo {
+    width: 20% !important;
+    border-right: 2px solid black !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 10px !important;
+    background: white !important;
+  }
+
+  .print-header-title {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 10px !important;
+    text-align: center !important;
+    border-right: 2px solid black !important;
+    background: white !important;
+  }
+
+  .print-header-title h1 {
+    font-size: 14pt !important;
+    font-weight: bold !important;
+    margin: 0 !important;
+    color: black !important;
+  }
+
+  .print-header-meta {
+    width: 25% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    padding: 5px 10px !important;
+    background: white !important;
+  }
+
+  .print-header-meta div {
+    display: flex !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid black !important;
+    padding: 2px 0 !important;
+    font-size: 8pt !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-header-meta div:last-child {
+    border-bottom: 0 !important;
+  }
+
+  /* Tabla de Metadatos */
+  .print-metadata-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 10px !important;
+    table-layout: auto !important;
+    border: 2px solid black !important;
+    background: white !important;
+  }
+
+  .print-metadata-table td {
+    border: 1px solid black !important;
+    padding: 6px 10px !important;
+    vertical-align: top !important;
+    font-size: 9pt !important;
+    width: 50%;
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-metadata-table td.full-width {
+    width: 100% !important;
+  }
+
+  .print-metadata-table .label {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    font-size: 8pt !important;
+    display: block !important;
+    margin-bottom: 2px !important;
+    color: black !important;
+    background: white !important;
+  }
+
+  .print-metadata-table .value {
+    display: block !important;
+    min-height: 12pt !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    color: black !important;
+    background: white !important;
+  }
+
+  /* Tabla de Pasos (Procedimiento) */
+  #hdt-steps-table {
+    display: table !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    border: 2px solid black !important;
+    background: white !important;
+  }
+
+  .print\:table-header-group {
+    display: table-header-group !important;
+  }
+
+  .print\:table-row-group {
+    display: table-row-group !important;
+  }
+
+  .print\:table-row {
+    display: table-row !important;
+  }
+
+  #hdt-steps-table [role="columnheader"],
+  #hdt-steps-table .print\:table-row>div {
+    display: table-cell !important;
+    vertical-align: top !important;
+    border: 1px solid black !important;
+    padding: 8px !important;
+    font-size: 9pt !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  #hdt-steps-table .print\:table-row>div:nth-child(1),
+  #hdt-steps-table [role="columnheader"]:nth-child(1) {
+    width: 40% !important;
+  }
+
+  #hdt-steps-table .print\:table-row>div:nth-child(2),
+  #hdt-steps-table [role="columnheader"]:nth-child(2) {
+    width: 20% !important;
+  }
+
+  #hdt-steps-table .print\:table-row>div:nth-child(3),
+  #hdt-steps-table [role="columnheader"]:nth-child(3) {
+    width: 20% !important;
+  }
+
+  #hdt-steps-table .print\:table-row>div:nth-child(4),
+  #hdt-steps-table [role="columnheader"]:nth-child(4) {
+    width: 20% !important;
+  }
+
+  /* RESET FINAL AGRESIVO */
+  *,
+  *::before,
+  *::after,
+  svg,
+  [class*="brand-"],
+  [class*="bg-brand-"],
+  [class*="text-brand-"],
+  [class*="border-brand-"],
+  [class*="divide-brand-"],
+  [class*="bg-zinc-"],
+  [class*="text-zinc-"] {
+    background-color: white !important;
+    background-image: none !important;
+    color: black !important;
+    border-color: black !important;
+    fill: black !important;
+    stroke: black !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  img {
+    max-width: 150px !important;
+    height: auto !important;
+    filter: grayscale(1) contrast(2) !important;
+  }
+
+  .print\:table-row,
+  .print-header,
+  .print-metadata-table {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  h1, h2, h3, .label, .value {
+    color: black !important;
+  }
+}

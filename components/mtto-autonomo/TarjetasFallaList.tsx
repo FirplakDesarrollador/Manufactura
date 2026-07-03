@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 type TarjetaFalla = {
@@ -122,7 +122,7 @@ export default function TarjetasFallaList({ initialData }: TarjetasFallaListProp
         </div>
 
         <Link 
-          href="/mtto-autonomo/tarjetas-falla/crear"
+          href="/tarjetas-falla/crear"
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -250,7 +250,7 @@ export default function TarjetasFallaList({ initialData }: TarjetasFallaListProp
                   </div>
                   
                   <Link 
-                    href={`/mtto-autonomo/tarjetas-falla/ver/${item.id}`}
+                    href={`/tarjetas-falla/ver/${item.id}`}
                     style={{ fontSize: '0.85rem', color: '#1A445B', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
                     Detalles
@@ -265,4 +265,3 @@ export default function TarjetasFallaList({ initialData }: TarjetasFallaListProp
     </div>
   );
 }
-

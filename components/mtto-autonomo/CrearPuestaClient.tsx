@@ -1,11 +1,11 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/mtto-autonomo/supabase';
-import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
+import { supabase } from '@/lib/supabase';
+import { supabaseTalentoHumano as supabaseTH } from '@/lib/supabase_talento_humano';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import React from 'react';
-import { generateConsecutivo } from '@/lib/mtto-autonomo/utils';
+import { generateConsecutivo } from '../lib/utils';
 import { 
   DndContext, 
   closestCenter, 
@@ -261,7 +261,7 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
         const { error: err2 } = await supabase.from('puestas_a_punto_detalle').insert(details);
         if (err2) throw err2;
       }
-      router.push(`/mtto-autonomo/puestas-a-punto/${encodeURIComponent(plantaSeleccionada)}`);
+      router.push(`/puestas-a-punto/${encodeURIComponent(plantaSeleccionada)}`);
     } catch (err: any) { setErrorDb(err.message); }
     finally { setLoading(false); }
   };
@@ -702,4 +702,3 @@ function SortablePuntoRow({ punto, pIdx, mId, rowSpan, maquinaNombre, updateMaqu
     </tr>
   );
 }
-

@@ -1,18 +1,18 @@
+import './mtto-globals.css';
 import type { Metadata } from 'next';
-import './mtto-autonomo.css';
 
 export const metadata: Metadata = {
   title: 'Mantenimiento Autónomo',
   description: 'App para el Mantenimiento Autónomo de FIRPLAK',
 };
 
-export default function MttoAutonomoLayout({
+export default function MttoLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="mtto-autonomo-wrapper min-h-screen">
+    <div className="mtto-app">
       {children}
     </div>
   );

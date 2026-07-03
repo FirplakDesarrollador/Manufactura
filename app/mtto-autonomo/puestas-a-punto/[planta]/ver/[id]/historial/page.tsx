@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/mtto-autonomo/supabase';
+import { supabase } from '../../../../../../lib/supabase';
 import React from 'react';
 import Link from 'next/link';
 
@@ -34,7 +34,7 @@ export default async function HistorialVersionesPage({ params }: { params: Promi
           <p style={{ color: '#586B77', margin: '4px 0 0 0' }}>{current.nombre_puesta_a_punto || current.proceso}</p>
         </div>
         <Link 
-          href={`/mtto-autonomo/puestas-a-punto/${planta}/ver/${id}`}
+          href={`/puestas-a-punto/${planta}/ver/${id}`}
           style={{ padding: '0.6rem 1.2rem', backgroundColor: '#F8FAFB', color: '#586B77', border: '1px solid #D1D9E0', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '0.85rem' }}
         >
           ← Volver al Detalle
@@ -70,7 +70,7 @@ export default async function HistorialVersionesPage({ params }: { params: Promi
               </p>
             </div>
             <Link 
-              href={`/mtto-autonomo/puestas-a-punto/${planta}/ver/${v.id_puesta_a_punto}`}
+              href={`/puestas-a-punto/${planta}/ver/${v.id_puesta_a_punto}`}
               style={{ padding: '0.6rem 1.5rem', backgroundColor: '#1A445B', color: 'white', textDecoration: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}
             >
               Cargar esta versión
@@ -81,4 +81,3 @@ export default async function HistorialVersionesPage({ params }: { params: Promi
     </div>
   );
 }
-
