@@ -1,5 +1,5 @@
 import VerPuestasClient from '@/components/mtto-autonomo/VerPuestasClient';
-import { supabase } from '../../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import BackButton from '@/components/mtto-autonomo/BackButton';
 
 export const revalidate = 0;

@@ -1,4 +1,4 @@
-import { supabase } from '../../../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import React from 'react';
 import Link from 'next/link';
 import { PrintActions } from '@/components/mtto-autonomo/PrintActions';

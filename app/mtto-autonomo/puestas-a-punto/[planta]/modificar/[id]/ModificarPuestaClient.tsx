@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../../../../lib/supabase';
-import { supabaseTH } from '../../../../../lib/supabaseTH';
+import { supabase } from '@/lib/supabase';
+import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';

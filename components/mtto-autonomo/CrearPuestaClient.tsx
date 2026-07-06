@@ -5,7 +5,7 @@ import { supabaseTalentoHumano as supabaseTH } from '@/lib/supabase_talento_huma
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import React from 'react';
-import { generateConsecutivo } from '../lib/utils';
+import { generateConsecutivo } from '@/lib/mtto-autonomo/utils';
 import { 
   DndContext, 
   closestCenter, 

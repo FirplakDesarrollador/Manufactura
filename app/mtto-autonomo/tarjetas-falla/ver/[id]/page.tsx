@@ -1,4 +1,4 @@
-import { supabase } from '../../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import BackButton from '@/components/mtto-autonomo/BackButton';
 import Link from 'next/link';
 

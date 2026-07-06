@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import BackButton from '@/components/mtto-autonomo/BackButton';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 
 export const revalidate = 0; // Prevenir caché estática
