@@ -73,6 +73,10 @@ export default function SistemaProduccionPage() {
         return hasApp('opt_sistemica') || hasApp('opt');
     }
 
+    const hasHdt = () => {
+        return true;
+    }
+
     return (
         <div className="min-h-screen flex flex-col bg-slate-50 font-sans selection:bg-[#254153] selection:text-white">
             {/* Background Decorations */}
@@ -218,7 +222,24 @@ export default function SistemaProduccionPage() {
                         </button>
                     )}
 
-                    {!hasApp('hora_a_hora') && !hasApp('opt') && !hasOptSistemica() && !hasApp('estadisticas_produccion') && !hasApp('tarjetas_excelencia') && (
+                    {/* HDT Button */}
+                    {hasHdt() && (
+                        <button
+                            onClick={() => router.push('/hdt')}
+                            className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(37,65,83,0.15)] hover:border-[#254153]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
+                        >
+                            <div className="absolute -top-12 -right-12 w-32 h-32 bg-blue-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                            
+                            <div className="relative z-10 w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#254153] group-hover:border-[#254153] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
+                                <svg className="w-8 h-8 text-[#254153] group-hover:text-white transition-colors duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                </svg>
+                            </div>
+                            <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#254153] transition-colors duration-300 text-center">HDT</span>
+                        </button>
+                    )}
+
+                    {!hasApp('hora_a_hora') && !hasApp('opt') && !hasOptSistemica() && !hasApp('estadisticas_produccion') && !hasApp('tarjetas_excelencia') && !hasHdt() && (
                         <div className="w-full max-w-lg py-20 px-8 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
                             <div className="inline-flex items-center justify-center w-24 h-24 bg-amber-50 rounded-full mb-6 ring-8 ring-amber-50/50">
                                 <svg className="w-12 h-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
