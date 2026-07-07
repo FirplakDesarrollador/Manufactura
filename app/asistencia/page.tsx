@@ -45,7 +45,7 @@ const APP_SUMMARIES = [
         id: "hora-hora",
         title: "Hora a Hora",
         icon: FileText,
-        color: "border-l-indigo-500 text-indigo-600",
+        color: "border-l-[#324354] text-[#324354]",
         description: "Seguimiento en tiempo real de la producción contra la meta teórica de la línea. Registra el rendimiento, la cantidad de piezas conformes y defectuosas, y los desperdicios generados en cada hora del turno.",
         tips: ["Completa el registro al final de cada hora de trabajo.", "Detalla los desperdicios si el rendimiento es menor al 80%."]
     },
@@ -99,52 +99,8 @@ const KNOWLEDGE_BASE: Record<string, string> = {
     error: "Si el sistema presenta fallas de carga o problemas de red:\n\n1. Asegúrate de tener conexión a Internet.\n2. Si estás reportando datos y falla la red, el sistema Hora a Hora tiene almacenamiento local temporal (Local Storage) para no perder tus datos.\n3. Si el error persiste, contacta al administrador del sistema con una captura de pantalla."
 };
 
-// Simple rule-based chatbot query matcher
-function getBotResponse(userMsg: string): string {
-    const cleaned = userMsg.toLowerCase().trim();
-    
-    if (cleaned.includes("hola") || cleaned.includes("buen") || cleaned.includes("saludo")) {
-        return KNOWLEDGE_BASE.hola;
-    }
-    if (cleaned.includes("piso") || cleaned.includes("control de piso") || cleaned.includes("marmol") || cleaned.includes("muebles") || cleaned.includes("fibra")) {
-        return KNOWLEDGE_BASE["control de piso"];
-    }
-    if (cleaned.includes("calidad") || cleaned.includes("defecto") || cleaned.includes("ms")) {
-        return KNOWLEDGE_BASE.calidad;
-    }
-    if (cleaned.includes("hora a hora") || cleaned.includes("hora") || cleaned.includes("rendimiento")) {
-        return KNOWLEDGE_BASE["hora a hora"];
-    }
-    if (cleaned.includes("opt") || cleaned.includes("observacion") || cleaned.includes("preventiva") || cleaned.includes("conducta")) {
-        return KNOWLEDGE_BASE.opt;
-    }
-    if (cleaned.includes("rcc") || cleaned.includes("correccion") || cleaned.includes("ficha") || cleaned.includes("control")) {
-        return KNOWLEDGE_BASE.rcc;
-    }
-    if (cleaned.includes("excelencia") || cleaned.includes("tarjeta") || cleaned.includes("propuesta") || cleaned.includes("sugerencia")) {
-        return KNOWLEDGE_BASE.excelencia;
-    }
-    if (cleaned.includes("5s") || cleaned.includes("orden") || cleaned.includes("limpieza") || cleaned.includes("seiri")) {
-        return KNOWLEDGE_BASE["5s"];
-    }
-    if (cleaned.includes("seguridad") || cleaned.includes("epp") || cleaned.includes("proteccion") || cleaned.includes("accident")) {
-        return KNOWLEDGE_BASE.seguridad;
-    }
-    if (cleaned.includes("desperdicio") || cleaned.includes("parada") || cleaned.includes("paro") || cleaned.includes("motivo")) {
-        return KNOWLEDGE_BASE.desperdicios;
-    }
-    if (cleaned.includes("permiso") || cleaned.includes("acceso") || cleaned.includes("ingresar") || cleaned.includes("usuario")) {
-        return KNOWLEDGE_BASE.permisos;
-    }
-    if (cleaned.includes("error") || cleaned.includes("falla") || cleaned.includes("no guarda") || cleaned.includes("guardar")) {
-        return KNOWLEDGE_BASE.error;
-    }
-
-    return "No estoy seguro de haber entendido tu consulta. Puedo ayudarte con información sobre:\n\n* **Control de Piso**\n* **Calidad**\n* **Hora a Hora** (rendimiento, desperdicios)\n* **OPT** (observaciones de conducta)\n* **Fichas RRC**\n* **Tarjetas Excelencia**\n* **Las 5S y Seguridad**\n* **Permisos o errores del sistema**\n\n¿Podrías reformular tu pregunta o seleccionar uno de los botones rápidos de sugerencia?";
-}
-
 interface Message {
-    sender: "bot" | "user";
+    sender: "user" | "bot";
     text: string;
     timestamp: Date;
 }
@@ -153,13 +109,12 @@ export default function AsistenciaPage() {
     const [messages, setMessages] = useState<Message[]>([
         {
             sender: "bot",
-            text: "¡Hola! Soy tu **Asistente de Manufactura Firplak**. ¿En qué puedo colaborar hoy? Puedes consultarme sobre el funcionamiento de cualquier módulo de la aplicación o reglas de la planta.",
+            text: KNOWLEDGE_BASE.hola,
             timestamp: new Date()
         }
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isTyping, setIsTyping] = useState(false);
-    
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -170,28 +125,37 @@ export default function AsistenciaPage() {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    const handleSendMessage = (textToSend: string) => {
-        if (!textToSend.trim()) return;
+    const handleSendMessage = (text: string) => {
+        if (!text.trim()) return;
 
-        // Add user message
-        const userMsg: Message = {
+        const newMsg: Message = {
             sender: "user",
-            text: textToSend,
+            text: text,
             timestamp: new Date()
         };
-        setMessages(prev => [...prev, userMsg]);
+
+        setMessages(prev => [...prev, newMsg]);
         setInputValue("");
         setIsTyping(true);
 
-        // Simulate typing delay
+        // Process response with simulated delay
         setTimeout(() => {
-            const responseText = getBotResponse(textToSend);
-            const botMsg: Message = {
+            let response = "Disculpa, no logré entender la consulta sobre manufactura. Intenta preguntar sobre: **Control de Piso**, **OPT**, **Hora a Hora**, **Calidad**, **5S** o **Seguridad**.";
+            
+            const cleanText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            for (const key of Object.keys(KNOWLEDGE_BASE)) {
+                if (cleanText.includes(key)) {
+                    response = KNOWLEDGE_BASE[key];
+                    break;
+                }
+            }
+
+            setMessages(prev => [...prev, {
                 sender: "bot",
-                text: responseText,
+                text: response,
                 timestamp: new Date()
-            };
-            setMessages(prev => [...prev, botMsg]);
+            }]);
             setIsTyping(false);
         }, 800);
     };
@@ -213,7 +177,6 @@ export default function AsistenciaPage() {
 
     // Helper to render markdown-like text nicely
     const renderMessageText = (text: string) => {
-        // Very basic markdown parser to handle bold **text** and bullet points * item
         const lines = text.split("\n");
         return lines.map((line, idx) => {
             let processed = line;
@@ -247,9 +210,9 @@ export default function AsistenciaPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col justify-between font-sans text-[#000000]">
             {/* Header */}
-            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
+            <header className="w-full bg-[#324354] text-white shadow-md p-4 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <Link href="/home">
                         <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
@@ -257,7 +220,7 @@ export default function AsistenciaPage() {
                             <span className="hidden sm:inline font-bold">Volver al Home</span>
                         </Button>
                     </Link>
-                    <h1 className="font-bold text-lg md:text-xl uppercase tracking-wider text-center flex-1">
+                    <h1 className="font-display font-light text-lg md:text-xl uppercase tracking-widest text-center flex-1">
                         Centro de Asistencia Firplak
                     </h1>
                     <div className="flex flex-col items-end">
@@ -268,11 +231,11 @@ export default function AsistenciaPage() {
             </header>
 
             {/* Split Content */}
-            <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                 
                 {/* Left side: Application glossary */}
                 <div className="lg:col-span-6 flex flex-col space-y-4">
-                    <div className="flex items-center gap-2 text-[#254153]">
+                    <div className="flex items-center gap-2 text-[#324354]">
                         <BookOpen size={20} />
                         <h2 className="text-xl font-bold">Glosario de Aplicaciones</h2>
                     </div>
@@ -281,7 +244,7 @@ export default function AsistenciaPage() {
                         {APP_SUMMARIES.map(app => {
                             const IconComponent = app.icon;
                             return (
-                                <Card key={app.id} className={`shadow-sm border-l-4 ${app.color} hover:shadow-md transition duration-200`}>
+                                <Card key={app.id} className={`shadow-sm border-l-4 ${app.color} hover:shadow-md transition duration-200 bg-white border-[#e2ded5]`}>
                                     <CardHeader className="py-3 px-4">
                                         <div className="flex items-center gap-2">
                                             <IconComponent size={20} />
@@ -292,12 +255,12 @@ export default function AsistenciaPage() {
                                         <p className="text-sm text-slate-500 leading-relaxed">
                                             {app.description}
                                         </p>
-                                        <div className="bg-slate-100/50 p-2.5 rounded-lg border border-slate-200/50">
+                                        <div className="bg-[#F6F3EE] p-2.5 rounded-lg border border-[#e2ded5]">
                                             <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Recomendación clave:</span>
                                             <ul className="space-y-1">
                                                 {app.tips.map((tip, idx) => (
                                                     <li key={idx} className="text-xs text-slate-600 flex items-start gap-1">
-                                                        <span className="text-[#254153] font-bold">&bull;</span>
+                                                        <span className="text-[#324354] font-bold">&bull;</span>
                                                         <span>{tip}</span>
                                                     </li>
                                                 ))}
@@ -311,15 +274,15 @@ export default function AsistenciaPage() {
                 </div>
 
                 {/* Right side: Chatbot */}
-                <div className="lg:col-span-6 flex flex-col h-[calc(100vh-170px)] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="lg:col-span-6 flex flex-col h-[calc(100vh-170px)] bg-white rounded-2xl border border-[#e2ded5] shadow-sm overflow-hidden">
                     {/* Chat Header */}
-                    <div className="bg-[#254153]/5 border-b border-slate-200 p-4 flex items-center justify-between">
+                    <div className="bg-[#324354]/5 border-b border-[#e2ded5] p-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-[#254153] flex items-center justify-center text-white">
+                            <div className="w-10 h-10 rounded-full bg-[#324354] flex items-center justify-center text-white">
                                 <Bot size={22} className="animate-pulse" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-[#254153] text-sm">Asistente Virtual de Manufactura</h3>
+                                <h3 className="font-bold text-[#324354] text-sm">Asistente Virtual de Manufactura</h3>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                                     <span className="text-[10px] text-slate-500 font-semibold">En línea (Soporte Planta)</span>
@@ -330,7 +293,7 @@ export default function AsistenciaPage() {
                     </div>
 
                     {/* Message Area */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F6F3EE]/30">
                         {messages.map((msg, index) => (
                             <div 
                                 key={index} 
@@ -339,13 +302,13 @@ export default function AsistenciaPage() {
                                 }`}
                             >
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-xs ${
-                                    msg.sender === "user" ? "bg-[#749094]" : "bg-[#254153]"
+                                    msg.sender === "user" ? "bg-[#7B8E90]" : "bg-[#324354]"
                                 }`}>
                                     {msg.sender === "user" ? <User size={14} /> : <Bot size={14} />}
                                 </div>
                                 <div className={`p-3 rounded-2xl text-sm shadow-sm ${
                                     msg.sender === "user" 
-                                        ? "bg-[#254153] text-white rounded-tr-none" 
+                                        ? "bg-[#324354] text-white rounded-tr-none" 
                                         : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
                                 }`}>
                                     {renderMessageText(msg.text)}
@@ -359,7 +322,7 @@ export default function AsistenciaPage() {
                         ))}
                         {isTyping && (
                             <div className="flex items-start gap-2.5 max-w-[85%]">
-                                <div className="w-8 h-8 rounded-full bg-[#254153] flex items-center justify-center text-white">
+                                <div className="w-8 h-8 rounded-full bg-[#324354] flex items-center justify-center text-white">
                                     <Bot size={14} />
                                 </div>
                                 <div className="bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1">
@@ -378,7 +341,7 @@ export default function AsistenciaPage() {
                             <button
                                 key={idx}
                                 onClick={() => handleSendMessage(s)}
-                                className="text-xs px-3 py-1.5 bg-slate-100 text-[#254153] border border-slate-200 rounded-full hover:bg-[#254153] hover:text-white transition duration-200 font-medium"
+                                className="text-xs px-3 py-1.5 bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] rounded-full hover:bg-[#324354] hover:text-white transition duration-200 font-medium"
                             >
                                 {s}
                             </button>
@@ -386,18 +349,18 @@ export default function AsistenciaPage() {
                     </div>
 
                     {/* Chat Input */}
-                    <div className="p-4 border-t border-slate-200 bg-white flex items-center gap-2">
+                    <div className="p-4 border-t border-[#e2ded5] bg-white flex items-center gap-2">
                         <Input
                             type="text"
                             placeholder="Haz una pregunta sobre el entorno de Manufactura..."
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            className="flex-1 bg-slate-50 border-slate-200 focus-visible:ring-[#254153] rounded-xl h-11"
+                            className="flex-1 bg-[#F6F3EE]/30 border-[#e2ded5] focus-visible:ring-[#324354] rounded-xl h-11"
                         />
                         <Button 
                             onClick={() => handleSendMessage(inputValue)}
-                            className="bg-[#254153] hover:bg-[#1c3241] text-white w-11 h-11 p-0 rounded-xl flex items-center justify-center shadow-md transition"
+                            className="bg-[#324354] hover:bg-[#283643] text-white w-11 h-11 p-0 rounded-xl flex items-center justify-center shadow-md transition"
                         >
                             <Send size={18} />
                         </Button>
@@ -410,7 +373,7 @@ export default function AsistenciaPage() {
             <div className="fixed bottom-6 right-6 z-50">
                 <Link
                     href="/home"
-                    className="w-14 h-14 bg-[#254153] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                    className="w-14 h-14 bg-[#324354] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
                 >
                     <Home size={28} />
                 </Link>
