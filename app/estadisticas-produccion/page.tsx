@@ -595,19 +595,19 @@ export default function EstadisticasSistemaProduccion() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="min-h-screen bg-[#F6F3EE] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#254153]"></div>
-                    <p className="text-slate-600 font-medium">Cargando estadísticas del sistema...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#324354]"></div>
+                    <p className="text-slate-600 font-medium font-sans">Cargando estadísticas del sistema...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
             {/* Header */}
-            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
+            <header className="w-full bg-[#324354] text-white shadow-md p-4 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <Link href="/home">
                         <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
@@ -615,8 +615,8 @@ export default function EstadisticasSistemaProduccion() {
                             <span className="hidden sm:inline font-bold">Volver a Producción</span>
                         </Button>
                     </Link>
-                    <h1 className="font-bold text-lg md:text-xl uppercase tracking-wider">
-                        Estadísticas Sistema de Producción
+                    <h1 className="font-display font-light text-lg md:text-xl uppercase tracking-widest">
+                        Estadísticas del Sistema
                     </h1>
                     <div className="flex flex-col items-end">
                         <div className="font-bold text-xl tracking-wider leading-none">FIRPLAK</div>
@@ -632,10 +632,10 @@ export default function EstadisticasSistemaProduccion() {
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
                     <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
                         <div className="flex items-center gap-2">
-                            <Filter size={18} className="text-[#254153]" />
-                            <h2 className="font-bold text-[#254153]">Filtros Generales</h2>
+                            <Filter size={18} className="text-[#324354]" />
+                            <h2 className="font-bold text-[#324354]">Filtros Generales</h2>
                             {activeFiltersCount > 0 && (
-                                <Badge className="bg-[#254153] text-white ml-2">
+                                <Badge className="bg-[#324354] text-white ml-2">
                                     {activeFiltersCount} activo{activeFiltersCount > 1 ? "s" : ""}
                                 </Badge>
                             )}
@@ -729,19 +729,19 @@ export default function EstadisticasSistemaProduccion() {
                 {/* Tabs */}
                 <Tabs defaultValue="general" className="w-full space-y-6">
                     <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto bg-slate-200/60 p-1 rounded-xl gap-1">
-                        <TabsTrigger value="general" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#254153] data-[state=active]:text-white text-xs sm:text-sm">
+                        <TabsTrigger value="general" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#324354] data-[state=active]:text-white text-xs sm:text-sm">
                             Unificada
                         </TabsTrigger>
-                        <TabsTrigger value="horahora" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#254153] data-[state=active]:text-white text-xs sm:text-sm">
+                        <TabsTrigger value="horahora" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#324354] data-[state=active]:text-white text-xs sm:text-sm">
                             Hora Hora
                         </TabsTrigger>
-                        <TabsTrigger value="opt_operativa" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#254153] data-[state=active]:text-white text-xs sm:text-sm">
+                        <TabsTrigger value="opt_operativa" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#324354] data-[state=active]:text-white text-xs sm:text-sm">
                             OPT Operativa
                         </TabsTrigger>
-                        <TabsTrigger value="opt_sistemica" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#254153] data-[state=active]:text-white text-xs sm:text-sm">
+                        <TabsTrigger value="opt_sistemica" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#324354] data-[state=active]:text-white text-xs sm:text-sm">
                             OPT Sistémica
                         </TabsTrigger>
-                        <TabsTrigger value="hdt" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#254153] data-[state=active]:text-white text-xs sm:text-sm">
+                        <TabsTrigger value="hdt" className="rounded-lg font-bold py-2.5 data-[state=active]:bg-[#324354] data-[state=active]:text-white text-xs sm:text-sm">
                             HDT
                         </TabsTrigger>
                     </TabsList>
@@ -750,7 +750,7 @@ export default function EstadisticasSistemaProduccion() {
                     <TabsContent value="general" className="space-y-6 animate-in fade-in duration-300">
                         {/* KPIs */}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                            <Card className="shadow-sm border-l-4 border-l-[#254153]">
+                            <Card className="shadow-sm border-l-4 border-l-[#324354]">
                                 <CardContent className="p-4 flex flex-col justify-center">
                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Evaluaciones Totales</span>
                                     <span className="text-3xl font-black text-slate-700 mt-1">{kpis.totalEvaluaciones}</span>
@@ -795,7 +795,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Comparativa por planta */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Distribución de Registros por Planta</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Distribución de Registros por Planta</CardTitle>
                                     <CardDescription>Cantidad de herramientas registradas en secciones</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80">
@@ -809,8 +809,8 @@ export default function EstadisticasSistemaProduccion() {
                                                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
                                                 <Legend iconSize={12} iconType="circle" />
-                                                <Bar dataKey="Hora a Hora" fill="#254153" radius={[4, 4, 0, 0]} />
-                                                <Bar dataKey="OPT Operativa" fill="#749094" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="Hora a Hora" fill="#324354" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="OPT Operativa" fill="#7B8E90" radius={[4, 4, 0, 0]} />
                                                 <Bar dataKey="HDT" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                             </BarChart>
                                         </ResponsiveContainer>
@@ -821,7 +821,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Tendencia cruzada */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Tendencia Histórica Comparativa</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Tendencia Histórica Comparativa</CardTitle>
                                     <CardDescription>Rendimiento (HH) vs Conducta (OPT Op) vs Cumplimiento (OPT Sis)</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80">
@@ -835,7 +835,7 @@ export default function EstadisticasSistemaProduccion() {
                                                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} domain={[0, 100]} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
                                                 <Legend iconSize={12} iconType="circle" />
-                                                <Line type="monotone" dataKey="Rendimiento (Hora a Hora)" stroke="#254153" strokeWidth={3} activeDot={{ r: 6 }} connectNulls />
+                                                <Line type="monotone" dataKey="Rendimiento (Hora a Hora)" stroke="#324354" strokeWidth={3} activeDot={{ r: 6 }} connectNulls />
                                                 <Line type="monotone" dataKey="Calificación (OPT Operativa)" stroke="#10b981" strokeWidth={3} activeDot={{ r: 6 }} connectNulls />
                                                 <Line type="monotone" dataKey="Cumplimiento (OPT Sistémica)" stroke="#a855f7" strokeWidth={3} activeDot={{ r: 6 }} connectNulls />
                                             </LineChart>
@@ -850,7 +850,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Gráfica por Persona */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Desempeño de Registros por Persona (Top 10)</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Desempeño de Registros por Persona (Top 10)</CardTitle>
                                     <CardDescription>Cantidad acumulada de registros por supervisor/auditor</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-[450px]">
@@ -864,8 +864,8 @@ export default function EstadisticasSistemaProduccion() {
                                                 <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} width={150} interval={0} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
                                                 <Legend iconSize={12} iconType="circle" />
-                                                <Bar dataKey="Hora a Hora" stackId="a" fill="#254153" />
-                                                <Bar dataKey="OPT Operativa" stackId="a" fill="#749094" />
+                                                <Bar dataKey="Hora a Hora" stackId="a" fill="#324354" />
+                                                <Bar dataKey="OPT Operativa" stackId="a" fill="#7B8E90" />
                                                 <Bar dataKey="OPT Sistémica" stackId="a" fill="#a855f7" />
                                                 <Bar dataKey="HDT" stackId="a" fill="#3b82f6" />
                                             </BarChart>
@@ -877,7 +877,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Desempeño Promedio por Planta */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Rendimiento y Calidad Promedio por Planta</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Rendimiento y Calidad Promedio por Planta</CardTitle>
                                     <CardDescription>Comparativa agregada de desempeño y calidad de procesos</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-[450px]">
@@ -891,7 +891,7 @@ export default function EstadisticasSistemaProduccion() {
                                                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} domain={[0, 100]} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
                                                 <Legend iconSize={12} iconType="circle" />
-                                                <Bar dataKey="Rendimiento Prom. HH (%)" fill="#254153" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="Rendimiento Prom. HH (%)" fill="#324354" radius={[4, 4, 0, 0]} />
                                                 <Bar dataKey="Calidad Prom. HH (%)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                                 <Bar dataKey="Calificación Prom. OPT (%)" fill="#10b981" radius={[4, 4, 0, 0]} />
                                             </BarChart>
@@ -905,7 +905,7 @@ export default function EstadisticasSistemaProduccion() {
                     <TabsContent value="horahora" className="space-y-6 animate-in fade-in duration-300">
                         {/* KPIs específicos de Hora a Hora */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Card className="shadow-sm border-l-4 border-l-[#254153]">
+                            <Card className="shadow-sm border-l-4 border-l-[#324354]">
                                 <CardContent className="p-4 flex flex-col justify-center">
                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Auditorías Hora a Hora</span>
                                     <span className="text-3xl font-black text-slate-700 mt-1">{kpis.totalHH}</span>
@@ -933,7 +933,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Distribución Estado Global */}
                             <Card className="shadow-sm border border-slate-200 lg:col-span-1">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Estado Global Evaluaciones</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Estado Global Evaluaciones</CardTitle>
                                     <CardDescription>Distribución de estados (Semáforo)</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-64 flex flex-col items-center justify-center">
@@ -954,7 +954,7 @@ export default function EstadisticasSistemaProduccion() {
                                                             dataKey="value"
                                                         >
                                                             {hhEstadoData.map((entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={estadoColors[entry.name] || '#64748b'} />
+                                                                 <Cell key={`cell-${index}`} fill={estadoColors[entry.name] || '#64748b'} />
                                                             ))}
                                                         </Pie>
                                                         <Tooltip />
@@ -977,7 +977,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Top Desperdicios */}
                             <Card className="shadow-sm border border-slate-200 lg:col-span-2">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Principales Motivos de Desperdicios</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Principales Motivos de Desperdicios</CardTitle>
                                     <CardDescription>Incidencias más reportadas</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-64">
@@ -990,7 +990,7 @@ export default function EstadisticasSistemaProduccion() {
                                                 <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} />
                                                 <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} width={100} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
-                                                <Bar dataKey="value" fill="#749094" radius={[0, 4, 4, 0]} barSize={20} />
+                                                <Bar dataKey="value" fill="#7B8E90" radius={[0, 4, 4, 0]} barSize={20} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     )}
@@ -1002,7 +1002,7 @@ export default function EstadisticasSistemaProduccion() {
                         {/* Evolución Temporal de Hora a Hora */}
                         <Card className="shadow-sm border border-slate-200">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-lg font-bold text-[#254153]">Evolución del Rendimiento y Calidad</CardTitle>
+                                <CardTitle className="text-lg font-bold text-[#324354]">Evolución del Rendimiento y Calidad</CardTitle>
                                 <CardDescription>Histórico detallado de las evaluaciones en planta</CardDescription>
                             </CardHeader>
                             <CardContent className="h-80">
@@ -1020,8 +1020,8 @@ export default function EstadisticasSistemaProduccion() {
                                         >
                                             <defs>
                                                 <linearGradient id="colorRend" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#254153" stopOpacity={0.4}/>
-                                                    <stop offset="95%" stopColor="#254153" stopOpacity={0}/>
+                                                    <stop offset="5%" stopColor="#324354" stopOpacity={0.4}/>
+                                                    <stop offset="95%" stopColor="#324354" stopOpacity={0}/>
                                                 </linearGradient>
                                                 <linearGradient id="colorCal" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
@@ -1033,7 +1033,7 @@ export default function EstadisticasSistemaProduccion() {
                                             <YAxis stroke="#64748b" fontSize={11} tickLine={false} domain={[0, 100]} />
                                             <Tooltip contentStyle={{ borderRadius: '8px' }} />
                                             <Legend iconSize={12} iconType="circle" />
-                                            <Area type="monotone" dataKey="Rendimiento" stroke="#254153" strokeWidth={2} fillOpacity={1} fill="url(#colorRend)" />
+                                            <Area type="monotone" dataKey="Rendimiento" stroke="#324354" strokeWidth={2} fillOpacity={1} fill="url(#colorRend)" />
                                             <Area type="monotone" dataKey="Calidad" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCal)" />
                                         </AreaChart>
                                     </ResponsiveContainer>
@@ -1046,7 +1046,7 @@ export default function EstadisticasSistemaProduccion() {
                     <TabsContent value="opt_operativa" className="space-y-6 animate-in fade-in duration-300">
                         {/* KPIs específicos de OPT Operativa */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <Card className="shadow-sm border-l-4 border-l-[#254153]">
+                            <Card className="shadow-sm border-l-4 border-l-[#324354]">
                                 <CardContent className="p-4 flex flex-col justify-center">
                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Evaluaciones OPT Op.</span>
                                     <span className="text-3xl font-black text-slate-700 mt-1">{kpis.totalOPT}</span>
@@ -1080,7 +1080,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Radar de Cumplimiento de Parámetros */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Cumplimiento por Parámetro (Auditoría Conducta)</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Cumplimiento por Parámetro (Auditoría Conducta)</CardTitle>
                                     <CardDescription>Tasa de aprobación (%) por elemento evaluado</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80 flex items-center justify-center">
@@ -1092,7 +1092,7 @@ export default function EstadisticasSistemaProduccion() {
                                                 <PolarGrid stroke="#e2e8f0" />
                                                 <PolarAngleAxis dataKey="subject" stroke="#64748b" fontSize={10} />
                                                 <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#cbd5e1" fontSize={8} />
-                                                <Radar name="Aprobación %" dataKey="A" stroke="#254153" fill="#254153" fillOpacity={0.3} />
+                                                <Radar name="Aprobación %" dataKey="A" stroke="#324354" fill="#324354" fillOpacity={0.3} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
                                             </RadarChart>
                                         </ResponsiveContainer>
@@ -1103,7 +1103,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Promedio Calificación por Planta */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Puntaje OPT Promedio por Sección</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Puntaje OPT Promedio por Sección</CardTitle>
                                     <CardDescription>Comportamientos seguros promedio por planta</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80">
@@ -1130,7 +1130,7 @@ export default function EstadisticasSistemaProduccion() {
                                                 <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
                                                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} domain={[0, 100]} />
                                                 <Tooltip contentStyle={{ borderRadius: '8px' }} />
-                                                <Bar dataKey="Puntaje" fill="#749094" radius={[4, 4, 0, 0]} barSize={40}>
+                                                <Bar dataKey="Puntaje" fill="#7B8E90" radius={[4, 4, 0, 0]} barSize={40}>
                                                     {filteredOPT.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                     ))}
@@ -1147,7 +1147,7 @@ export default function EstadisticasSistemaProduccion() {
                     <TabsContent value="opt_sistemica" className="space-y-6 animate-in fade-in duration-300">
                         {/* KPIs específicos de OPT Sistémica */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Card className="shadow-sm border-l-4 border-l-[#254153]">
+                            <Card className="shadow-sm border-l-4 border-l-[#324354]">
                                 <CardContent className="p-4 flex flex-col justify-center">
                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Auditorías Realizadas (OPT Sistémica)</span>
                                     <span className="text-3xl font-black text-slate-700 mt-1">{kpis.totalOPTSist}</span>
@@ -1167,7 +1167,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Cumplimiento Promedio por Módulo */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Cumplimiento por Módulo</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Cumplimiento por Módulo</CardTitle>
                                     <CardDescription>Porcentaje promedio de cumplimiento en cada módulo evaluado</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80">
@@ -1194,7 +1194,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Distribución de Evaluaciones por Módulo */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Auditorías por Módulo (Cantidad)</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Auditorías por Módulo (Cantidad)</CardTitle>
                                     <CardDescription>Distribución del volumen de evaluaciones</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80">
@@ -1220,7 +1220,7 @@ export default function EstadisticasSistemaProduccion() {
                     <TabsContent value="hdt" className="space-y-6 animate-in fade-in duration-300">
                         {/* KPIs específicos de HDT */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Card className="shadow-sm border-l-4 border-l-[#254153]">
+                            <Card className="shadow-sm border-l-4 border-l-[#324354]">
                                 <CardContent className="p-4 flex flex-col justify-center">
                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Hojas de División de Trabajo (HDTs)</span>
                                     <span className="text-3xl font-black text-slate-700 mt-1">{kpis.totalHDT}</span>
@@ -1242,7 +1242,7 @@ export default function EstadisticasSistemaProduccion() {
                             {/* Cantidad de HDTs por Planta (Requerimiento de usuario) */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Cantidad de HDT por Planta</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Cantidad de HDT por Planta</CardTitle>
                                     <CardDescription>Cantidad de estándares de trabajo elaborados por sección</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80">
@@ -1265,11 +1265,11 @@ export default function EstadisticasSistemaProduccion() {
                                     )}
                                 </CardContent>
                             </Card>
-
+                            
                             {/* Top Creadores / Autores de HDT */}
                             <Card className="shadow-sm border border-slate-200">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg font-bold text-[#254153]">Top Elaboradores de HDT</CardTitle>
+                                    <CardTitle className="text-lg font-bold text-[#324354]">Top Elaboradores de HDT</CardTitle>
                                     <CardDescription>Supervisores y analistas líderes en estandarización</CardDescription>
                                 </CardHeader>
                                 <CardContent className="h-80">
@@ -1298,7 +1298,7 @@ export default function EstadisticasSistemaProduccion() {
             <div className="fixed bottom-6 right-6 z-50">
                 <Link
                     href="/home"
-                    className="w-14 h-14 bg-[#254153] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                    className="w-14 h-14 bg-[#324354] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
                     title="Volver al Menú Principal"
                 >
                     <Home size={28} />

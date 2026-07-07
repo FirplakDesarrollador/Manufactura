@@ -42,9 +42,9 @@ export default function IndicadoresProductividadPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col justify-between font-sans text-[#000000]">
             {/* Header */}
-            <header className="w-full bg-[#254153] text-white shadow-md p-4">
+            <header className="w-full bg-[#324354] text-white shadow-md p-4">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <Link href="/home">
                         <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 text-white font-bold text-sm transition">
@@ -52,7 +52,7 @@ export default function IndicadoresProductividadPage() {
                             <span>Volver al Home</span>
                         </button>
                     </Link>
-                    <h1 className="font-bold text-lg md:text-xl uppercase tracking-wider text-center">
+                    <h1 className="font-display font-light text-lg md:text-xl uppercase tracking-widest text-center">
                         Indicadores de Productividad
                     </h1>
                     <div className="flex flex-col items-end">
@@ -63,13 +63,13 @@ export default function IndicadoresProductividadPage() {
             </header>
 
             {/* Sub-Header Actions */}
-            <div className="w-full bg-white border-b border-slate-200 py-3 px-4 shadow-sm">
+            <div className="w-full bg-white border-b border-[#e2ded5] py-3 px-4 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-4">
                     <button
                         onClick={() => setViewMode("bi")}
                         className={`flex items-center gap-2 px-5 py-2.5 font-bold rounded-xl transition duration-200 ${
                             viewMode === "bi"
-                                ? "bg-[#254153] text-white shadow-md"
+                                ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
@@ -80,7 +80,7 @@ export default function IndicadoresProductividadPage() {
                         onClick={() => setViewMode("manual")}
                         className={`flex items-center gap-2 px-5 py-2.5 font-bold rounded-xl transition duration-200 ${
                             viewMode === "manual"
-                                ? "bg-[#254153] text-white shadow-md"
+                                ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
@@ -93,7 +93,7 @@ export default function IndicadoresProductividadPage() {
             {/* Main Area */}
             <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 pb-20">
                 {viewMode === "bi" ? (
-                    <div className="w-full h-[650px] bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="w-full h-[650px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
                         <iframe
                             title="Tablero BI Productividad"
                             width="100%"
@@ -108,7 +108,7 @@ export default function IndicadoresProductividadPage() {
                     <div className="space-y-8 animate-in fade-in duration-300">
                         {/* Title & Instructions */}
                         <div className="text-center max-w-2xl mx-auto space-y-2">
-                            <h2 className="text-2xl font-extrabold text-[#254153]">Resumen Manual de Productividad</h2>
+                            <h2 className="text-2xl font-extrabold text-[#324354]">Resumen Manual de Productividad</h2>
                             <p className="text-sm text-slate-500 font-medium">
                                 Haz clic sobre cualquier número para editar el valor manualmente. Los colores de las tarjetas se actualizarán de forma automática según las metas establecidas.
                             </p>
@@ -132,7 +132,7 @@ export default function IndicadoresProductividadPage() {
                                                     onChange={(e) => setNivelServicio(parseFloat(e.target.value) || 0)}
                                                     onBlur={() => setEditingCard(null)}
                                                     autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#254153] focus:outline-none w-32 py-1"
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
                                                 />
                                                 <span className="text-4xl font-extrabold text-slate-950">%</span>
                                             </div>
@@ -167,7 +167,7 @@ export default function IndicadoresProductividadPage() {
                                                     onChange={(e) => setProductividadPct(parseFloat(e.target.value) || 0)}
                                                     onBlur={() => setEditingCard(null)}
                                                     autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#254153] focus:outline-none w-32 py-1"
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
                                                 />
                                                 <span className="text-4xl font-extrabold text-slate-950">%</span>
                                             </div>
@@ -200,7 +200,7 @@ export default function IndicadoresProductividadPage() {
                                                 onChange={(e) => setProductividadPz(parseInt(e.target.value) || 0)}
                                                 onBlur={() => setEditingCard(null)}
                                                 autoFocus
-                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#254153] focus:outline-none w-36 py-1"
+                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-1"
                                             />
                                         ) : (
                                             <span 
@@ -231,7 +231,7 @@ export default function IndicadoresProductividadPage() {
                                                 onChange={(e) => setProductividadKg(parseInt(e.target.value) || 0)}
                                                 onBlur={() => setEditingCard(null)}
                                                 autoFocus
-                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#254153] focus:outline-none w-36 py-1"
+                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-1"
                                             />
                                         ) : (
                                             <span 
@@ -267,7 +267,7 @@ export default function IndicadoresProductividadPage() {
                                                     onChange={(e) => setCalidad(parseFloat(e.target.value) || 0)}
                                                     onBlur={() => setEditingCard(null)}
                                                     autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#254153] focus:outline-none w-32 py-1"
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
                                                 />
                                                 <span className="text-4xl font-extrabold text-slate-950">%</span>
                                             </div>
@@ -302,7 +302,7 @@ export default function IndicadoresProductividadPage() {
                                                     onChange={(e) => setPresentismo(parseFloat(e.target.value) || 0)}
                                                     onBlur={() => setEditingCard(null)}
                                                     autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#254153] focus:outline-none w-32 py-1"
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
                                                 />
                                                 <span className="text-4xl font-extrabold text-slate-950">%</span>
                                             </div>
@@ -335,7 +335,7 @@ export default function IndicadoresProductividadPage() {
                                                 onChange={(e) => setAccidentes(parseInt(e.target.value) || 0)}
                                                 onBlur={() => setEditingCard(null)}
                                                 autoFocus
-                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#254153] focus:outline-none w-32 py-1"
+                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
                                             />
                                         ) : (
                                             <span 
@@ -357,7 +357,7 @@ export default function IndicadoresProductividadPage() {
             </main>
 
             {/* Footer */}
-            <footer className="py-6 text-center text-gray-400 text-sm border-t border-slate-100 bg-white">
+            <footer className="py-6 text-center text-gray-400 text-sm border-t border-[#e2ded5] bg-white">
                 &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
             </footer>
         </div>

@@ -11,9 +11,9 @@ type HdtRow = Database['public']['Tables']['hdts']['Row']
 export default function HdtPlantsPage() {
     return (
         <Suspense fallback={
-            <div className="flex flex-col items-center justify-center min-h-screen space-y-4" style={{ backgroundColor: '#f8fafc' }}>
-                <Loader2 className="h-12 w-12 animate-spin" style={{ color: 'var(--brand-primary)' }} />
-                <p className="font-medium" style={{ color: '#6b7280' }}>Cargando plantas...</p>
+            <div className="flex flex-col items-center justify-center min-h-screen space-y-4 bg-[#F6F3EE]">
+                <Loader2 className="h-12 w-12 animate-spin text-[#324354]" />
+                <p className="font-medium text-slate-500 font-sans">Cargando plantas...</p>
             </div>
         }>
             <PlantsContent />
@@ -72,16 +72,13 @@ function PlantsContent() {
     }, [router])
 
     return (
-        <div className="min-h-screen flex flex-col font-sans" style={{ backgroundColor: '#f8fafc', color: '#18181b' }}>
+        <div className="min-h-screen flex flex-col font-sans bg-[#F6F3EE] text-[#000000]">
             {/* Dark Header */}
-            <header className="p-4 flex items-center shadow-md relative z-10" style={{ backgroundColor: 'var(--brand-primary)' }}>
+            <header className="p-4 flex items-center shadow-md relative z-10 bg-[#324354]">
                 <div className="flex items-center gap-1">
                     <button
                         onClick={() => router.push('/hdt')}
-                        className="p-2 rounded-full transition-colors"
-                        style={{ color: 'white' }}
-                        onMouseOver={e => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)')}
-                        onMouseOut={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        className="p-2 rounded-full transition-colors hover:bg-white/10 text-white"
                         title="Volver"
                     >
                         <ArrowLeft className="h-6 w-6" />
@@ -95,43 +92,43 @@ function PlantsContent() {
 
             <main className="flex-1 max-w-5xl mx-auto w-full p-6 sm:p-12">
                 <div className="space-y-8">
-                    <div className="flex items-center gap-3 pb-6" style={{ borderBottom: '1px solid #e4e4e7' }}>
-                        <div className="p-3 rounded-2xl" style={{ backgroundColor: 'rgba(27,65,84,0.10)' }}>
-                            <Factory className="h-8 w-8" style={{ color: 'var(--brand-primary)' }} />
+                    <div className="flex items-center gap-3 pb-6 border-b border-[#e2ded5]">
+                        <div className="p-3 rounded-2xl bg-[#324354]/10">
+                            <Factory className="h-8 w-8 text-[#324354]" />
                         </div>
                         <div>
-                            <h2 className="text-3xl font-bold" style={{ color: 'var(--brand-primary)' }}>Plantas disponibles</h2>
-                            <p className="font-medium" style={{ color: '#6b7280' }}>Selecciona una planta para ver su listado de HDTs</p>
+                            <h2 className="text-3xl font-bold text-[#324354]">Plantas disponibles</h2>
+                            <p className="font-medium text-slate-500">Selecciona una planta para ver su listado de HDTs</p>
                         </div>
                     </div>
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                            <Loader2 className="h-12 w-12 animate-spin" style={{ color: 'var(--brand-primary)' }} />
-                            <p className="font-medium animate-pulse" style={{ color: '#6b7280' }}>Consultando base de datos...</p>
+                            <Loader2 className="h-12 w-12 animate-spin text-[#324354]" />
+                            <p className="font-medium animate-pulse text-slate-500">Consultando base de datos...</p>
                         </div>
                     ) : error ? (
-                        <div className="rounded-3xl p-8 flex flex-col items-center text-center space-y-4" style={{ backgroundColor: '#fef2f2', border: '1px solid #fee2e2' }}>
-                            <AlertCircle className="h-12 w-12" style={{ color: '#ef4444' }} />
-                            <p className="text-lg font-medium" style={{ color: '#991b1b' }}>{error}</p>
-                            <button onClick={() => window.location.reload()} className="px-6 py-2 rounded-xl font-bold text-white" style={{ backgroundColor: '#dc2626' }}>Reintentar</button>
+                        <div className="rounded-3xl p-8 flex flex-col items-center text-center space-y-4 bg-red-50 border border-red-200">
+                            <AlertCircle className="h-12 w-12 text-red-500" />
+                            <p className="text-lg font-medium text-red-700">{error}</p>
+                            <button onClick={() => window.location.reload()} className="px-6 py-2 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700">Reintentar</button>
                         </div>
                     ) : plants.length === 0 ? (
                         <div className="space-y-6">
-                            <div className="border-2 border-dashed rounded-3xl p-16 flex flex-col items-center text-center space-y-6 bg-white" style={{ borderColor: '#e4e4e7' }}>
-                                <div className="p-5 rounded-full" style={{ backgroundColor: '#fffbeb' }}>
-                                    <LayoutGrid className="h-12 w-12" style={{ color: '#f59e0b' }} />
+                            <div className="border-2 border-dashed rounded-3xl p-16 flex flex-col items-center text-center space-y-6 bg-white border-[#e2ded5]">
+                                <div className="p-5 rounded-full bg-amber-50">
+                                    <LayoutGrid className="h-12 w-12 text-amber-500" />
                                 </div>
-                                <p className="text-xl font-bold" style={{ color: '#6b7280' }}>No se encontraron plantas disponibles.</p>
-                                <p className="font-medium max-w-md" style={{ color: '#9ca3af' }}>
+                                <p className="text-xl font-bold text-slate-600">No se encontraron plantas disponibles.</p>
+                                <p className="font-medium max-w-md text-slate-400">
                                     {totalCount === 0
                                         ? 'La base de datos respondió correctamente, pero la tabla está vacía (0 registros detectados).'
                                         : `Se encontraron ${totalCount} registros, pero no logramos identificar el nombre de la planta.`}
                                 </p>
                             </div>
-                            <div className="rounded-2xl p-6" style={{ backgroundColor: 'rgba(244,244,245,0.5)', border: '1px solid #e4e4e7' }}>
-                                <h3 className="text-sm font-bold uppercase tracking-widest mb-4" style={{ color: '#9ca3af' }}>Detalles técnicos</h3>
-                                <pre className="text-[10px] sm:text-xs font-mono p-4 rounded-xl overflow-x-auto" style={{ backgroundColor: '#18181b', color: '#4ade80' }}>
+                            <div className="rounded-2xl p-6 bg-slate-50 border border-slate-200">
+                                <h3 className="text-sm font-bold uppercase tracking-widest mb-4 text-slate-400">Detalles técnicos</h3>
+                                <pre className="text-[10px] sm:text-xs font-mono p-4 rounded-xl overflow-x-auto bg-slate-900 text-emerald-400">
                                     {JSON.stringify(debugInfo, null, 2)}
                                 </pre>
                             </div>
@@ -142,28 +139,17 @@ function PlantsContent() {
                                 <button
                                     key={planta}
                                     onClick={() => router.push(`/hdt/list?planta=${encodeURIComponent(planta)}&action=${action}`)}
-                                    className="group bg-white p-8 rounded-3xl flex items-center justify-between transition-all duration-300 text-left"
-                                    style={{ border: '2px solid rgba(27,65,84,0.05)', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
-                                    onMouseOver={e => {
-                                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-primary)'
-                                        ;(e.currentTarget as HTMLElement).style.backgroundColor = '#f8fafc'
-                                        ;(e.currentTarget as HTMLElement).style.boxShadow = '0 20px 40px -15px rgba(27,65,84,0.15)'
-                                    }}
-                                    onMouseOut={e => {
-                                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(27,65,84,0.05)'
-                                        ;(e.currentTarget as HTMLElement).style.backgroundColor = 'white'
-                                        ;(e.currentTarget as HTMLElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'
-                                    }}
+                                    className="group bg-white p-8 rounded-3xl flex items-center justify-between transition-all duration-300 text-left border border-[#e2ded5] hover:border-[#324354] hover:bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)]"
                                 >
                                     <div className="flex items-center gap-5">
-                                        <div className="h-14 w-14 rounded-2xl flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: 'rgba(27,65,84,0.05)' }}>
-                                            <Factory className="h-7 w-7" style={{ color: 'var(--brand-primary)' }} />
+                                        <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-slate-50 transition-colors duration-300 group-hover:bg-[#324354]/10">
+                                            <Factory className="h-7 w-7 text-[#324354]" />
                                         </div>
-                                        <span className="text-xl font-bold capitalize transition-transform duration-300" style={{ color: 'var(--brand-primary)' }}>
+                                        <span className="text-xl font-bold capitalize text-[#324354]">
                                             {planta.toLowerCase()}
                                         </span>
                                     </div>
-                                    <ChevronRight className="h-6 w-6" style={{ color: '#d4d4d8' }} />
+                                    <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-[#324354] transition-colors" />
                                 </button>
                             ))}
                         </div>
@@ -171,8 +157,8 @@ function PlantsContent() {
                 </div>
             </main>
 
-            <footer className="p-8 text-center bg-transparent">
-                <p className="text-xs font-bold tracking-[0.2em] uppercase" style={{ color: '#9ca3af' }}>
+            <footer className="p-8 text-center border-t border-[#e2ded5]">
+                <p className="text-xs font-bold tracking-[0.2em] uppercase text-slate-400">
                     Firplak S.A. | Planta de Producción
                 </p>
             </footer>
