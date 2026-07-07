@@ -213,7 +213,7 @@ export default function SistemaProduccionPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
                                 </svg>
                             </div>
-                            <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#254153] transition-colors duration-300 text-center">Estadísticas Sistema</span>
+                            <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#254153] transition-colors duration-300 text-center">Estadísticas del Sistema</span>
                         </button>
                     )}
 
