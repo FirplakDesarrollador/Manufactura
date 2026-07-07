@@ -126,15 +126,6 @@ export default function SistemaProduccionPage() {
             {/* Main Content */}
             <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-12 lg:p-16">
                 
-                <div className="text-center mb-12 sm:mb-16">
-                    <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-800 tracking-tight mb-3">
-                        ¿Qué deseas consultar hoy?
-                    </h2>
-                    <p className="text-gray-500 font-medium max-w-xl mx-auto">
-                        Selecciona una de las herramientas a continuación para acceder a la gestión y métricas del sistema.
-                    </p>
-                </div>
-
                 <div className="w-full max-w-[1600px] flex flex-wrap justify-center gap-6 md:gap-8">
                     
                     {/* HDT Button */}
@@ -151,8 +142,9 @@ export default function SistemaProduccionPage() {
                                 </svg>
                             </div>
                             <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#254153] transition-colors duration-300 text-center leading-tight">
-                                HDT Hoja División de Trabajo
-                                <span className="text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">Estandarizacion</span>
+                                HDT
+                                <span className="block text-base font-bold text-gray-600 group-hover:text-[#254153] mt-1 transition-colors duration-300">Hoja División de Trabajo</span>
+                                <span className="block text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 mt-1 transition-colors duration-300">Estandarización</span>
                             </span>
                         </button>
                     )}
