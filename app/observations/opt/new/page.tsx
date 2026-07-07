@@ -5,6 +5,8 @@ import Link from 'next/link'
 import BackButton from './BackButton'
 import { ArrowLeft } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function NewOPTForm() {
     const externalSupabase = createExternalClient()
 
