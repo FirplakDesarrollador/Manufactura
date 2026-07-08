@@ -94,24 +94,29 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const totalPulido = filteredOrdenes.reduce((acc, o) => acc + (o.pulido || 0) + (o.desgelcada || 0), 0)
     const totalSaldo = filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0)
 
-    const countAcabado = registrosGlobales.filter(r =>
+    // Filter registrosGlobales to only include those belonging to the filtered orders
+    const validOrderIds = new Set(filteredOrdenes.map(o => o.orden_fabricacion))
+    const filteredRegistrosGlobales = registrosGlobales.filter(r => validOrderIds.has(r.orden_fabricacion))
+
+    const countAcabado = filteredRegistrosGlobales.filter(r =>
         ['Pulido', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || '') &&
         (r.pintura_fecha && new Date(r.pintura_fecha).toLocaleDateString('es-ES') === todayStr)
     ).length
 
     const today = new Date().toISOString().split('T')[0]
     
-    // Global Totals (Dashboard paridad)
-    const totalDigitado = registrosGlobales.filter(r => r.estado === 'Digitado').length
-    const totalTransito = registrosGlobales.filter(r => r.estado === 'Transito').length
-    const countCediHoy = registrosGlobales.filter(r => 
+    // Global Totals (Dashboard paridad - matching the order cards exactly)
+    const totalDigitado = filteredOrdenes.reduce((acc, o) => acc + (o.digitado || 0), 0)
+    const totalTransito = filteredOrdenes.reduce((acc, o) => acc + (o.transito || 0), 0)
+    
+    const countCediHoy = filteredRegistrosGlobales.filter(r => 
         r.estado === 'Cedi' && 
         (r.cedi_fecha || '').split('T')[0] === today
     ).length
 
     // Kilogramos: Current Transito + Cedi Today (Matches reference app logic)
-    const transitoRecords = registrosGlobales.filter(r => r.estado === 'Transito')
-    const cediTodayRecords = registrosGlobales.filter(r => r.estado === 'Cedi' && (r.cedi_fecha || '').split('T')[0] === today)
+    const transitoRecords = filteredRegistrosGlobales.filter(r => r.estado === 'Transito')
+    const cediTodayRecords = filteredRegistrosGlobales.filter(r => r.estado === 'Cedi' && (r.cedi_fecha || '').split('T')[0] === today)
     
     const totalKilogramos = [...transitoRecords, ...cediTodayRecords]
         .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)

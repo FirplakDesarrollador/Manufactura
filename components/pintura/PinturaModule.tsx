@@ -195,6 +195,9 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         const totalKilos = [...transitoTotal, ...cediToday]
             .reduce((acc, t) => acc + (Number(t.kilos_vaciados) || 0), 0)
 
+        // Derive transito from filtered orders so it respects the search filter exactly
+        const transitoFiltered = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.transito || 0), 0)
+
         return {
             cantidad: totalCantidad,
             programado: totalProgramado,
@@ -204,7 +207,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             acabado: acabadoToday.length,
             saldo: baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.saldo || 0), 0),
             digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
-            transito: transitoTotal.length,
+            transito: transitoFiltered,
             cedi: cediToday.length,
             kilogramos: parseFloat(totalKilos.toFixed(1))
         }
