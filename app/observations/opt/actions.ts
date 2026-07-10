@@ -24,7 +24,7 @@ export async function createOPTObservation(formData: FormData) {
     const va_count = parseInt(formData.get('va_count') as string || '0')
     const nva_count = parseInt(formData.get('nva_count') as string || '0')
     const observaciones_va_nva = formData.get('observaciones_va_nva') as string
-    const archivo = formData.get('archivo') as File
+    const archivo_url = formData.get('archivo_url') as string || null
     const realizadoPor = formData.get('realizadoPor') as string
 
     // Potentially upload file to Supabase storage if a bucket is configured
@@ -122,48 +122,67 @@ export async function createOPTObservation(formData: FormData) {
     score += scoreVANVA;
     // ==========================================
 
-    const { error } = await supabase
+    const insertData: any = {
+        'ID': nextId,
+        'Título': titulo,
+        'Planta': planta,
+        'Operario': operario,
+        'Puesto': puesto,
+        'Etiquetas': etiquetas,
+        'Elementos de seguridad': elementos_seguridad,
+        'Puesto con ergonomía': puesto_ergonomia,
+        'Puesto ordenado y aseado': puesto_ordenado,
+        'Cumple HDT': cumple_hdt,
+        'Cumple puesta a punto / plan de control': cumple_puesta_punto,
+        'Observaciones de ergonomía': observaciones_ergonomia,
+        'Cumple 5S': cumple_5s,
+        'Observaciones orden y aseo': observaciones_orden_aseo,
+        'Observaciones 5S': observaciones_5s,
+        'Observaciones herramientas': observaciones_herramientas,
+        'Observaciones indicadores': observaciones_indicadores,
+        'Observaciones producto conforme': observaciones_producto_conforme,
+        'Observaciones plan control': observaciones_plan_control,
+        'Observaciones seguridad': observaciones_seguridad,
+        'Observaciones HDT': observaciones_hdt,
+        'Observaciones defectos calidad': observaciones_defectos,
+        'Producto conforme': producto_conforme,
+        'Herramientas en buen estado': herramientas_estado,
+        'Operario conoce los defectos de calidad': conoce_defectos,
+        'Operario conoce sus indicadores': conoce_indicadores,
+        'Observación lejana / cercana': observacion_tipo,
+        'Emociones': emociones,
+        'VA': va_count.toString(),
+        'NVA': nva_count.toString(),
+        'Observaciones VA/NVA': observaciones_va_nva,
+        'Created': user?.email,
+        'Modified': user?.email,
+        'Create_at': new Date().toISOString(),
+        'Created By': realizadoPor || user?.email || null,
+        'Calificación': score
+    }
+
+    if (archivo_url) {
+        insertData['archivo'] = archivo_url
+    }
+
+    let { error } = await supabase
         .from('OPT')
-        .insert([
-            {
-                'ID': nextId,
-                'Título': titulo,
-                'Planta': planta,
-                'Operario': operario,
-                'Puesto': puesto,
-                'Etiquetas': etiquetas,
-                'Elementos de seguridad': elementos_seguridad,
-                'Puesto con ergonomía': puesto_ergonomia,
-                'Puesto ordenado y aseado': puesto_ordenado,
-                'Cumple HDT': cumple_hdt,
-                'Cumple puesta a punto / plan de control': cumple_puesta_punto,
-                'Observaciones de ergonomía': observaciones_ergonomia,
-                'Cumple 5S': cumple_5s,
-                'Observaciones orden y aseo': observaciones_orden_aseo,
-                'Observaciones 5S': observaciones_5s,
-                'Observaciones herramientas': observaciones_herramientas,
-                'Observaciones indicadores': observaciones_indicadores,
-                'Observaciones producto conforme': observaciones_producto_conforme,
-                'Observaciones plan control': observaciones_plan_control,
-                'Observaciones seguridad': observaciones_seguridad,
-                'Observaciones HDT': observaciones_hdt,
-                'Observaciones defectos calidad': observaciones_defectos,
-                'Producto conforme': producto_conforme,
-                'Herramientas en buen estado': herramientas_estado,
-                'Operario conoce los defectos de calidad': conoce_defectos,
-                'Operario conoce sus indicadores': conoce_indicadores,
-                'Observación lejana / cercana': observacion_tipo,
-                'Emociones': emociones,
-                'VA': va_count.toString(),
-                'NVA': nva_count.toString(),
-                'Observaciones VA/NVA': observaciones_va_nva,
-                'Created': user?.email,
-                'Modified': user?.email,
-                'Create_at': new Date().toISOString(),
-                'Created By': realizadoPor || user?.email || null,
-                'Calificación': score
-            }
-        ])
+        .insert([insertData])
+
+    let columnMissing = false
+
+    if (error && archivo_url && (error.code === '42703' || error.message?.includes('archivo') || error.message?.includes('column'))) {
+        console.warn('La columna "archivo" no existe en la tabla OPT. Reintentando sin asociar la imagen...')
+        const { archivo, ...insertDataWithoutFile } = insertData
+        const { error: retryError } = await supabase
+            .from('OPT')
+            .insert([insertDataWithoutFile])
+        
+        error = retryError
+        if (!error) {
+            columnMissing = true
+        }
+    }
 
     if (error) {
         console.error('Error inserting OPT:', error)
@@ -172,6 +191,7 @@ export async function createOPTObservation(formData: FormData) {
 
     return { 
         success: true, 
+        columnMissing,
         scoreData: {
             total: score,
             basicData: scoreBasicData,

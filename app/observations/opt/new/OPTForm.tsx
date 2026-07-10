@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { Home, ChevronDown, Save, Info, Paperclip, Camera, X, AlertTriangle } from 'lucide-react'
 import { createOPTObservation } from '../actions'
+import { supabase } from '@/lib/supabase'
 import { SearchableSelect } from '@/components/opt/ui/SearchableSelect'
 import { ScoreModal, ScoreData } from '@/components/opt/ui/ScoreModal'
 
@@ -105,6 +106,99 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
         setter(checked)
     }
 
+    const compressImage = (file: File): Promise<File> => {
+        return new Promise((resolve, reject) => {
+            if (!file.type.startsWith('image/')) {
+                return resolve(file)
+            }
+
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+            reader.onload = (event) => {
+                const img = new Image()
+                img.src = event.target?.result as string
+                img.onload = () => {
+                    const canvas = document.createElement('canvas')
+                    let width = img.width
+                    let height = img.height
+
+                    const MAX_WIDTH = 1600
+                    const MAX_HEIGHT = 1600
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height = Math.round((height * MAX_WIDTH) / width)
+                            width = MAX_WIDTH
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width = Math.round((width * MAX_HEIGHT) / height)
+                            height = MAX_HEIGHT
+                        }
+                    }
+
+                    canvas.width = width
+                    canvas.height = height
+
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) {
+                        return resolve(file)
+                    }
+
+                    ctx.drawImage(img, 0, 0, width, height)
+
+                    canvas.toBlob(
+                        (blob) => {
+                            if (!blob) {
+                                return resolve(file)
+                            }
+                            // Force filename to have .jpg extension since we output jpeg format
+                            let newName = file.name
+                            if (!newName.toLowerCase().endsWith('.jpg') && !newName.toLowerCase().endsWith('.jpeg')) {
+                                const baseName = newName.substring(0, newName.lastIndexOf('.')) || newName
+                                newName = `${baseName}.jpg`
+                            }
+                            const compressedFile = new File([blob], newName, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            })
+                            resolve(compressedFile)
+                        },
+                        'image/jpeg',
+                        0.75
+                    )
+                }
+                img.onerror = (err) => reject(err)
+            }
+            reader.onerror = (err) => reject(err)
+        })
+    }
+
+    const uploadImageToSupabase = async (file: File) => {
+        let fileToUpload = file
+        
+        try {
+            if (file.type.startsWith('image/')) {
+                fileToUpload = await compressImage(file)
+            }
+        } catch (compressionError) {
+            console.error('Error compressing image, uploading original file instead:', compressionError)
+        }
+
+        const fileExt = fileToUpload.name.split('.').pop() || 'jpg'
+        const fileName = `opt-attachments/opt-${Date.now()}.${fileExt}`
+        const { error: uploadError } = await supabase.storage
+            .from('fichas-media')
+            .upload(fileName, fileToUpload)
+
+        if (uploadError) {
+            throw new Error(`Error al subir el archivo: ${uploadError.message}`)
+        }
+
+        const { data } = supabase.storage.from('fichas-media').getPublicUrl(fileName)
+        return data.publicUrl
+    }
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setErrorMessage(null)
@@ -114,7 +208,6 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
             for (const elem of Array.from(form.elements) as any[]) {
                 if (!elem.validity.valid) {
                     const name = elem.name || elem.id || 'un campo';
-                    // Convert names like observaciones_seguridad to Observaciones seguridad
                     const friendlyName = name.replace(/_/g, ' ');
                     setErrorMessage(`Falta completar el campo obligatorio: ${friendlyName}. \n\nRecuerde que si marca "No", las observaciones son obligatorias.`);
                     elem.focus();
@@ -127,11 +220,28 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
 
         setIsSubmitting(true)
         try {
+            let fileUrl = null
+            if (selectedFile) {
+                setErrorMessage("Subiendo archivo adjunto / foto...")
+                fileUrl = await uploadImageToSupabase(selectedFile)
+                setErrorMessage(null)
+            }
+
             const formData = new FormData(e.currentTarget)
+            formData.delete('archivo')
+
+            if (fileUrl) {
+                formData.set('archivo_url', fileUrl)
+            }
+
             const result = await createOPTObservation(formData)
             if (result && result.success && result.scoreData) {
-                setScoreData(result.scoreData as ScoreData)
-                setIsModalOpen(true)
+                if (result.columnMissing) {
+                    setErrorMessage("¡OPT guardada con éxito!\n\nNota: La foto/archivo adjunto no se pudo asociar porque falta la columna 'archivo' en la tabla 'OPT' en Supabase. Contacta al administrador para que la cree.")
+                } else {
+                    setScoreData(result.scoreData as ScoreData)
+                    setIsModalOpen(true)
+                }
             } else if (result && !result.success) {
                 setErrorMessage(`Error de la Base de Datos: ${result.error || 'Desconocido'}`)
                 window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -861,10 +971,11 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                         <div className="flex justify-center mt-12 mb-20">
                             <button
                                 type="submit"
-                                className="p-4 rounded-xl text-[#254153] border-2 border-[#254153] hover:bg-gray-50 active:scale-95 transition-all shadow-md group"
+                                disabled={isSubmitting}
+                                className={`p-4 rounded-xl text-[#254153] border-2 border-[#254153] transition-all shadow-md group ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 active:scale-95'}`}
                                 title="Guardar OPT"
                             >
-                                <Save size={100} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
+                                <Save size={100} strokeWidth={1.5} className={isSubmitting ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'} />
                             </button>
                         </div>
                     )}

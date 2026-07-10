@@ -3,7 +3,7 @@ import { createExternalClient } from '@/lib/supabase/external'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Home, ChevronLeft } from 'lucide-react'
+import { Home, ChevronLeft, Paperclip, ExternalLink } from 'lucide-react'
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -175,17 +175,46 @@ export default async function OPTDetailPage({ params }: PageProps) {
 
                                     // Special Handling: Datos Adjuntos
                                     if (key === 'Datos Adjuntos') {
+                                        const fileUrl = observation.archivo;
+                                        const isImage = typeof fileUrl === 'string' && /\.(jpeg|jpg|gif|png|webp|svg)($|\?)/i.test(fileUrl);
+                                        
                                         return (
                                             <tr key={key} className="hover:bg-gray-50/50 transition-colors">
-                                                <th className="px-6 py-3 bg-gray-50/50 text-xs font-bold uppercase text-gray-400 w-1/3 border-r border-gray-100">
+                                                <th className="px-6 py-3 bg-gray-50/50 text-xs font-bold uppercase text-gray-400 w-1/3 border-r border-gray-100 align-top">
                                                     Datos Adjuntos
                                                 </th>
-                                                <td className="px-6 py-3 text-sm text-primary">
-                                                    {observation.archivo ? (
-                                                        <span className="flex items-center gap-2 group">
-                                                            <span className="w-1.5 h-1.5 bg-secondary rounded-full animate-pulse" />
-                                                            {observation.archivo}
-                                                        </span>
+                                                <td className="px-6 py-3 text-sm">
+                                                    {fileUrl ? (
+                                                        isImage ? (
+                                                            <div className="space-y-2">
+                                                                <div className="w-48 h-48 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 shadow-sm relative group">
+                                                                    <img 
+                                                                        src={fileUrl} 
+                                                                        alt="Archivo adjunto" 
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                    <a 
+                                                                        href={fileUrl} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer"
+                                                                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-2 font-medium text-xs cursor-pointer"
+                                                                    >
+                                                                        <ExternalLink size={16} /> Ver original
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <a 
+                                                                href={fileUrl} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 text-primary transition-colors font-medium text-xs shadow-sm cursor-pointer"
+                                                            >
+                                                                <Paperclip size={14} className="text-secondary" />
+                                                                <span>Abrir archivo adjunto</span>
+                                                                <ExternalLink size={12} className="text-gray-400" />
+                                                            </a>
+                                                        )
                                                     ) : (
                                                         <span className="text-gray-300 italic">No hay nada adjunto.</span>
                                                     )}
