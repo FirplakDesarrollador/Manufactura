@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Home, ChevronLeft, Paperclip, ExternalLink } from 'lucide-react'
+import PageContainer from '@/components/layout/PageContainer'
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -126,7 +127,7 @@ export default async function OPTDetailPage({ params }: PageProps) {
                 </div>
             </header>
 
-            <main className="flex flex-col p-4 sm:p-6 text-primary max-w-4xl mx-auto w-full">
+            <PageContainer as="main" hasHeader={false} hasFooter={false} className="p-4 sm:p-6 text-primary max-w-4xl mx-auto w-full">
                 {/* Quick View Table Section */}
                 <section className="mb-10 w-full overflow-hidden border-2 border-primary rounded-xl shadow-lg bg-white font-sans text-black">
                 <div className="bg-primary text-white px-6 py-4 flex justify-between items-center relative">
@@ -284,7 +285,7 @@ export default async function OPTDetailPage({ params }: PageProps) {
                         </table>
                     </div>
                 </section>
-            </main>
+            </PageContainer>
         </div>
     )
 }

@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Save, Play, Square, Pause, AlertCircle } from "lucide-react";
+import PageContainer from "@/components/layout/PageContainer";
 
 // Wizard Steps
 import BasicInfoStep from "@/components/wizard/BasicInfoStep";
@@ -94,8 +95,13 @@ export default function NuevaEvaluacion() {
             </div>
 
             {/* Main Content Area */}
-            <main className="flex-1 w-full max-w-5xl p-4 sm:p-6 pb-40">
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <PageContainer
+                as="main"
+                hasHeader={false}
+                hasFooter={currentStep > 0}
+                className="w-full max-w-5xl p-4 sm:p-6"
+            >
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
                     {currentStep === 0 && <BasicInfoStep onNext={handleNext} />}
                     {currentStep === 1 && <CycleTimeStep />}
                     {currentStep === 2 && <QualityStep />}
@@ -104,7 +110,7 @@ export default function NuevaEvaluacion() {
                     {currentStep === 5 && <SignatureStep />}
                     {currentStep === 6 && <SummaryStep />}
                 </div>
-            </main>
+            </PageContainer>
 
             {/* Bottom Action Bar for mobile / tablet friendliness */}
             {currentStep > 0 && (
