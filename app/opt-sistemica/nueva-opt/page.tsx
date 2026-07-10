@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
-import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 
 const subModules = [
   { id: '5s', name: "5'S", icon: '⭐', description: 'Evaluación y seguimiento de los estándares de las 5S.' },
@@ -49,14 +49,14 @@ export default function NuevaOptPage() {
   if (!hasReadPrinciples) {
     return (
       <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-        <header className="header" style={{ padding: '12px 0' }}>
-          <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <FirplakLogo height={35} color="white" />
-            <button onClick={() => router.push('/opt-sistemica')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-              Salir
-            </button>
-          </div>
-        </header>
+        <Header
+          title="OPT Sistémica"
+          subtitle="Principios"
+          backUrl="/opt-sistemica"
+          userEmail={session.user.email}
+          showLogout={true}
+          onLogout={() => router.push('/opt-sistemica')}
+        />
 
         <main className="container" style={{ paddingTop: '40px', paddingBottom: '60px' }}>
           <div className="animate-fade-in card" style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
@@ -127,29 +127,17 @@ export default function NuevaOptPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
       {/* Header */}
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={35} color="white" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.8)' }}>{session.user.email}</span>
-            <button 
-              onClick={() => router.push('/opt-sistemica')}
-              style={{ 
-                background: 'rgba(255, 255, 255, 0.1)', 
-                color: 'white', 
-                border: 'none', 
-                padding: '8px 16px', 
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: 600
-              }}
-            >
-              Volver al Inicio
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header
+        title="Nueva OPT"
+        subtitle="Registro Sistémico"
+        backUrl="/opt-sistemica"
+        userEmail={session.user.email}
+        showLogout={true}
+        onLogout={async () => {
+          await supabase.auth.signOut();
+          router.push('/login');
+        }}
+      />
 
       {/* Main Content */}
       <main className="container" style={{ paddingTop: '40px' }}>
