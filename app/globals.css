@@ -81,6 +81,10 @@
   --sidebar-accent-foreground: #324354;
   --sidebar-border: #e2ded5;
   --sidebar-ring: #324354;
+
+  /* Layout Custom Variables */
+  --header-height: 80px;
+  --footer-height: 80px;
 }
 
 .dark {

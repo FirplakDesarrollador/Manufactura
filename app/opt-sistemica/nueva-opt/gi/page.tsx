@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 // import { supabaseFPK } from '@/lib/opt-sistemica/supabase-fpk'; // No longer needed
+import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 
 const questions = [
@@ -226,23 +227,21 @@ export default function GIPage() {
         </div>
       )}
 
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={40} color="white" />
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button 
-              onClick={() => setShowGuide(true)} 
-              className="btn-primary" 
-              style={{ background: 'var(--accent)', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 800 }}
-            >
-              📖 Ficha GI
-            </button>
-            <button onClick={() => router.push('/opt-sistemica/nueva-opt')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-              Volver
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header
+        title="Gestión de Indicadores (GI)"
+        subtitle="Nueva OPT Sistémica"
+        backUrl="/opt-sistemica/nueva-opt"
+        userEmail={session.user.email}
+        showLogout={false}
+        actionButton={
+          <button 
+            onClick={() => setShowGuide(true)} 
+            className="px-4 py-2 bg-[#1d1d1b] hover:bg-[#333] border border-white/10 text-white rounded-xl transition font-semibold text-sm whitespace-nowrap shadow-sm hover:shadow-md shrink-0 cursor-pointer flex items-center gap-2"
+          >
+            <span>📖</span> Ficha GI
+          </button>
+        }
+      />
 
       <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">

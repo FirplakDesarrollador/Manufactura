@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
-import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   Cell, PieChart, Pie 
@@ -24,6 +24,7 @@ interface PlanData {
 }
 
 export default function IndicadoresPage() {
+  const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<RecordData[]>([]);
   const [planning, setPlanning] = useState<PlanData[]>([]);
@@ -44,6 +45,7 @@ export default function IndicadoresPage() {
       if (!session) {
         router.push('/login');
       } else {
+        setSession(session);
         fetchData();
       }
     });
@@ -132,14 +134,13 @@ export default function IndicadoresPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--background)' }}>
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={35} color="white" />
-          <button onClick={() => router.push('/opt-sistemica')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-            Volver
-          </button>
-        </div>
-      </header>
+      <Header
+        title="Indicadores"
+        subtitle="Métricas de Desempeño"
+        backUrl="/opt-sistemica"
+        userEmail={session?.user?.email}
+        showLogout={false}
+      />
 
       <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">

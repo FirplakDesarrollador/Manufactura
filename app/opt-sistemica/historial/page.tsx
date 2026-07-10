@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
-import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 
 interface OPTRecord {
   id: string;
@@ -122,14 +122,13 @@ export default function HistorialPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={35} color="white" />
-          <button onClick={() => router.push('/opt-sistemica')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-            Volver
-          </button>
-        </div>
-      </header>
+      <Header
+        title="Historial"
+        subtitle="Consulta de Observaciones"
+        backUrl="/opt-sistemica"
+        userEmail={session.user.email}
+        showLogout={false}
+      />
 
       <main className="container" style={{ paddingTop: '50px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">

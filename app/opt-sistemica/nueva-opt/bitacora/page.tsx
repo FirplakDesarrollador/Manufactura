@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 
 export default function BitacoraPage() {
   const [selection, setSelection] = useState<'MS_FV' | 'MBL_CEFI' | null>(null);
@@ -11,14 +11,12 @@ export default function BitacoraPage() {
   if (!selection) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--background)' }}>
-        <header className="header" style={{ padding: '12px 0' }}>
-          <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <FirplakLogo height={35} color="white" />
-            <button onClick={() => router.push('/opt-sistemica/nueva-opt')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-              Volver
-            </button>
-          </div>
-        </header>
+        <Header
+          title="Bitácora"
+          subtitle="Selección de Bitácora"
+          backUrl="/opt-sistemica/nueva-opt"
+          showLogout={false}
+        />
 
         <main className="container" style={{ 
           display: 'flex', 
@@ -105,14 +103,12 @@ export default function BitacoraPage() {
   // Specific content based on selection
   return (
     <div style={{ minHeight: '100vh', background: 'var(--background)' }}>
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={35} color="white" />
-          <button onClick={() => setSelection(null)} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-            Cambiar Bitácora
-          </button>
-        </div>
-      </header>
+      <Header
+        title="Bitácora"
+        subtitle={selection === 'MS_FV' ? 'Seguimiento MS y FV' : 'Seguimiento MBL y CEFI'}
+        onBack={() => setSelection(null)}
+        showLogout={false}
+      />
       <main className="container" style={{ paddingTop: '60px' }}>
         <div className="animate-fade-in">
           <h1 style={{ color: 'var(--accent)', fontSize: '2.5rem', fontWeight: 700, marginBottom: '20px' }}>

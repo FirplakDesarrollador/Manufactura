@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
+import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 
 export default function HomePage() {
@@ -60,38 +61,13 @@ export default function HomePage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--background)' }}>
       {/* Header */}
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center' 
-        }}>
-          <FirplakLogo height={40} color="white" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.8)' }}>
-              {session.user.email}
-            </span>
-            <button 
-              onClick={handleLogout}
-              style={{ 
-                background: 'rgba(255, 255, 255, 0.1)', 
-                color: 'white', 
-                border: 'none', 
-                padding: '8px 16px', 
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)')}
-              onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
-            >
-              Cerrar Sesión
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header
+        title="OPT Sistémica"
+        subtitle="Dashboard Principal"
+        backUrl="/sistema-produccion"
+        userEmail={session.user.email}
+        onLogout={handleLogout}
+      />
 
       {/* Main Content */}
       <main className="container" style={{ paddingTop: '60px' }}>

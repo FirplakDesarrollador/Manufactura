@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
+import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 
 const questions = [
@@ -261,16 +262,29 @@ export default function EEPage() {
         </div>
       )}
 
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-          <FirplakLogo height={40} color="white" />
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button onClick={() => setActiveGuide('PREPARARSE')} className="btn-primary" style={{ background: 'var(--accent)', fontSize: '0.85rem', padding: '8px 12px' }}>📖 Prepararse</button>
-            <button onClick={() => setActiveGuide('INSTRUIR')} className="btn-primary" style={{ background: 'var(--accent)', fontSize: '0.85rem', padding: '8px 12px' }}>📖 Instruir</button>
-            <button onClick={() => router.push('/opt-sistemica/nueva-opt')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.85rem', padding: '8px 12px' }}>Volver</button>
+      <Header
+        title="Entrenamiento Estandarizado"
+        subtitle="Nueva OPT Sistémica"
+        backUrl="/opt-sistemica/nueva-opt"
+        userEmail={session.user.email}
+        showLogout={false}
+        actionButton={
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setActiveGuide('PREPARARSE')} 
+              className="px-3 py-1.5 bg-[#1d1d1b] hover:bg-[#333] border border-white/10 text-white rounded-xl transition font-semibold text-xs whitespace-nowrap shadow-sm hover:shadow-md cursor-pointer"
+            >
+              📖 Prepararse
+            </button>
+            <button 
+              onClick={() => setActiveGuide('INSTRUIR')} 
+              className="px-3 py-1.5 bg-[#1d1d1b] hover:bg-[#333] border border-white/10 text-white rounded-xl transition font-semibold text-xs whitespace-nowrap shadow-sm hover:shadow-md cursor-pointer"
+            >
+              📖 Instruir
+            </button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">

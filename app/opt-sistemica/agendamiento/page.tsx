@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
-import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Clock, User, Target } from 'lucide-react';
 
 interface Planificacion {
@@ -187,59 +187,37 @@ export default function AgendamientoPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={35} color="white" />
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ 
-              background: 'white', 
-              borderRadius: '12px', 
-              display: 'flex', 
-              padding: '4px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              <button 
-                onClick={() => setViewMode('weekly')}
-                style={{ 
-                  padding: '8px 20px', 
-                  background: viewMode === 'weekly' ? 'var(--primary)' : 'transparent', 
-                  color: viewMode === 'weekly' ? 'white' : 'rgba(255,255,255,0.8)',
-                  borderRadius: '8px', 
-                  border: 'none', 
-                  fontWeight: 700, 
-                  cursor: 'pointer', 
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <List size={16} /> Semana
-              </button>
-              <button 
-                onClick={() => setViewMode('monthly')}
-                style={{ 
-                  padding: '8px 20px', 
-                  background: viewMode === 'monthly' ? 'var(--primary)' : 'transparent', 
-                  color: viewMode === 'monthly' ? 'white' : 'rgba(255,255,255,0.8)',
-                  borderRadius: '8px', 
-                  border: 'none', 
-                  fontWeight: 700, 
-                  cursor: 'pointer', 
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <CalendarIcon size={16} /> Mes
-              </button>
-            </div>
-            <button onClick={() => router.push('/opt-sistemica')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)', height: '40px' }}>Volver</button>
+      <Header
+        title="Agendamiento"
+        subtitle="Planificación de Observaciones"
+        backUrl="/opt-sistemica"
+        userEmail={session?.user?.email}
+        showLogout={false}
+        actionButton={
+          <div style={{ 
+            background: 'rgba(255,255,255,0.08)', 
+            borderRadius: '12px', 
+            display: 'flex', 
+            padding: '4px',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <button 
+              onClick={() => setViewMode('weekly')}
+              className={`px-4 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 cursor-pointer transition-all duration-200 ${viewMode === 'weekly' ? 'bg-[#7B8E90] text-white' : 'text-white/70 hover:text-white'}`}
+              style={{ border: 'none' }}
+            >
+              <List size={14} /> Semana
+            </button>
+            <button 
+              onClick={() => setViewMode('monthly')}
+              className={`px-4 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 cursor-pointer transition-all duration-200 ${viewMode === 'monthly' ? 'bg-[#7B8E90] text-white' : 'text-white/70 hover:text-white'}`}
+              style={{ border: 'none' }}
+            >
+              <CalendarIcon size={14} /> Mes
+            </button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">

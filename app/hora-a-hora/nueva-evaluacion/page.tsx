@@ -94,7 +94,7 @@ export default function NuevaEvaluacion() {
             </div>
 
             {/* Main Content Area */}
-            <main className="flex-1 w-full max-w-5xl p-4 sm:p-6 pb-40">
+            <main className="flex-1 w-full max-w-5xl p-4 sm:p-6">
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {currentStep === 0 && <BasicInfoStep onNext={handleNext} />}
                     {currentStep === 1 && <CycleTimeStep />}
@@ -104,6 +104,8 @@ export default function NuevaEvaluacion() {
                     {currentStep === 5 && <SignatureStep />}
                     {currentStep === 6 && <SummaryStep />}
                 </div>
+                {/* Div espaciador físico para dejar espacio libre entre el contenido y el banner fijo de navegación */}
+                {currentStep > 0 && <div className="h-36 w-full shrink-0" />}
             </main>
 
             {/* Bottom Action Bar for mobile / tablet friendliness */}

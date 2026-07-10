@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
-import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 
 const questions = [
   { id: '6.1', text: "Elija una zona del puesto de trabajo, ¿Puede observarse que en la primera S que no hay elementos innecesarios? ¿en la segunda S todos los elementos estan ordenados?" },
@@ -106,14 +106,13 @@ export default function CincoSPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={40} color="white" />
-          <button onClick={() => router.push('/opt-sistemica/nueva-opt')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-            Volver
-          </button>
-        </div>
-      </header>
+      <Header
+        title="5'S"
+        subtitle="Nueva OPT Sistémica"
+        backUrl="/opt-sistemica/nueva-opt"
+        userEmail={session.user.email}
+        showLogout={false}
+      />
 
       <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">
