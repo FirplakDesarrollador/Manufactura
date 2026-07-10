@@ -227,7 +227,7 @@ export default function OPTForm({ empleados, cargos, realizadoPorList, initialDa
                 setErrorMessage(null)
             }
 
-            const formData = new FormData(e.currentTarget)
+            const formData = new FormData(form)
             formData.delete('archivo')
 
             if (fileUrl) {
