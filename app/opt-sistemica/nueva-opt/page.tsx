@@ -196,7 +196,7 @@ export default function NuevaOptPage() {
                   flexDirection: 'column',
                   padding: '24px'
                 }}
-                onClick={() => router.push(`/nueva-opt/${module.id}`)}
+                onClick={() => router.push(`/opt-sistemica/nueva-opt/${module.id}`)}
                 onMouseOver={(e) => {
                   e.currentTarget.style.transform = 'translateY(-5px)';
                   e.currentTarget.style.borderColor = 'var(--primary)';
