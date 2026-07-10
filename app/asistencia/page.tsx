@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import PageContainer from "@/components/layout/PageContainer";
 import { 
     ArrowLeft, 
     Home, 
@@ -232,12 +231,7 @@ export default function AsistenciaPage() {
             </header>
 
             {/* Split Content */}
-            <PageContainer
-                as="main"
-                hasHeader={false}
-                hasFooter={false}
-                className="relative z-10 w-full max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"
-            >
+            <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                 
                 {/* Left side: Application glossary */}
                 <div className="lg:col-span-6 flex flex-col space-y-4">
@@ -373,7 +367,7 @@ export default function AsistenciaPage() {
                     </div>
                 </div>
 
-            </PageContainer>
+            </main>
 
             {/* Sticky Home Button */}
             <div className="fixed bottom-6 right-6 z-50">

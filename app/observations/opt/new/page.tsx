@@ -4,7 +4,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import BackButton from './BackButton'
 import { ArrowLeft } from 'lucide-react'
-import PageContainer from '@/components/layout/PageContainer'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,9 +30,9 @@ export default async function NewOPTForm() {
         .order('nombreCompleto', { ascending: true })
 
     return (
-        <div className="flex min-h-screen flex-col bg-white text-[#000155]">
+        <main className="flex min-h-screen flex-col bg-white text-[#000155]">
             {/* Header Banner */}
-            <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+            <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
                 <div className="w-32 flex items-center">
                     <Link href="/opt" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" title="Volver al menú OPT">
                         <ArrowLeft className="w-6 h-6" />
@@ -54,10 +53,10 @@ export default async function NewOPTForm() {
             </header>
 
             {/* Form Content */}
-            <PageContainer as="div" hasHeader={false} hasFooter={false} className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6">
                 <OPTForm empleados={empleados} cargos={cargos} realizadoPorList={realizadoPorList} />
-            </PageContainer>
-        </div>
+            </div>
+        </main>
     )
 }
 
