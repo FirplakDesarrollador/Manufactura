@@ -60,10 +60,10 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="home-container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '40px', padding: '40px 20px' }}>
+    <div className="home-container min-h-screen flex flex-col justify-center items-center gap-8 md:gap-10 py-10 px-4 sm:px-6 md:px-8">
       
       {/* Botón Volver a Calidad */}
-      <div style={{ width: '100%', maxWidth: '1100px', display: 'flex', justifyContent: 'flex-start', margin: '0 0 -20px 0' }}>
+      <div className="w-full max-w-[1100px] flex justify-start -mb-4 md:-mb-5">
         <Link href="/calidad" style={{ textDecoration: 'none' }}>
           <button style={{ 
             display: 'flex', 
@@ -87,24 +87,11 @@ export default function LandingPage() {
       </div>
       
       {/* Logo Firplak Estetizado */}
-      <div style={{ 
-        background: 'var(--header-bg)', 
-        padding: '30px 60px', 
-        borderRadius: '25px', 
-        boxShadow: '0 15px 40px rgba(0,0,0,0.15)', 
-        marginBottom: '20px',
-        transition: 'transform 0.3s ease'
-      }}>
+      <div className="bg-[#254153] px-8 py-6 md:px-14 md:py-8 rounded-3xl shadow-[0_15px_40px_rgba(0,0,0,0.15)] mb-4 md:mb-5 transition-transform duration-300 hover:scale-[1.02]">
         <FirplakLogo height="100px" />
       </div>
       
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: `repeat(auto-fit, minmax(280px, 1fr))`, 
-        gap: '30px', 
-        maxWidth: '1100px', 
-        width: '100%' 
-      }}>
+      <div className="w-full max-w-[1100px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-4 md:px-0">
         
         {/* Módulo 1: Nueva Ficha */}
         <Link href="/ficha-rcc/fichas/crear" style={{ textDecoration: 'none' }}>

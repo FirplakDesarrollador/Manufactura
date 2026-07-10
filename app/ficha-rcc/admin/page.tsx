@@ -6,12 +6,7 @@ import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
 import Link from 'next/link';
 
-// Correos autorizados para el módulo de administrador
-const ADMIN_EMAILS = [
-  'coordinacioncalidad@firplak.com', 
-  'estiven.londono@firplak.com', 
-  'estiven.londoño@firplak.com'
-];
+// Eliminamos ADMIN_EMAILS y usaremos la base de datos
 
 export default function AdminPage() {
   const router = useRouter();
@@ -42,9 +37,17 @@ export default function AdminPage() {
       }
       
       const userEmail = session.user.email?.toLowerCase() || '';
-      const adminFound = ADMIN_EMAILS.some(email => email.toLowerCase() === userEmail);
       
-      if (!adminFound) {
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('permisos')
+        .eq('correo', userEmail)
+        .single();
+
+      const permisosFicha = userData?.permisos?.ficha_rcc || {};
+      const hasAccess = permisosFicha === true || permisosFicha?.administrador === true;
+      
+      if (!hasAccess) {
         router.push('/ficha-rcc/');
         return;
       }

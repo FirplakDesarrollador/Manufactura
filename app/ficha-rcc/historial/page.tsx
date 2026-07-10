@@ -131,14 +131,14 @@ export default function HomePage() {
   if (!user) return null;
 
   return (
-    <div className="home-container" style={{ maxWidth: '1200px' }}>
-      <div className="header" style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ background: 'var(--header-bg)', padding: '20px 40px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <FirplakLogo height="70px" />
+    <div className="home-container w-full max-w-[1200px] mx-auto px-4 sm:px-6 md:px-8 py-6">
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-6 mb-8">
+        <div className="flex items-center">
+          <div className="bg-[#254153] px-8 py-5 rounded-2xl shadow-lg transition-transform hover:scale-105">
+            <FirplakLogo height="60px" />
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '16px' }}>
+        <div className="flex flex-wrap justify-center gap-3 lg:gap-4 w-full lg:w-auto">
           <Link href="/home" style={{ textDecoration: 'none' }}>
             <button className="btn-secondary">
                Volver al Menú
@@ -202,32 +202,28 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="glass-panel" style={{ marginBottom: '32px', padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-          <h2 style={{ fontSize: '20px' }}>Historial de Fichas</h2>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input 
-                type="text" 
-                placeholder="Buscar por defecto o responsable..." 
-                className="input-field" 
-                style={{ width: '280px', marginBottom: 0, padding: '10px' }}
-                value={busquedaDefecto}
-                onChange={(e) => setBusquedaDefecto(e.target.value)}
-              />
-              <select 
-                className="input-field" 
-                style={{ width: '220px', marginBottom: 0, padding: '10px' }}
-                value={filtroPlanta}
-                onChange={(e) => setFiltroPlanta(e.target.value as any)}
-              >
-                <option value="Todas">Todas las Plantas</option>
-                <option value="Mármol Sintético">Mármol Sintético</option>
-                <option value="Fibra de vidrio">Fibra de vidrio</option>
-                <option value="Muebles">Muebles</option>
-                <option value="Cefi">Cefi</option>
-              </select>
-            </div>
+      <div className="glass-panel mb-8 p-4 md:p-6 rounded-2xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <h2 className="text-xl font-semibold m-0">Historial de Fichas</h2>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <input 
+              type="text" 
+              placeholder="Buscar por defecto o responsable..." 
+              className="input-field w-full sm:w-[280px] !mb-0 p-2.5" 
+              value={busquedaDefecto}
+              onChange={(e) => setBusquedaDefecto(e.target.value)}
+            />
+            <select 
+              className="input-field w-full sm:w-[220px] !mb-0 p-2.5" 
+              value={filtroPlanta}
+              onChange={(e) => setFiltroPlanta(e.target.value as any)}
+            >
+              <option value="Todas">Todas las Plantas</option>
+              <option value="Mármol Sintético">Mármol Sintético</option>
+              <option value="Fibra de vidrio">Fibra de vidrio</option>
+              <option value="Muebles">Muebles</option>
+              <option value="Cefi">Cefi</option>
+            </select>
           </div>
         </div>
 
@@ -240,8 +236,8 @@ export default function HomePage() {
             No se encontraron fichas de alerta.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+            <table className="w-full min-w-[850px] border-collapse text-left">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                   <th style={{ padding: '12px' }}># Ficha</th>

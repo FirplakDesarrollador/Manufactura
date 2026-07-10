@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
 import Link from 'next/link';
-import { isAuthorized } from '@/lib/ficha-rcc/auth';
+// Importación de auth eliminada
 import { FichaAlerta, Accion } from '@/types';
 import Combobox from '@/components/ficha-rcc/Combobox';
 import { PLANTAS_LIST } from '@/lib/ficha-rcc/constants';
@@ -33,7 +33,18 @@ export default function ContingenciasPage() {
         return;
       }
 
-      if (!isAuthorized(session.user.email)) {
+      const userEmail = session.user.email?.toLowerCase() || '';
+      
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('permisos')
+        .eq('correo', userEmail)
+        .single();
+
+      const permisosFicha = userData?.permisos?.ficha_rcc || {};
+      const hasAccess = permisosFicha === true || permisosFicha?.contingencias === true;
+
+      if (!hasAccess) {
         router.push('/ficha-rcc/');
         return;
       }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
 import Link from 'next/link';
-import { isAuthorized } from '@/lib/ficha-rcc/auth';
+// Importación de auth eliminada
 import Combobox from '@/components/ficha-rcc/Combobox';
 
 type AsistenciaEstado = 'Presente' | 'Ausente' | 'Permiso' | 'Incapacidad' | 'No Convocado';
@@ -32,7 +32,23 @@ export default function AsistenciaPage() {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session || !isAuthorized(session.user.email)) {
+      if (!session) {
+        router.push('/ficha-rcc/');
+        return;
+      }
+      
+      const userEmail = session.user.email?.toLowerCase() || '';
+      
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('permisos')
+        .eq('correo', userEmail)
+        .single();
+
+      const permisosFicha = userData?.permisos?.ficha_rcc || {};
+      const hasAccess = permisosFicha === true || permisosFicha?.asistencia === true;
+
+      if (!hasAccess) {
         router.push('/ficha-rcc/');
         return;
       }
