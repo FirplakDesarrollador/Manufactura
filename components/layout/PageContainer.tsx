@@ -23,32 +23,26 @@ export default function PageContainer({
 }: PageContainerProps) {
     const Component = as;
 
-    const containerStyle: React.CSSProperties = {
-        // Variables locales para el cálculo dinámico en cascada
-        "--header-height": hasHeader ? headerHeight : "0px",
-        "--footer-height": hasFooter ? footerHeight : "0px",
+    const inlineStyle: React.CSSProperties = {
+        // Redefinimos las variables CSS para que las clases CSS utilitarias las usen si son provistas
+        ...(hasHeader ? { "--header-height": headerHeight } : {}),
+        ...(hasFooter ? { "--footer-height": footerHeight } : {}),
         
-        // Compensaciones de padding considerando Safe Area (notch y barras de sistema de iOS/Android)
-        paddingTop: hasHeader 
-            ? "calc(var(--header-height) + env(safe-area-inset-top, 0px))" 
-            : "env(safe-area-inset-top, 0px)",
-            
-        paddingBottom: hasFooter 
-            ? "calc(var(--footer-height) + env(safe-area-inset-bottom, 16px) + 24px)" 
-            : "calc(env(safe-area-inset-bottom, 16px) + 24px)",
-            
-        // Flexbox layout fluido
+        // Flexbox layout fluido (quitamos flex: 1 1 0% para evitar restricción de scroll)
         display: "flex",
         flexDirection: "column",
-        flex: "1 1 0%",
+        flexGrow: 1,
         width: "100%",
         ...style
     } as React.CSSProperties;
 
+    const headerClass = hasHeader ? "page-container-header" : "page-container-no-header";
+    const footerClass = hasFooter ? "page-container-footer" : "page-container-no-footer";
+
     return (
         <Component 
-            style={containerStyle} 
-            className={`page-container ${className}`}
+            style={inlineStyle} 
+            className={`page-container ${headerClass} ${footerClass} ${className}`}
             {...props}
         >
             {children}

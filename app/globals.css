@@ -132,3 +132,20 @@
     @apply font-sans;
   }
 }
+
+/* PageContainer Utility Classes to resolve fixed/sticky overlaps and override Tailwind shorthand padding */
+.page-container-header {
+  padding-top: calc(var(--header-height, 80px) + env(safe-area-inset-top, 0px)) !important;
+}
+
+.page-container-no-header {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+}
+
+.page-container-footer {
+  padding-bottom: calc(var(--footer-height, 80px) + env(safe-area-inset-bottom, 16px) + 24px) !important;
+}
+
+.page-container-no-footer {
+  padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 24px) !important;
+}
