@@ -22,7 +22,7 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
     calidad: ['ms'],
     hora_a_hora: true,
-    ficha_rcc: true,
+    ficha_rcc: ['acceso_general', 'administrador', 'contingencias', 'asistencia'],
     opt: true,
     configuracion: true,
     tarjetas_excelencia: true,
@@ -120,7 +120,13 @@ export default function UsuariosConfiguracionPage() {
                 updated[modulo] = !updated[modulo];
             } else {
                 // Es un submódulo, aseguramos hacer una copia profunda (clon) del objeto anidado
-                updated[modulo] = { ...(updated[modulo] || {}) };
+                // Si el valor actual era un booleano (migración legacy), lo convertimos asumiendo que significa "acceso_general"
+                const currentVal = updated[modulo];
+                if (typeof currentVal === 'boolean') {
+                    updated[modulo] = { acceso_general: currentVal };
+                } else {
+                    updated[modulo] = { ...(currentVal || {}) };
+                }
                 updated[modulo][subModulo] = !updated[modulo][subModulo];
             }
             return updated;

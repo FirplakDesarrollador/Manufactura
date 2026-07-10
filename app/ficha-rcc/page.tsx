@@ -5,20 +5,13 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
 import Link from 'next/link';
-import { isAuthorized } from '@/lib/ficha-rcc/auth';
-
-// Correos autorizados para el módulo de administrador
-const ADMIN_EMAILS = [
-  'coordinacioncalidad@firplak.com', 
-  'estiven.londono@firplak.com', 
-  'estiven.londoño@firplak.com'
-];
 
 export default function LandingPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isAuthorizedUser, setIsAuthorizedUser] = useState(false);
+  const [isContingenciasAuth, setIsContingenciasAuth] = useState(false);
+  const [isAsistenciaAuth, setIsAsistenciaAuth] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,11 +21,30 @@ export default function LandingPage() {
         router.push('/login');
       } else {
         setUser(session.user);
-        // Verificamos si el usuario es administrador
         const userEmail = session.user.email?.toLowerCase() || '';
-        const adminFound = ADMIN_EMAILS.some(email => email.toLowerCase() === userEmail);
-        setIsAdmin(adminFound);
-        setIsAuthorizedUser(isAuthorized(userEmail));
+        
+        // Consultar los permisos desde la tabla usuarios
+        const { data: userData } = await supabase
+          .from('usuarios')
+          .select('permisos')
+          .eq('correo', userEmail)
+          .single();
+          
+        const permisos = userData?.permisos || {};
+        const fichaPermisos = permisos.ficha_rcc;
+        
+        // Manejar formato nuevo (objeto)
+        if (typeof fichaPermisos === 'object' && fichaPermisos !== null) {
+          setIsAdmin(fichaPermisos.administrador === true);
+          setIsContingenciasAuth(fichaPermisos.contingencias === true);
+          setIsAsistenciaAuth(fichaPermisos.asistencia === true);
+        } else {
+          // Si es booleano (legacy) o undefined, por defecto no damos admin ni contingencias
+          setIsAdmin(false);
+          setIsContingenciasAuth(false);
+          setIsAsistenciaAuth(false);
+        }
+        
         setLoading(false);
       }
     };
@@ -188,7 +200,7 @@ export default function LandingPage() {
         )}
 
         {/* Módulo 4: Contingencias (Solo Autorizados) */}
-        {isAuthorizedUser && (
+        {isContingenciasAuth && (
           <Link href="/ficha-rcc/contingencias" style={{ textDecoration: 'none' }}>
             <div className="glass-panel" style={{ 
               padding: '40px', 
@@ -221,7 +233,7 @@ export default function LandingPage() {
         )}
 
         {/* Módulo 5: Asistencia (Solo Autorizados) */}
-        {isAuthorizedUser && (
+        {isAsistenciaAuth && (
           <Link href="/ficha-rcc/asistencia" style={{ textDecoration: 'none' }}>
             <div className="glass-panel" style={{ 
               padding: '40px', 
