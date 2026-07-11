@@ -25,18 +25,26 @@ export default function Header({
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
+  // Función para obtener la primera palabra del nombre del usuario a partir de su correo y capitalizarla
+  const getFirstName = (email: string) => {
+    if (!email) return '';
+    const part = email.split('@')[0]; // Toma la parte previa al @ (ej. hector.chinchilla)
+    const firstName = part.split('.')[0].split('-')[0]; // Toma el primer nombre antes de un punto o guion (ej. hector)
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1); // Capitaliza (ej. Hector)
+  };
+
   return (
-    <header className="relative z-50 bg-[#324354] border-b border-[#324354] shadow-md sticky top-0 font-sans">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+    <header className="relative z-50 bg-[#324354] border-b border-[#324354] shadow-md sticky top-0 font-sans w-full">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative">
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
         <div className="flex items-center gap-6">
           <button
             onClick={() => setIsOpen(true)}
-            className="group flex items-center justify-center w-11 h-11 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/30 rounded-xl transition-all duration-300 shadow-sm cursor-pointer"
+            className="group flex items-center justify-center w-10 h-10 text-white hover:text-slate-300 transition-colors cursor-pointer"
             title="Menú de Navegación"
           >
-            <svg className="w-6 h-6 text-[#F6F3EE] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
@@ -50,7 +58,16 @@ export default function Header({
           </div>
         </div>
 
-        {/* Right Side: Action Button & Welcome User & Logout Button */}
+        {/* Center: Firplak Logo */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
+          <img 
+            src="/logo-firplak-white.png" 
+            alt="Firplak" 
+            className="h-8 w-auto object-contain" 
+          />
+        </div>
+
+        {/* Right Side: Welcome User (First Name only) */}
         <div className="flex items-center space-x-6 min-w-0 shrink-0">
           {actionButton && (
             <div className="shrink-0">
@@ -59,21 +76,12 @@ export default function Header({
           )}
           
           {userEmail && (
-            <div className="text-right hidden md:block max-w-[200px] lg:max-w-[300px] min-w-0">
+            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
               <p className="text-[10px] text-[#F6F3EE]/60 font-bold tracking-widest uppercase">Bienvenido</p>
               <p className="text-sm font-semibold text-white truncate" title={userEmail}>
-                {userEmail}
+                {getFirstName(userEmail)}
               </p>
             </div>
-          )}
-
-          {showLogout && onLogout && (
-            <button
-              onClick={onLogout}
-              className="px-4 py-2 bg-[#7B8E90] hover:bg-[#6c7d7f] text-white rounded-xl transition font-semibold text-sm whitespace-nowrap shadow-sm hover:shadow-md shrink-0 cursor-pointer"
-            >
-              Cerrar Sesión
-            </button>
           )}
         </div>
       </div>

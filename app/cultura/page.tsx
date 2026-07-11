@@ -67,45 +67,43 @@ export default function CulturaPage() {
 
       {/* Main Content */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-6 md:p-12 lg:p-16">
-        <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 md:gap-12 animate-fade-in">
-          
-
+        <div className="w-full max-w-6xl mx-auto flex flex-col gap-4 md:gap-6 animate-fade-in">
 
           {/* Core Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {/* Left Column: Nuestro Propósito (5 cols) */}
-            <div className="lg:col-span-5 flex flex-col gap-6">
+            <div className="lg:col-span-5 flex flex-col gap-4">
               <div className="pl-2">
-                <h3 className="text-3xl font-light text-[#324354] tracking-wide uppercase font-sans">
+                <h3 className="text-xl md:text-2xl font-light text-[#324354] tracking-wide uppercase font-sans">
                   Nuestro Propósito
                 </h3>
-                <div className="h-1 w-16 bg-[#7B8E90] mt-2 rounded-full" />
+                <div className="h-[3px] w-12 bg-[#7B8E90] mt-1.5 rounded-full" />
               </div>
 
               {/* Purpose Cards */}
-              <div className="flex flex-col gap-6 flex-1">
+              <div className="flex flex-col gap-4 flex-1">
                 
                 {/* Purpose Item 1 */}
-                <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-[#e2ded5] shadow-[0_4px_20px_rgba(50,67,84,0.02)] hover:shadow-[0_12px_30px_rgba(50,67,84,0.08)] hover:border-[#324354]/20 transition-all duration-300 group flex flex-col gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#324354]/5 flex items-center justify-center text-[#324354] group-hover:bg-[#324354] group-hover:text-white transition-colors duration-300">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-[#e2ded5] shadow-[0_4px_20px_rgba(50,67,84,0.02)] hover:shadow-[0_12px_30px_rgba(50,67,84,0.08)] hover:border-[#324354]/20 transition-all duration-300 group flex flex-col gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#324354]/5 flex items-center justify-center text-[#324354] group-hover:bg-[#324354] group-hover:text-white transition-colors duration-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.0} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                     </svg>
                   </div>
-                  <p className="text-base sm:text-lg text-slate-700 leading-relaxed font-sans">
+                  <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-sans">
                     <strong className="font-bold text-[#324354]">Mejoramos</strong> <i>la experiencia de</i> <strong className="font-bold text-[#324354]">habitar, creando soluciones</strong> <i>para los</i> <strong className="font-bold text-[#324354]">hogares</strong> <i>de Colombia y América.</i>
                   </p>
                 </div>
 
                 {/* Purpose Item 2 */}
-                <div className="bg-white/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-[#e2ded5] shadow-[0_4px_20px_rgba(50,67,84,0.02)] hover:shadow-[0_12px_30px_rgba(50,67,84,0.08)] hover:border-[#324354]/20 transition-all duration-300 group flex flex-col gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#324354]/5 flex items-center justify-center text-[#324354] group-hover:bg-[#324354] group-hover:text-white transition-colors duration-300">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-[#e2ded5] shadow-[0_4px_20px_rgba(50,67,84,0.02)] hover:shadow-[0_12px_30px_rgba(50,67,84,0.08)] hover:border-[#324354]/20 transition-all duration-300 group flex flex-col gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#324354]/5 flex items-center justify-center text-[#324354] group-hover:bg-[#324354] group-hover:text-white transition-colors duration-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.0} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
-                  <p className="text-base sm:text-lg text-slate-700 leading-relaxed font-sans">
+                  <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-sans">
                     <i>Somos una</i> <strong className="font-bold text-[#324354]">plataforma</strong> <i>para el</i> <strong className="font-bold text-[#324354]">progreso</strong> <i>de</i> <strong className="font-bold text-[#324354]">nuestra gente</strong> <i>y sus</i> <strong className="font-bold text-[#324354]">familias.</strong>
                   </p>
                 </div>
@@ -114,16 +112,16 @@ export default function CulturaPage() {
             </div>
 
             {/* Right Column: 5 Comportamientos (7 cols) */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
+            <div className="lg:col-span-7 flex flex-col gap-4">
               <div className="pl-2">
-                <h3 className="text-3xl font-light text-[#324354] tracking-wide uppercase font-sans">
+                <h3 className="text-xl md:text-2xl font-light text-[#324354] tracking-wide uppercase font-sans">
                   5 Comportamientos
                 </h3>
-                <div className="h-1 w-16 bg-[#7B8E90] mt-2 rounded-full" />
+                <div className="h-[3px] w-12 bg-[#7B8E90] mt-1.5 rounded-full" />
               </div>
 
               {/* Behavior List */}
-              <div className="flex flex-col gap-3 flex-1 justify-between">
+              <div className="flex flex-col gap-2.5 flex-1 justify-between">
                 {[
                   "Hacemos felices a nuestros clientes",
                   "Jugamos a ganar en equipo",
@@ -133,14 +131,14 @@ export default function CulturaPage() {
                 ].map((behavior, idx) => (
                   <div 
                     key={idx}
-                    className="bg-white/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-[#e2ded5] shadow-[0_2px_10px_rgba(50,67,84,0.01)] hover:shadow-[0_8px_20px_rgba(50,67,84,0.05)] hover:border-[#324354]/15 hover:translate-x-1.5 transition-all duration-300 flex items-center gap-4 sm:gap-6 group"
+                    className="bg-white/80 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-[#e2ded5] shadow-[0_2px_10px_rgba(50,67,84,0.01)] hover:shadow-[0_8px_20px_rgba(50,67,84,0.05)] hover:border-[#324354]/15 hover:translate-x-1.5 transition-all duration-300 flex items-center gap-3 sm:gap-4 group"
                   >
                     {/* Number Badge */}
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-[#324354]/5 flex items-center justify-center font-display font-light text-[#324354] text-lg sm:text-xl group-hover:bg-[#324354] group-hover:text-[#F6F3EE] transition-colors duration-300 shadow-sm">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-lg bg-[#324354]/5 flex items-center justify-center font-display font-light text-[#324354] text-base sm:text-lg group-hover:bg-[#324354] group-hover:text-[#F6F3EE] transition-colors duration-300 shadow-sm">
                       {idx + 1}
                     </div>
                     {/* Behavior Description */}
-                    <span className="text-base sm:text-lg font-semibold text-slate-800 leading-tight">
+                    <span className="text-sm sm:text-base font-semibold text-slate-800 leading-tight">
                       {behavior}
                     </span>
                   </div>
