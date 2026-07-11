@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Header from '@/components/opt-sistemica/Header'
 
 interface User {
     id: string
@@ -131,41 +132,13 @@ export default function HomePage() {
     return (
         <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
             {/* Header */}
-            <header className="bg-[#324354] sticky top-0 z-50 shadow-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between relative">
-                    {/* Logo */}
-                    <div className="flex items-center shrink-0">
-                        <img 
-                            src="/logo-firplak-white.png" 
-                            alt="Firplak" 
-                            className="h-10 w-auto object-contain" 
-                        />
-                    </div>
-
-                    {/* Central Title */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden sm:block">
-                        <h2 className="text-xl md:text-2xl font-sans font-normal text-white tracking-[0.2em] uppercase">
-                            Manufactura
-                        </h2>
-                    </div>
-
-                    {/* Right side */}
-                    <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right hidden sm:block">
-                            <p className="text-[10px] text-[#F6F3EE]/60 uppercase tracking-widest font-medium">Bienvenido</p>
-                            <p className="text-sm font-semibold text-white max-w-[220px] truncate" title={user?.email || 'Usuario'}>
-                                {user?.email || 'Usuario'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="px-4 py-2 bg-[#7B8E90] hover:bg-[#6c7d7f] text-white rounded-xl transition font-semibold text-sm whitespace-nowrap shadow-sm hover:shadow-md"
-                        >
-                            Cerrar Sesión
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <Header
+                title="Manufactura"
+                subtitle="Panel de Módulos"
+                userEmail={user?.email}
+                showLogout={true}
+                onLogout={handleLogout}
+            />
 
             {/* Main Content */}
             <main className="flex-1 flex items-center justify-center px-6 py-12 md:py-16 lg:py-20 pt-6 md:pt-8 lg:pt-10">
