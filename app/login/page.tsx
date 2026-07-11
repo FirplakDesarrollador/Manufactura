@@ -40,7 +40,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#254153] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#324354] flex items-center justify-center p-4 font-sans text-slate-800">
       {/* Fondo decorativo */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full mix-blend-overlay filter blur-3xl opacity-10 animate-pulse"></div>
@@ -49,23 +49,26 @@ export default function LoginPage() {
 
       {/* Card del login */}
       <div className="relative w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-white/20">
+        <div className="bg-[#F6F3EE] rounded-3xl shadow-2xl p-8 border border-white/20">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#254153] rounded-full mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#324354] rounded-2xl mb-4 shadow-md">
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Monogram A-Peak icon path */}
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-[#254153] mb-2">Manufactura</h1>
-            <p className="text-[#254153]/70">Bienvenido de nuevo</p>
+            <h1 className="text-3xl font-display font-light text-[#324354] mb-2 uppercase tracking-widest">
+              Manufactura
+            </h1>
+            <p className="text-[#324354]/70 font-medium">Bienvenido de nuevo</p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSignIn} className="space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-[#254153] mb-2">
+              <label className="block text-sm font-semibold text-[#324354] mb-2">
                 Correo Electrónico
               </label>
               <input
@@ -73,14 +76,14 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@email.com"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#254153] focus:border-transparent transition"
+                className="w-full px-4 py-3 bg-white border border-[#e2ded5] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#324354] focus:border-transparent transition font-medium"
                 required
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-[#254153] mb-2">
+              <label className="block text-sm font-semibold text-[#324354] mb-2">
                 Contraseña
               </label>
               <input
@@ -88,7 +91,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#254153] focus:border-transparent transition"
+                className="w-full px-4 py-3 bg-white border border-[#e2ded5] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#324354] focus:border-transparent transition font-medium"
                 required
               />
             </div>
@@ -100,11 +103,11 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-[#254153] focus:ring-2 focus:ring-[#254153]"
+                  className="w-4 h-4 rounded border-gray-300 text-[#324354] focus:ring-2 focus:ring-[#324354]"
                 />
-                <span className="text-sm text-gray-600">Recuérdame</span>
+                <span className="text-sm text-gray-600 font-medium">Recuérdame</span>
               </label>
-              <Link href="#" className="text-sm text-[#254153] hover:underline transition">
+              <Link href="#" className="text-sm text-[#324354] hover:underline font-semibold transition">
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
@@ -120,7 +123,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#254153] text-white font-semibold py-3 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1a2e3b] shadow-lg shadow-[#254153]/20"
+              className="w-full bg-[#324354] hover:bg-[#283643] text-white font-semibold py-3 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#324354]/20"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -137,8 +140,8 @@ export default function LoginPage() {
           </form>
 
           {/* Footer */}
-          <div className="mt-8 pt-8 border-t border-gray-100 text-center text-sm text-gray-500">
-            ¿No tienes cuenta? <span className="text-[#254153] font-medium hover:underline cursor-pointer transition">Contacta al administrador</span>
+          <div className="mt-8 pt-8 border-t border-gray-200 text-center text-sm text-gray-500 font-medium">
+            ¿No tienes cuenta? <span className="text-[#324354] font-bold hover:underline cursor-pointer transition">Contacta al administrador</span>
           </div>
         </div>
       </div>

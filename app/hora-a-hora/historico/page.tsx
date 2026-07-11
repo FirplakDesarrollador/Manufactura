@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { EvaluacionHoraHora } from "@/lib/store";
 import { fetchEvaluaciones, updateEvaluacion, deleteEvaluacion } from "@/lib/db/horaHora";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Eye, Search, X, TrendingUp, BarChart2, ShieldCheck, ShieldX, Clock, Trash2, PenLine, Edit2, User, Save, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Eye, Search, X, TrendingUp, BarChart2, ShieldCheck, ShieldX, Clock, Trash2, PenLine, Edit2, User, Save, CheckCircle2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -456,6 +456,18 @@ export default function Historico() {
     const [selected, setSelected] = useState<EvaluacionHoraHora | null>(null);
     const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
     const [nameMap, setNameMap] = useState<Record<string, string>>({});
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({
+        key: 'tiempoInicio',
+        direction: 'desc'
+    });
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     useEffect(() => {
         // Fetch from Supabase, merge with localStorage
@@ -517,14 +529,58 @@ export default function Historico() {
         return creadoPor;
     };
 
-    const filteredData = data.filter(item =>
-        (item.linea || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.operario || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.planta || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.puesto || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.creadoPor || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.consecutivo?.toString() || "").includes(searchTerm)
-    );
+    const filteredAndSortedData = useMemo(() => {
+        let result = [...data].filter(item =>
+            (item.linea || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.operario || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.planta || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.puesto || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.creadoPor || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.consecutivo?.toString() || "").includes(searchTerm)
+        );
+
+        if (sortConfig) {
+            result.sort((a, b) => {
+                let valA: any = '';
+                let valB: any = '';
+
+                if (sortConfig.key === 'consecutivo') {
+                    valA = a.consecutivo || 0;
+                    valB = b.consecutivo || 0;
+                    return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+                } else if (sortConfig.key === 'tiempoInicio') {
+                    valA = new Date(a.tiempoInicio).getTime();
+                    valB = new Date(b.tiempoInicio).getTime();
+                    return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+                } else if (sortConfig.key === 'plantaPuesto') {
+                    valA = `${a.planta || ''} ${a.puesto || ''}`.toLowerCase();
+                    valB = `${b.planta || ''} ${b.puesto || ''}`.toLowerCase();
+                } else if (sortConfig.key === 'operario') {
+                    valA = (a.operario || '').toLowerCase();
+                    valB = (b.operario || '').toLowerCase();
+                } else if (sortConfig.key === 'realizadoPor') {
+                    valA = resolveUserName(a.creadoPor).toLowerCase();
+                    valB = resolveUserName(b.creadoPor).toLowerCase();
+                } else if (sortConfig.key === 'rendimiento') {
+                    valA = a.rendimiento || 0;
+                    valB = b.rendimiento || 0;
+                    return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+                }
+
+                if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return result;
+    }, [data, searchTerm, sortConfig, nameMap]);
+
+    const SortIcon = ({ columnKey }: { columnKey: string }) => {
+        if (!sortConfig || sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="opacity-30 ml-1 inline-block align-middle" />;
+        return sortConfig.direction === 'asc' 
+            ? <ArrowUp size={14} className="ml-1 text-white inline-block align-middle" /> 
+            : <ArrowDown size={14} className="ml-1 text-white inline-block align-middle" />;
+    };
 
     const getStatusBadge = (estado: string) => {
         switch (estado) {
@@ -588,7 +644,7 @@ export default function Historico() {
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1 absolute right-0">
-                            {filteredData.length} REGISTROS ENCONTRADOS
+                            {filteredAndSortedData.length} REGISTROS ENCONTRADOS
                         </p>
                     </div>
                 </div>
@@ -597,24 +653,54 @@ export default function Historico() {
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader className="bg-[#254153] hover:bg-[#254153]">
-                                <TableRow className="hover:bg-[#254153] border-none">
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider rounded-tl-lg w-12">#</TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider">Fecha</TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider">Planta / Puesto</TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider">Operario</TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider">Realizado por</TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider">KPIs</TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider text-right rounded-tr-lg">Acciones</TableHead>
+                                <TableRow className="hover:bg-[#254153] border-none select-none">
+                                    <TableHead 
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider rounded-tl-lg w-16 cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        onClick={() => requestSort('consecutivo')}
+                                    >
+                                        # <SortIcon columnKey="consecutivo" />
+                                    </TableHead>
+                                    <TableHead 
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        onClick={() => requestSort('tiempoInicio')}
+                                    >
+                                        Fecha <SortIcon columnKey="tiempoInicio" />
+                                    </TableHead>
+                                    <TableHead 
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        onClick={() => requestSort('plantaPuesto')}
+                                    >
+                                        Planta / Puesto <SortIcon columnKey="plantaPuesto" />
+                                    </TableHead>
+                                    <TableHead 
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        onClick={() => requestSort('operario')}
+                                    >
+                                        Operario <SortIcon columnKey="operario" />
+                                    </TableHead>
+                                    <TableHead 
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        onClick={() => requestSort('realizadoPor')}
+                                    >
+                                        Realizado por <SortIcon columnKey="realizadoPor" />
+                                    </TableHead>
+                                    <TableHead 
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        onClick={() => requestSort('rendimiento')}
+                                    >
+                                        KPIs <SortIcon columnKey="rendimiento" />
+                                    </TableHead>
+                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider text-right rounded-tr-lg w-28">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredData.length === 0 ? (
+                                {filteredAndSortedData.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={7} className="h-48 text-center text-slate-400 font-medium">
                                             No hay registros para mostrar.
-                                        </TableCell>
+                                          </TableCell>
                                     </TableRow>
-                                ) : filteredData.map((item) => {
+                                ) : filteredAndSortedData.map((item) => {
                                     const isOwner = currentUserEmail && (item.creadoPorEmail === currentUserEmail || item.creadoPor === currentUserEmail);
                                     return (
                                         <TableRow key={item.id} className="hover:bg-slate-50 transition-colors">

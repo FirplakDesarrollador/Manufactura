@@ -145,8 +145,8 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             vaciado: vaciadoToday.length,
             acabado: acabadoToday.length,
             saldo: filteredOrdenes.reduce((acc, o) => acc + (o.saldo || 0), 0),
-            digitado: baseRegistros.filter(r => r.estado === 'Digitado').length,
-            transito: baseRegistros.filter(r => r.estado === 'Transito').length,
+            digitado: filteredOrdenes.reduce((acc, o) => acc + (o.digitado || 0), 0),
+            transito: filteredOrdenes.reduce((acc, o) => acc + (o.transito || 0), 0),
             cedi: cediToday.length,
             kilos: totalKilos
         }
