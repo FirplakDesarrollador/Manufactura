@@ -168,11 +168,8 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'Calidad Inicio', path: '/calidad' },
-                { label: 'Fichas RCC', path: '/ficha-rcc' },
-                { label: 'Historial RCC', path: '/ficha-rcc/historial' },
-                { label: 'Contingencias', path: '/ficha-rcc/contingencias' },
-                { label: 'Administración RCC', path: '/ficha-rcc/admin' }
+                { label: 'Calidad MS', path: '/calidad/ms' },
+                { label: 'Ficha RRC', path: '/ficha-rcc' }
               ]
             },
             { 
