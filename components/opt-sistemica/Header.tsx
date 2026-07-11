@@ -169,9 +169,10 @@ export default function Header({
               ),
               subItems: [
                 { label: 'Calidad MS', path: '/calidad/ms' },
-                { label: 'Respuesta Rapida Calidad RRC', path: '/ficha-rcc' },
+                { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
                 { label: 'Criterios de Calidad', path: '/calidad/criterios' },
-                { label: 'Plan de Vigilancia', path: '/calidad/vigilancia' }
+                { label: 'Plan de Vigilancia', path: '/calidad/vigilancia' },
+                { label: 'QRQC Quick Response Quality Control', path: '/calidad/qrqc' }
               ]
             },
             { 
