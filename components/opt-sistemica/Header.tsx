@@ -76,11 +76,11 @@ export default function Header({
           )}
           
           {userEmail && (
-            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0 flex flex-col gap-1">
-              <p className="text-sm font-semibold text-white truncate leading-none" title={userEmail}>
+            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0 flex flex-col gap-2 justify-center">
+              <p className="text-lg sm:text-xl font-semibold text-white truncate tracking-wide leading-none" title={userEmail}>
                 {getFirstName(userEmail)}
               </p>
-              <p className="text-[11px] italic text-[#7B8E90] tracking-wider leading-none">
+              <p className="text-xs sm:text-sm italic text-[#7B8E90] tracking-wider leading-none">
                 Usuario
               </p>
             </div>
