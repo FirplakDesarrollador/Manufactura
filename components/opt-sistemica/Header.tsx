@@ -200,10 +200,13 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'Mantenimiento Inicio', path: '/mtto-autonomo' },
-                { label: 'Línea Lilac', path: '/mtto-autonomo/lilac' },
                 { label: 'Puestas a Punto', path: '/mtto-autonomo/puestas-a-punto' },
-                { label: 'Tarjetas de Falla', path: '/mtto-autonomo/tarjetas-falla' }
+                { label: 'Tarjetas de Anomalías', path: '/mtto-autonomo/tarjetas-falla' },
+                { label: 'Gestión de Mantenimiento', path: '#' },
+                { label: 'Mantenimiento Autónomo LILAC', path: '/mtto-autonomo/lilac' },
+                { label: 'Controles Visuales', path: '#' },
+                { label: 'Lecciones LUP', path: '#' },
+                { label: 'Principio de Máquina', path: '#' }
               ]
             },
             { label: 'Indicadores Productividad', path: '/indicadores-productividad', icon: (
@@ -238,32 +241,42 @@ export default function Header({
 
             return (
               <div key={idx} className="w-full">
-                <button
-                  onClick={() => {
-                    if (hasSubItems) {
-                      toggleMenu(item.label);
-                    } else {
+                <div className="w-full flex items-stretch rounded-xl hover:bg-white/10 transition-all duration-300 text-slate-200 hover:text-white group">
+                  {/* Zona Izquierda: Clic para Navegar al Módulo */}
+                  <button
+                    onClick={() => {
                       setIsOpen(false);
                       router.push(item.path);
-                    }
-                  }}
-                  className="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-slate-200 hover:text-white font-medium text-sm text-left cursor-pointer group"
-                >
-                  <div className="text-slate-400 group-hover:text-white transition-colors">
-                    {item.icon}
-                  </div>
-                  <span>{item.label}</span>
+                    }}
+                    className="flex-1 flex items-center gap-4 px-4 py-3 text-left font-medium text-sm cursor-pointer group-hover:text-white"
+                  >
+                    <div className="text-slate-400 group-hover:text-white transition-colors">
+                      {item.icon}
+                    </div>
+                    <span>{item.label}</span>
+                  </button>
+
+                  {/* Zona Derecha: Flecha para desplegar submenú */}
                   {hasSubItems && (
-                    <svg 
-                      className={`w-4 h-4 ml-auto text-slate-400 group-hover:text-white transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMenu(item.label);
+                      }}
+                      className="px-4 hover:bg-white/20 rounded-r-xl transition-colors cursor-pointer shrink-0 flex items-center justify-center border-l border-white/5"
+                      title={isExpanded ? "Colapsar submenú" : "Expandir submenú"}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                      <svg 
+                        className={`w-4 h-4 text-slate-400 group-hover:text-white transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
                   )}
-                </button>
+                </div>
 
                 {/* Submenu rendering */}
                 {hasSubItems && isExpanded && (
