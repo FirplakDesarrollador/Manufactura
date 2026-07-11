@@ -132,7 +132,7 @@ export default function HomePage() {
         <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
             {/* Header */}
             <header className="bg-[#324354] sticky top-0 z-50 shadow-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between relative">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between relative">
                     {/* Logo */}
                     <div className="flex items-center shrink-0">
                         <img 
@@ -168,7 +168,7 @@ export default function HomePage() {
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 flex items-center justify-center p-6 md:p-12 lg:p-16">
+            <main className="flex-1 flex items-center justify-center px-6 py-12 md:py-16 lg:py-20 pt-16 md:pt-28 lg:pt-36">
                 <div className="w-full max-w-6xl mx-auto px-4 md:px-8">
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 justify-items-center">
                         {/* Control de Piso Button */}
@@ -304,6 +304,19 @@ export default function HomePage() {
                                 </svg>
                             </div>
                             <span className="text-lg md:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300">Cultura</span>
+                        </button>
+
+                        {/* Inventarios Button */}
+                        <button
+                            onClick={() => router.push('/inventarios')}
+                            className="w-full max-w-[260px] aspect-square flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                        >
+                            <div className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-4 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                                <svg className="w-12 h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                            </div>
+                            <span className="text-lg md:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300">Inventarios</span>
                         </button>
 
                         {!hasManufactura() && !hasCalidad() && !hasConfiguracion() && !hasIndicadoresProductividad() && !hasAsistencia() && !hasMttoAutonomo() && !hasSistemaProduccion() && (
