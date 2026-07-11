@@ -63,7 +63,7 @@ export default function Header({
           <img 
             src="/logo-firplak-white.png" 
             alt="Firplak" 
-            className="h-8 w-auto object-contain" 
+            className="h-12 w-auto object-contain" 
           />
         </div>
 
@@ -76,10 +76,12 @@ export default function Header({
           )}
           
           {userEmail && (
-            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
-              <p className="text-[10px] text-[#F6F3EE]/60 font-bold tracking-widest uppercase">Bienvenido</p>
-              <p className="text-sm font-semibold text-white truncate" title={userEmail}>
+            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0 flex flex-col gap-1">
+              <p className="text-sm font-semibold text-white truncate leading-none" title={userEmail}>
                 {getFirstName(userEmail)}
+              </p>
+              <p className="text-[11px] italic text-[#7B8E90] tracking-wider leading-none">
+                Usuario
               </p>
             </div>
           )}
