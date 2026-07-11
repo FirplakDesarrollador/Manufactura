@@ -24,6 +24,19 @@ export default function Header({
 }: HeaderProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Estado para controlar qué acordeones de submenús están abiertos
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    'Control de Piso': false,
+    'Sistema de Producción': false
+  });
+
+  const toggleMenu = (menuKey: string) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [menuKey]: !prev[menuKey]
+    }));
+  };
 
   // Función para obtener la primera palabra del nombre del usuario a partir de su correo y capitalizarla
   const getFirstName = (email: string) => {
@@ -101,12 +114,18 @@ export default function Header({
         
         {/* Drawer Header */}
         <div className="p-6 border-b border-slate-700/60 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <img src="/logo-firplak-white.png" alt="Firplak" className="h-8 w-auto object-contain" />
-            <div>
-              <h2 className="text-lg font-display font-light tracking-wider leading-none">FIRPLAK</h2>
-              <span className="text-[10px] text-slate-400 tracking-widest uppercase font-bold">Manufactura</span>
+          <div className="flex flex-col items-start gap-1">
+            {/* Logo de Firplak con recorte CSS en la parte inferior para ocultar el eslogan */}
+            <div className="h-[22px] overflow-hidden flex items-start">
+              <img 
+                src="/logo-firplak-white.png" 
+                alt="Firplak" 
+                className="h-8 w-auto object-contain -mt-0.5" 
+              />
             </div>
+            <span className="text-[10px] text-slate-400 tracking-[0.25em] uppercase font-bold mt-1">
+              Manufactura
+            </span>
           </div>
           <button 
             onClick={() => setIsOpen(false)}
@@ -119,28 +138,51 @@ export default function Header({
         </div>
 
         {/* Drawer Menu Items */}
-        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
           {[
             { label: 'Inicio', path: '/home', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
             )},
-            { label: 'Control de Piso', path: '/home/selection', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            )},
+            { 
+              label: 'Control de Piso', 
+              path: '/home/selection', 
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              ),
+              subItems: [
+                { label: 'Mármol Sintético', path: '/marmol' },
+                { label: 'Muebles', path: '/muebles' },
+                { label: 'Fibra de Vidrio', path: '/fibra' }
+              ]
+            },
             { label: 'Calidad', path: '/calidad', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             )},
-            { label: 'Sistema de Producción', path: '/sistema-produccion', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            )},
+            { 
+              label: 'Sistema de Producción', 
+              path: '/sistema-produccion', 
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              ),
+              subItems: [
+                { label: 'HDT', path: '/hdt' },
+                { label: 'Hora a Hora', path: '/hora-a-hora' },
+                { label: 'OPT Operativa', path: '/opt' },
+                { label: 'OPT Sistémica', path: '/opt-sistemica' },
+                { label: 'Estadísticas del Sistema', path: '/estadisticas-produccion' },
+                { label: 'Tarjetas Excelencia', path: '/tarjetas-excelencia' },
+                { label: 'Bitácora', path: '/sistema-produccion/bitacora' },
+                { label: 'Auditorías', path: '/sistema-produccion/auditorias' }
+              ]
+            },
             { label: 'Mantenimiento', path: '/mtto-autonomo', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
@@ -172,21 +214,59 @@ export default function Header({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             )}
-          ].map((item, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setIsOpen(false);
-                router.push(item.path);
-              }}
-              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-white/10 transition-colors text-slate-200 hover:text-white font-medium text-sm text-left cursor-pointer group"
-            >
-              <div className="text-slate-400 group-hover:text-white transition-colors">
-                {item.icon}
+          ].map((item, idx) => {
+            const hasSubItems = item.subItems && item.subItems.length > 0;
+            const isExpanded = expandedMenus[item.label] || false;
+
+            return (
+              <div key={idx} className="w-full">
+                <button
+                  onClick={() => {
+                    if (hasSubItems) {
+                      toggleMenu(item.label);
+                    } else {
+                      setIsOpen(false);
+                      router.push(item.path);
+                    }
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-slate-200 hover:text-white font-medium text-sm text-left cursor-pointer group"
+                >
+                  <div className="text-slate-400 group-hover:text-white transition-colors">
+                    {item.icon}
+                  </div>
+                  <span>{item.label}</span>
+                  {hasSubItems && (
+                    <svg 
+                      className={`w-4 h-4 ml-auto text-slate-400 group-hover:text-white transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </button>
+
+                {/* Submenu rendering */}
+                {hasSubItems && isExpanded && (
+                  <div className="pl-6 border-l border-slate-700/40 ml-6 mt-1 space-y-1 animate-slide-down">
+                    {item.subItems!.map((sub, sIdx) => (
+                      <button
+                        key={sIdx}
+                        onClick={() => {
+                          setIsOpen(false);
+                          router.push(sub.path);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-all duration-300 text-slate-300 hover:text-white font-medium text-xs text-left cursor-pointer"
+                      >
+                        <span>{sub.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <span>{item.label}</span>
-            </button>
-          ))}
+            );
+          })}
         </div>
 
         {/* Drawer Footer (User Info & Logout) */}
