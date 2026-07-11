@@ -28,7 +28,9 @@ export default function Header({
   // Estado para controlar qué acordeones de submenús están abiertos
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     'Control de Piso': false,
-    'Sistema de Producción': false
+    'Calidad': false,
+    'Sistema de Producción': false,
+    'Mantenimiento': false
   });
 
   const toggleMenu = (menuKey: string) => {
@@ -72,11 +74,11 @@ export default function Header({
         </div>
 
         {/* Center: Firplak Logo */}
-        <div className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
+        <div className="absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
           <img 
-            src="/logo-firplak-white.png" 
+            src="/logo-firplak-clean.png" 
             alt="Firplak" 
-            className="h-14 w-auto object-contain" 
+            className="h-10 w-auto object-contain" 
           />
         </div>
 
@@ -115,14 +117,12 @@ export default function Header({
         {/* Drawer Header */}
         <div className="p-6 border-b border-slate-700/60 flex items-center justify-between shrink-0">
           <div className="flex flex-col items-start gap-1">
-            {/* Logo de Firplak con recorte CSS en la parte inferior para ocultar el eslogan */}
-            <div className="h-[22px] overflow-hidden flex items-start">
-              <img 
-                src="/logo-firplak-white.png" 
-                alt="Firplak" 
-                className="h-8 w-auto object-contain -mt-0.5" 
-              />
-            </div>
+            {/* Logo de Firplak nuevo (sin eslogan) */}
+            <img 
+              src="/logo-firplak-clean.png" 
+              alt="Firplak" 
+              className="h-6 w-auto object-contain" 
+            />
             <span className="text-[10px] text-slate-400 tracking-[0.25em] uppercase font-bold mt-1">
               Manufactura
             </span>
@@ -159,11 +159,22 @@ export default function Header({
                 { label: 'Fibra de Vidrio', path: '/fibra' }
               ]
             },
-            { label: 'Calidad', path: '/calidad', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            )},
+            { 
+              label: 'Calidad', 
+              path: '/calidad', 
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ),
+              subItems: [
+                { label: 'Calidad Inicio', path: '/calidad' },
+                { label: 'Fichas RCC', path: '/ficha-rcc' },
+                { label: 'Historial RCC', path: '/ficha-rcc/historial' },
+                { label: 'Contingencias', path: '/ficha-rcc/contingencias' },
+                { label: 'Administración RCC', path: '/ficha-rcc/admin' }
+              ]
+            },
             { 
               label: 'Sistema de Producción', 
               path: '/sistema-produccion', 
@@ -183,11 +194,21 @@ export default function Header({
                 { label: 'Auditorías', path: '/sistema-produccion/auditorias' }
               ]
             },
-            { label: 'Mantenimiento', path: '/mtto-autonomo', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-              </svg>
-            )},
+            { 
+              label: 'Mantenimiento', 
+              path: '/mtto-autonomo', 
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                </svg>
+              ),
+              subItems: [
+                { label: 'Mantenimiento Inicio', path: '/mtto-autonomo' },
+                { label: 'Línea Lilac', path: '/mtto-autonomo/lilac' },
+                { label: 'Puestas a Punto', path: '/mtto-autonomo/puestas-a-punto' },
+                { label: 'Tarjetas de Falla', path: '/mtto-autonomo/tarjetas-falla' }
+              ]
+            },
             { label: 'Indicadores Productividad', path: '/indicadores-productividad', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
