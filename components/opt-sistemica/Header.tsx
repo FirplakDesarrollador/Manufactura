@@ -78,7 +78,7 @@ export default function Header({
           <img 
             src="/logo-firplak-clean.png" 
             alt="Firplak" 
-            className="h-10 w-auto object-contain" 
+            className="h-13 w-auto object-contain" 
           />
         </div>
 

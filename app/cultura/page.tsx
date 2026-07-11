@@ -147,6 +147,13 @@ export default function CulturaPage() {
             </div>
 
           </div>
+          
+          {/* Slogan de Firplak */}
+          <div className="text-center mt-6">
+            <p className="text-base sm:text-lg italic text-[#7B8E90] tracking-[0.25em] font-light uppercase">
+              Inspirando Hogares
+            </p>
+          </div>
         </div>
       </main>
 
