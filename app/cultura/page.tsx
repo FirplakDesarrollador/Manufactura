@@ -69,12 +69,7 @@ export default function CulturaPage() {
       <main className="relative z-10 flex-1 flex items-center justify-center p-6 md:p-12 lg:p-16">
         <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 md:gap-12 animate-fade-in">
           
-          {/* Main Title Banner */}
-          <div className="bg-[#324354] text-[#F6F3EE] rounded-2xl md:rounded-3xl shadow-[0_10px_30px_rgba(50,67,84,0.15)] py-5 px-6 md:py-6 md:px-12 text-center border border-[#324354]/10">
-            <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-sans font-light tracking-[0.15em] sm:tracking-[0.25em] uppercase leading-snug">
-              Resumen del Propósito y Comportamientos de Firplak
-            </h2>
-          </div>
+
 
           {/* Core Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
