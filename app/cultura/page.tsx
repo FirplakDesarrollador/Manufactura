@@ -115,7 +115,7 @@ export default function CulturaPage() {
             <div className="lg:col-span-7 flex flex-col gap-4">
               <div className="pl-2">
                 <h3 className="text-xl md:text-2xl font-light text-[#324354] tracking-wide uppercase font-sans">
-                  5 Comportamientos
+                  5 Comportamientos / Valores
                 </h3>
                 <div className="h-[3px] w-12 bg-[#7B8E90] mt-1.5 rounded-full" />
               </div>
