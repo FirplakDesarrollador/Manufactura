@@ -138,7 +138,7 @@ export default function Header({
         </div>
 
         {/* Drawer Menu Items */}
-        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2 custom-scrollbar">
           {[
             { label: 'Inicio', path: '/home', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -313,6 +313,25 @@ export default function Header({
           </div>
         )}
       </div>
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #475569;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #64748b;
+        }
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #475569 transparent;
+        }
+      `}</style>
     </header>
   );
 }
