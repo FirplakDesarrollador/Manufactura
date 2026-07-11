@@ -116,14 +116,14 @@ export default function Header({
         
         {/* Drawer Header */}
         <div className="p-6 border-b border-slate-700/60 flex items-center justify-between shrink-0">
-          <div className="flex flex-col items-start gap-1">
+          <div className="flex flex-col items-start gap-0">
             {/* Logo de Firplak nuevo (sin eslogan) */}
             <img 
               src="/logo-firplak-clean.png" 
               alt="Firplak" 
-              className="h-9 w-auto object-contain" 
+              className="h-9 w-auto object-contain -ml-[2px]" 
             />
-            <span className="text-[10px] text-slate-400 tracking-[0.25em] uppercase font-bold mt-1">
+            <span className="text-[10px] text-slate-400 tracking-[0.25em] uppercase font-bold leading-none ml-[2px]">
               Manufactura
             </span>
           </div>
