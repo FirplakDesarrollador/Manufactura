@@ -59,11 +59,11 @@ export default function Header({
         </div>
 
         {/* Center: Firplak Logo */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
+        <div className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
           <img 
             src="/logo-firplak-white.png" 
             alt="Firplak" 
-            className="h-12 w-auto object-contain" 
+            className="h-14 w-auto object-contain" 
           />
         </div>
 
@@ -76,8 +76,8 @@ export default function Header({
           )}
           
           {userEmail && (
-            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0 flex flex-col gap-2 justify-center">
-              <p className="text-lg sm:text-xl font-semibold text-white truncate tracking-wide leading-none" title={userEmail}>
+            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
+              <p className="text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1" title={userEmail}>
                 {getFirstName(userEmail)}
               </p>
               <p className="text-xs sm:text-sm italic text-[#7B8E90] tracking-wider leading-none">
