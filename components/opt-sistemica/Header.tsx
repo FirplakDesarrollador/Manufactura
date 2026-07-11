@@ -121,7 +121,7 @@ export default function Header({
             <img 
               src="/logo-firplak-clean.png" 
               alt="Firplak" 
-              className="h-6 w-auto object-contain" 
+              className="h-9 w-auto object-contain" 
             />
             <span className="text-[10px] text-slate-400 tracking-[0.25em] uppercase font-bold mt-1">
               Manufactura
