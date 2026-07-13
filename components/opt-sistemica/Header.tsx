@@ -49,7 +49,8 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full">
+    <>
+      <header className="fixed top-0 left-0 right-0 z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative">
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
@@ -351,5 +352,7 @@ export default function Header({
         }
       `}</style>
     </header>
+    <div className="h-20 w-full shrink-0"></div>
+   </>
   );
 }
