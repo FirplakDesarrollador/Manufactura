@@ -201,7 +201,7 @@ export default function AsistenciaPage() {
   }
 
   return (
-    <div className="home-container" style={{ maxWidth: '1100px' }}>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Respuesta Rápida Calidad"
         subtitle="RRC"
@@ -213,7 +213,9 @@ export default function AsistenciaPage() {
         }}
       />
 
-      <div className="glass-panel" style={{ padding: '40px' }}>
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1100px]">
+          <div className="glass-panel" style={{ padding: '40px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h2 style={{ color: 'var(--primary)', marginBottom: '10px' }}>Control de Asistencia Diaria</h2>
@@ -327,6 +329,8 @@ export default function AsistenciaPage() {
         </div>
 
       </div>
-    </div>
+     </div>
+    </main>
+   </div>
   );
 }

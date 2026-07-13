@@ -131,7 +131,7 @@ export default function HomePage() {
   if (!user) return null;
 
   return (
-    <div className="home-container w-full max-w-[1200px] mx-auto px-4 sm:px-6 md:px-8 py-6">
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Respuesta Rápida Calidad"
         subtitle="RRC"
@@ -139,6 +139,9 @@ export default function HomePage() {
         showLogout={true}
         onLogout={handleLogout}
       />
+
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1200px]">
 
       {/* Carpetas de Defectos - Solo se muestran si se ha seleccionado una planta específica */}
       {filtroPlanta !== 'Todas' && (
@@ -303,7 +306,9 @@ export default function HomePage() {
             </table>
           </div>
         )}
+       </div>
       </div>
+     </main>
     </div>
   );
 }

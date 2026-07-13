@@ -216,7 +216,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="home-container" style={{ width: '100%', maxWidth: '850px', margin: '0 auto' }}>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Respuesta Rápida Calidad"
         subtitle="RRC"
@@ -228,7 +228,9 @@ export default function AdminPage() {
         }}
       />
 
-      <div className="glass-panel" style={{ padding: '30px', minHeight: '700px', display: 'flex', flexDirection: 'column', width: '100%' }}>
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[850px]">
+          <div className="glass-panel" style={{ padding: '30px', minHeight: '700px', display: 'flex', flexDirection: 'column', width: '100%' }}>
         <h1 style={{ color: 'var(--primary)', marginBottom: '8px', fontSize: '26px' }}>Panel de Administración</h1>
         
         {/* Sistema de Pestañas */}
@@ -453,6 +455,8 @@ export default function AdminPage() {
           </>
         ) : null}
       </div>
-    </div>
+     </div>
+    </main>
+   </div>
   );
 }

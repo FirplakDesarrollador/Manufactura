@@ -254,7 +254,7 @@ export default function DetalleFichaPage({ params }: { params: Promise<{ id: str
   }
 
   return (
-    <div className="home-container" style={{ maxWidth: '1100px' }}>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Respuesta Rápida Calidad"
         subtitle="RRC"
@@ -266,7 +266,9 @@ export default function DetalleFichaPage({ params }: { params: Promise<{ id: str
         }}
       />
 
-      <div className="glass-panel">
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1100px]">
+          <div className="glass-panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h2 style={{ margin: 0, color: 'var(--primary)' }}>
                 {isOwner ? 'Editar Ficha de Alerta' : 'Consultar Ficha de Alerta'}
@@ -544,6 +546,8 @@ export default function DetalleFichaPage({ params }: { params: Promise<{ id: str
           )}
         </form>
       </div>
-    </div>
+     </div>
+    </main>
+   </div>
   );
 }

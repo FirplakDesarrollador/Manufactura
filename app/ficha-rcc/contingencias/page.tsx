@@ -121,7 +121,7 @@ export default function ContingenciasPage() {
   }
 
   return (
-    <div className="home-container" style={{ maxWidth: '1100px' }}>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Respuesta Rápida Calidad"
         subtitle="RRC"
@@ -133,7 +133,9 @@ export default function ContingenciasPage() {
         }}
       />
 
-      <div className="glass-panel" style={{ padding: '40px' }}>
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1100px]">
+          <div className="glass-panel" style={{ padding: '40px' }}>
         <h2 style={{ color: 'var(--primary)', marginBottom: '10px' }}>Panel de Contingencias</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Validación de acciones de contingencia y erradicación.</p>
 
@@ -232,6 +234,8 @@ export default function ContingenciasPage() {
           </div>
         )}
       </div>
-    </div>
+     </div>
+    </main>
+   </div>
   );
 }

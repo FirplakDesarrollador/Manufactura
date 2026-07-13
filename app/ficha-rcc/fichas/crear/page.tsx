@@ -207,7 +207,7 @@ export default function CrearFichaPage() {
   };
 
   return (
-    <div className="home-container" style={{ maxWidth: '1100px' }}>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Respuesta Rápida Calidad"
         subtitle="RRC"
@@ -219,7 +219,9 @@ export default function CrearFichaPage() {
         }}
       />
 
-      <div className="glass-panel">
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1100px]">
+          <div className="glass-panel">
         {error && (
           <div className="auth-error" style={{ marginBottom: '24px' }}>
              {error}
@@ -414,6 +416,8 @@ export default function CrearFichaPage() {
           </button>
         </form>
       </div>
-    </div>
+     </div>
+    </main>
+   </div>
   );
 }
