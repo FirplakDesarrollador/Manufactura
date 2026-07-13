@@ -56,7 +56,7 @@ export default function PrincipioMaquinaPage() {
             Estamos trabajando para brindarte la mejor experiencia en Principio de Máquina. ¡Pronto estará disponible!
           </p>
           <button
-            onClick={() => router.push('/mtto-autonomo')}
+            onClick={() => router.push('/mantenimiento')}
             className="btn-primary w-full"
           >
             Volver a Mantenimiento

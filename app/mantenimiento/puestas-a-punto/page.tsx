@@ -76,7 +76,7 @@ export default function PuestasAPuntoPage() {
           <div className="modules-grid-centered">
             {arrayPlantas.map((planta, index) => (
               <Link 
-                href={`/mtto-autonomo/puestas-a-punto/${planta}`} 
+                href={`/mantenimiento/puestas-a-punto/${planta}`} 
                 key={index} 
                 className="module-card-icon" 
                 style={{ animationDelay: `${index * 0.1}s`, padding: '2rem 1.5rem', gap: '1rem', textDecoration: 'none' }}

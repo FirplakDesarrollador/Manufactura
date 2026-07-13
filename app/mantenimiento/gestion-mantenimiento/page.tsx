@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Header from '@/components/opt-sistemica/Header';
 
-export default function ControlesVisualesPage() {
+export default function GestionMantenimientoPage() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export default function ControlesVisualesPage() {
     <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Mantenimiento"
-        subtitle="Controles Visuales"
+        subtitle="Gestión de Mantenimiento"
         userEmail={userEmail}
         showLogout={true}
         onLogout={async () => {
@@ -53,10 +53,10 @@ export default function ControlesVisualesPage() {
           </div>
           <h2 className="text-2xl font-bold text-[#324354] mb-3">Módulo en construcción</h2>
           <p className="text-sm text-gray-500 mb-8 leading-relaxed">
-            Estamos trabajando para brindarte la mejor experiencia en controles visuales. ¡Pronto estará disponible!
+            Estamos trabajando para brindarte la mejor experiencia en la gestión de mantenimiento. ¡Pronto estará disponible!
           </p>
           <button
-            onClick={() => router.push('/mtto-autonomo')}
+            onClick={() => router.push('/mantenimiento')}
             className="btn-primary w-full"
           >
             Volver a Mantenimiento

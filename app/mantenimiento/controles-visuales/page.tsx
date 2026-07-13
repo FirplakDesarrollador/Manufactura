@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Header from '@/components/opt-sistemica/Header';
 
-export default function LeccionesLUPPage() {
+export default function ControlesVisualesPage() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export default function LeccionesLUPPage() {
     <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
       <Header
         title="Mantenimiento"
-        subtitle="Lecciones LUP"
+        subtitle="Controles Visuales"
         userEmail={userEmail}
         showLogout={true}
         onLogout={async () => {
@@ -53,10 +53,10 @@ export default function LeccionesLUPPage() {
           </div>
           <h2 className="text-2xl font-bold text-[#324354] mb-3">Módulo en construcción</h2>
           <p className="text-sm text-gray-500 mb-8 leading-relaxed">
-            Estamos trabajando para brindarte la mejor experiencia en Lecciones Un Punto (LUP). ¡Pronto estará disponible!
+            Estamos trabajando para brindarte la mejor experiencia en controles visuales. ¡Pronto estará disponible!
           </p>
           <button
-            onClick={() => router.push('/mtto-autonomo')}
+            onClick={() => router.push('/mantenimiento')}
             className="btn-primary w-full"
           >
             Volver a Mantenimiento

@@ -197,20 +197,20 @@ export default function Header({
             },
             { 
               label: 'Mantenimiento', 
-              path: '/mtto-autonomo', 
+              path: '/mantenimiento', 
               icon: (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                 </svg>
               ),
               subItems: [
-                { label: 'Puestas a Punto', path: '/mtto-autonomo/puestas-a-punto' },
-                { label: 'Tarjetas de Anomalías', path: '/mtto-autonomo/tarjetas-falla' },
-                { label: 'Gestión de Mantenimiento', path: '#' },
-                { label: 'Mantenimiento Autónomo LILAC', path: '/mtto-autonomo/lilac' },
-                { label: 'Controles Visuales', path: '#' },
-                { label: 'Lecciones LUP', path: '#' },
-                { label: 'Principio de Máquina', path: '#' }
+                { label: 'Puestas a Punto', path: '/mantenimiento/puestas-a-punto' },
+                { label: 'Tarjetas de Anomalías', path: '/mantenimiento/tarjetas-falla' },
+                { label: 'Gestión de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
+                { label: 'Mantenimiento Autónomo LILAC', path: '/mantenimiento/lilac' },
+                { label: 'Controles Visuales', path: '/mantenimiento/controles-visuales' },
+                { label: 'Lecciones LUP', path: '/mantenimiento/lecciones-lup' },
+                { label: 'Principio de Máquina', path: '/mantenimiento/principio-maquina' }
               ]
             },
             { label: 'Indicadores Productividad', path: '/indicadores-productividad', icon: (
