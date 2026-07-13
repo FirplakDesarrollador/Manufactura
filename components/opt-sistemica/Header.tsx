@@ -49,7 +49,7 @@ export default function Header({
   };
 
   return (
-    <header className="relative z-50 bg-[#324354] border-b border-[#324354] shadow-md sticky top-0 font-sans w-full">
+    <header className="sticky top-0 z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative">
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
