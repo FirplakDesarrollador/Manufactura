@@ -3,13 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
-import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 import Link from 'next/link';
-
-// Eliminamos ADMIN_EMAILS y usaremos la base de datos
 
 export default function AdminPage() {
   const router = useRouter();
+  const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [planta, setPlanta] = useState('Mármol Sintético');
@@ -37,6 +36,7 @@ export default function AdminPage() {
       }
       
       const userEmail = session.user.email?.toLowerCase() || '';
+      setUserEmail(session.user.email || '');
       
       const { data: userData } = await supabase
         .from('usuarios')
@@ -217,14 +217,16 @@ export default function AdminPage() {
 
   return (
     <div className="home-container" style={{ width: '100%', maxWidth: '850px', margin: '0 auto' }}>
-      <div className="header" style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ background: 'var(--header-bg)', padding: '15px 30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-          <FirplakLogo height="50px" />
-        </div>
-        <Link href="/home" style={{ textDecoration: 'none' }}>
-           <button className="btn-secondary">Volver al Menú</button>
-        </Link>
-      </div>
+      <Header
+        title="Respuesta Rápida Calidad"
+        subtitle="RRC"
+        userEmail={userEmail}
+        showLogout={true}
+        onLogout={async () => {
+          await supabase.auth.signOut();
+          router.push('/login');
+        }}
+      />
 
       <div className="glass-panel" style={{ padding: '30px', minHeight: '700px', display: 'flex', flexDirection: 'column', width: '100%' }}>
         <h1 style={{ color: 'var(--primary)', marginBottom: '8px', fontSize: '26px' }}>Panel de Administración</h1>

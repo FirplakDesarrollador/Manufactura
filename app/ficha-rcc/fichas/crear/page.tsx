@@ -7,13 +7,14 @@ import { PlantaEnum, OrigenEnum, Accion } from '@/types';
 import { useEffect } from 'react';
 import Link from 'next/link';
 import SignatureCanvas from 'react-signature-canvas';
-import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 import Combobox from '@/components/ficha-rcc/Combobox';
 import { PLANTAS_LIST, ORIGENES_LIST } from '@/lib/ficha-rcc/constants';
 import { isAuthorized } from '@/lib/ficha-rcc/auth';
 
 export default function CrearFichaPage() {
   const router = useRouter();
+  const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthorizedUser, setIsAuthorizedUser] = useState(false);
@@ -33,6 +34,9 @@ export default function CrearFichaPage() {
     fetchResponsables();
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthorizedUser(isAuthorized(session?.user?.email));
+      if (session?.user?.email) {
+        setUserEmail(session.user.email);
+      }
     });
   }, [planta]);
 
@@ -204,16 +208,16 @@ export default function CrearFichaPage() {
 
   return (
     <div className="home-container" style={{ maxWidth: '1100px' }}>
-      <div className="header" style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ background: 'var(--header-bg)', padding: '20px 40px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <FirplakLogo height="70px" />
-          </div>
-        </div>
-        <Link href="/home" style={{ textDecoration: 'none' }}>
-           <button className="btn-secondary">Volver al Panel</button>
-        </Link>
-      </div>
+      <Header
+        title="Respuesta Rápida Calidad"
+        subtitle="RRC"
+        userEmail={userEmail}
+        showLogout={true}
+        onLogout={async () => {
+          await supabase.auth.signOut();
+          router.push('/login');
+        }}
+      />
 
       <div className="glass-panel">
         {error && (
