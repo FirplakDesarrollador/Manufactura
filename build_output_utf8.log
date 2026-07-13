@@ -1,0 +1,1274 @@
+﻿
+> control_de_piso@0.1.0 build
+> next build
+
+node.exe : ÔÜá 
+`eslint` 
+configuration in 
+next.config.ts is no 
+longer supported. See 
+more info here: https:
+//nextjs.org/docs/app/
+api-reference/cli/next
+#next-lint-options
+En línea: 1 Carácter: 
+1
++ & "C:\Program Files\
+nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (ÔÜá `eslin   
+ t` co...xt-lint-o    
+ptions:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+ÔÜá Invalid 
+next.config.ts 
+options detected: 
+ÔÜá     Unrecognized 
+key(s) in object: 
+'eslint'
+ÔÜá See more info 
+here: https://nextjs.o
+rg/docs/messages/inval
+id-next-config
+Ôû▓ Next.js 16.2.0 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack 
+build failed with 16 
+errors:
+./app/mtto-autonomo/pu
+estas-a-punto/[planta]
+/modificar/[id]/Modifi
+carPuestaClient.tsx:9:
+1
+Module not found: 
+Can't resolve 
+'@dnd-kit/core'
+  [90m 7 |[0m 
+[36mimport[0m 
+[33mImage[0m 
+[36mfrom[0m 
+[32m'next/image'[0m;
+  [90m 8 |[0m 
+[36mimport[0m 
+[33mReact[0m 
+[36mfrom[0m 
+[32m'react'[0m;
+[31m[1m>[0m [90m 
+9 |[0m 
+[36mimport[0m { 
+  [90m   |[0m 
+[31m[1m^^^^^^^^[0m
+[31m[1m>[0m 
+[90m10 |[0m   
+[33mDndContext[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m11 |[0m   
+closestCenter, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^[
+0m
+[31m[1m>[0m 
+[90m12 |[0m   [33mK
+eyboardSensor[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^
+[0m
+[31m[1m>[0m 
+[90m13 |[0m   [33mP
+ointerSensor[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^[
+0m
+[31m[1m>[0m 
+[90m14 |[0m   
+useSensor, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m15 |[0m   
+useSensors
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m16 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^[0m
+  [90m17 |[0m 
+[36mimport[0m 
+[36mtype[0m { 
+[33mDragEndEvent[0m 
+[36mas[0m [33mDragE
+ndEventType[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+  [90m18 |[0m 
+[36mimport[0m { 
+  [90m19 |[0m   
+arrayMove,
+
+
+
+Import trace:
+  Server Component:
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/Mo
+dificarPuestaClient.ts
+x
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/pa
+ge.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/hdt/HdtFo
+rm.tsx:12:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/core'
+  [90m10 |[0m 
+[36mimport[0m { 
+isAuthorizedEditor } 
+[36mfrom[0m [32m'@/
+lib/hdt/authorized-edi
+tors'[0m
+  [90m11 |[0m
+[31m[1m>[0m 
+[90m12 |[0m 
+[36mimport[0m {
+  [90m   |[0m 
+[31m[1m^^^^^^^[0m
+[31m[1m>[0m 
+[90m13 |[0m     
+[33mDndContext[0m,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m14 |[0m     
+closestCenter,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^
+[0m
+[31m[1m>[0m 
+[90m15 |[0m     [33
+mKeyboardSensor[0m,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+[0m
+[31m[1m>[0m 
+[90m16 |[0m     [33
+mPointerSensor[0m,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^
+[0m
+[31m[1m>[0m 
+[90m17 |[0m     
+useSensor,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m18 |[0m     
+useSensors,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m19 |[0m     
+[33mDragEndEvent[0m,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^[
+0m
+[31m[1m>[0m 
+[90m20 |[0m     
+[33mTouchSensor[0m
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m21 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^[0m
+  [90m22 |[0m 
+[36mimport[0m {
+  [90m23 |[0m     
+arrayMove,
+  [90m24 |[0m     [
+33mSortableContext[0m
+,
+
+
+
+Import trace:
+  Server Component:
+    ./components/hdt/H
+dtForm.tsx
+    ./app/hdt/view/[id
+]/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/mtto-auto
+nomo/CrearPuestaClient
+.tsx:9:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/core'
+  [90m 7 |[0m 
+[36mimport[0m 
+[33mReact[0m 
+[36mfrom[0m 
+[32m'react'[0m;
+  [90m 8 |[0m 
+[36mimport[0m { 
+generateConsecutivo } 
+[36mfrom[0m [32m'@/
+lib/mtto-autonomo/util
+s'[0m;
+[31m[1m>[0m [90m 
+9 |[0m 
+[36mimport[0m { 
+  [90m   |[0m 
+[31m[1m^^^^^^^^[0m
+[31m[1m>[0m 
+[90m10 |[0m   
+[33mDndContext[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m11 |[0m   
+closestCenter, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^[
+0m
+[31m[1m>[0m 
+[90m12 |[0m   [33mK
+eyboardSensor[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^
+[0m
+[31m[1m>[0m 
+[90m13 |[0m   [33mP
+ointerSensor[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^[
+0m
+[31m[1m>[0m 
+[90m14 |[0m   
+useSensor, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m15 |[0m   
+useSensors
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m16 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^[0m
+  [90m17 |[0m 
+[36mimport[0m 
+[36mtype[0m { 
+[33mDragEndEvent[0m 
+[36mas[0m [33mDragE
+ndEventType[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+  [90m18 |[0m 
+[36mimport[0m { 
+  [90m19 |[0m   
+arrayMove,
+
+
+
+Import trace:
+  Server Component:
+    ./components/mtto-
+autonomo/CrearPuestaCl
+ient.tsx
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/crear/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/hdt/HdtFo
+rm.tsx:30:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/modifiers'
+  [90m28 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m
+  [90m29 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m
+[31m[1m>[0m 
+[90m30 |[0m 
+[36mimport[0m { rest
+rictToVerticalAxis, 
+restrictToWindowEdges 
+} [36mfrom[0m [32m'
+@dnd-kit/modifiers'[0
+m
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^[0
+m
+  [90m31 |[0m
+  [90m32 |[0m 
+[36mtype[0m 
+[33mHdtRow[0m = [33
+mDatabase[0m[[32m'pu
+blic'[0m][[32m'Table
+s'[0m][[32m'hdts'[0
+m][[32m'Row'[0m]
+  [90m33 |[0m 
+[36mtype[0m 
+[33mStepRow[0m = [3
+3mDatabase[0m[[32m'p
+ublic'[0m][[32m'Tabl
+es'[0m][[32m'hdt_ste
+ps'[0m][[32m'Row'[0
+m]
+
+
+
+Import trace:
+  Server Component:
+    ./components/hdt/H
+dtForm.tsx
+    ./app/hdt/view/[id
+]/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./app/mtto-autonomo/pu
+estas-a-punto/[planta]
+/modificar/[id]/Modifi
+carPuestaClient.tsx:18
+:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/sortable'
+  [90m16 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+  [90m17 |[0m 
+[36mimport[0m 
+[36mtype[0m { 
+[33mDragEndEvent[0m 
+[36mas[0m [33mDragE
+ndEventType[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+[31m[1m>[0m 
+[90m18 |[0m 
+[36mimport[0m { 
+  [90m   |[0m 
+[31m[1m^^^^^^^^[0m
+[31m[1m>[0m 
+[90m19 |[0m   
+arrayMove, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m20 |[0m   [33mS
+ortableContext[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+[0m
+[31m[1m>[0m 
+[90m21 |[0m   sortab
+leKeyboardCoordinates,
+ 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m22 |[0m   vertic
+alListSortingStrategy,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m23 |[0m   
+useSortable
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m24 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^[0m
+  [90m25 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m;
+  [90m26 |[0m 
+[36mimport[0m { v4 
+[36mas[0m uuidv4 } 
+[36mfrom[0m 
+[32m'uuid'[0m;
+  [90m27 |[0m
+
+
+
+Import trace:
+  Server Component:
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/Mo
+dificarPuestaClient.ts
+x
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/pa
+ge.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/hdt/HdtFo
+rm.tsx:22:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/sortable'
+  [90m20 |[0m     
+[33mTouchSensor[0m
+  [90m21 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m
+[31m[1m>[0m 
+[90m22 |[0m 
+[36mimport[0m {
+  [90m   |[0m 
+[31m[1m^^^^^^^[0m
+[31m[1m>[0m 
+[90m23 |[0m     
+arrayMove,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m24 |[0m     [33
+mSortableContext[0m,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^[0m
+[31m[1m>[0m 
+[90m25 |[0m     sort
+ableKeyboardCoordinate
+s,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m26 |[0m     vert
+icalListSortingStrateg
+y,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m27 |[0m     
+useSortable
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m28 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^[0m
+  [90m29 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m
+  [90m30 |[0m 
+[36mimport[0m { rest
+rictToVerticalAxis, 
+restrictToWindowEdges 
+} [36mfrom[0m [32m'
+@dnd-kit/modifiers'[0
+m
+  [90m31 |[0m
+
+
+
+Import trace:
+  Server Component:
+    ./components/hdt/H
+dtForm.tsx
+    ./app/hdt/view/[id
+]/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/mtto-auto
+nomo/CrearPuestaClient
+.tsx:18:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/sortable'
+  [90m16 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+  [90m17 |[0m 
+[36mimport[0m 
+[36mtype[0m { 
+[33mDragEndEvent[0m 
+[36mas[0m [33mDragE
+ndEventType[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/core'[0m;
+[31m[1m>[0m 
+[90m18 |[0m 
+[36mimport[0m { 
+  [90m   |[0m 
+[31m[1m^^^^^^^^[0m
+[31m[1m>[0m 
+[90m19 |[0m   
+arrayMove, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m20 |[0m   [33mS
+ortableContext[0m, 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+[0m
+[31m[1m>[0m 
+[90m21 |[0m   sortab
+leKeyboardCoordinates,
+ 
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m22 |[0m   vertic
+alListSortingStrategy,
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m23 |[0m   
+useSortable
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^[0m
+[31m[1m>[0m 
+[90m24 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^[0m
+  [90m25 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m;
+  [90m26 |[0m 
+[36mimport[0m { v4 
+[36mas[0m uuidv4 } 
+[36mfrom[0m 
+[32m'uuid'[0m;
+  [90m27 |[0m
+
+
+
+Import trace:
+  Server Component:
+    ./components/mtto-
+autonomo/CrearPuestaCl
+ient.tsx
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/crear/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./app/mtto-autonomo/pu
+estas-a-punto/[planta]
+/modificar/[id]/Modifi
+carPuestaClient.tsx:25
+:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/utilities'
+  [90m23 |[0m   
+useSortable
+  [90m24 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m;
+[31m[1m>[0m 
+[90m25 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+[0m
+  [90m26 |[0m 
+[36mimport[0m { v4 
+[36mas[0m uuidv4 } 
+[36mfrom[0m 
+[32m'uuid'[0m;
+  [90m27 |[0m
+  [90m28 |[0m 
+[36minterface[0m 
+[33mItem[0m {
+
+
+
+Import trace:
+  Server Component:
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/Mo
+dificarPuestaClient.ts
+x
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/pa
+ge.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/hdt/HdtFo
+rm.tsx:29:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/utilities'
+  [90m27 |[0m     
+useSortable
+  [90m28 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m
+[31m[1m>[0m 
+[90m29 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+[0m
+  [90m30 |[0m 
+[36mimport[0m { rest
+rictToVerticalAxis, 
+restrictToWindowEdges 
+} [36mfrom[0m [32m'
+@dnd-kit/modifiers'[0
+m
+  [90m31 |[0m
+  [90m32 |[0m 
+[36mtype[0m 
+[33mHdtRow[0m = [33
+mDatabase[0m[[32m'pu
+blic'[0m][[32m'Table
+s'[0m][[32m'hdts'[0
+m][[32m'Row'[0m]
+
+
+
+Import trace:
+  Server Component:
+    ./components/hdt/H
+dtForm.tsx
+    ./app/hdt/view/[id
+]/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/mtto-auto
+nomo/CrearPuestaClient
+.tsx:25:1
+Module not found: 
+Can't resolve 
+'@dnd-kit/utilities'
+  [90m23 |[0m   
+useSortable
+  [90m24 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m;
+[31m[1m>[0m 
+[90m25 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+[0m
+  [90m26 |[0m 
+[36mimport[0m { v4 
+[36mas[0m uuidv4 } 
+[36mfrom[0m 
+[32m'uuid'[0m;
+  [90m27 |[0m
+  [90m28 |[0m 
+[36minterface[0m 
+[33mItem[0m {
+
+
+
+Import trace:
+  Server Component:
+    ./components/mtto-
+autonomo/CrearPuestaCl
+ient.tsx
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/crear/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/tarjetas-
+excelencia/ChatBot.tsx
+:5:1
+Module not found: 
+Can't resolve 
+'framer-motion'
+  [90m3 |[0m 
+[36mimport[0m { 
+useState } 
+[36mfrom[0m 
+[32m"react"[0m;
+  [90m4 |[0m 
+[36mimport[0m { [33
+mMessageCircle[0m, 
+[33mX[0m, 
+[33mSend[0m, 
+[33mBot[0m, 
+[33mUser[0m } 
+[36mfrom[0m [32m"lu
+cide-react"[0m;
+[31m[1m>[0m [90m5 
+|[0m [36mimport[0m 
+{ motion, [33mAnimate
+Presence[0m } 
+[36mfrom[0m [32m"fr
+amer-motion"[0m;
+  [90m  |[0m [31m[
+1m^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^[0m
+  [90m6 |[0m
+  [90m7 |[0m 
+[36mexport[0m 
+[36mdefault[0m 
+[36mfunction[0m 
+[33mChatBot[0m() {
+  [90m8 |[0m     
+[36mconst[0m 
+[isOpen, setIsOpen] = 
+useState([36mfalse[0
+m);
+
+
+
+Import trace:
+  Server Component:
+    ./components/tarje
+tas-excelencia/ChatBot
+.tsx
+    ./app/tarjetas-exc
+elencia/layout.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./app/ficha-rcc/fichas
+/[id]/page.tsx:8:1
+Module not found: 
+Can't resolve 'react-s
+ignature-canvas'
+  [90m 6 |[0m 
+[36mimport[0m { 
+[33mPlantaEnum[0m, 
+[33mOrigenEnum[0m, 
+[33mAccion[0m, 
+[33mFichaAlerta[0m 
+} [36mfrom[0m 
+[32m'@/types'[0m;
+  [90m 7 |[0m 
+[36mimport[0m 
+[33mLink[0m 
+[36mfrom[0m 
+[32m'next/link'[0m;
+[31m[1m>[0m [90m 
+8 |[0m 
+[36mimport[0m [33mS
+ignatureCanvas[0m 
+[36mfrom[0m [32m're
+act-signature-canvas'
+[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^[0m
+  [90m 9 |[0m 
+[36mimport[0m 
+[33mFirplakLogo[0m 
+[36mfrom[0m [32m'@/
+components/ficha-rcc/F
+irplakLogo'[0m;
+  [90m10 |[0m 
+[36mimport[0m 
+[33mCombobox[0m 
+[36mfrom[0m [32m'@/
+components/ficha-rcc/C
+ombobox'[0m;
+  [90m11 |[0m 
+[36mimport[0m { [33
+mPLANTAS_LIST[0m, [3
+3mORIGENES_LIST[0m } 
+[36mfrom[0m [32m'@/
+lib/ficha-rcc/constant
+s'[0m;
+
+
+
+Import traces:
+  Client Component 
+Browser:
+    ./app/ficha-rcc/fi
+chas/[id]/page.tsx 
+[Client Component 
+Browser]
+    ./app/ficha-rcc/fi
+chas/[id]/page.tsx 
+[Server Component]
+
+  Client Component 
+SSR:
+    ./app/ficha-rcc/fi
+chas/[id]/page.tsx 
+[Client Component SSR]
+    ./app/ficha-rcc/fi
+chas/[id]/page.tsx 
+[Server Component]
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./app/ficha-rcc/fichas
+/crear/page.tsx:9:1
+Module not found: 
+Can't resolve 'react-s
+ignature-canvas'
+  [90m 7 |[0m 
+[36mimport[0m { 
+useEffect } 
+[36mfrom[0m 
+[32m'react'[0m;
+  [90m 8 |[0m 
+[36mimport[0m 
+[33mLink[0m 
+[36mfrom[0m 
+[32m'next/link'[0m;
+[31m[1m>[0m [90m 
+9 |[0m 
+[36mimport[0m [33mS
+ignatureCanvas[0m 
+[36mfrom[0m [32m're
+act-signature-canvas'
+[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^[0m
+  [90m10 |[0m 
+[36mimport[0m 
+[33mFirplakLogo[0m 
+[36mfrom[0m [32m'@/
+components/ficha-rcc/F
+irplakLogo'[0m;
+  [90m11 |[0m 
+[36mimport[0m 
+[33mCombobox[0m 
+[36mfrom[0m [32m'@/
+components/ficha-rcc/C
+ombobox'[0m;
+  [90m12 |[0m 
+[36mimport[0m { [33
+mPLANTAS_LIST[0m, [3
+3mORIGENES_LIST[0m } 
+[36mfrom[0m [32m'@/
+lib/ficha-rcc/constant
+s'[0m;
+
+
+
+Import traces:
+  Client Component 
+Browser:
+    ./app/ficha-rcc/fi
+chas/crear/page.tsx 
+[Client Component 
+Browser]
+    ./app/ficha-rcc/fi
+chas/crear/page.tsx 
+[Server Component]
+
+  Client Component 
+SSR:
+    ./app/ficha-rcc/fi
+chas/crear/page.tsx 
+[Client Component SSR]
+    ./app/ficha-rcc/fi
+chas/crear/page.tsx 
+[Server Component]
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./app/mtto-autonomo/pu
+estas-a-punto/[planta]
+/modificar/[id]/Modifi
+carPuestaClient.tsx:26
+:1
+Module not found: 
+Can't resolve 'uuid'
+  [90m24 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m;
+  [90m25 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m;
+[31m[1m>[0m 
+[90m26 |[0m 
+[36mimport[0m { v4 
+[36mas[0m uuidv4 } 
+[36mfrom[0m 
+[32m'uuid'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^[0m
+  [90m27 |[0m
+  [90m28 |[0m 
+[36minterface[0m 
+[33mItem[0m {
+  [90m29 |[0m   id: 
+string | number;
+
+
+
+Import trace:
+  Server Component:
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/Mo
+dificarPuestaClient.ts
+x
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/modificar/[id]/pa
+ge.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/mtto-auto
+nomo/CrearPuestaClient
+.tsx:26:1
+Module not found: 
+Can't resolve 'uuid'
+  [90m24 |[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/sortable'[0m;
+  [90m25 |[0m 
+[36mimport[0m { 
+[33mCSS[0m } 
+[36mfrom[0m [32m'@d
+nd-kit/utilities'[0m;
+[31m[1m>[0m 
+[90m26 |[0m 
+[36mimport[0m { v4 
+[36mas[0m uuidv4 } 
+[36mfrom[0m 
+[32m'uuid'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^[0m
+  [90m27 |[0m
+  [90m28 |[0m 
+[36minterface[0m 
+[33mItem[0m {
+  [90m29 |[0m   id: 
+string | number;
+
+
+
+Import trace:
+  Server Component:
+    ./components/mtto-
+autonomo/CrearPuestaCl
+ient.tsx
+    ./app/mtto-autonom
+o/puestas-a-punto/[pla
+nta]/crear/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+./components/mtto-auto
+nomo/CrearTarjetaClien
+t.tsx:7:1
+Module not found: 
+Can't resolve 'uuid'
+  [90m 5 |[0m 
+[36mimport[0m { 
+supabaseTalentoHumano 
+[36mas[0m 
+supabaseTH } 
+[36mfrom[0m [32m'@/
+lib/supabase_talento_h
+umano'[0m;
+  [90m 6 |[0m 
+[36mimport[0m [33mS
+earchableSelect[0m 
+[36mfrom[0m [32m'./
+SearchableSelect'[0m;
+[31m[1m>[0m [90m 
+7 |[0m 
+[36mimport[0m { v4 
+[36mas[0m uuidv4 } 
+[36mfrom[0m 
+[32m'uuid'[0m;
+  [90m   |[0m [31m
+[1m^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m
+  [90m 9 |[0m 
+[36mexport[0m 
+[36mdefault[0m 
+[36mfunction[0m [33
+mCrearTarjetaClient[0
+m() {
+  [90m10 |[0m   
+[36mconst[0m router 
+= useRouter();
+
+
+
+Import trace:
+  Server Component:
+    ./components/mtto-
+autonomo/CrearTarjetaC
+lient.tsx
+    ./app/mtto-autonom
+o/tarjetas-falla/crear
+/page.tsx
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+    at <unknown> (./ap
+p/mtto-autonomo/puesta
+s-a-punto/[planta]/mod
+ificar/[id]/ModificarP
+uestaClient.tsx:9:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/hdt/HdtForm.t
+sx:12:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/mtto-autonomo
+/CrearPuestaClient.tsx
+:9:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/hdt/HdtForm.t
+sx:30:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./ap
+p/mtto-autonomo/puesta
+s-a-punto/[planta]/mod
+ificar/[id]/ModificarP
+uestaClient.tsx:18:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/hdt/HdtForm.t
+sx:22:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/mtto-autonomo
+/CrearPuestaClient.tsx
+:18:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./ap
+p/mtto-autonomo/puesta
+s-a-punto/[planta]/mod
+ificar/[id]/ModificarP
+uestaClient.tsx:25:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/hdt/HdtForm.t
+sx:29:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/mtto-autonomo
+/CrearPuestaClient.tsx
+:25:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/tarjetas-exce
+lencia/ChatBot.tsx:5:1
+)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./ap
+p/ficha-rcc/fichas/[id
+]/page.tsx:8:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./ap
+p/ficha-rcc/fichas/cre
+ar/page.tsx:9:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./ap
+p/mtto-autonomo/puesta
+s-a-punto/[planta]/mod
+ificar/[id]/ModificarP
+uestaClient.tsx:26:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/mtto-autonomo
+/CrearPuestaClient.tsx
+:26:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
+    at <unknown> (./co
+mponents/mtto-autonomo
+/CrearTarjetaClient.ts
+x:7:1)
+    at <unknown> (http
+s://nextjs.org/docs/me
+ssages/module-not-foun
+d)
