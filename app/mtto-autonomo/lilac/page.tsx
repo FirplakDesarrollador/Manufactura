@@ -29,6 +29,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import Header from '@/components/opt-sistemica/Header'
 
 // ----------------------------------------------------
 // 1. SEED DATA - AUTOMANTENIMIENTO ENCHAPADORA SCM (LILAC)
@@ -280,6 +281,7 @@ const INITIAL_HISTORY = [
 
 export default function LillacModulePage() {
   const router = useRouter()
+  const [userEmail, setUserEmail] = useState('')
   const [activeTab, setActiveTab] = useState<'ejecucion' | 'historial' | 'dashboard' | 'estandares'>('ejecucion')
   
   // Storage states
@@ -287,8 +289,15 @@ export default function LillacModulePage() {
   const [history, setHistory] = useState<any[]>([])
   const [anomalies, setAnomalies] = useState<any[]>([])
 
-  // Load from LocalStorage
   useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserEmail(user.email || '')
+      }
+    }
+    checkUser()
+
     const savedHistory = localStorage.getItem('lilac_history')
     const savedAnomalies = localStorage.getItem('lilac_anomalies')
     
@@ -729,39 +738,16 @@ export default function LillacModulePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F3EE] font-sans text-[#000000]">
-      {/* Dark Header */}
-      <header className="relative z-50 bg-[#324354] border-b border-[#324354] shadow-md sticky top-0">
-        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => {
-                if (isRoundActive) {
-                  if (confirm("¿Estás seguro de que quieres cancelar la ronda en curso? Se perderán los datos ingresados.")) {
-                    setIsRoundActive(false)
-                    router.push('/mtto-autonomo')
-                  }
-                } else {
-                  router.push('/mtto-autonomo')
-                }
-              }}
-              className="group flex items-center justify-center w-11 h-11 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/30 rounded-xl transition-all duration-300 shadow-sm"
-              title="Volver a Mantenimiento"
-            >
-              <ArrowLeft className="w-5 h-5 text-[#F6F3EE] group-hover:scale-110 transition-transform" />
-            </button>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase">
-                Mantenimiento Autónomo LILAC
-              </h1>
-              <p className="text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide">Estándares de Limpieza, Inspección, Lubricación, Ajuste y Cambio</p>
-            </div>
-          </div>
-          
-          <div className="hidden lg:flex items-center gap-3">
-            <span className="text-xs font-bold px-3 py-1.5 bg-[#7B8E90]/20 text-white rounded-full border border-white/10">NIVEL INTERMEDIO</span>
-          </div>
-        </div>
-      </header>
+      <Header
+        title="Mantenimiento"
+        subtitle="Mantenimiento Autónomo LILAC"
+        userEmail={userEmail}
+        showLogout={true}
+        onLogout={async () => {
+          await supabase.auth.signOut()
+          router.push('/login')
+        }}
+      />
 
       {/* Tabs Menu (Only visible when round is NOT active) */}
       {!isRoundActive && (
