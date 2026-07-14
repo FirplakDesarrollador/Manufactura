@@ -41,6 +41,7 @@ const SEED_STANDARDS = [
     planta: "MBL",
     criticidad: "A",
     codigo_hdt: "V1",
+    imagen_url: "/stefani_scm.png",
     labor: "Limpieza y Ajuste de Enchapadora SCM Stefani",
     herramientas: ["Brocha", "Pistola de aire comprimido", "Recogedor", "Trapos", "Tíner"],
     insumos: ["Trapos", "Thinner", "Alcohol etílico al 70%"],
@@ -1646,28 +1647,42 @@ export default function LillacModulePage() {
                       </div>
                     </div>
 
-                    {/* Standard Header Info Card */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Herramientas</span>
-                        <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.herramientas?.join(', ') || 'Ninguna'}</p>
-                      </div>
-                      <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Insumos</span>
-                        <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.insumos?.join(', ') || 'Ninguno'}</p>
-                      </div>
-                      <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Equipo Protección (EPP)</span>
-                        <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.epp?.join(', ') || 'Ninguno'}</p>
-                      </div>
-                    </div>
+                    {/* Standard Header Info Card & Image */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      <div className={selectedMasterEstandar.imagen_url ? "lg:col-span-8 space-y-4" : "lg:col-span-12 space-y-4"}>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
+                            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Herramientas</span>
+                            <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.herramientas?.join(', ') || 'Ninguna'}</p>
+                          </div>
+                          <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
+                            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Insumos</span>
+                            <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.insumos?.join(', ') || 'Ninguno'}</p>
+                          </div>
+                          <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
+                            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Equipo Protección (EPP)</span>
+                            <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.epp?.join(', ') || 'Ninguno'}</p>
+                          </div>
+                        </div>
 
-                    {selectedMasterEstandar.nota_general && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-1.5">
-                        <Info size={14} className="flex-shrink-0 mt-0.5" />
-                        <span><strong>Nota general de seguridad:</strong> {selectedMasterEstandar.nota_general}</span>
+                        {selectedMasterEstandar.nota_general && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-1.5">
+                            <Info size={14} className="flex-shrink-0 mt-0.5" />
+                            <span><strong>Nota general de seguridad:</strong> {selectedMasterEstandar.nota_general}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      {selectedMasterEstandar.imagen_url && (
+                        <div className="lg:col-span-4 bg-slate-50 border border-slate-200 rounded-2xl p-2 shadow-inner overflow-hidden flex items-center justify-center max-h-[180px]">
+                          <img 
+                            src={selectedMasterEstandar.imagen_url} 
+                            alt={selectedMasterEstandar.equipo} 
+                            className="object-contain w-full h-full max-h-[160px] rounded-xl hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                      )}
+                    </div>
 
                     {/* Steps list */}
                     <div className="space-y-4">
