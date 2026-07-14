@@ -70,7 +70,7 @@ export default function HomePage() {
       />
 
       {/* Main Content */}
-      <main className="container" style={{ paddingTop: '60px' }}>
+      <main className="container" style={{ paddingTop: '100px' }}>
         <div className="animate-fade-in">
           <h1 style={{ color: 'var(--accent)', fontSize: '2.5rem', marginBottom: '8px', fontWeight: 700 }}>
             Bienvenido,

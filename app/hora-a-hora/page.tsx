@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { createExternalClient } from "@/lib/supabase/external";
+import Header from "@/components/opt-sistemica/Header";
 
 export default function Home() {
   const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
   const [initials, setInitials] = useState("");
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function Home() {
         if (!name) name = email;
 
         setUserName(name);
+        setUserEmail(email);
         const parts = name.split(/[\s@]+/);
         if (parts.length >= 2) {
           setInitials((parts[0][0] + parts[1][0]).toUpperCase());
@@ -50,30 +53,12 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white flex flex-col relative font-sans">
-      {/* Header */}
-      <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between">
-        <Link href="/home">
-          <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors" title="Volver al menú de producción">
-            <ArrowLeft size={24} />
-          </button>
-        </Link>
-        
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className="font-bold text-2xl tracking-widest leading-none">FIRPLAK</div>
-          <div className="text-[10px] opacity-80 uppercase tracking-widest mt-1">inspiring homes</div>
-        </div>
-        
-        {/* User avatar + logout */}
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex flex-col items-end mr-1">
-            <span className="text-xs font-semibold leading-tight truncate max-w-[140px]">{userName}</span>
-          </div>
-          <div className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center text-sm font-bold shrink-0">
-            {initials || "?"}
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col relative font-sans pt-28">
+      <Header 
+        title="Hora a Hora"
+        subtitle="Módulo Operativo"
+        userEmail={userEmail}
+      />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 pb-20">

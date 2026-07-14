@@ -64,7 +64,7 @@ export default function BitacoraPage() {
       />
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 flex items-center justify-center p-6 md:p-12">
+      <main className="relative z-10 flex-1 flex items-center justify-center p-6 md:p-12 pt-28">
         <div className="w-full max-w-lg mx-auto text-center animate-fade-in">
           
           {/* Card Glassmorphism */}

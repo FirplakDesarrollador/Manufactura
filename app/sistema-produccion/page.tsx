@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Header from '@/components/opt-sistemica/Header'
 
 interface User {
     id: string
@@ -86,43 +87,14 @@ export default function SistemaProduccionPage() {
             </div>
 
             {/* Premium Header */}
-            <header className="relative z-50 bg-[#324354] border-b border-[#324354] shadow-md sticky top-0">
-                <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                        <button
-                            onClick={() => router.push('/home')}
-                            className="group flex items-center justify-center w-11 h-11 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/30 rounded-xl transition-all duration-300 shadow-sm"
-                            title="Volver al Inicio"
-                        >
-                            <svg className="w-5 h-5 text-[#F6F3EE] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                        </button>
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase">
-                                Sistema de Producción
-                            </h1>
-                            <p className="text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide">Módulo Operativo</p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-6 min-w-0 shrink-0">
-                        <div className="text-right hidden md:block max-w-[200px] lg:max-w-[300px] min-w-0">
-                            <p className="text-[10px] text-[#F6F3EE]/60 font-bold tracking-widest uppercase">Bienvenido</p>
-                            <p className="text-sm font-semibold text-white truncate" title={user?.email || 'Usuario'}>{user?.email || 'Usuario'}</p>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="px-4 py-2 bg-[#7B8E90] hover:bg-[#6c7d7f] text-white rounded-xl transition font-semibold text-sm whitespace-nowrap shadow-sm hover:shadow-md shrink-0"
-                        >
-                            Cerrar Sesión
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <Header 
+                title="Sistema de Producción"
+                subtitle="Módulo Operativo"
+                userEmail={user?.email || ''}
+            />
 
             {/* Main Content */}
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-12 lg:p-16">
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-12 lg:p-16 pt-28">
                 
                 <div className="w-full max-w-[1600px] flex flex-wrap justify-center gap-6 md:gap-8">
                     
