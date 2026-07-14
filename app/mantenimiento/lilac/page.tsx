@@ -34,168 +34,455 @@ import Header from '@/components/opt-sistemica/Header'
 // ----------------------------------------------------
 // 1. SEED DATA - AUTOMANTENIMIENTO ENCHAPADORA SCM (LILAC)
 // ----------------------------------------------------
-const SEED_ESTANDAR = {
-  id: "est-enchapadora-scm",
-  equipo: "Enchapadora SCM",
-  planta: "MBL",
-  criticidad: "A",
-  codigo_hdt: "V1",
-  labor: "Limpieza y Ajuste de Enchapadora SCM",
-  herramientas: ["Brocha", "Pistola de aire comprimido", "Recogedor", "Trapos", "Tíner"],
-  insumos: ["Trapos", "Thinner", "Alcohol etílico al 70%"],
-  epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
-  fecha_elaboracion: "2023-10-26",
-  elaboro: "Roberto Aguilar",
-  aprobo: "Hector Chinchilla",
-  nota_general: "No se debe utilizar silicona en la máquina.",
-  steps: [
-    {
-      id: "step-1",
-      orden: 1,
-      nombre_paso: "Accionar paro de emergencia de la máquina",
-      categoria_lilac: "Seguridad",
-      frecuencia: "Cada turno",
-      tiempo_estimado_min: 2,
-      criterio_aceptacion: "Paro de emergencia accionado, máquina apagada y cabina desbloqueada de forma segura.",
-      sub_acciones: [
-        {
-          detalle_texto: "Girar llave para desbloquear cabina.",
-          imagen_url: "/imagenes_enchapadora_scm/paso01_paro_emergencia.png"
-        }
-      ]
-    },
-    {
-      id: "step-2",
-      orden: 2,
-      nombre_paso: "Soplar toda la máquina de arriba hacia abajo",
-      categoria_lilac: "Limpieza",
-      frecuencia: "Cada turno",
-      tiempo_estimado_min: 5,
-      criterio_aceptacion: "Libre de viruta y polvo en guías, calderín y zonas mecánicas visibles.",
-      sub_acciones: [
-        {
-          detalle_texto: "Partiendo desde el calderín soplar hacia la izquierda, y del calderín hacia el tupí soplar hacia la derecha. Esto evita impurezas en la pega.",
-          imagen_url: "/imagenes_enchapadora_scm/paso02a_soplado_general.png"
-        },
-        {
-          detalle_texto: "Continuación del soplado general de la máquina.",
-          imagen_url: "/imagenes_enchapadora_scm/paso02b_soplado_general_2.png"
-        }
-      ]
-    },
-    {
-      id: "step-3",
-      orden: 3,
-      nombre_paso: "Abrir las compuertas y soplar al interior",
-      categoria_lilac: "Limpieza",
-      frecuencia: "Cada turno",
-      tiempo_estimado_min: 8,
-      criterio_aceptacion: "Compuertas interiores sopladas, libre de aserrín acumulado en grupos de corte y perfilado.",
-      sub_acciones: [
-        {
-          detalle_texto: "Se realiza el soplado de arriba hacia abajo quitando todas las impurezas de todos los grupos.",
-          imagen_url: "/imagenes_enchapadora_scm/paso03_abrir_compuertas_soplar.png"
-        }
-      ]
-    },
-    {
-      id: "step-4",
-      orden: 4,
-      nombre_paso: "Actividades de limpieza al interior de las compuertas",
-      categoria_lilac: "Limpieza",
-      frecuencia: "Cada turno",
-      tiempo_estimado_min: 10,
-      criterio_aceptacion: "Piso de compuertas barrido, recipientes de polvillo vacíos y niveles de líquidos llenos e iguales.",
-      sub_acciones: [
-        {
-          detalle_texto: "1. Retirar retales de canto. 2. Barrer puesto de trabajo y recoger polvillo y retales.",
-          imagen_url: "/imagenes_enchapadora_scm/paso04a_retirar_retales_barrer.png"
-        },
-        {
-          detalle_texto: "3. Vaciar el polvillo que se recoge en los dos recipientes que están debajo de la máquina.",
-          imagen_url: "/imagenes_enchapadora_scm/paso04b_vaciar_polvillo.png"
-        },
-        {
-          detalle_texto: "4. Verificar niveles de líquidos: blanco (antiadherente) RIE y rosado (limpiador) RIE. Rellenar cuando sea necesario; ambos tarros deben permanecer con la misma cantidad.",
-          imagen_url: "/imagenes_enchapadora_scm/paso04c_verificar_niveles_liquidos.png"
-        }
-      ]
-    },
-    {
-      id: "step-5",
-      orden: 5,
-      nombre_paso: "Piezas palpadoras: limpieza del rodillo palpador vertical",
-      categoria_lilac: "Inspección",
-      frecuencia: "Cada 8 horas",
-      tiempo_estimado_min: 4,
-      criterio_aceptacion: "Rodillo palpador vertical limpio, gira libremente y libre de adhesivos endurecidos.",
-      sub_acciones: [
-        {
-          detalle_texto: "Referencia del punto antes de limpiar.",
-          imagen_url: "/imagenes_enchapadora_scm/paso05a_palpador_vertical_ref.png"
-        },
-        {
-          detalle_texto: "1. Limpiar la superficie del palpador. 2. Eliminar la suciedad; ambas actividades se realizan con aire comprimido. Si no sale con aire comprimido, aplicar thinner o alcohol en un trapo y limpiar.",
-          imagen_url: "/imagenes_enchapadora_scm/paso05b_limpieza_palpador_vertical.png"
-        }
-      ]
-    },
-    {
-      id: "step-6",
-      orden: 6,
-      nombre_paso: "Realizar vaciado de pega",
-      categoria_lilac: "Ajuste",
-      frecuencia: "Una vez por turno",
-      tiempo_estimado_min: 12,
-      criterio_aceptacion: "Bandeja desbloqueada, cola descargada y depósito limpio para evitar carbonización.",
-      sub_acciones: [
-        {
-          detalle_texto: "Referencia general del punto de vaciado de pega.",
-          imagen_url: "/imagenes_enchapadora_scm/paso06a_vaciado_pega_ref.png"
-        },
-        {
-          detalle_texto: "1. Dejar presionado el rodillo de pega.",
-          imagen_url: "/imagenes_enchapadora_scm/paso06b_presionar_rodillo_pega.png"
-        },
-        {
-          detalle_texto: "2. Poner la máquina en manual.",
-          imagen_url: "/imagenes_enchapadora_scm/paso06c_maquina_manual.png"
-        },
-        {
-          detalle_texto: "3. Presionar descargue de cola.",
-          imagen_url: "/imagenes_enchapadora_scm/paso06d_descargue_cola.png"
-        },
-        {
-          detalle_texto: "4. Despresurizar la válvula del rodillo de arrastre de canto.",
-          imagen_url: "/imagenes_enchapadora_scm/paso06e_despresurizar_valvula.png"
-        },
-        {
-          detalle_texto: "5. Desbloquear bandeja.",
-          imagen_url: "/imagenes_enchapadora_scm/paso06f_desbloquear_bandeja.png"
-        },
-        {
-          detalle_texto: "6. Halar bandeja y 7. Vaciar pega.",
-          imagen_url: "/imagenes_enchapadora_scm/paso06g_halar_bandeja.png"
-        }
-      ]
-    },
-    {
-      id: "step-7",
-      orden: 7,
-      nombre_paso: "Verificación de rodillo de presión",
-      categoria_lilac: "Inspección",
-      frecuencia: "Cada turno",
-      tiempo_estimado_min: 3,
-      criterio_aceptacion: "Rodillos de presión completamente libres de pegante o virutas que marquen la madera.",
-      sub_acciones: [
-        {
-          detalle_texto: "Verificar que el rodillo de presión no tenga impurezas; si es el caso, retirarlas con trapo y tíner.",
-          imagen_url: "/imagenes_enchapadora_scm/paso07_verificacion_rodillo_presion.png"
-        }
-      ]
-    }
-  ]
-}
+const SEED_STANDARDS = [
+  {
+    id: "est-enchapadora-scm",
+    equipo: "Enchapadora SCM Stefani",
+    planta: "MBL",
+    criticidad: "A",
+    codigo_hdt: "V1",
+    labor: "Limpieza y Ajuste de Enchapadora SCM Stefani",
+    herramientas: ["Brocha", "Pistola de aire comprimido", "Recogedor", "Trapos", "Tíner"],
+    insumos: ["Trapos", "Thinner", "Alcohol etílico al 70%"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2023-10-26",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina. No se debe utilizar silicona en la máquina.",
+    steps: [
+      {
+        id: "step-1-1",
+        orden: 1,
+        nombre_paso: "Accionar paro de emergencia de la máquina",
+        categoria_lilac: "Seguridad",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 2,
+        criterio_aceptacion: "Paro de emergencia accionado, máquina apagada y cabina desbloqueada de forma segura.",
+        sub_acciones: [{ detalle_texto: "Girar llave para desbloquear cabina.", imagen_url: "/imagenes_enchapadora_scm/paso01_paro_emergencia.png" }]
+      },
+      {
+        id: "step-1-2",
+        orden: 2,
+        nombre_paso: "Soplar toda la máquina de arriba hacia abajo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Libre de viruta y polvo en guías, calderín y zonas mecánicas visibles.",
+        sub_acciones: [
+          { detalle_texto: "Partiendo desde el calderín soplar hacia la izquierda, y del calderín hacia el tupí soplar hacia la derecha. Esto evita impurezas en la pega.", imagen_url: "/imagenes_enchapadora_scm/paso02a_soplado_general.png" },
+          { detalle_texto: "Continuación del soplado general de la máquina.", imagen_url: "/imagenes_enchapadora_scm/paso02b_soplado_general_2.png" }
+        ]
+      },
+      {
+        id: "step-1-3",
+        orden: 3,
+        nombre_paso: "Abrir las compuertas y soplar al interior",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Compuertas interiores sopladas, libre de aserrín acumulado en grupos de corte y perfilado.",
+        sub_acciones: [{ detalle_texto: "Se realiza el soplado de arriba hacia abajo quitando todas las impurezas de todos los grupos.", imagen_url: "/imagenes_enchapadora_scm/paso03_abrir_compuertas_soplar.png" }]
+      },
+      {
+        id: "step-1-4",
+        orden: 4,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración libres de obstrucciones y virutas acumuladas.",
+        sub_acciones: [{ detalle_texto: "Vaciar y barrer campanas de aspiración.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-5",
+        orden: 5,
+        nombre_paso: "Limpiar guía de canto con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Guía de canto limpia, libre de polvo y residuos que afecten la alimentación del material.",
+        sub_acciones: [{ detalle_texto: "Soplar la guía de canto.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-6",
+        orden: 6,
+        nombre_paso: "Limpiar los restos de adhesivo en el palpador y el conducto de salida del caldero, haciendo una descarga",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 10,
+        criterio_aceptacion: "Depósito de pega limpio, conducto de salida sin obstrucciones y descarga realizada.",
+        sub_acciones: [{ detalle_texto: "Limpiar residuos del caldero y palpador, vaciar residuo.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-7",
+        orden: 7,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se enchapó, con trapo y alcohol isopropílico o thinner",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 12,
+        criterio_aceptacion: "Áreas enchapadas libres de suciedad y excedentes, limpio con trapo y alcohol o thinner.",
+        sub_acciones: [{ detalle_texto: "Limpieza con trapo humedecido en alcohol isopropílico o thinner.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-8",
+        orden: 8,
+        nombre_paso: "Limpiar las superficies de contacto: guías, rodillos y cualquier parte en contacto directo con el panel",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Superficies de contacto suaves y limpias, libre de marcas de pegante.",
+        sub_acciones: [{ detalle_texto: "Limpiar guías y rodillos de arrastre con trapo y alcohol o thinner.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-9",
+        orden: 9,
+        nombre_paso: "Eliminar restos de adhesivo que puedan acumularse en los rodillos o en el palpador del caldero",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Rodillos y palpador sin acumulaciones duras de pegante.",
+        sub_acciones: [{ detalle_texto: "Limpiar con trapo y solvente antes de que se endurezcan.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-10",
+        orden: 10,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Chasis exterior libre de polvo y residuos visibles.",
+        sub_acciones: [{ detalle_texto: "Pasar trapo seco o ligeramente húmedo por la superficie exterior.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-seccionadora-scm",
+    equipo: "Seccionadora SCM Sigma Prima",
+    planta: "MBL",
+    criticidad: "A",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Seccionadora SCM Sigma Prima",
+    herramientas: ["Brocha", "Pistola de aire comprimido", "Trapos", "Limpiador para discos"],
+    insumos: ["Trapos", "Limpiador de resinas", "Aceite ligero"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-02-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-2-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de material cortado de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración libres de aserrín y recortes acumulados.",
+        sub_acciones: [{ detalle_texto: "Retirar piezas grandes de material y limpiar la campana.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-2",
+        orden: 2,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se cortó, con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Zona de corte soplada y libre de viruta acumulada.",
+        sub_acciones: [{ detalle_texto: "Soplar la mesa de trabajo y carro de sierras con aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-3",
+        orden: 3,
+        nombre_paso: "Limpiar las superficies de contacto: guías y rodillos, con trapo y aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Guías limpias de polvo para asegurar un deslizamiento sin rozamiento.",
+        sub_acciones: [{ detalle_texto: "Limpiar las guías de alineación y rodillos con trapo y aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-4",
+        orden: 4,
+        nombre_paso: "Eliminar restos de madera que puedan acumularse en los discos o en el carro sierras (usar limpiador para discos y soplar con aire comprimido)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Discos limpios sin resina acumulada, carro sierras soplado.",
+        sub_acciones: [{ detalle_texto: "Aplicar limpiador para discos y soplar todas las superficies.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Superficie exterior limpia.",
+        sub_acciones: [{ detalle_texto: "Pasar trapo por el exterior del equipo.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-taladro-cyflex-s",
+    equipo: "Taladro vertical CYFLEX S",
+    planta: "MBL",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Taladro vertical CYFLEX S",
+    herramientas: ["Trapos", "Pistola de aire comprimido", "Brocha"],
+    insumos: ["Trapos", "Alcohol isopropílico", "Lubricante de guías"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-03-10",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-3-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración al finalizar cada turno o cada vez que sea necesario",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno o cuando sea necesario",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración sin acumulaciones de viruta.",
+        sub_acciones: [{ detalle_texto: "Retirar viruta acumulada de la zona de aspiración.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-2",
+        orden: 2,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Guías limpias y lubricadas, libres de polvillo adherido.",
+        sub_acciones: [{ detalle_texto: "Soplar guías y pasar trapo para remover impurezas.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-3",
+        orden: 3,
+        nombre_paso: "Soplar con aire comprimido las pinzas de sujeción al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Pinzas de agarre limpias para evitar deslizamiento inadecuado.",
+        sub_acciones: [{ detalle_texto: "Soplar pinzas de sujeción neumáticas.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-4",
+        orden: 4,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó (mesa y cabezal de brocas)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Mesa de trabajo y cabezal de brocas sin restos de material.",
+        sub_acciones: [{ detalle_texto: "Limpiar mesa y cabezal de brocas con trapo y aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Carcasa exterior libre de polvo.",
+        sub_acciones: [{ detalle_texto: "Limpieza de chasis exterior con trapo.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-taladro-cx100",
+    equipo: "Taladro vertical CX 100",
+    planta: "MBL",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Taladro vertical CX 100",
+    herramientas: ["Trapos", "Pistola de aire comprimido", "Brocha"],
+    insumos: ["Trapos", "Alcohol isopropílico"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-03-10",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-4-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración al finalizar cada turno o cada vez que sea necesario",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno o cuando sea necesario",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración sin virutas.",
+        sub_acciones: [{ detalle_texto: "Remover la viruta de las campanas.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-2",
+        orden: 2,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Guías limpias y deslizantes.",
+        sub_acciones: [{ detalle_texto: "Soplar y pasar trapo en las guías de los ejes.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-3",
+        orden: 3,
+        nombre_paso: "Soplar con aire comprimido las pinzas de sujeción al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Pinzas libres de polvillo para un agarre firme.",
+        sub_acciones: [{ detalle_texto: "Soplar las mordazas/pinzas de sujeción.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-4",
+        orden: 4,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó (mesa y cabezal de brocas)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Mesa limpia y cabezal libre de polvo acumulado.",
+        sub_acciones: [{ detalle_texto: "Limpiar mesa y cabezal de brocas con trapo y aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Chasis exterior limpio.",
+        sub_acciones: [{ detalle_texto: "Limpiar superficies externas con trapo.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-taladro-cx200",
+    equipo: "Taladro vertical CX 200",
+    planta: "MBL",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Taladro vertical CX 200",
+    herramientas: ["Trapos", "Pistola de aire comprimido", "Brocha"],
+    insumos: ["Trapos", "Alcohol isopropílico"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-03-10",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-5-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración al finalizar cada turno o cada vez que sea necesario",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno o cuando sea necesario",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Aspiradores libres de obstrucción.",
+        sub_acciones: [{ detalle_texto: "Limpiar acumulaciones en campanas.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-2",
+        orden: 2,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Guías sin virutas ni suciedad.",
+        sub_acciones: [{ detalle_texto: "Limpieza general de guías.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-3",
+        orden: 3,
+        nombre_paso: "Soplar con aire comprimido las pinzas de sujeción al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Pinzas neumáticas limpias.",
+        sub_acciones: [{ detalle_texto: "Soplar pinzas.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-4",
+        orden: 4,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó (mesa de trabajo y los dos cabezales de brocas)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Mesa de trabajo y ambos cabezales de brocas libres de polvo.",
+        sub_acciones: [{ detalle_texto: "Limpieza con trapo y aire comprimido de mesa y cabezales.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Chasis limpio.",
+        sub_acciones: [{ detalle_texto: "Limpiar carcasa exterior.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-escuadradora-robland",
+    equipo: "Escuadradora Robland",
+    planta: "MBL",
+    criticidad: "C",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Escuadradora Robland",
+    herramientas: ["Brocha", "Pistola de aire comprimido", "Trapos"],
+    insumos: ["Trapos", "Alcohol etílico al 70%"],
+    epp: ["Gafas de seguridad", "Botas de seguridad"],
+    fecha_elaboracion: "2024-04-05",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-6-1",
+        orden: 1,
+        nombre_paso: "Al terminar el turno, soplar cuidadosamente el aserrín y el polvo, especialmente alrededor de ventiladores y motores",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al terminar el turno",
+        tiempo_estimado_min: 7,
+        criterio_aceptacion: "Motores y ventiladores libres de polvo para prevenir sobrecalentamiento.",
+        sub_acciones: [{ detalle_texto: "Soplar suavemente el polvo de ventiladores y motores.", imagen_url: "" }]
+      },
+      {
+        id: "step-6-2",
+        orden: 2,
+        nombre_paso: "Mantener libre de polvo las guías del carro de aluminio para preservar el deslizamiento suave",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Carro de aluminio desliza suave y libre de interferencias.",
+        sub_acciones: [{ detalle_texto: "Limpiar guías del carro.", imagen_url: "" }]
+      },
+      {
+        id: "step-6-3",
+        orden: 3,
+        nombre_paso: "Limpiar el disco principal e incisor, sus bridas y tuercas, cada vez que se realice el cambio",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada vez que se realice el cambio",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Tuercas y bridas limpias para evitar vibraciones en el disco.",
+        sub_acciones: [{ detalle_texto: "Limpiar discos y piezas de sujeción al cambiarlos.", imagen_url: "" }]
+      },
+      {
+        id: "step-6-4",
+        orden: 4,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Exterior del equipo libre de aserrín acumulado.",
+        sub_acciones: [{ detalle_texto: "Limpieza general de chasis con trapo.", imagen_url: "" }]
+      }
+    ]
+  }
+]
+
+const SEED_ESTANDAR = SEED_STANDARDS[0]
 
 // Default initial anomalies if localStorage is empty
 const INITIAL_ANOMALIES = [
@@ -286,7 +573,7 @@ export default function LillacModulePage() {
   const [searchTerm, setSearchTerm] = useState('')
   
   // Storage states
-  const [standards, setStandards] = useState<any[]>([SEED_ESTANDAR])
+  const [standards, setStandards] = useState<any[]>(SEED_STANDARDS)
   const [history, setHistory] = useState<any[]>([])
   const [anomalies, setAnomalies] = useState<any[]>([])
 
@@ -355,10 +642,10 @@ export default function LillacModulePage() {
   // ----------------------------------------------------
   const [roundSetup, setRoundSetup] = useState({
     planta: "MBL",
-    equipo: "Enchapadora SCM",
+    equipo: SEED_STANDARDS[0].equipo,
     operario: "",
     turno: "Mañana",
-    estandarId: "est-enchapadora-scm"
+    estandarId: SEED_STANDARDS[0].id
   })
   const [isRoundActive, setIsRoundActive] = useState(false)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -381,7 +668,7 @@ export default function LillacModulePage() {
   const [showAnomalyForm, setShowAnomalyForm] = useState(false)
 
   // Selected equipment in Master list
-  const [selectedMasterEstandar, setSelectedMasterEstandar] = useState<any>(SEED_ESTANDAR)
+  const [selectedMasterEstandar, setSelectedMasterEstandar] = useState<any>(SEED_STANDARDS[0])
   const [isAddingStandard, setIsAddingStandard] = useState(false)
 
   // ----------------------------------------------------
@@ -403,7 +690,7 @@ export default function LillacModulePage() {
   }
 
   const activeEstandar = useMemo(() => {
-    return standards.find(s => s.id === roundSetup.estandarId) || SEED_ESTANDAR
+    return standards.find(s => s.id === roundSetup.estandarId) || SEED_STANDARDS[0]
   }, [standards, roundSetup.estandarId])
 
   const currentStep = activeEstandar.steps[currentStepIndex]
