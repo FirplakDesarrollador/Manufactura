@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
-import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 import Link from 'next/link';
 // Importación de auth eliminada
 import Combobox from '@/components/ficha-rcc/Combobox';
@@ -17,6 +17,7 @@ interface RegistroAsistencia {
 
 export default function AsistenciaPage() {
   const router = useRouter();
+  const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fecha, setFecha] = useState(() => {
@@ -38,6 +39,7 @@ export default function AsistenciaPage() {
       }
       
       const userEmail = session.user.email?.toLowerCase() || '';
+      setUserEmail(session.user.email || '');
       
       const { data: userData } = await supabase
         .from('usuarios')
@@ -199,26 +201,30 @@ export default function AsistenciaPage() {
   }
 
   return (
-    <div className="home-container" style={{ maxWidth: '1100px' }}>
-      <div className="header" style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ background: 'var(--header-bg)', padding: '20px 40px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <FirplakLogo height="70px" />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <Link href="/ficha-rcc/asistencia/indicadores" style={{ textDecoration: 'none' }}>
-             <button className="btn-primary" style={{ padding: '10px 20px', background: 'var(--accent)' }}>📊 Indicadores</button>
-          </Link>
-          <Link href="/home" style={{ textDecoration: 'none' }}>
-             <button className="btn-secondary">Volver al Panel</button>
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
+      <Header
+        title="Respuesta Rápida Calidad"
+        subtitle="RRC"
+        userEmail={userEmail}
+        showLogout={true}
+        onLogout={async () => {
+          await supabase.auth.signOut();
+          router.push('/login');
+        }}
+      />
 
-      <div className="glass-panel" style={{ padding: '40px' }}>
-        <h2 style={{ color: 'var(--primary)', marginBottom: '10px' }}>Control de Asistencia Diaria</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Registra la asistencia del personal responsable principal.</p>
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1100px]">
+          <div className="glass-panel" style={{ padding: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h2 style={{ color: 'var(--primary)', marginBottom: '10px' }}>Control de Asistencia Diaria</h2>
+            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Registra la asistencia del personal responsable principal.</p>
+          </div>
+          <Link href="/ficha-rcc/asistencia/indicadores" style={{ textDecoration: 'none' }}>
+             <button className="btn-primary" style={{ padding: '10px 20px', background: 'var(--accent)', width: 'auto' }}>📊 Indicadores</button>
+          </Link>
+        </div>
 
         {/* Indicadores y Filtros */}
         <div style={{ display: 'flex', gap: '30px', marginBottom: '40px', flexWrap: 'wrap' }}>
@@ -323,6 +329,8 @@ export default function AsistenciaPage() {
         </div>
 
       </div>
-    </div>
+     </div>
+    </main>
+   </div>
   );
 }

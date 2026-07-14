@@ -1,4 +1,5 @@
-.mtto-app {
+.mtto-autonomo-wrapper {
+.mtto-autonomo-wrapper {
   --bg-color: #FAFAFA;
   --card-bg: #FFFFFF;
   --text-primary: #123348;
@@ -14,13 +15,7 @@
   --radius-xl: 16px;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-.mtto-app {
+.mtto-autonomo-wrapper {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: var(--bg-color);
   color: var(--text-primary);
@@ -32,7 +27,7 @@
 }
 
 /* Subtle background decoration */
-.mtto-app::before {
+.mtto-autonomo-wrapper::before {
   content: "";
   position: absolute;
   top: -10%;
@@ -43,7 +38,7 @@
   z-index: 0;
 }
 
-.mtto-app::after {
+.mtto-autonomo-wrapper::after {
   content: "";
   position: absolute;
   bottom: -15%;
@@ -547,10 +542,7 @@
   opacity: 0;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+
 
 /* ============================================================
    PRINT STYLES - Global
@@ -566,9 +558,16 @@
     margin: 0 !important;
   }
 
-  .mtto-app {
+  .mtto-autonomo-wrapper {
     background: white !important;
     padding: 0 !important;
     overflow: visible !important;
   }
+}
+
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import { PlantaEnum, OrigenEnum, Accion, FichaAlerta } from '@/types';
 import Link from 'next/link';
 import SignatureCanvas from 'react-signature-canvas';
-import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
+import Header from '@/components/opt-sistemica/Header';
 import Combobox from '@/components/ficha-rcc/Combobox';
 import { PLANTAS_LIST, ORIGENES_LIST } from '@/lib/ficha-rcc/constants';
 import { isAuthorized } from '@/lib/ficha-rcc/auth';
@@ -254,19 +254,21 @@ export default function DetalleFichaPage({ params }: { params: Promise<{ id: str
   }
 
   return (
-    <div className="home-container" style={{ maxWidth: '1100px' }}>
-      <div className="header" style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ background: 'var(--header-bg)', padding: '20px 40px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <FirplakLogo height="70px" />
-          </div>
-        </div>
-        <Link href="/home" style={{ textDecoration: 'none' }}>
-           <button className="btn-secondary">Volver al Panel</button>
-        </Link>
-      </div>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
+      <Header
+        title="Respuesta Rápida Calidad"
+        subtitle="RRC"
+        userEmail={user?.email}
+        showLogout={true}
+        onLogout={async () => {
+          await supabase.auth.signOut();
+          router.push('/login');
+        }}
+      />
 
-      <div className="glass-panel">
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1100px]">
+          <div className="glass-panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h2 style={{ margin: 0, color: 'var(--primary)' }}>
                 {isOwner ? 'Editar Ficha de Alerta' : 'Consultar Ficha de Alerta'}
@@ -544,6 +546,8 @@ export default function DetalleFichaPage({ params }: { params: Promise<{ id: str
           )}
         </form>
       </div>
-    </div>
+     </div>
+    </main>
+   </div>
   );
 }

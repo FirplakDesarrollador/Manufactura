@@ -26,6 +26,7 @@ import {
     Home
 } from "lucide-react";
 import Link from "next/link";
+import Header from "@/components/opt-sistemica/Header";
 import { format } from "date-fns";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -103,6 +104,18 @@ export default function EstadisticasSistemaProduccion() {
     const [optSistemicaData, setOptSistemicaData] = useState<OPTSistemicaRecord[]>([]);
     const [hdtData, setHdtData] = useState<HDTRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [userEmail, setUserEmail] = useState('');
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserEmail(user.email || '');
+            }
+        };
+        checkUser();
+    }, []);
 
     // Filtros
     const [filterYear, setFilterYear] = useState<string>("all");
@@ -605,25 +618,13 @@ export default function EstadisticasSistemaProduccion() {
     }
 
     return (
-        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000] pt-28">
             {/* Header */}
-            <header className="w-full bg-[#324354] text-white shadow-md p-4 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/home">
-                        <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
-                            <ArrowLeft size={20} />
-                            <span className="hidden sm:inline font-bold">Volver a Producción</span>
-                        </Button>
-                    </Link>
-                    <h1 className="font-display font-light text-lg md:text-xl uppercase tracking-widest">
-                        Estadísticas del Sistema
-                    </h1>
-                    <div className="flex flex-col items-end">
-                        <div className="font-bold text-xl tracking-wider leading-none">FIRPLAK</div>
-                        <div className="text-[9px] opacity-70 uppercase tracking-widest">inspiring homes</div>
-                    </div>
-                </div>
-            </header>
+            <Header 
+                title="Estadísticas de Producción"
+                subtitle="Módulo Operativo"
+                userEmail={userEmail}
+            />
 
             {/* Main Content */}
             <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 pb-20 space-y-6">

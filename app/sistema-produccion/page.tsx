@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Header from '@/components/opt-sistemica/Header'
 
 interface User {
     id: string
@@ -86,43 +87,14 @@ export default function SistemaProduccionPage() {
             </div>
 
             {/* Premium Header */}
-            <header className="relative z-50 bg-[#324354] border-b border-[#324354] shadow-md sticky top-0">
-                <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                        <button
-                            onClick={() => router.push('/home')}
-                            className="group flex items-center justify-center w-11 h-11 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/30 rounded-xl transition-all duration-300 shadow-sm"
-                            title="Volver al Inicio"
-                        >
-                            <svg className="w-5 h-5 text-[#F6F3EE] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                        </button>
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase">
-                                Sistema de Producción
-                            </h1>
-                            <p className="text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide">Módulo Operativo</p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-6 min-w-0 shrink-0">
-                        <div className="text-right hidden md:block max-w-[200px] lg:max-w-[300px] min-w-0">
-                            <p className="text-[10px] text-[#F6F3EE]/60 font-bold tracking-widest uppercase">Bienvenido</p>
-                            <p className="text-sm font-semibold text-white truncate" title={user?.email || 'Usuario'}>{user?.email || 'Usuario'}</p>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="px-4 py-2 bg-[#7B8E90] hover:bg-[#6c7d7f] text-white rounded-xl transition font-semibold text-sm whitespace-nowrap shadow-sm hover:shadow-md shrink-0"
-                        >
-                            Cerrar Sesión
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <Header 
+                title="Sistema de Producción"
+                subtitle="Módulo Operativo"
+                userEmail={user?.email || ''}
+            />
 
             {/* Main Content */}
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-12 lg:p-16">
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-12 lg:p-16 pt-28">
                 
                 <div className="w-full max-w-[1600px] flex flex-wrap justify-center gap-6 md:gap-8">
                     
@@ -231,6 +203,36 @@ export default function SistemaProduccionPage() {
                             <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">Tarjetas Excelencia</span>
                         </button>
                     )}
+
+                    {/* Bitácora Button */}
+                    <button
+                        onClick={() => router.push('/sistema-produccion/bitacora')}
+                        className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
+                    >
+                        <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                        
+                        <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
+                            <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                        </div>
+                        <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">Bitácora</span>
+                    </button>
+
+                    {/* Auditorías Button */}
+                    <button
+                        onClick={() => router.push('/sistema-produccion/auditorias')}
+                        className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
+                    >
+                        <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                        
+                        <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
+                            <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">Auditorías</span>
+                    </button>
 
                     {!hasApp('hora_a_hora') && !hasApp('opt') && !hasOptSistemica() && !hasApp('estadisticas_produccion') && !hasApp('tarjetas_excelencia') && !hasHdt() && (
                         <div className="w-full max-w-lg py-20 px-8 text-center bg-white rounded-3xl border border-[#e2ded5] shadow-sm">
