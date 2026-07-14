@@ -282,7 +282,8 @@ const INITIAL_HISTORY = [
 export default function LillacModulePage() {
   const router = useRouter()
   const [userEmail, setUserEmail] = useState('')
-  const [activeTab, setActiveTab] = useState<'ejecucion' | 'historial' | 'dashboard' | 'estandares'>('ejecucion')
+  const [activeTab, setActiveTab] = useState<'estandares' | 'historial' | 'auditoria' | 'ejecucion'>('estandares')
+  const [searchTerm, setSearchTerm] = useState('')
   
   // Storage states
   const [standards, setStandards] = useState<any[]>([SEED_ESTANDAR])
@@ -754,18 +755,6 @@ export default function LillacModulePage() {
         <div className="bg-white border-b border-[#e2ded5] py-2 px-4 shadow-sm relative z-30">
           <div className="max-w-7xl mx-auto flex flex-wrap gap-2 sm:gap-4 justify-center">
             <button
-              onClick={() => setActiveTab('ejecucion')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
-                activeTab === 'ejecucion'
-                  ? 'bg-[#324354] text-white shadow-md'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }`}
-            >
-              <Play size={16} />
-              <span>Ejecutar Ronda</span>
-            </button>
-
-            <button
               onClick={() => setActiveTab('estandares')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
                 activeTab === 'estandares'
@@ -774,7 +763,7 @@ export default function LillacModulePage() {
               }`}
             >
               <ClipboardList size={16} />
-              <span>Estándares (Capa A)</span>
+              <span>Estándares</span>
             </button>
 
             <button
@@ -786,19 +775,31 @@ export default function LillacModulePage() {
               }`}
             >
               <History size={16} />
-              <span>Historial (Capa B)</span>
+              <span>Historial</span>
             </button>
 
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => setActiveTab('auditoria')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
-                activeTab === 'dashboard'
+                activeTab === 'auditoria'
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
             >
-              <LayoutDashboard size={16} />
-              <span>Indicadores KPIs</span>
+              <Activity size={16} />
+              <span>Auditoría</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ejecucion')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+                activeTab === 'ejecucion'
+                  ? 'bg-[#324354] text-white shadow-md'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Play size={16} />
+              <span>Ejecución</span>
             </button>
           </div>
         </div>
@@ -1142,31 +1143,65 @@ export default function LillacModulePage() {
               <div className="bg-white rounded-2xl border border-[#e2ded5] shadow-sm p-4 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <h3 className="font-bold text-[#324354] text-sm">Estándares LILAC</h3>
-                  <button
-                    onClick={() => setIsAddingStandard(true)}
-                    className="p-1 bg-[#324354]/10 hover:bg-[#324354]/20 rounded text-[#324354] transition"
-                    title="Registrar nuevo estándar"
-                  >
-                    <Plus size={16} />
-                  </button>
+                </div>
+
+                {/* New Standard Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsAddingStandard(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#324354] hover:bg-[#25313e] text-white font-bold rounded-xl transition duration-200 shadow-sm text-xs uppercase tracking-wider"
+                >
+                  <Plus size={16} />
+                  <span>Nuevo Estándar</span>
+                </button>
+
+                {/* Search Box */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar estándar..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-[#324354] font-medium"
+                  />
+                  <div className="absolute left-3 top-3 text-slate-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  {standards.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => { setSelectedMasterEstandar(s); setIsAddingStandard(false) }}
-                      className={`w-full p-3 rounded-xl border text-left transition ${
-                        selectedMasterEstandar.id === s.id
-                          ? 'border-[#324354] bg-[#324354]/5 font-semibold text-[#324354]'
-                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                      }`}
-                    >
-                      <div className="text-xs uppercase font-extrabold tracking-wider text-slate-400">{s.planta}</div>
-                      <div className="text-sm font-bold truncate">{s.equipo}</div>
-                      <div className="text-[11px] truncate text-slate-500">{s.labor}</div>
-                    </button>
-                  ))}
+                  {standards
+                    .filter(s => 
+                      s.equipo?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                      s.labor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      s.planta?.toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                    .map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setSelectedMasterEstandar(s); setIsAddingStandard(false) }}
+                        className={`w-full p-3 rounded-xl border text-left transition ${
+                          selectedMasterEstandar.id === s.id
+                            ? 'border-[#324354] bg-[#324354]/5 font-semibold text-[#324354]'
+                            : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        <div className="text-xs uppercase font-extrabold tracking-wider text-slate-400">{s.planta}</div>
+                        <div className="text-sm font-bold truncate">{s.equipo}</div>
+                        <div className="text-[11px] truncate text-slate-500">{s.labor}</div>
+                      </button>
+                    ))}
+                  {standards.filter(s => 
+                    s.equipo?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    s.labor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    s.planta?.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).length === 0 && (
+                    <div className="text-center text-xs text-slate-400 py-4">
+                      No se encontraron estándares.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1570,8 +1605,8 @@ export default function LillacModulePage() {
           </div>
         )}
 
-        {/* TAB 4: KPIS / DASHBOARD */}
-        {activeTab === 'dashboard' && (
+        {/* TAB 3: AUDITORIA / KPIS */}
+        {activeTab === 'auditoria' && (
           <div className="space-y-6">
             
             {/* Key KPI summary cards */}
