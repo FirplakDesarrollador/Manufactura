@@ -28,7 +28,8 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     tarjetas_excelencia: true,
     estadisticas_produccion: true,
     indicadores_productividad: true,
-    asistencia: true
+    asistencia: true,
+    mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar']
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -43,7 +44,8 @@ const PERMISSION_LABELS: Record<string, string> = {
     tarjetas_excelencia: 'Tarjetas Excelencia',
     estadisticas_produccion: 'Estadísticas Sistema',
     indicadores_productividad: 'Indicadores Productividad',
-    asistencia: 'Asistencia'
+    asistencia: 'Asistencia',
+    mantenimiento: 'Mantenimiento (LILAC)'
 };
 
 export default function UsuariosConfiguracionPage() {

@@ -219,7 +219,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
         const { error: e2 } = await supabase.from('puestas_a_punto_detalle').insert(rows);
         if (e2) throw e2;
         setMsg({ t: 's', m: `Nueva versión creada.` });
-        setTimeout(() => router.push(`/puestas-a-punto/${encodeURIComponent(planta)}/ver/${newEnc.id_puesta_a_punto}`), 1500);
+        setTimeout(() => router.push(`/mantenimiento/puestas-a-punto/${encodeURIComponent(planta)}/ver/${newEnc.id_puesta_a_punto}`), 1500);
       } else {
         const dataToUpdate = { 
           nombre_puesta_a_punto: enc.nombre_puesta_a_punto, 
@@ -239,7 +239,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
         const { error: e3 } = await supabase.from('puestas_a_punto_detalle').insert(rows);
         if (e3) throw e3;
         setMsg({ t: 's', m: "Base de datos actualizada." });
-        setTimeout(() => router.push(`/puestas-a-punto/${encodeURIComponent(planta)}/ver/${id}`), 1500);
+        setTimeout(() => router.push(`/mantenimiento/puestas-a-punto/${encodeURIComponent(planta)}/ver/${id}`), 1500);
       }
     } catch (e: any) { setMsg({ t: 'e', m: e.message }); }
     finally { setLoading(false); }

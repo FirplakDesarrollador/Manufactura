@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default async function PlantaPage({ params }: { params: Promise<{ planta: string }> }) {
   const resolvedParams = await params;
-  const basePath = `/puestas-a-punto/${resolvedParams.planta}`;
+  const basePath = `/mantenimiento/puestas-a-punto/${resolvedParams.planta}`;
   
   const actions = [
     { 

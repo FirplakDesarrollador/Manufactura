@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Cpu } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
 
@@ -33,6 +33,11 @@ export default function MttoHomePage() {
   }
 
   const modules = [
+    { 
+      title: "Máquinas", 
+      path: "/mantenimiento/maquinas", 
+      icon: <Cpu size={32} />
+    },
     { 
       title: "Puestas a Punto", 
       path: "/mantenimiento/puestas-a-punto", 

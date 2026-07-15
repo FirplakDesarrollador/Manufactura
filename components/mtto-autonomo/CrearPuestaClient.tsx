@@ -261,7 +261,7 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
         const { error: err2 } = await supabase.from('puestas_a_punto_detalle').insert(details);
         if (err2) throw err2;
       }
-      router.push(`/puestas-a-punto/${encodeURIComponent(plantaSeleccionada)}`);
+      router.push(`/mantenimiento/puestas-a-punto/${encodeURIComponent(plantaSeleccionada)}`);
     } catch (err: any) { setErrorDb(err.message); }
     finally { setLoading(false); }
   };
