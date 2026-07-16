@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -58,20 +59,30 @@ export default function CalidadMsReportPage() {
         if (defectsRes.data) setDefects(defectsRes.data)
         if (reportsRes.data) {
             setTodaysReports(reportsRes.data)
-            calculateStats(reportsRes.data)
+            
+            const isIgnoredDefect = (defectName: string) => {
+                const cleanName = defectName.replace(/^\s*\d+\.\s*/, '').trim().toLowerCase()
+                return [
+                    'saldos/destrucciones',
+                    'opaco',
+                    'error en pedido referencia',
+                    'quebrados logistica'
+                ].includes(cleanName)
+            }
+            
+            const total = reportsRes.data.length
+            const defectuosos = reportsRes.data.filter(r => {
+                if (!r.defectos_lista || r.defectos_lista === '') return false
+                const defects = String(r.defectos_lista).split(',').map(s => s.trim())
+                return defects.some(d => !isIgnoredDefect(d))
+            }).length
+            const buenos = total - defectuosos
+            const ifi = total > 0 ? (buenos / total) * 100 : 0
+            setStats({ buenos, defectuosos, total, ifi })
         }
 
         setLoading(false)
     }, [router])
-
-    const calculateStats = (reports: { defectos_lista?: string }[]) => {
-        const total = reports.length
-        const defectuosos = reports.filter(r => r.defectos_lista && r.defectos_lista !== '').length
-        const buenos = total - defectuosos
-        const ifi = total > 0 ? (buenos / total) * 100 : 0
-
-        setStats({ buenos, defectuosos, total, ifi })
-    }
 
     useEffect(() => {
         const load = async () => {
@@ -182,16 +193,17 @@ export default function CalidadMsReportPage() {
             <div className="bg-gray-50 border-b border-gray-200 sticky top-[56px] z-40">
                 <div className="max-w-full px-4 py-3 flex flex-wrap items-center gap-6">
                     <div className="flex-1 min-w-[300px]">
-                        <select
-                            value={selectedProduct}
-                            onChange={(e) => setSelectedProduct(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-[#254153] font-black text-base focus:border-[#254153] outline-none transition-all appearance-none"
-                        >
-                            <option value="">-- SELECCIONAR REFERENCIA DE PRODUCTO --</option>
-                            {products.map((p) => (
-                                <option key={p.id} value={p.id}>{p.Referencia}</option>
-                            ))}
-                        </select>
+                        <SearchableSelect
+                            name="producto"
+                            options={products.map((p) => p.Referencia)}
+                            placeholder="-- SELECCIONAR REFERENCIA DE PRODUCTO --"
+                            defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
+                            onValueChange={(val) => {
+                                const product = products.find(p => p.Referencia === val)
+                                setSelectedProduct(product ? product.id.toString() : '')
+                            }}
+                            className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-[#254153] font-black text-base focus:border-[#254153] outline-none transition-all"
+                        />
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -218,32 +230,34 @@ export default function CalidadMsReportPage() {
                     <div className="h-10 w-px bg-gray-200 hidden lg:block" />
 
                     {/* Quick Metrics */}
-                    <div className="flex items-center space-x-6 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center space-x-8 overflow-x-auto no-scrollbar ml-auto">
                         <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-green-500 rounded-none shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
-                            <span className="text-xs font-black text-gray-400 uppercase tracking-tighter">OK:</span>
-                            <span className="text-lg font-black text-green-600">{stats.buenos}</span>
+                            <div className="w-6 h-6 rounded-full bg-[#36A284] flex items-center justify-center text-white">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                            <span className="text-xl font-bold text-[#36A284]">{stats.buenos}</span>
+                            <span className="text-sm font-medium text-gray-500">Buenos</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-red-500 rounded-none shadow-[0_0_5px_rgba(239,68,68,0.5)]" />
-                            <span className="text-xs font-black text-gray-400 uppercase tracking-tighter">DEF:</span>
-                            <span className="text-lg font-black text-red-600">{stats.defectuosos}</span>
+                            <div className="w-6 h-6 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-sm">
+                                !
+                            </div>
+                            <span className="text-xl font-bold text-[#F24E4E]">{stats.defectuosos}</span>
+                            <span className="text-sm font-medium text-gray-500">Defectuosos</span>
                         </div>
-                        <div className="flex flex-col items-center px-4 border-l border-gray-200">
-                            <span className="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Eficiencia</span>
-                            <span className="text-xl font-black text-blue-600 leading-none">{stats.ifi.toFixed(1)}%</span>
+                        <div className="flex items-center">
+                            <span className="text-lg font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
                         </div>
-                        <div className="flex flex-col items-center px-4 border-l border-gray-200">
-                            <span className="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Total</span>
-                            <span className="text-xl font-black text-[#254153] leading-none">{stats.total}</span>
+                        <div className="flex items-center">
+                            <span className="text-lg font-bold text-gray-800">Total: {stats.total}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Grid - Full Width No Padding constraint */}
-            <main className="flex-1 w-full bg-gray-50 p-1">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 3xl:grid-cols-12 gap-1">
+            {/* Grid */}
+            <main className="flex-1 w-full bg-white p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                     {defects.map((defect, index) => {
                         const defectName = defect.defecto || defect.Defecto || defect.nombre || defect.Nombre || 'Defecto'
                         return (

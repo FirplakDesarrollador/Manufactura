@@ -12,13 +12,16 @@ interface SearchableSelectProps {
     onValueChange?: (value: string) => void
     defaultValue?: string
     disabled?: boolean
+    className?: string
 }
 
-export function SearchableSelect({ name, options, placeholder, required, label, onValueChange, defaultValue = '', disabled = false }: SearchableSelectProps) {
+export function SearchableSelect({ name, options, placeholder, required, label, onValueChange, defaultValue = '', disabled = false, className = '' }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState('')
     const [selectedValue, setSelectedValue] = React.useState(defaultValue)
     const containerRef = React.useRef<HTMLDivElement>(null)
+
+    // ... keeping the rest unchanged but modifying the trigger button class
 
     const normalize = (str: string) =>
         str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
@@ -70,9 +73,9 @@ export function SearchableSelect({ name, options, placeholder, required, label, 
 
                 <div
                     onClick={() => !disabled && setIsOpen(!isOpen)}
-                    className={`flex h-10 w-full items-center justify-between rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm ring-offset-white focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 ${disabled ? 'cursor-not-allowed opacity-50 bg-slate-50' : 'cursor-pointer hover:bg-slate-50/50'}`}
+                    className={`flex items-center justify-between rounded-md border border-slate-300 bg-white ring-offset-white focus-within:outline-none focus-within:ring-2 focus-within:ring-[#254153] focus-within:ring-offset-2 ${disabled ? 'cursor-not-allowed opacity-50 bg-slate-50' : 'cursor-pointer hover:bg-slate-50/50'} ${className || 'h-10 px-3 py-2 text-sm'}`}
                 >
-                    <span className={selectedValue ? 'text-slate-900 font-medium' : 'text-slate-500'}>
+                    <span className={selectedValue ? 'font-medium' : 'text-slate-500 font-normal'}>
                         {selectedValue || placeholder}
                     </span>
                     <div className="flex items-center gap-2">
@@ -91,12 +94,12 @@ export function SearchableSelect({ name, options, placeholder, required, label, 
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-md max-h-60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
                         <div className="p-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80 sticky top-0">
                             <Search size={16} className="text-slate-400" />
-                            <input
-                                autoFocus
-                                type="text"
-                                className="w-full bg-transparent outline-none text-sm py-1 placeholder:text-slate-400"
-                                placeholder="Buscar supervisor..."
-                                value={searchTerm}
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    className="w-full bg-transparent outline-none text-sm py-1 placeholder:text-slate-400"
+                                    placeholder="Buscar..."
+                                    value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                             />

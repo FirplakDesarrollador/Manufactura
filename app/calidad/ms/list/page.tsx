@@ -113,15 +113,42 @@ export default function ReportedDefectsListPage() {
                 }
             }
 
+            // --- DEBUG START ---
+            const { data: diaData } = await supabase.from('query_ms_reporte_defectos_dia').select('id')
+            if (diaData) {
+                const diaIds = new Set(diaData.map(d => d.id))
+                const missing = typedData.filter(r => !diaIds.has(r.id))
+                console.log('Missing from view:', missing.map(m => ({ id: m.id, defecto: m.defecto, Molde: m.Molde, Reparacion: (m as any).Reparacion })))
+            }
+            // --- DEBUG END ---
+
+            // Excluded defects logic based on query_ms_ifi_dia and user request
+            const isIgnoredDefect = (defectName: string) => {
+                const cleanName = defectName.replace(/^\s*\d+\.\s*/, '').trim().toLowerCase()
+                return [
+                    'saldos/destrucciones',
+                    'opaco',
+                    'error en pedido referencia',
+                    'quebrados logistica'
+                ].includes(cleanName)
+            }
+
             // Calculate total pieces stats (each record = 1 piece inspected)
             const filteredByDate = typedData.filter(r =>
                 new Date(r.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }) === selectedDate
             )
             const totalPieces = filteredByDate.length
+            
             const defectivePieces = filteredByDate.filter(r => {
                 const defects = Array.isArray(r.defecto) ? r.defecto : []
-                return defects.length > 0
+                const validDefects = defects.filter(d => {
+                    const name = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)
+                    if (!name) return false
+                    return !isIgnoredDefect(name)
+                })
+                return validDefects.length > 0
             }).length
+            
             const goodPieces = totalPieces - defectivePieces
             const efficiency = totalPieces > 0 ? (goodPieces / totalPieces) * 100 : 0
 

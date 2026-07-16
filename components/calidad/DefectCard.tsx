@@ -20,45 +20,35 @@ export const DefectCard: React.FC<DefectCardProps> = ({
     return (
         <button
             onClick={() => onToggle(!isSelected)}
-            className={`relative p-4 border transition-all duration-200 flex flex-col justify-between aspect-square w-full text-left group ${isSelected
-                    ? 'bg-[#254153] border-[#254153] text-white shadow-xl z-10'
-                    : 'bg-white border-gray-200 text-[#254153] hover:border-[#254153] hover:shadow-md'
-                }`}
+            className={`p-3 border transition-colors flex flex-col justify-between w-full text-left min-h-[90px] ${
+                isSelected
+                    ? 'bg-[#F2C94C] border-[#F2C94C] text-gray-800'
+                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
         >
-            <div className="relative z-10 w-full">
-                <div className="flex justify-between items-start mb-2">
-                    <span className={`text-[10px] font-bold tracking-tighter px-1.5 py-0.5 border ${isSelected ? 'border-blue-400 text-blue-300' : 'border-gray-200 text-gray-400'
-                        }`}>
-                        {index.toString().padStart(2, '0')}
-                    </span>
-
-                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-gray-100'}`} />
-                </div>
-
-                <h3 className={`text-xs font-black leading-tight uppercase tracking-tight break-words ${isSelected ? 'text-white' : 'text-[#254153]'
-                    }`}>
-                    {title}
+            <div className="mb-2">
+                <h3 className="text-sm font-medium leading-tight">
+                    {index}. {title}
                 </h3>
             </div>
 
-            <div className="relative z-10 flex flex-col items-end w-full">
-                <span className={`text-[8px] uppercase font-bold tracking-widest mb-1 ${isSelected ? 'text-white/40' : 'text-gray-300'
-                    }`}>
-                    Count Today
-                </span>
-                <div
-                    className={`text-4xl font-black leading-none transition-all duration-300 ${isSelected
-                            ? 'text-white'
-                            : 'text-gray-200 group-hover:text-[#254153]'
-                        }`}
-                >
+            <div className="flex justify-between items-center w-full mt-auto">
+                {/* Toggle Switch */}
+                <div className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors ${
+                    isSelected ? 'bg-white/70' : 'bg-gray-200'
+                }`}>
+                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${
+                        isSelected ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                </div>
+
+                {/* Count Pill */}
+                <div className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${
+                    isSelected ? 'bg-[#E5BE45] text-gray-800' : 'bg-gray-100 text-gray-600'
+                }`}>
                     {count}
                 </div>
             </div>
-
-            {/* Structural Accent */}
-            <div className={`absolute bottom-0 left-0 h-1 transition-all duration-300 ${isSelected ? 'w-full bg-blue-500' : 'w-0 bg-gray-200'
-                }`} />
         </button>
     )
 }
