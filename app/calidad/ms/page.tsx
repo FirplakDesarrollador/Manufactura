@@ -13,6 +13,7 @@ export default function CalidadMsReportPage() {
     interface User {
         id: string
         email?: string
+        localId?: number
     }
     const [loading, setLoading] = useState(true)
     const [products, setProducts] = useState<ProducloMS[]>([])
@@ -47,7 +48,18 @@ export default function CalidadMsReportPage() {
             router.push('/login')
             return
         }
-        setUser(userData.user)
+        
+        const { data: localUser } = await supabase
+            .from('usuarios')
+            .select('id')
+            .eq('uuid', userData.user.id)
+            .single()
+
+        setUser({
+            id: userData.user.id,
+            email: userData.user.email,
+            localId: localUser?.id
+        })
 
         const [productsRes, defectsRes, reportsRes] = await Promise.all([
             supabase.from('productos_defectos_ms').select('*').order('Referencia'),
@@ -122,7 +134,7 @@ export default function CalidadMsReportPage() {
 
         const reportData = {
             producto_id: parseInt(selectedProduct),
-            create_by: user?.id,
+            create_by: user?.localId,
             defecto: selectedDefectNames,
             created_at: new Date().toISOString()
         }
