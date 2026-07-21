@@ -1,0 +1,26 @@
+Searching for unique identifier...
+Total rows fetched: 10
+Columns: Imagen, Descripcion, Maquina, Subconjunto, Taller, Tipo, Sku/Modelo, Observacion, Marca, Almacén, Proveedor, Otros proveedores, Ubicación, Minimo, Maximo, Stock actual, Por pedir, Costo unitario, Lead Time
+ (dias), Frecuencia de cambio, Criticidad/para proceso?, App Created By, Revision, App Modified By, Created, Label setting, Created By, Attachments, Descripcion"_1,"Descripcion"_2,"Item is a Record, Retention label, Retention label Applied, ID, Compliance Asset Id, Modified, Modified By, Item Child Count, Folder Child Count, Content Type, Label applied by, Version
+
+Row 1: ID=null, Descripcion=Aguja de cabezote Multicolor ATC-40321, Sku/Modelo=ATC-40321, Modified=9
+
+Row 2: ID=null, Descripcion=Disco Diamantado 5 in X 2mm Corte Metal (Rotoflex), Sku/Modelo=CIPR01-00-49-000-0, Modified=10
+
+Row 3: ID=null, Descripcion=Filtro del vastago para resina  BF-14-467, Sku/Modelo=BF-14-467, Modified=11
+
+Row 4: ID=null, Descripcion=Filtro del vastago para resina  BF-14-680, Sku/Modelo=BF-14-680, Modified=12
+
+Row 5: ID=null, Descripcion=Perilla Potenciometro Ultracaster, Sku/Modelo=AU-103 - Verificar*, Modified=13
+
+Row 6: ID=null, Descripcion=Correa dentada de la ultracaster, Sku/Modelo=800 8M, Modified=14
+
+Row 7: ID=null, Descripcion=Empaque Boquilla ATC-40304, Sku/Modelo=ATC-40304, Modified=15
+
+Row 8: ID=null, Descripcion=Kit empaques Multicolor VLS 24RK-4T-2T, Sku/Modelo=VLS 24RK-4T-2T, Modified=16
+
+Row 9: ID=null, Descripcion=Kit bomba de resina MLS-46RK-PCK-1T  (Descontinuado), Sku/Modelo=MLS-46RK-PCK-1T     , Modified=17
+
+Row 10: ID=null, Descripcion=Boquilla de gelcoat UCT-418 MS (ahora 518), Sku/Modelo=UCT-418, Modified=18
+
+Did NOT find "id" (lowercase) column.

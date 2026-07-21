@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
+import SubHeader from '@/components/opt-sistemica/SubHeader';
 
 interface OPTRecord {
   id: string;
@@ -125,10 +126,11 @@ export default function HistorialPage() {
       <Header
         title="Historial"
         subtitle="Consulta de Observaciones"
-        backUrl="/opt-sistemica"
+        backUrl="/sistema-produccion"
         userEmail={session.user.email}
         showLogout={false}
       />
+      <SubHeader />
 
       <main className="container" style={{ paddingTop: '50px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">

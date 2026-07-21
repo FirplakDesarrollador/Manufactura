@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
+import Header from '@/components/opt-sistemica/Header';
+import SubHeader from '@/components/opt-sistemica/SubHeader';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 
 const allowedAdminEmails = ['coordinacioncalidad@firplak.com', 'estiven.londono@firplak.com', 'jakeline.chaverra@firplak.com'];
@@ -72,14 +74,14 @@ export default function AdminPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      <header className="header" style={{ padding: '12px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <FirplakLogo height={40} color="white" />
-          <button onClick={() => router.push('/opt-sistemica')} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>
-            Volver
-          </button>
-        </div>
-      </header>
+      <Header
+        title="Administración"
+        subtitle="Gestión de Responsables"
+        backUrl="/sistema-produccion"
+        userEmail={session?.user?.email}
+        showLogout={false}
+      />
+      <SubHeader />
 
       <main className="container" style={{ paddingTop: '48px', paddingBottom: '80px', maxWidth: '600px' }}>
         <div className="animate-fade-in">

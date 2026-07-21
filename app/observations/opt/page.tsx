@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Home, ChevronLeft, Calendar, User, Briefcase, ArrowUp, ArrowDown, ArrowUpDown, UserCheck, Search, ArrowLeft } from 'lucide-react'
+import Header from '@/components/opt-sistemica/Header'
+import SubHeader from '@/components/opt/SubHeader'
 
 export default function OPTHistoryPage() {
     const [observations, setObservations] = useState<any[]>([])
@@ -14,10 +16,18 @@ export default function OPTHistoryPage() {
         key: 'Create_at',
         direction: 'desc'
     })
+    const [userEmail, setUserEmail] = useState('')
     const [searchTerm, setSearchTerm] = useState('')
     const router = useRouter()
-
     const supabase = createClient()
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data }) => {
+            if (data?.user) {
+                setUserEmail(data.user.email || "")
+            }
+        })
+    }, [supabase])
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -112,29 +122,15 @@ export default function OPTHistoryPage() {
     }
 
     return (
-        <main className="flex min-h-screen flex-col bg-background">
-            {/* Header */}
-            <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-                <div className="w-32 flex items-center">
-                    <Link href="/opt" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" title="Volver al menú OPT">
-                        <ArrowLeft className="w-6 h-6" />
-                    </Link>
-                </div>
-                
-                <h1 className="font-bold text-base sm:text-lg md:text-xl uppercase tracking-wider text-center flex-1 truncate px-2">
-                    Histórico OPT
-                </h1>
-                
-                <div className="w-32 flex justify-end">
-                    <img
-                        src="/firplak-logo.png"
-                        alt="Firplak Logo"
-                        className="brightness-0 invert object-contain max-h-[32px]"
-                    />
-                </div>
-            </header>
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000] w-full">
+            <Header 
+                title="OPT Operativa"
+                subtitle="Historial"
+                userEmail={userEmail}
+            />
+            <SubHeader />
 
-            <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
+            <div className="p-4 sm:p-6 max-w-[1500px] mx-auto w-full">
                 <div className="mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h2 className="text-2xl font-bold text-primary">Observaciones Guardadas</h2>
                     
@@ -282,7 +278,7 @@ export default function OPTHistoryPage() {
                     <Home size={28} />
                 </Link>
             </div>
-        </main>
+        </div>
     )
 }
 

@@ -1,0 +1,4 @@
+Checking uniqueness of Modified column...
+Total rows checked: 100
+Unique Modified values: 100
+Modified column is UNIQUE in this sample.

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Cpu } from 'lucide-react'
+import { ArrowLeft, Cpu, Archive } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
 
@@ -74,6 +74,11 @@ export default function MttoHomePage() {
           <path d="M168,144a8,8,0,0,1-8,8H120a8,8,0,0,1,0-16h40A8,8,0,0,1,168,144Zm-48,40h16a8,8,0,0,0,0-16H120a8,8,0,0,0,0,16ZM216,40V216a24,24,0,0,1-24,24H64a24,24,0,0,1-24-24V40A24,24,0,0,1,64,16H192A24,24,0,0,1,216,40Zm-16,0a8,8,0,0,0-8-8H64a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H192a8,8,0,0,0,8-8ZM96,96a12,12,0,1,1-12-12A12,12,0,0,1,96,96Zm0,48a12,12,0,1,1-12-12A12,12,0,0,1,96,144Zm0,48a12,12,0,1,1-12-12A12,12,0,0,1,96,192Zm72-104H120a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Z"></path>
         </svg>
       )
+    },
+    { 
+      title: "Almacen", 
+      path: "/mantenimiento/almacen", 
+      icon: <Archive size={32} />
     },
     { 
       title: "Controles Visuales", 

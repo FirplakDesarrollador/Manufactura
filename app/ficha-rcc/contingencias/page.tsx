@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { FichaAlerta, Accion } from '@/types';
 import Combobox from '@/components/ficha-rcc/Combobox';
 import { PLANTAS_LIST } from '@/lib/ficha-rcc/constants';
+import SubHeader from '@/components/ficha-rcc/SubHeader';
 
 export default function ContingenciasPage() {
   const router = useRouter();
@@ -132,6 +133,7 @@ export default function ContingenciasPage() {
           router.push('/login');
         }}
       />
+      <SubHeader />
 
       <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
         <div className="w-full max-w-[1100px]">

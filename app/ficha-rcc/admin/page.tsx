@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import Header from '@/components/opt-sistemica/Header';
 import Link from 'next/link';
+import SubHeader from '@/components/ficha-rcc/SubHeader';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -227,6 +228,7 @@ export default function AdminPage() {
           router.push('/login');
         }}
       />
+      <SubHeader />
 
       <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
         <div className="w-full max-w-[850px]">
