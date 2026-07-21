@@ -98,6 +98,23 @@ export default function SistemaProduccionPage() {
                 
                 <div className="w-full max-w-[1600px] flex flex-wrap justify-center gap-6 md:gap-8">
                     
+                    {/* Indicadores del Sistema Button */}
+                    {hasApp('estadisticas_produccion') && (
+                        <button
+                            onClick={() => router.push('/estadisticas-produccion')}
+                            className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
+                        >
+                            <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                            
+                            <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
+                                <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+                                </svg>
+                            </div>
+                            <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">Indicadores del Sistema</span>
+                        </button>
+                    )}
+
                     {/* HDT Button */}
                     {hasHdt() && (
                         <button
@@ -170,22 +187,7 @@ export default function SistemaProduccionPage() {
                         </button>
                     )}
 
-                    {/* Estadísticas del Sistema Button */}
-                    {hasApp('estadisticas_produccion') && (
-                        <button
-                            onClick={() => router.push('/estadisticas-produccion')}
-                            className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
-                        >
-                            <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-                            
-                            <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
-                                <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
-                                </svg>
-                            </div>
-                            <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">Estadísticas del Sistema</span>
-                        </button>
-                    )}
+
 
                     {/* Tarjetas Excelencia Button */}
                     {hasApp('tarjetas_excelencia') && (
@@ -232,6 +234,37 @@ export default function SistemaProduccionPage() {
                             </svg>
                         </div>
                         <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">Auditorías</span>
+                    </button>
+
+                    {/* 5'S Button */}
+                    <button
+                        onClick={() => router.push('/sistema-produccion/5s')}
+                        className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
+                    >
+                        <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                        
+                        <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
+                            <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            </svg>
+                        </div>
+                        <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">5'S</span>
+                    </button>
+
+                    {/* Configuración Button */}
+                    <button
+                        onClick={() => router.push('/sistema-produccion/configuracion')}
+                        className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
+                    >
+                        <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                        
+                        <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
+                            <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </div>
+                        <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center">Configuración</span>
                     </button>
 
                     {!hasApp('hora_a_hora') && !hasApp('opt') && !hasOptSistemica() && !hasApp('estadisticas_produccion') && !hasApp('tarjetas_excelencia') && !hasHdt() && (

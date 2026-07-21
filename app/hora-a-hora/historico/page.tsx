@@ -15,6 +15,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { createExternalClient } from "@/lib/supabase/external";
+import Header from "@/components/opt-sistemica/Header";
+import SubHeader from "@/components/hora-a-hora/SubHeader";
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraHora; onClose: () => void; resolveUserName: (v: string | undefined) => string }) {
@@ -614,23 +616,15 @@ export default function Historico() {
     const [editing, setEditing] = useState<EvaluacionHoraHora | null>(null);
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center">
-            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/hora-a-hora">
-                        <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
-                            <ArrowLeft size={20} />
-                            <span className="hidden sm:inline font-bold text-lg">Histórico Hora-Hora</span>
-                        </Button>
-                    </Link>
-                    <div className="flex flex-col items-end">
-                        <div className="font-bold text-2xl tracking-widest leading-none">FIRPLAK</div>
-                        <div className="text-[10px] opacity-80 uppercase tracking-widest">inspiring homes</div>
-                    </div>
-                </div>
-            </header>
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center font-sans text-[#000000] w-full">
+            <Header 
+                title="Hora a Hora"
+                subtitle="Histórico"
+                userEmail={currentUserEmail}
+            />
+            <SubHeader />
 
-            <main className="flex-1 w-full max-w-6xl p-4 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <main className="flex-1 w-full max-w-[1500px] p-4 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                 <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between mt-6">
                     <h2 className="text-2xl font-bold text-[#254153]">Observaciones Guardadas</h2>
@@ -649,13 +643,13 @@ export default function Historico() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-none shadow-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader className="bg-[#254153] hover:bg-[#254153]">
                                 <TableRow className="hover:bg-[#254153] border-none select-none">
                                     <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider rounded-tl-lg w-16 cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider w-16 cursor-pointer hover:bg-[#3b5998] transition-colors"
                                         onClick={() => requestSort('consecutivo')}
                                     >
                                         # <SortIcon columnKey="consecutivo" />
@@ -690,7 +684,7 @@ export default function Historico() {
                                     >
                                         KPIs <SortIcon columnKey="rendimiento" />
                                     </TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider text-right rounded-tr-lg w-28">Acciones</TableHead>
+                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider text-right w-28">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

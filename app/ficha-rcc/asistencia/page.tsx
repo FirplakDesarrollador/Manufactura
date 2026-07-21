@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import Header from '@/components/opt-sistemica/Header';
 import Link from 'next/link';
+import SubHeader from '@/components/ficha-rcc/SubHeader';
 // Importación de auth eliminada
-import Combobox from '@/components/ficha-rcc/Combobox';
 
 type AsistenciaEstado = 'Presente' | 'Ausente' | 'Permiso' | 'Incapacidad' | 'No Convocado';
 
@@ -28,6 +28,7 @@ export default function AsistenciaPage() {
   const [procesos, setProcesos] = useState<any[]>([]);
   const [registros, setRegistros] = useState<Record<string, AsistenciaEstado>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [historicoPorcentajes, setHistoricoPorcentajes] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const init = async () => {
@@ -65,17 +66,52 @@ export default function AsistenciaPage() {
     }
   }, [fecha, procesos]);
 
+  const fetchHistoricoPorcentajes = async () => {
+    const { data, error } = await supabase
+      .from('registro_asistencia')
+      .select('responsable, estado');
+
+    if (error) {
+      console.error('Error fetching historical stats:', error);
+      return;
+    }
+
+    const counts: Record<string, { total: number; presente: number }> = {};
+    if (data) {
+      data.forEach(row => {
+        if (!counts[row.responsable]) {
+          counts[row.responsable] = { total: 0, presente: 0 };
+        }
+        counts[row.responsable].total++;
+        if (row.estado === 'Presente') {
+          counts[row.responsable].presente++;
+        }
+      });
+    }
+
+    const percentages: Record<string, number> = {};
+    Object.entries(counts).forEach(([name, c]) => {
+      percentages[name] = c.total > 0 ? Math.round((c.presente / c.total) * 100) : 100;
+    });
+    setHistoricoPorcentajes(percentages);
+  };
+
   const fetchResponsables = async () => {
     setLoading(true);
-    const { data: respData } = await supabase
-      .from('cat_responsables')
-      .select('nombre, proceso_id, cat_procesos(nombre)')
-      .order('nombre', { ascending: true });
-    
-    const { data: procData } = await supabase
-      .from('cat_procesos')
-      .select('*')
-      .order('nombre', { ascending: true });
+    const [_, respRes, procRes] = await Promise.all([
+      fetchHistoricoPorcentajes(),
+      supabase
+        .from('cat_responsables')
+        .select('nombre, proceso_id, cat_procesos(nombre)')
+        .order('nombre', { ascending: true }),
+      supabase
+        .from('cat_procesos')
+        .select('*')
+        .order('nombre', { ascending: true })
+    ]);
+
+    const respData = respRes.data;
+    const procData = procRes.data;
 
     if (procData && respData) {
       const grouped = procData.map(proc => ({
@@ -100,10 +136,10 @@ export default function AsistenciaPage() {
 
     const nuevosRegistros: Record<string, AsistenciaEstado> = {};
     
-    // Por defecto todos presentes
+    // Por defecto todos ausentes (desmarcados)
     procesos.forEach(proc => {
       proc.personal.forEach((p: any) => {
-        nuevosRegistros[p.nombre] = 'Presente';
+        nuevosRegistros[p.nombre] = 'Ausente';
       });
     });
 
@@ -150,6 +186,7 @@ export default function AsistenciaPage() {
       if (error) throw error;
       
       alert('Asistencia guardada/actualizada correctamente.');
+      await fetchHistoricoPorcentajes();
     } catch (error) {
       console.error('Error guardando asistencia:', error);
       alert('Error al guardar asistencia.');
@@ -171,6 +208,7 @@ export default function AsistenciaPage() {
       if (error) throw error;
       
       alert('Datos del día eliminados.');
+      await fetchHistoricoPorcentajes();
       fetchAsistencia(fecha);
     } catch (error) {
       console.error('Error eliminando día:', error);
@@ -212,6 +250,7 @@ export default function AsistenciaPage() {
           router.push('/login');
         }}
       />
+      <SubHeader />
 
       <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
         <div className="w-full max-w-[1100px]">
@@ -221,9 +260,6 @@ export default function AsistenciaPage() {
             <h2 style={{ color: 'var(--primary)', marginBottom: '10px' }}>Control de Asistencia Diaria</h2>
             <p style={{ color: 'var(--text-muted)', margin: 0 }}>Registra la asistencia del personal responsable principal.</p>
           </div>
-          <Link href="/ficha-rcc/asistencia/indicadores" style={{ textDecoration: 'none' }}>
-             <button className="btn-primary" style={{ padding: '10px 20px', background: 'var(--accent)', width: 'auto' }}>📊 Indicadores</button>
-          </Link>
         </div>
 
         {/* Indicadores y Filtros */}
@@ -300,18 +336,83 @@ export default function AsistenciaPage() {
                   {statsProcesos.find(s => s.nombre === proc.nombre)?.asistio ? '✓ PROCESO PRESENTE' : '✗ PROCESO AUSENTE'}
                 </span>
               </div>
-              {proc.personal.map((p: any, idx: number) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 200px', padding: '12px 24px', borderBottom: idx === proc.personal.length - 1 ? 'none' : '1px solid var(--border)', alignItems: 'center' }}>
-                  <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{p.nombre}</div>
-                  <div>
-                    <Combobox 
-                      options={['Presente', 'Ausente', 'Permiso', 'Incapacidad', 'No Convocado']}
-                      value={registros[p.nombre] || 'Presente'}
-                      onChange={(val) => handleEstadoChange(p.nombre, val)}
-                    />
+              {proc.personal.map((p: any, idx: number) => {
+                const isPresent = (registros[p.nombre] || 'Ausente') === 'Presente';
+                const currentEstado = registros[p.nombre] || 'Ausente';
+                
+                // Color mapping:
+                // Verde: #59a96a
+                // Amarillo: #deb841 (for Permiso, Incapacidad)
+                // Rojo: #d14747 (for Ausente)
+                // Sage: #7B8E90 (for No Convocado)
+                let statusColor = '#d14747'; // Default Ausente
+                if (currentEstado === 'Presente') {
+                  statusColor = '#59a96a';
+                } else if (currentEstado === 'Permiso' || currentEstado === 'Incapacidad') {
+                  statusColor = '#deb841';
+                } else if (currentEstado === 'No Convocado') {
+                  statusColor = '#7B8E90';
+                }
+
+                return (
+                  <div 
+                    key={idx} 
+                    onClick={() => handleEstadoChange(p.nombre, isPresent ? 'Ausente' : 'Presente')}
+                    style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr auto', 
+                      padding: '16px 24px', 
+                      borderBottom: idx === proc.personal.length - 1 ? 'none' : '1px solid var(--border)', 
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      backgroundColor: 'transparent',
+                      transition: 'background-color 0.2s ease',
+                    }}
+                    className="hover:bg-black/[0.02]"
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{p.nombre}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Asistencia histórica: <span style={{ 
+                          fontWeight: 600, 
+                          color: (historicoPorcentajes[p.nombre] !== undefined ? historicoPorcentajes[p.nombre] : 100) >= 90 ? '#59a96a' : (historicoPorcentajes[p.nombre] !== undefined ? historicoPorcentajes[p.nombre] : 100) >= 80 ? '#deb841' : '#d14747'
+                        }}>{historicoPorcentajes[p.nombre] !== undefined ? `${historicoPorcentajes[p.nombre]}%` : '100%'}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ 
+                        fontSize: '14px', 
+                        fontWeight: 600, 
+                        color: statusColor,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {currentEstado}
+                      </span>
+                      <div 
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: isPresent ? `2px solid ${statusColor}` : '2px solid #7B8E90',
+                          backgroundColor: isPresent ? statusColor : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        {isPresent && (
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {proc.personal.length === 0 && (
                 <div style={{ padding: '15px 24px', color: 'var(--text-muted)', fontSize: '14px' }}>Sin personal asignado</div>
               )}

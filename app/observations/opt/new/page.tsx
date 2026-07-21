@@ -1,14 +1,20 @@
 import { createExternalClient } from '@/lib/supabase/external'
+import { createClient } from '@/lib/supabase/server'
 import OPTForm from './OPTForm'
 import Image from 'next/image'
 import Link from 'next/link'
 import BackButton from './BackButton'
 import { ArrowLeft } from 'lucide-react'
+import Header from '@/components/opt-sistemica/Header'
+import SubHeader from '@/components/opt/SubHeader'
 
 export const dynamic = 'force-dynamic'
 
 export default async function NewOPTForm() {
     const externalSupabase = createExternalClient()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userEmail = user?.email || ''
 
     const { data: empleados } = await externalSupabase
         .from('empleados')
@@ -30,33 +36,19 @@ export default async function NewOPTForm() {
         .order('nombreCompleto', { ascending: true })
 
     return (
-        <main className="flex min-h-screen flex-col bg-white text-[#000155]">
-            {/* Header Banner */}
-            <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-                <div className="w-32 flex items-center">
-                    <Link href="/opt" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" title="Volver al menú OPT">
-                        <ArrowLeft className="w-6 h-6" />
-                    </Link>
-                </div>
-                
-                <h1 className="font-bold text-base sm:text-lg md:text-xl uppercase tracking-wider text-center flex-1 truncate px-2">
-                    Nueva OPT
-                </h1>
-                
-                <div className="w-32 flex justify-end">
-                    <img
-                        src="/firplak-logo.png"
-                        alt="Firplak Logo"
-                        className="brightness-0 invert object-contain max-h-[32px]"
-                    />
-                </div>
-            </header>
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000] w-full">
+            <Header 
+                title="OPT Operativa"
+                subtitle="Nueva Evaluación"
+                userEmail={userEmail}
+            />
+            <SubHeader />
 
             {/* Form Content */}
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 flex-1">
                 <OPTForm empleados={empleados} cargos={cargos} realizadoPorList={realizadoPorList} />
             </div>
-        </main>
+        </div>
     )
 }
 

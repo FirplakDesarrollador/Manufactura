@@ -1,31 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, MessageSquare, AlignLeft, AlertTriangle, Clock, Award, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import Header from "@/components/opt-sistemica/Header";
+import SubHeader from "@/components/opt/SubHeader";
 
 export default function CriteriosPage() {
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setUserEmail(data.user.email || "");
+      }
+    });
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Header */}
-      <header className="w-full bg-[#254153] text-white h-20 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="w-32 flex items-center">
-          <Link href="/opt" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" title="Volver al menú OPT">
-            <ArrowLeft className="w-6 h-6" />
-          </Link>
-        </div>
-        
-        <h1 className="font-bold text-base sm:text-lg md:text-xl uppercase tracking-wider text-center flex-1 truncate px-2">
-          Criterios de Calificación
-        </h1>
-        
-        <div className="w-32 flex justify-end">
-          <img
-            src="/firplak-logo.png"
-            alt="Firplak Logo"
-            className="brightness-0 invert object-contain max-h-[32px]"
-          />
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000] w-full">
+      <Header 
+        title="OPT Operativa"
+        subtitle="Criterios de Calificación"
+        userEmail={userEmail}
+      />
+      <SubHeader />
 
       {/* Main Content */}
       <main className="flex-1 p-6 flex flex-col items-center pb-20">

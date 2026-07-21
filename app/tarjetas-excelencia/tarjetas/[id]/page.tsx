@@ -25,7 +25,7 @@ export default function TarjetaPage({ params }: { params: Promise<{ id: string }
             <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
                     <Link
-                        href={`/tarjetas-excelencia/categorias/${tarjeta.categoria_id}`}
+                        href="/tarjetas-excelencia"
                         className="p-2 bg-white rounded-full shadow-sm border border-gray-100 hover:bg-gray-50 transition-colors text-gray-500"
                     >
                         <ArrowLeft size={18} />

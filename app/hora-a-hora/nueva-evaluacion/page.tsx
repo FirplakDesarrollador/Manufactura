@@ -16,7 +16,10 @@ import WastesStep from "@/components/wizard/WastesStep";
 import SignatureStep from "@/components/wizard/SignatureStep";
 import SummaryStep from "@/components/wizard/SummaryStep";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner"; // we installed sonner
+import { toast } from "sonner";
+import Header from "@/components/opt-sistemica/Header";
+import { createClient } from "@/lib/supabase/client";
+import SubHeader from "@/components/hora-a-hora/SubHeader";
 
 const STEPS = [
     { id: 0, title: "Generales" },
@@ -30,6 +33,7 @@ const STEPS = [
 
 export default function NuevaEvaluacion() {
     const [currentStep, setCurrentStep] = useState(0);
+    const [userEmail, setUserEmail] = useState("");
     const router = useRouter();
     const { evaluacionActual, cerrarEvaluacion, reset } = useStore();
 
@@ -38,11 +42,24 @@ export default function NuevaEvaluacion() {
         reset();
     }, [reset]);
 
+    // Fetch user session email
+    useEffect(() => {
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data }) => {
+            if (data?.user) {
+                setUserEmail(data.user.email || "");
+            }
+        });
+    }, []);
+
     const handleNext = () => {
         // Step 0 validation is handled internally by BasicInfoStep
         if (currentStep === 1) {
-            if (!evaluacionActual?.ciclos || evaluacionActual.ciclosTotales < 10) {
-                toast.error("Debes registrar al menos 10 ciclos válidos para continuar.");
+            const planta = evaluacionActual?.planta || "";
+            const esCicloReducido = planta === "FV" || planta === "RTM";
+            const minCiclos = esCicloReducido ? 1 : 10;
+            if (!evaluacionActual?.ciclos || evaluacionActual.ciclosTotales < minCiclos) {
+                toast.error(`Debes registrar al menos ${minCiclos} ciclo${minCiclos > 1 ? "s" : ""} válido${minCiclos > 1 ? "s" : ""} para continuar.`);
                 return;
             }
         }
@@ -68,20 +85,13 @@ export default function NuevaEvaluacion() {
     const progress = ((currentStep + 1) / STEPS.length) * 100;
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center">
-            {/* Top Navbar */}
-            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white" onClick={() => router.push("/hora-a-hora")}>
-                        <ArrowLeft size={20} />
-                        <span className="font-bold text-base md:text-lg">Nueva Evaluación</span>
-                    </Button>
-                    <div className="flex flex-col items-end">
-                        <div className="font-bold text-xl md:text-2xl tracking-widest leading-none">FIRPLAK</div>
-                        <div className="text-[8px] md:text-[10px] opacity-80 uppercase tracking-widest">inspiring homes</div>
-                    </div>
-                </div>
-            </header>
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center font-sans text-[#000000] w-full">
+            <Header 
+                title="Hora a Hora"
+                subtitle="Nueva Evaluación"
+                userEmail={userEmail}
+            />
+            <SubHeader />
 
             {/* Progress Bar Area */}
             <div className="w-full bg-white border-b border-slate-200 py-3 px-4 shadow-sm z-40">

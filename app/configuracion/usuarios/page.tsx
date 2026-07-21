@@ -29,7 +29,7 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     estadisticas_produccion: true,
     indicadores_productividad: true,
     asistencia: true,
-    mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar']
+    mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador']
 };
 
 const PERMISSION_LABELS: Record<string, string> = {

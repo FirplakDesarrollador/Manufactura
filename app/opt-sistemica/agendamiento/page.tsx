@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
+import SubHeader from '@/components/opt-sistemica/SubHeader';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Clock, User, Target } from 'lucide-react';
 
 interface Planificacion {
@@ -33,7 +34,7 @@ export default function AgendamientoPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [planned, setPlanned] = useState<Planificacion[]>([]);
-  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly');
+  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('monthly');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [session, setSession] = useState<any>(null);
   const router = useRouter();
@@ -190,34 +191,11 @@ export default function AgendamientoPage() {
       <Header
         title="Agendamiento"
         subtitle="Planificación de Observaciones"
-        backUrl="/opt-sistemica"
+        backUrl="/sistema-produccion"
         userEmail={session?.user?.email}
         showLogout={false}
-        actionButton={
-          <div style={{ 
-            background: 'rgba(255,255,255,0.08)', 
-            borderRadius: '12px', 
-            display: 'flex', 
-            padding: '4px',
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <button 
-              onClick={() => setViewMode('weekly')}
-              className={`px-4 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 cursor-pointer transition-all duration-200 ${viewMode === 'weekly' ? 'bg-[#7B8E90] text-white' : 'text-white/70 hover:text-white'}`}
-              style={{ border: 'none' }}
-            >
-              <List size={14} /> Semana
-            </button>
-            <button 
-              onClick={() => setViewMode('monthly')}
-              className={`px-4 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 cursor-pointer transition-all duration-200 ${viewMode === 'monthly' ? 'bg-[#7B8E90] text-white' : 'text-white/70 hover:text-white'}`}
-              style={{ border: 'none' }}
-            >
-              <CalendarIcon size={14} /> Mes
-            </button>
-          </div>
-        }
       />
+      <SubHeader />
 
       <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">
