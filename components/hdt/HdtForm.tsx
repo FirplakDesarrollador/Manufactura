@@ -198,7 +198,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
     );
 
     useEffect(() => {
-        if ((currentMode === 'edit' || currentMode === 'view' || currentMode === 'breakdown') && hdtId) {
+        if ((mode === 'edit' || mode === 'view' || mode === 'breakdown') && hdtId) {
             fetchHdtData()
         }
         fetchPlantas()
@@ -209,14 +209,14 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                 const authorized = isAuthorizedEditor(user.email)
                 setCanDelete(authorized)
                 // Si llegó al modo edit sin autorización, forzar vista solo lectura
-                if (!authorized && (currentMode === 'edit')) {
+                if (!authorized && (mode === 'edit')) {
                     setCurrentMode('view')
                 }
             }
         }
         checkUserPerms()
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hdtId, currentMode])
+    }, [hdtId])
 
     const fetchPlantas = async () => {
         setLoadingPlantas(true)
@@ -263,6 +263,14 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                 // If this is an old version, force 'view' mode to prevent edits
                 if (!hdtData.is_current && (currentMode === 'edit' || mode === 'edit')) {
                     setCurrentMode('view')
+                }
+
+                // If mode is 'view' and HDT is vigente, check if user is authorized and switch to edit
+                if (mode === 'view' && hdtData.is_current) {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user?.email && isAuthorizedEditor(user.email)) {
+                        setCurrentMode('edit')
+                    }
                 }
 
                 // Fetch Versions History (Contextual)
@@ -583,7 +591,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
 
             // 2. Save Steps
             // Logic: Delete existing steps and insert new ones (simpler for MVP)
-            if (mode === 'edit') {
+            if (mode !== 'create') {
                 const { error: delError } = await (supabase
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     .from('hdt_steps') as any)
@@ -609,14 +617,19 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
             if (insError) throw insError
 
             setSuccess(true)
-            setTimeout(() => {
-                if (mode === 'create') {
+            if (mode === 'create') {
+                setTimeout(() => {
                     router.push('/hdt')
-                } else {
+                }, 2000)
+            } else {
+                // Refresh data after a short delay but keep success visible longer
+                setTimeout(() => {
+                    fetchHdtData()
+                }, 1000)
+                setTimeout(() => {
                     setSuccess(false)
-                    fetchHdtData() // Refresh to see updated info
-                }
-            }, 2000)
+                }, 3000)
+            }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
@@ -936,11 +949,13 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                             <div className="p-2.5 flex flex-col sm:flex-row sm:items-center gap-2 relative">
                                 <label id="epps-label" htmlFor="btn-epps" className="text-[10px] font-bold text-brand-primary uppercase w-20">EPPS</label>
                                 <div className="flex-1 relative" ref={eppRef}>
-                                    <button
+                                    <div
                                         id="btn-epps"
-                                        type="button"
+                                        role="button"
+                                        tabIndex={0}
                                         onClick={() => (currentMode !== 'view' && currentMode !== 'breakdown') && setShowEppDropdown(!showEppDropdown)}
-                                        className={`w-full bg-zinc-50 border-none rounded-lg p-1.5 text-left flex flex-wrap gap-1 min-h-[32px] items-center ${currentMode === 'view' || currentMode === 'breakdown' ? 'bg-transparent cursor-default' : 'hover:bg-zinc-100'}`}
+                                        onKeyDown={(e) => e.key === 'Enter' && (currentMode !== 'view' && currentMode !== 'breakdown') && setShowEppDropdown(!showEppDropdown)}
+                                        className={`w-full bg-zinc-50 border-none rounded-lg p-1.5 text-left flex flex-wrap gap-1 min-h-[32px] items-center ${currentMode === 'view' || currentMode === 'breakdown' ? 'bg-transparent cursor-default' : 'hover:bg-zinc-100 cursor-pointer'}`}
                                         aria-haspopup="listbox"
                                         aria-expanded={showEppDropdown}
                                         aria-labelledby="epps-label"
@@ -967,7 +982,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                                                 </span>
                                             ))
                                         )}
-                                    </button>
+                                    </div>
 
                                     {showEppDropdown && currentMode !== 'view' && currentMode !== 'breakdown' && (
                                         <div className="absolute z-[120] top-full left-0 right-0 mt-1 bg-white border-2 border-brand-primary/10 rounded-xl shadow-2xl p-1.5 max-h-48 overflow-y-auto transform origin-top transition-all">
@@ -1318,7 +1333,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                     aria-label="Acciones del formulario"
                     className="fixed bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-2 md:px-4 z-50 hidden-print"
                 >
-                    <div className="bg-white/95 backdrop-blur-xl border-2 border-brand-primary/10 rounded-2xl md:rounded-3xl p-3 md:p-4 shadow-2xl flex items-center justify-between gap-2 md:gap-4 flex-wrap sm:flex-nowrap">
+                    <div className="bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl p-3 md:p-4 shadow-2xl flex items-center justify-between gap-2 md:gap-4 flex-wrap sm:flex-nowrap" style={{border: '2px solid rgba(27,65,84,0.1)'}}>
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
@@ -1332,7 +1347,8 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                             <button
                                 type="button"
                                 onClick={() => router.push('/hdt')}
-                                className="h-10 w-10 md:h-12 md:w-12 bg-brand-primary/10 text-brand-primary rounded-xl md:rounded-2xl font-bold hover:bg-brand-primary hover:text-white transition-all flex items-center justify-center shrink-0"
+                                className="h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl font-bold transition-all flex items-center justify-center shrink-0"
+                                style={{background: 'rgba(27,65,84,0.1)', color: '#1b4154'}}
                                 title="Menú Principal"
                                 aria-label="Menú Principal"
                             >
@@ -1389,27 +1405,33 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                             )}
                         </div>
 
-                        {currentMode !== 'view' && currentMode !== 'breakdown' && (
+                        {(currentMode === 'create' || currentMode === 'edit' || (currentMode === 'view' && canDelete && formData.is_current)) && (
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className="px-6 md:px-10 py-2.5 md:py-3 text-sm md:text-base bg-brand-primary text-white rounded-xl md:rounded-2xl font-bold hover:bg-brand-secondary transition-all shadow-lg hover:shadow-brand-primary/30 flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0"
+                                className="px-6 md:px-10 py-2.5 md:py-3 text-sm md:text-base text-white rounded-xl md:rounded-2xl font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0"
+                                style={{background: success ? '#16a34a' : '#1b4154'}}
                             >
                                 {saving ? (
                                     <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin shrink-0" />
+                                ) : success ? (
+                                    <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
                                 ) : (
                                     <Save className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
                                 )}
-                                <span className="whitespace-nowrap">{currentMode === 'create' ? 'Crear HDT' : 'Guardar Cambios'}</span>
+                                <span className="whitespace-nowrap">
+                                    {saving ? 'Guardando...' : success ? '¡Guardado!' : currentMode === 'create' ? 'Crear HDT' : 'Guardar Cambios'}
+                                </span>
                             </button>
                         )}
 
-                        {currentMode === 'edit' && (
+                        {(currentMode === 'edit' || (currentMode === 'view' && canDelete && formData.is_current)) && (
                             <button
                                 type="button"
                                 onClick={handleCreateNewVersion}
                                 disabled={creatingVersion || saving}
-                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-zinc-100 text-brand-primary border-2 border-brand-primary/20 rounded-xl md:rounded-2xl font-bold hover:bg-brand-primary/10 transition-all flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0"
+                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-zinc-100 rounded-xl md:rounded-2xl font-bold transition-all flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0"
+                                style={{color: '#1b4154', border: '2px solid rgba(27,65,84,0.2)'}}
                             >
                                 {creatingVersion ? (
                                     <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin shrink-0" />
