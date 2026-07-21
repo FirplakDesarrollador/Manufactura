@@ -1,0 +1,11 @@
+Total hdts: 312
+Unique plantas in hdts: ["Marmol sintetico","Muebles","Fibra de Vidrio","Calidad","CEFI"]
+Unique processes in hdts (first 20): ["Desprensado","Vaciado","Pulido","Contramoldes","Alistamiento de moldes","Desmolde","Acabado","Pintura","Enchape","Entrega","Prensado","Calidad Muebles","Empaque","Kitting","Máquinas","Corte","Programación","Moldes","Materia Prima","Ensamble"]
+Total unique labors in hdts: 95
+Unique labors in hdts (first 20): ["Tapar burbujas","Operario de maquina adm","Agilizador de línea buffer","Operario maquina ultracaster","Encerado de cm","Alistamiento de moldes","Agilizador de línea en desmolde","Desmolde","Moldeo","Acabado de piezas brillantes","Agilizador linea pintura","Pintura piezas de colores negro grises","Pintura de piezas brillantes y naturales","Enchape curvo","Auxiliar pulido","Enchape A","Entrega de muebles","Enchape B","Encerar","Auxiliar de vaciado"]
+Total cargos in TH: 246
+Sample cargo list: ["Jefe jurídico y normativo","Analista prevención y control ambiental","Analista SGSST y cumplimiento legal","Analista de control contractual","Operario Quartzone","Coordinadora de cartera y tesorería","Línea buffer","Línea buffer MS","Gerente general","Analista de planeación de producción y abastecimiento","Auxiliar junior de facturación","Auxiliar senior de logística","Coordinador de exportaciones y distribución","Coordinador de planeación de producción","Supervisor logística","Auxiliar junior de comercio exterior","Director compras y mercadeo","Jefe de comercio exterior y key account compras","Auxiliar de comercio exterior","Diseñador gráfico junior"]
+Total employees in TH: 361
+Active employees count: 361
+Total unique cargos among employees: 173
+Sample employee cargos (first 20): ["Promotor de Ventas","Máquina láser","Supervisor","Promotor técnico","Acabado","Acabado MS","Prensador A","Inspector de calidad muebles","Taladro","Taladro Cefi","Inspector de calidad fibra de vidrio","Analista de TI","Practicante MAC","Enchapador B Cefi","Coordinadora de manufactura","Director de manufactura","Analista de performance y desarrollo","Practicante TI","Reparación Moldes","Auxiliar de vaciado MS"]

@@ -1,0 +1,54 @@
+Total employees: 361
+Unique plantas in empleados: ["Comercial","Cefi","Calidad","Servicios","Moldes","Marmol sintetico","Muebles","TI","Manufactura","Talento y Cultura","Administrativa","RR Moldes","I+D+I","Mantenimiento","Fibra de vidrio","Contabilidad","CEDI","Logistica","Ingenieria","Financiera","Almacen","Todos","Legal","Negociacion y compras","Mercadeo"]
+Active employees: 361
+Unique plantas in active employees: ["Comercial","Cefi","Calidad","Servicios","Moldes","Marmol sintetico","Muebles","TI","Manufactura","Talento y Cultura","Administrativa","RR Moldes","I+D+I","Mantenimiento","Fibra de vidrio","Contabilidad","CEDI","Logistica","Ingenieria","Financiera","Almacen","Todos","Legal","Negociacion y compras","Mercadeo"]
+Plant: Comercial, Total active cargos: 22
+Sample cargos: ["Promotor de Ventas","Practicante MAC","Promotor de servicios","Promotor técnico","Asesor comercial e-commerce","Asesor comercial canal propio","Jefe zona córdoba sucre urabá","Asesor comercial","Jefe de canal obras y distribución","Visitador técnico"]
+Plant: Cefi, Total active cargos: 13
+Sample cargos: ["Máquina láser","Taladro Cefi","Enchapador B Cefi","Máquina láser Cefi","Seccionadora CEFI","Maquina CNC Cefi","Enchapador A","Enchapador A Cefi","Enhuacalador","Operario armador de cajas"]
+Plant: Calidad, Total active cargos: 9
+Sample cargos: ["Supervisor","Inspector de calidad muebles","Inspector de calidad fibra de vidrio","Inspector de calidad mármol sintético","Inspector de calidad MP","Inspector de calidad de marmol sintetico","Inspector de calidad marmol sintetico","Auxiliar de calidad","Coordinador de calidad y sistema de producción"]
+Plant: Servicios, Total active cargos: 6
+Sample cargos: ["Promotor técnico","Auxiliar senior de servicios","Auxiliar de servicios","Coordinador de servicios técnicos","Coordinador de soporte técnico y servicios","Jefe de servicios"]
+Plant: Moldes, Total active cargos: 6
+Sample cargos: ["Acabado","Modelista","Operario líder de moldes","Pintor","Soldador","Supervisor"]
+Plant: Marmol sintetico, Total active cargos: 23
+Sample cargos: ["Acabado MS","Prensador A","Auxiliar de vaciado MS","Encerado de moldes MS","Auxiliar de pulido MS","Prensador B","Desmoldador MS","Empaque MS","Pulidor MS","Moldeador"]
+Plant: Muebles, Total active cargos: 10
+Sample cargos: ["Taladro","Supervisor","Máquina láser","Enchapador B","Patinador","Enchapador A","Seccionadora","Escuadrador","Operario programador de muebles","Taladro Cefi"]
+Plant: TI, Total active cargos: 2
+Sample cargos: ["Analista de TI","Analista de infraestructura y seguridad informática"]
+Plant: Manufactura, Total active cargos: 4
+Sample cargos: ["Coordinadora de manufactura","Director de manufactura","Jefe de Producción","Analista de manufactura"]
+Plant: Talento y Cultura, Total active cargos: 5
+Sample cargos: ["Analista de performance y desarrollo","Analista de Diseño Organizacional","Auxiliar de talento y vinculación","Auxiliar junior mensajería","Jefe de talento humano"]
+Plant: Administrativa, Total active cargos: 1
+Sample cargos: ["Practicante TI"]
+Plant: RR Moldes, Total active cargos: 3
+Sample cargos: ["Reparación Moldes","Acabado","Operario líder de moldes"]
+Plant: I+D+I, Total active cargos: 11
+Sample cargos: ["Especialista de ingeniería de diseño","Especialista junior de diseño","Estimador de proyectos","Implementador de producto","Implementador de producto y mejora continua","Especialista de diseño junior","Coordinador de Ingeniería de Diseño","Coordinador diseño muebles","Practicante I+D+i","Especialista de diseño integral"]
+Plant: Mantenimiento, Total active cargos: 5
+Sample cargos: ["Técnico de mantenimiento","Auxiliar de obra civil","Coordinador de mantenimiento","Jefe de mantenimiento","Soldador"]
+Plant: Fibra de vidrio, Total active cargos: 15
+Sample cargos: ["Ensamblador 2 FV","Acabado FV","Pulidor FV","Pintor FV","Acabado MS","Desmoldador FV","Enhuacalador","Ensayador","Ensamblador 1 FV","Instalador de herraje"]
+Plant: Contabilidad, Total active cargos: 6
+Sample cargos: ["Practicante contabilidad","Auxiliar contable y de inventarios","Coordinadora de costos e inventarios","Directora de Contabilidad","Auxiliar junior de contabilidad","Analista de Contabilidad"]
+Plant: CEDI, Total active cargos: 4
+Sample cargos: ["Operario CEDI","Operario líder CEDI","Operario líder exportaciones","Supervisor"]
+Plant: Logistica, Total active cargos: 9
+Sample cargos: ["Auxiliar junior de distribución","Coordinador de planeación de producción","Auxiliar senior de logística","Analista de planeación de producción y abastecimiento","Auxiliar junior de facturación","Analista de planeación de producto terminado","Auxiliar junior logística","Practicante logística","Director de Logística"]
+Plant: Ingenieria, Total active cargos: 5
+Sample cargos: ["Especialista de desarrollo de producto","Auxiliar junior ingeniería","Jefe de ingeniería","Analista de Ingeniería","Operario de apoyo ingeniería"]
+Plant: Financiera, Total active cargos: 6
+Sample cargos: ["Analista de Cartera","Coordinadora de cartera y tesorería","Auxiliar senior cartera","Directora financiera","Gerente general","Practicante financiero"]
+Plant: Almacen, Total active cargos: 9
+Sample cargos: ["Operario de almacén","Kitting","Operario de montacarga","Operario líder de almacén","Analista de abastecimiento","Auxiliar junior de almacenamiento","Auxiliar junior de distribución","Jefe de abastecimiento MP","Supervisor"]
+Plant: Todos, Total active cargos: 1
+Sample cargos: ["Presidente de la Junta"]
+Plant: Legal, Total active cargos: 6
+Sample cargos: ["Analista SGSST y cumplimiento legal","Analista prevención y control ambiental","Analista de control contractual","Auxiliar de promoción y prevención","Auxiliar de servicios generales","Jefe jurídico y normativo"]
+Plant: Negociacion y compras, Total active cargos: 6
+Sample cargos: ["Auxiliar de comercio exterior","Auxiliar de compras y negociaciones","Auxiliar senior comercio exterior","Director compras y mercadeo","Jefe de comercio exterior y key account compras","Jefe de negociación y compras"]
+Plant: Mercadeo, Total active cargos: 4
+Sample cargos: ["Auxiliar de retención y reactivación de clientes","Diseñador gráfico","Jefe de mercadeo","Practicante mercadeo"]

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Plus, Edit3 } from 'lucide-react'
+import { LogOut, Plus, Edit3, BarChart3 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
 import { isAuthorizedEditor } from '@/lib/hdt/authorized-editors'
@@ -52,6 +52,12 @@ export default function HdtMenuPage() {
             action: () => router.push('/hdt/create'),
             requiresEdit: false,
         },
+        {
+            title: 'Estadísticas y Calidad',
+            icon: <BarChart3 className="h-10 w-10" style={{ color: 'var(--brand-primary)' }} />,
+            action: () => router.push('/hdt/statistics'),
+            requiresEdit: false,
+        },
     ]
 
     const menuItems = allMenuItems.filter(item => !item.requiresEdit || canEdit)
@@ -77,7 +83,7 @@ export default function HdtMenuPage() {
                     </div>
 
                     {/* Menu Buttons Area */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full">
                         {menuItems.map((item, index) => (
                             <button
                                 key={index}
