@@ -17,6 +17,7 @@ interface Usuario {
 }
 
 const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
+    hdt: ['acceso_general', 'crear', 'editar', 'estadisticas'],
     fibra: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
@@ -33,6 +34,7 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
+    hdt: 'HDT Estandarización',
     fibra: 'Control de Piso (Fibra)',
     modulos: 'Control de Piso (Mármol)',
     muebles: 'Control de Piso (Muebles)',

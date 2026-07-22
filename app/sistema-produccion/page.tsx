@@ -14,6 +14,7 @@ interface User {
         opt_sistemica?: any;
         estadisticas_produccion?: any;
         tarjetas_excelencia?: any;
+        hdt?: any;
     }
 }
 
@@ -74,7 +75,7 @@ export default function SistemaProduccionPage() {
     }
 
     const hasHdt = () => {
-        return true;
+        return hasApp('hdt');
     }
 
     return (

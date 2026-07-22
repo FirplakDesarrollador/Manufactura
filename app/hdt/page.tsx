@@ -22,7 +22,18 @@ export default function HdtMenuPage() {
                 const namePart = user.email.split('@')[0].split('.')[0]
                 const capitalized = namePart.charAt(0).toUpperCase() + namePart.slice(1).toLowerCase()
                 setUserName(capitalized)
-                setCanEdit(isAuthorizedEditor(user.email))
+
+                // Fetch dynamic permissions from Supabase
+                const { data: userData } = await supabase
+                    .from('usuarios')
+                    .select('permisos')
+                    .eq('uuid', user.id)
+                    .single()
+
+                const permisos = (userData?.permisos as any) || {}
+                // Permite editar si tiene permisos.hdt.editar, permisos.hdt === true, o si está en la lista estática original
+                const hasEditPermission = permisos.hdt?.editar || permisos.hdt === true || isAuthorizedEditor(user.email)
+                setCanEdit(!!hasEditPermission)
             }
         }
         getUser()
