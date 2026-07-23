@@ -42,11 +42,28 @@ export default function HomePage() {
             return
         }
 
-        const { data: userData } = await supabase
+        let { data: userData } = await supabase
             .from('usuarios')
-            .select('permisos')
+            .select('id, permisos')
             .eq('uuid', authUser.id)
-            .single()
+            .maybeSingle()
+
+        if (!userData && authUser.email) {
+            // Auto-vinculación por correo electrónico (insensible a mayúsculas/minúsculas)
+            const { data: emailUser } = await supabase
+                .from('usuarios')
+                .select('id, permisos')
+                .ilike('correo', authUser.email)
+                .maybeSingle()
+
+            if (emailUser) {
+                await supabase
+                    .from('usuarios')
+                    .update({ uuid: authUser.id })
+                    .eq('id', emailUser.id)
+                userData = emailUser
+            }
+        }
 
         const combinedUser: User = {
             id: authUser.id,

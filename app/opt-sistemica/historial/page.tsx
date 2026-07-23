@@ -54,6 +54,15 @@ const QUESTION_MAPPING: Record<string, Record<string, string>> = {
     '6.3': "Solicite el estado de referencia de la zona, ¿Existe Mapa (4S Estandarizar)? ¿Observe el puesto de trabajo o área y ¿se cumple el estandar con demarcación?",
     '6.4': "Solicite la última rejilla de observación de 5s ¿Esta lleva a la mejora del estado de referencia?",
     '6.5': "Existe una herramienta que hace posible que los colaboradores o cualquier persona comunique necesidades de mejora ¿hay disciplina en su uso?"
+  },
+  'MA': {
+    '3.1': "Verificar si se está llenando el tablero de autónomo de la máquina (Ver foto)",
+    '4.1': "Verificar si tiene reporte de observaciones",
+    '5.1': "Verificar estado general y de limpieza de la máquina (Campo Abierto)",
+    '6.1': "¿El operario del puesto ha realizado el mantenimiento autónomo y lo conoce?",
+    '7.1': "¿Cómo está recibiendo la máquina diariamente del turno anterior?",
+    '8.1': "¿El operario está entrenado para realizar el mantenimiento autónomo?",
+    '9.1': "Verificar si en la HILU está validada la casilla de Mantenimiento Autónomo"
   }
 };
 
@@ -115,6 +124,7 @@ export default function HistorialPage() {
       case 'BE': return '📉 Gestión de Bajas Estadísticas';
       case 'AF': return '🤝 Acompañamiento Frecuente';
       case '5S': return "🧹 5'S";
+      case 'MA': return "🔧 Mantenimiento Autónomo";
       default: return type;
     }
   };
@@ -268,7 +278,7 @@ export default function HistorialPage() {
                         Pregunta {id}
                       </span>
                       <span style={{ fontWeight: 500, color: 'var(--accent)', fontSize: '1.05rem', lineHeight: 1.4 }}>
-                        {QUESTION_MAPPING[selectedRecord.modulo_tipo]?.[id] || 'Pregunta no identificada'}
+                        {QUESTION_MAPPING[selectedRecord.modulo_tipo]?.[id] || res.text || 'Pregunta no identificada'}
                       </span>
                     </div>
                     <div style={{ 

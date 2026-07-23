@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/opt-sistemica/SubHeader';
-import { Star, TrendingDown, Users, BookOpen, GraduationCap, BarChart3, Search, ClipboardList } from 'lucide-react';
+import { Star, TrendingDown, Users, BookOpen, GraduationCap, BarChart3, Search, ClipboardList, Wrench } from 'lucide-react';
 
 const subModules = [
   { id: '5s', name: "5'S", icon: '⭐', description: 'Evaluación y seguimiento de los estándares de las 5S.' },
@@ -16,6 +16,7 @@ const subModules = [
   { id: 'gi', name: 'Gestión de indicadores (GI)', icon: '📊', description: 'Monitoreo de KPI y métricas de desempeño.' },
   { id: 'opt', name: 'OPT', icon: '🔍', description: 'Observación Preventiva del Trabajo y seguridad.' },
   { id: 'te', name: 'Trabajo estandarizado (TE)', icon: '📋', description: 'Verificación de cumplimiento de estándares operativos.' },
+  { id: 'ma', name: 'Mantenimiento Autónomo (MA)', icon: '🔧', description: 'Inspección de máquinas, checklist autónomo, estado de tablero, entrenamiento e HILU.' }
 ];
 
 const getModuleIcon = (id: string, className: string) => {
@@ -28,6 +29,7 @@ const getModuleIcon = (id: string, className: string) => {
     case 'gi': return <BarChart3 className={className} size={28} />;
     case 'opt': return <Search className={className} size={28} />;
     case 'te': return <ClipboardList className={className} size={28} />;
+    case 'ma': return <Wrench className={className} size={28} />;
     default: return <ClipboardList className={className} size={28} />;
   }
 };

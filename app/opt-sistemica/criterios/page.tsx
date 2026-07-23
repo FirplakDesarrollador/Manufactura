@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClipboardCheck, FileText, CheckCircle2, TrendingDown, Users, BookOpen, GraduationCap, BarChart3, Star, Search, ClipboardList } from "lucide-react";
+import { ClipboardCheck, FileText, CheckCircle2, TrendingDown, Users, BookOpen, GraduationCap, BarChart3, Star, Search, ClipboardList, Wrench } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/components/opt-sistemica/Header";
 import SubHeader from "@/components/opt-sistemica/SubHeader";
@@ -111,7 +111,7 @@ export default function OptSistemicaCriteriosPage() {
               </div>
 
               {/* 5S */}
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow md:col-span-2">
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div>
                   <div className="flex justify-between items-start mb-4">
                     <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
@@ -122,6 +122,22 @@ export default function OptSistemicaCriteriosPage() {
                   <h3 className="text-base font-bold text-slate-800 mb-2">Orden, Limpieza y Mejora Continua</h3>
                   <p className="text-slate-600 text-xs leading-relaxed">
                     Mide la clasificación, el orden visual de las herramientas, el uso de mapas de referencia (4S Estandarizar), la disciplina en el checklist de limpieza y el uso de los buzones de necesidades de los colaboradores.
+                  </p>
+                </div>
+              </div>
+
+              {/* MA */}
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                      <Wrench className="w-6 h-6" />
+                    </div>
+                    <span className="text-slate-500 text-xs font-bold bg-rose-50 px-3 py-1 rounded-full">Mantenimiento Autónomo</span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-2">Inspección y Tableros Autónomos</h3>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    Audita la ejecución del checklist diario de puesta a punto de la máquina, el estado del tablero de autónomo, el entrenamiento práctico de los operadores, su percepción diaria y la validación en la HILU.
                   </p>
                 </div>
               </div>
