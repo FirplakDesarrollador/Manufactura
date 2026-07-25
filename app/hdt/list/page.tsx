@@ -7,6 +7,8 @@ import { ArrowLeft, FileText, Search, Home, User, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/hdt/database.types'
 import GroupedHdtList from '@/components/hdt/GroupedHdtList'
+import Header from '@/components/opt-sistemica/Header'
+import SubHeader from '@/components/hdt/SubHeader'
 
 type HdtRow = Database['public']['Tables']['hdts']['Row']
 
@@ -111,23 +113,21 @@ function HdtListContent() {
 
   const userEmailName = currentUser?.email?.split('@')[0] || 'usuario'
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   return (
     <div className="min-h-screen flex flex-col font-sans" style={{ backgroundColor: '#F6F3EE' }}>
-      {/* Dark Header */}
-      <header className="p-4 flex items-center shadow-md relative z-10 text-white" style={{ backgroundColor: '#324354' }}>
-        <div className="flex items-center gap-1">
-          <Link href="/hdt/plants" className="p-2 rounded-full transition-colors hover:bg-white/10" title="Volver">
-            <ArrowLeft className="h-6 w-6" />
-          </Link>
-          <Link href="/hdt" className="p-2 rounded-full transition-colors hover:bg-white/10" title="Ir al Menú Principal">
-            <Home className="h-6 w-6" />
-          </Link>
-        </div>
-        <div className="flex-1 text-center">
-          <h1 className="text-2xl font-normal tracking-tight">HDTs de {planta}</h1>
-        </div>
-        <div className="w-10"></div>
-      </header>
+      <Header
+        title="HDT"
+        subtitle="Estandarización"
+        userEmail={currentUser?.email || ''}
+        showLogout={true}
+        onLogout={handleSignOut}
+      />
+      <SubHeader />
 
       <main className="flex-1 max-w-5xl mx-auto w-full p-6 sm:p-12">
         <div className="space-y-6">

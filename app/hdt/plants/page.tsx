@@ -2,9 +2,11 @@
 
 import React, { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Factory, Loader2, ChevronRight, AlertCircle, LayoutGrid } from 'lucide-react'
+import { Factory, Loader2, ChevronRight, AlertCircle, LayoutGrid } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/hdt/database.types'
+import Header from '@/components/opt-sistemica/Header'
+import SubHeader from '@/components/hdt/SubHeader'
 
 type HdtRow = Database['public']['Tables']['hdts']['Row']
 
@@ -28,9 +30,15 @@ function PlantsContent() {
     const [debugInfo, setDebugInfo] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [userEmail, setUserEmail] = useState('')
     const router = useRouter()
     const searchParams = useSearchParams()
     const action = searchParams.get('action') || 'view'
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+        router.push('/login')
+    }
 
     useEffect(() => {
         const fetchPlants = async () => {
@@ -41,6 +49,7 @@ function PlantsContent() {
 
                 const { data: { user }, error: authError } = await supabase.auth.getUser()
                 if (authError || !user) { router.push('/login'); return }
+                setUserEmail(user.email || '')
 
                 const { data, error: fetchError } = await supabase.from('hdts').select('*')
 
@@ -73,22 +82,14 @@ function PlantsContent() {
 
     return (
         <div className="min-h-screen flex flex-col font-sans bg-[#F6F3EE] text-[#000000]">
-            {/* Dark Header */}
-            <header className="p-4 flex items-center shadow-md relative z-10 bg-[#324354]">
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={() => router.push('/hdt')}
-                        className="p-2 rounded-full transition-colors hover:bg-white/10 text-white"
-                        title="Volver"
-                    >
-                        <ArrowLeft className="h-6 w-6" />
-                    </button>
-                </div>
-                <div className="flex-1 text-center">
-                    <h1 className="text-white text-2xl font-normal tracking-tight">Selecciona Planta</h1>
-                </div>
-                <div className="w-10"></div>
-            </header>
+            <Header
+                title="HDT"
+                subtitle="Estandarización"
+                userEmail={userEmail}
+                showLogout={true}
+                onLogout={handleSignOut}
+            />
+            <SubHeader />
 
             <main className="flex-1 max-w-5xl mx-auto w-full p-6 sm:p-12">
                 <div className="space-y-8">

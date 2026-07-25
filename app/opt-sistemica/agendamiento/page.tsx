@@ -103,7 +103,8 @@ export default function AgendamientoPage() {
       setSuccessEvent({ fecha, hora, modulo, responsable, observado });
       fetchData();
     } else {
-      setError('Error al guardar la programación.');
+      console.error("Error inserting planificacion:", insertError);
+      setError(insertError.message || 'Error al guardar la programación.');
     }
     setSaving(false);
   };
@@ -207,7 +208,7 @@ export default function AgendamientoPage() {
               </h1>
               <p style={{ color: '#666' }}>Planificación de observaciones {viewMode === 'weekly' ? 'semanal' : 'mensual'}.</p>
             </div>
-            <button onClick={() => setShowForm(true)} className="btn-primary" style={{ padding: '14px 28px', fontSize: '1.1rem' }}>
+            <button onClick={() => { setError(null); setShowForm(true); }} className="btn-primary" style={{ padding: '14px 28px', fontSize: '1.1rem' }}>
               + Nuevo
             </button>
           </div>
@@ -381,6 +382,11 @@ export default function AgendamientoPage() {
                   <select className="input-field" value={modulo} onChange={e => setModulo(e.target.value)}>
                     {MODULOS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
+                  {error && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
+                      ⚠️ {error}
+                    </div>
+                  )}
                   <button type="submit" disabled={saving} className="btn-primary" style={{ padding: '16px' }}>
                     {saving ? 'Guardando...' : 'Confirmar Programación'}
                   </button>
