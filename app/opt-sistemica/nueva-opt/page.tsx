@@ -80,28 +80,26 @@ export default function NuevaOptPage() {
       <SubHeader />
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-12 lg:p-16">
-        <div className="animate-fade-in w-full max-w-[1600px] flex flex-wrap justify-center gap-6 md:gap-8">
-          {subModules.map((module) => (
-            <button 
-              key={module.id}
-              onClick={() => router.push(`/opt-sistemica/nueva-opt/${module.id}`)}
-              className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
-            >
-              <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-              
-              <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
-                {getModuleIcon(module.id, "text-[#324354] group-hover:text-white transition-colors duration-500")}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-12 md:py-16 lg:py-20 pt-28">
+        <div className="w-full max-w-[1700px] mx-auto px-4 md:px-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full">
+            {subModules.map((module) => (
+              <div key={module.id} className="w-full max-w-[290px] aspect-square">
+                <button 
+                  onClick={() => router.push(`/opt-sistemica/nueva-opt/${module.id}`)}
+                  className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                >
+                  <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300 shadow-sm">
+                    {getModuleIcon(module.id, "text-[#324354] group-hover:text-white transition-colors duration-300")}
+                  </div>
+                  
+                  <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] transition-colors duration-300 text-center leading-tight">
+                    {module.name}
+                  </span>
+                </button>
               </div>
-              
-              <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                {module.name}
-                <span className="block text-xs md:text-sm font-normal text-gray-400 group-hover:text-gray-500 mt-1.5 transition-colors duration-300 leading-normal max-w-[200px]">
-                  {module.description}
-                </span>
-              </span>
-            </button>
-          ))}
+            ))}
+          </div>
         </div>
       </main>
 
