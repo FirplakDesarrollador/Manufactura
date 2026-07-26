@@ -277,28 +277,30 @@ export default function AsistenciaPage() {
         }
       `}} />
 
-      {/* Subheader Toggler (Tabs) */}
-      <div className="flex justify-center border-b border-[#e2ded5] relative z-10 w-full bg-white/50 backdrop-blur-md">
-        <div className="flex space-x-12">
+      {/* Subheader Toggler (Pills layout matching Hora a Hora) */}
+      <div className="w-full bg-white border-b border-[#e2ded5] relative z-10 py-3 shadow-[0_2px_10px_rgba(50,67,84,0.02)]">
+        <div className="max-w-4xl mx-auto px-6 flex justify-center gap-4">
           <button
             onClick={() => setActiveTab('assistant')}
-            className={`py-4 px-6 text-sm font-semibold tracking-wider transition-all relative cursor-pointer uppercase ${
-              activeTab === 'assistant' 
-                ? 'text-[#324354] border-b-2 border-[#324354]' 
-                : 'text-slate-400 hover:text-[#324354]'
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold tracking-wide transition-all cursor-pointer border ${
+              activeTab === 'assistant'
+                ? 'bg-[#324354] text-white border-[#324354] shadow-sm'
+                : 'bg-white text-slate-600 border-[#e2ded5] hover:bg-slate-50'
             }`}
           >
-            Asistente Virtual
+            <Bot size={16} />
+            <span>Asistente Virtual</span>
           </button>
           <button
             onClick={() => setActiveTab('glossary')}
-            className={`py-4 px-6 text-sm font-semibold tracking-wider transition-all relative cursor-pointer uppercase ${
-              activeTab === 'glossary' 
-                ? 'text-[#324354] border-b-2 border-[#324354]' 
-                : 'text-slate-400 hover:text-[#324354]'
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold tracking-wide transition-all cursor-pointer border ${
+              activeTab === 'glossary'
+                ? 'bg-[#324354] text-white border-[#324354] shadow-sm'
+                : 'bg-white text-slate-600 border-[#e2ded5] hover:bg-slate-50'
             }`}
           >
-            Glosario de Módulos
+            <BookOpen size={16} />
+            <span>Glosario de Módulos</span>
           </button>
         </div>
       </div>
