@@ -86,6 +86,7 @@ export default function BitacoraPage() {
   const [selectedSupervisor, setSelectedSupervisor] = useState<Supervisor | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+  const [userEmail, setUserEmail] = useState('');
 
   const [subSelection, setSubSelection] = useState<'MS_FV' | 'MBL_CEFI' | null>(null);
   const todayDate = new Date().toISOString().split('T')[0];
@@ -103,6 +104,8 @@ export default function BitacoraPage() {
         router.push('/login');
         return;
       }
+      
+      setUserEmail(session.user.email || '');
 
       // 1. Buscar perfil por UUID
       let { data: userData, error: userError } = await supabase
