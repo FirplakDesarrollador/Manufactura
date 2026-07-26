@@ -310,7 +310,7 @@ export default function BitacoraPage() {
         onLogout={handleLogout}
       />
 
-      {/* Styles Scoping */}
+      {/* Styles Scoping with Montserrat font family and custom variables */}
       <style dangerouslySetInnerHTML={{ __html: `
         .bitacora-scope {
           --primary: #7B8E90;
@@ -323,6 +323,7 @@ export default function BitacoraPage() {
           --glass-border: rgba(255, 255, 255, 0.2);
           --error: #d14747;
           --success: #59a96a;
+          font-family: 'Montserrat', sans-serif;
         }
         .bitacora-scope .card {
           background: white;
@@ -342,11 +343,11 @@ export default function BitacoraPage() {
       `}} />
 
       {/* Main Container */}
-      <main className="relative z-10 flex-1 flex flex-col justify-start p-6 md:p-12 pt-28 max-w-7xl mx-auto w-full">
+      <main className="relative z-10 flex-1 flex items-center justify-center p-6 md:p-12 pt-28 max-w-[1700px] mx-auto w-full">
         
         {/* Pantalla de Selección de Planta */}
         {!selectedPlanta && (
-          <div className="w-full animate-fade-in">
+          <div className="w-full animate-fade-in px-4 md:px-8">
             <header className="mb-10 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <button 
@@ -361,17 +362,23 @@ export default function BitacoraPage() {
               <p className="text-slate-500 font-medium text-base">Elige la planta o área de producción que deseas consultar hoy.</p>
             </header>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {/* Grid aligned to 5 columns per row, matching main landing style */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full">
               {plantas.map((planta) => (
-                <div 
-                  key={planta.id} 
-                  className="card cursor-pointer flex flex-col items-center gap-6 text-center hover:-translate-y-2 hover:shadow-[0_15px_30px_rgba(50,67,84,0.1)] hover:border-[#324354] transition-all duration-300" 
-                  onClick={() => setSelectedPlanta(planta)}
-                >
-                  <div className="w-20 h-20 bg-[#324354]/5 rounded-full flex items-center justify-center text-[#324354]">
-                    <ProcessIcon name={planta.nombre} size={44} />
-                  </div>
-                  <h3 className="text-lg font-bold text-[#324354]">{planta.nombre}</h3>
+                <div key={planta.id} className="w-full max-w-[290px] aspect-square">
+                  <button 
+                    className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group" 
+                    onClick={() => setSelectedPlanta(planta)}
+                  >
+                    <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                      <div className="text-[#324354] group-hover:text-white transition-colors duration-300">
+                        <ProcessIcon name={planta.nombre} size={36} className="w-8 h-8 md:w-12 md:h-12" />
+                      </div>
+                    </div>
+                    <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
+                      {planta.nombre}
+                    </span>
+                  </button>
                 </div>
               ))}
             </div>
@@ -380,7 +387,7 @@ export default function BitacoraPage() {
 
         {/* Sub-selección para Calidad */}
         {selectedPlanta && selectedPlanta.nombre === 'Calidad' && !subSelection && (
-          <div className="w-full animate-fade-in">
+          <div className="w-full animate-fade-in px-4 md:px-8">
             <header className="mb-10 flex flex-col gap-2">
               <button 
                 onClick={() => setSelectedPlanta(null)} 
@@ -393,33 +400,44 @@ export default function BitacoraPage() {
               <p className="text-slate-500 font-medium text-base">Selecciona el sub-proceso de calidad correspondiente.</p>
             </header>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto w-full pt-4">
-              <button 
-                onClick={() => setSubSelection('MS_FV')} 
-                className="card cursor-pointer flex flex-col items-center justify-center gap-6 hover:-translate-y-2 hover:shadow-[0_15px_30px_rgba(50,67,84,0.1)] hover:border-[#324354] transition-all duration-300 bg-white"
-              >
-                <div className="w-20 h-20 bg-[#324354]/5 rounded-full flex items-center justify-center text-[#324354]">
-                  <ProcessIcon name="MS_FV" size={44} />
-                </div>
-                <h3 className="text-xl font-bold text-[#324354]">MS y FV</h3>
-              </button>
+            {/* Grid aligned to 5 columns per row, matching main landing style */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full pt-4">
+              
+              <div className="w-full max-w-[290px] aspect-square">
+                <button 
+                  onClick={() => setSubSelection('MS_FV')} 
+                  className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                >
+                  <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                    <div className="text-[#324354] group-hover:text-white transition-colors duration-300">
+                      <ProcessIcon name="MS_FV" size={36} className="w-8 h-8 md:w-12 md:h-12" />
+                    </div>
+                  </div>
+                  <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">MS y FV</span>
+                </button>
+              </div>
 
-              <button 
-                onClick={() => setSubSelection('MBL_CEFI')} 
-                className="card cursor-pointer flex flex-col items-center justify-center gap-6 hover:-translate-y-2 hover:shadow-[0_15px_30px_rgba(50,67,84,0.1)] hover:border-[#324354] transition-all duration-300 bg-white"
-              >
-                <div className="w-20 h-20 bg-[#324354]/5 rounded-full flex items-center justify-center text-[#324354]">
-                  <ProcessIcon name="MBL_CEFI" size={44} />
-                </div>
-                <h3 className="text-xl font-bold text-[#324354]">MBL y CEFI</h3>
-              </button>
+              <div className="w-full max-w-[290px] aspect-square">
+                <button 
+                  onClick={() => setSubSelection('MBL_CEFI')} 
+                  className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                >
+                  <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                    <div className="text-[#324354] group-hover:text-white transition-colors duration-300">
+                      <ProcessIcon name="MBL_CEFI" size={36} className="w-8 h-8 md:w-12 md:h-12" />
+                    </div>
+                  </div>
+                  <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">MBL y CEFI</span>
+                </button>
+              </div>
+              
             </div>
           </div>
         )}
 
         {/* Lista de Actividades de la Planta seleccionada */}
         {selectedPlanta && (selectedPlanta.nombre !== 'Calidad' || subSelection) && (
-          <div className="w-full animate-fade-in pb-28">
+          <div className="w-full animate-fade-in pb-28 max-w-4xl mx-auto">
             <header className="mb-8 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <button 
