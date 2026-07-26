@@ -50,6 +50,12 @@ Hemos completado con éxito todas las solicitudes de restructuración de diseño
 
 ---
 
+## 4. Rediseño del Módulo "Mantenimiento" (`/mantenimiento`)
+* **Alineación Visual**: Aplicado el mismo diseño de grilla premium del Home y Sistema de Producción (5 columnas en PC, 1700px ancho máximo, tarjetas de 290px de tamaño aspect-square).
+* **Consistencia Visual**: Unificado el comportamiento del efecto zoom-hover y los colores de los contenedores circulares de iconos.
+
+---
+
 ## 4. Renombramiento de "Indicadores Productividad" a "Tablero de Control"
 Se actualizó la nomenclatura del módulo a lo largo de toda la aplicación manteniendo el ruteo intacto para evitar fallas:
 * **Botón del Home**: Cambiado el texto de la tarjeta a `Tablero de Control`.
