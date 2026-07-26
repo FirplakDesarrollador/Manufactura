@@ -272,13 +272,13 @@ export default function ConsultaSAPPage() {
                     <div className="h-[3px] bg-[#f4b000] w-full"></div>
 
                     {/* SAP WINDOW BODY */}
-                    <div className="p-2.5 bg-[#f3f0ea] flex flex-col gap-2.5">
+                    <div className="py-1 px-2.5 bg-[#f3f0ea] flex flex-col gap-1">
 
                         {/* HEADER DETAILS FORM - TWO COLUMNS */}
                         <div className="flex flex-wrap lg:flex-nowrap gap-x-8 gap-y-2 items-start justify-between w-full">
                             
                             {/* LEFT COLUMN FIELDS */}
-                            <div className="space-y-1.5 shrink-0">
+                            <div className="space-y-0.5 shrink-0">
                                 {/* Tipo */}
                                 <div className="flex items-center">
                                     <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none">Tipo</span>
@@ -329,7 +329,7 @@ export default function ConsultaSAPPage() {
                                         type="text" 
                                         value={activeOrder.descripcionProducto} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[280px] rounded-none focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[480px] rounded-none focus:outline-none"
                                     />
                                 </div>
 
@@ -405,7 +405,7 @@ export default function ConsultaSAPPage() {
                             </div>
 
                             {/* RIGHT COLUMN FIELDS */}
-                            <div className="space-y-1.5 shrink-0 w-full lg:w-[350px]">
+                            <div className="space-y-0.5 shrink-0 w-full lg:w-[350px]">
                                 {/* Nº */}
                                 <div className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-2">
