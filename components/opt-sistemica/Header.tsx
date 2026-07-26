@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 interface HeaderProps {
   title: string;
@@ -24,6 +25,28 @@ export default function Header({
 }: HeaderProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [internalEmail, setInternalEmail] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (userEmail) {
+      setInternalEmail(userEmail);
+    } else {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data?.session?.user?.email) {
+          setInternalEmail(data.session.user.email);
+        }
+      });
+    }
+  }, [userEmail]);
+
+  const handleSignOut = async () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      await supabase.auth.signOut();
+      router.push('/login');
+    }
+  };
   
   // Estado para controlar qué acordeones de submenús están abiertos
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
@@ -91,10 +114,10 @@ export default function Header({
             </div>
           )}
           
-          {userEmail && (
+          {(internalEmail || userEmail) && (
             <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
-              <p className="text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1" title={userEmail}>
-                {getFirstName(userEmail)}
+              <p className="text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1" title={internalEmail || userEmail}>
+                {getFirstName(internalEmail || userEmail || '')}
               </p>
               <p className="text-xs sm:text-sm italic text-[#7B8E90] tracking-wider leading-none">
                 Usuario
@@ -324,19 +347,19 @@ export default function Header({
         </div>
 
         {/* Drawer Footer (User Info & Logout) */}
-        {userEmail && (
+        {(internalEmail || userEmail) && (
           <div className="p-6 border-t border-slate-700/60 bg-slate-900/40 space-y-4 shrink-0">
             <div className="flex flex-col gap-0.5">
               <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Sesión Activa</span>
-              <span className="text-xs font-semibold text-slate-300 truncate" title={userEmail}>
-                {userEmail}
+              <span className="text-xs font-semibold text-slate-300 truncate" title={internalEmail || userEmail}>
+                {internalEmail || userEmail}
               </span>
             </div>
-            {showLogout && onLogout && (
+            {showLogout && (
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  onLogout();
+                  handleSignOut();
                 }}
                 className="w-full py-2.5 bg-[#7B8E90] hover:bg-[#6c7d7f] text-white rounded-xl transition font-semibold text-xs text-center cursor-pointer shadow-sm hover:shadow-md"
               >
