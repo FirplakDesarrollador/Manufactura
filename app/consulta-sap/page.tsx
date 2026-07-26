@@ -772,68 +772,26 @@ export default function ConsultaSAPPage() {
                         </div>
 
                         {/* COMMENTS & PACKAGING AREA */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1.5">
+                        <div className="flex items-start justify-between w-full mt-1.5">
                             {/* Comentarios */}
-                            <div className="flex flex-col gap-0.5">
-                                <label className="text-[11px] text-gray-800 select-none">Comentarios</label>
+                            <div className="flex items-start gap-1">
+                                <span className="text-[11px] text-gray-800 select-none w-[75px] shrink-0 pt-1">Comentarios</span>
                                 <textarea
                                     value={activeOrder.comentarios}
                                     readOnly
-                                    rows={1}
-                                    className="bg-white border border-[#b2b2b2] p-1 text-xs text-black w-full rounded-none focus:outline-none resize-none font-sans"
+                                    className="bg-white border border-[#b2b2b2] p-1 text-xs text-black w-[250px] h-[50px] rounded-none focus:outline-none resize-none font-sans leading-normal"
                                 />
                             </div>
 
                             {/* Observaciones sobre empaque */}
-                            <div className="flex flex-col gap-0.5">
-                                <label className="text-[11px] text-gray-800 select-none">Observaciones sobre empaque</label>
+                            <div className="flex items-start gap-1">
+                                <span className="text-[11px] text-gray-800 select-none w-[150px] shrink-0 pt-1 text-right">Observaciones sobre empaque</span>
                                 <textarea
                                     value={activeOrder.observacionesEmpaque}
                                     readOnly
-                                    rows={1}
-                                    className="bg-white border border-[#b2b2b2] p-1 text-xs text-black w-full rounded-none focus:outline-none resize-none font-sans"
+                                    className="bg-white border border-[#b2b2b2] p-1 text-xs text-black w-[250px] h-[50px] rounded-none focus:outline-none resize-none font-sans leading-normal"
                                 />
                             </div>
-                        </div>
-
-                        {/* WINDOW ACTION BUTTONS */}
-                        <div className="flex gap-2.5 mt-2">
-                            <button
-                                className="border-l-4 border-l-amber-500 bg-[#e1e1e1] hover:bg-[#d0d0d0] border border-gray-400 px-6 py-1 text-xs text-black font-semibold shadow-sm hover:shadow active:scale-[0.98] transition-all rounded-none cursor-pointer"
-                                onClick={() => alert(`Orden de Fabricación OF-${activeOrder.noOrden} consultada de SAP con éxito.`)}
-                            >
-                                OK
-                            </button>
-                            <button
-                                className="bg-[#e1e1e1] hover:bg-[#d0d0d0] border border-gray-400 px-6 py-1 text-xs text-black transition-all shadow-sm hover:shadow active:scale-[0.98] rounded-none cursor-pointer"
-                                onClick={() => router.push('/home')}
-                            >
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* SAP BOTTOM STATUS BAR */}
-                    <div className="bg-[#eceae6] border-t border-[#a3a3a3] grid grid-cols-12 text-[10px] text-gray-700 h-6 border-b select-none">
-                        {/* Status Message Cell */}
-                        <div className="col-span-8 border-r border-[#d4d4d4] px-3 flex items-center bg-white font-medium truncate text-emerald-800">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block mr-2 shrink-0 animate-pulse"></span>
-                            Operación completada con éxito. Datos de Orden {activeOrder.noOrden} cargados correctamente.
-                        </div>
-
-                        {/* Date Cell */}
-                        <div className="col-span-2 border-r border-[#d4d4d4] px-2 flex items-center justify-center font-mono select-none">
-                            15/07/2026
-                        </div>
-
-                        {/* Time Cell */}
-                        <div className="col-span-1 border-r border-[#d4d4d4] px-2 flex items-center justify-center font-mono select-none">
-                            {currentTime || "14:32:00"}
-                        </div>
-
-                        {/* SAP Business One Logo replica */}
-                        <div className="col-span-1 px-2 flex items-center justify-center bg-gradient-to-r from-[#eceae6] to-[#dfdbd5] font-black text-slate-500 font-sans tracking-tight text-[9px] select-none italic text-right">
-                            SAP Business One
                         </div>
                     </div>
                 </div>
