@@ -404,97 +404,98 @@ export default function ConsultaSAPPage() {
                                 </div>
                             </div>
 
-                            {/* RIGHT COLUMN FIELDS (realigned to the left next to labels in green mark) */}
-                            <div className="space-y-1.5 shrink-0">
+                            {/* RIGHT COLUMN FIELDS */}
+                            <div className="space-y-1.5 shrink-0 w-full lg:w-[350px]">
                                 {/* Nº */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none">Nº</span>
-                                    <div className="flex items-center gap-1.5">
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none">Nº</span>
+                                    <div className="flex items-center gap-1.5 w-[180px]">
                                         <input 
                                             type="text" 
                                             value="OF-Produ" 
                                             readOnly 
-                                            className="bg-[#f0ede9] border border-transparent px-1 py-0.5 text-xs text-gray-600 w-[70px] rounded-none select-none outline-none font-medium"
+                                            className="bg-[#f0ede9] border border-transparent px-1 py-0.5 text-xs text-gray-600 w-[75px] rounded-none select-none outline-none font-medium"
                                         />
                                         <input 
                                             type="text" 
                                             value={activeOrder.noOrden} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[90px] rounded-none font-semibold text-right focus:outline-none"
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black flex-1 rounded-none font-semibold text-right focus:outline-none"
                                         />
                                     </div>
                                 </div>
 
                                 {/* Fecha orden de fabricacion */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none font-medium">Fecha orden de fabricac</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none font-medium">Fecha orden de fabricac</span>
                                     <input 
                                         type="text" 
                                         value={activeOrder.fechaOrden} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[100px] rounded-none text-right focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none text-right focus:outline-none"
                                     />
                                 </div>
 
                                 {/* Fecha de inicio */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none font-medium">Fecha de inicio</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none font-medium">Fecha de inicio</span>
                                     <input 
                                         type="text" 
                                         value={activeOrder.fechaInicio} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[100px] rounded-none text-right focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none text-right focus:outline-none"
                                     />
                                 </div>
 
                                 {/* Fecha de finalización */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none font-medium">Fecha de finalización</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none font-medium">Fecha de finalización</span>
                                     <input 
                                         type="text" 
                                         value={activeOrder.fechaFinalizacion} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[100px] rounded-none text-right focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none text-right focus:outline-none"
                                     />
                                 </div>
-                                      {/* Usuario */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none">Usuario</span>
+
+                                {/* Usuario */}
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none">Usuario</span>
                                     <select 
                                         value={activeOrder.usuario} 
                                         disabled 
-                                        className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
+                                        className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
                                     >
                                         <option>{activeOrder.usuario}</option>
                                     </select>
                                 </div>
 
                                 {/* Origen */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none">Origen</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none">Origen</span>
                                     <input 
                                         type="text" 
                                         value={activeOrder.origen} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none focus:outline-none"
                                     />
                                 </div>
 
                                 {/* Vinculados a */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none font-medium">Vinculados a</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none font-medium">Vinculados a</span>
                                     <select 
                                         value={activeOrder.vinculadoA} 
                                         disabled 
-                                        className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
+                                        className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
                                     >
                                         <option>{activeOrder.vinculadoA}</option>
                                     </select>
                                 </div>
 
                                 {/* Pedido vinculado */}
-                                <div className="flex items-center">
-                                    <div className="w-[140px] shrink-0 flex items-center">
+                                <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center">
                                         <span className="text-[11px] text-gray-800 select-none">Pedido vinculado</span>
                                         <SapLinkArrow />
                                     </div>
@@ -502,13 +503,13 @@ export default function ConsultaSAPPage() {
                                         type="text" 
                                         value={activeOrder.pedidoVinculado} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[80px] rounded-none focus:outline-none font-semibold text-right"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none focus:outline-none font-semibold text-right"
                                     />
                                 </div>
 
                                 {/* Cliente */}
-                                <div className="flex items-center">
-                                    <div className="w-[140px] shrink-0 flex items-center">
+                                <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center">
                                         <span className="text-[11px] text-gray-800 select-none">Cliente</span>
                                         <SapLinkArrow />
                                     </div>
@@ -516,29 +517,29 @@ export default function ConsultaSAPPage() {
                                         type="text" 
                                         value={activeOrder.cliente} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[120px] rounded-none focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none focus:outline-none"
                                     />
                                 </div>
 
                                 {/* Centro de Costos */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none font-medium">Centro de Costos</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none font-medium">Centro de Costos</span>
                                     <input 
                                         type="text" 
                                         value={activeOrder.centroCostos} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[120px] rounded-none focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none focus:outline-none"
                                     />
                                 </div>
 
                                 {/* Proyecto */}
-                                <div className="flex items-center">
-                                    <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none font-medium">Proyecto</span>
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-[11px] text-gray-800 select-none font-medium">Proyecto</span>
                                     <input 
                                         type="text" 
                                         value={activeOrder.proyecto} 
                                         readOnly 
-                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[120px] rounded-none focus:outline-none"
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none focus:outline-none"
                                     />
                                 </div>
                             </div>
