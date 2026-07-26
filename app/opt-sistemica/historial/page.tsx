@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/opt-sistemica/SubHeader';
+import { Search } from 'lucide-react';
 
 interface OPTRecord {
   id: string;
@@ -73,6 +74,19 @@ export default function HistorialPage() {
   const [session, setSession] = useState<any>(null);
   const router = useRouter();
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState<'created_at' | 'user_email' | 'modulo_tipo' | 'percentage'>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const requestSort = (field: 'created_at' | 'user_email' | 'modulo_tipo' | 'percentage') => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortField === field && sortDirection === 'asc') {
+      direction = 'desc';
+    }
+    setSortField(field);
+    setSortDirection(direction);
+  };
+
   const fetchRecords = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -109,6 +123,47 @@ export default function HistorialPage() {
     });
   };
 
+  const filteredRecords = records.filter(record => {
+    const term = searchTerm.toLowerCase();
+    return (
+      record.user_email.toLowerCase().includes(term) ||
+      record.modulo_tipo.toLowerCase().includes(term) ||
+      formatDate(record.created_at).toLowerCase().includes(term) ||
+      `${record.percentage}%`.includes(term)
+    );
+  });
+
+  const sortedRecords = [...filteredRecords].sort((a, b) => {
+    let aVal: any = a[sortField];
+    let bVal: any = b[sortField];
+    
+    if (sortField === 'created_at') {
+      aVal = new Date(a.created_at).getTime();
+      bVal = new Date(b.created_at).getTime();
+    }
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const renderSortableHeader = (label: string, field: 'created_at' | 'user_email' | 'modulo_tipo' | 'percentage', alignClass: string = 'text-left') => {
+    const isActive = sortField === field;
+    return (
+      <th 
+        onClick={() => requestSort(field)}
+        className={`px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-slate-700/50 transition-colors ${alignClass}`}
+      >
+        <div className={`flex items-center gap-1.5 ${alignClass === 'text-center' ? 'justify-center' : alignClass === 'text-right' ? 'justify-end' : ''}`}>
+          <span>{label}</span>
+          <span className="text-[10px] opacity-80 font-normal">
+            {isActive ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : ' ↕'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   const canEdit = (record: OPTRecord) => {
     if (!session?.user) return false;
     return (
@@ -132,95 +187,112 @@ export default function HistorialPage() {
   if (!session) return null;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
+    <div className="min-h-screen flex flex-col bg-[#F6F3EE] font-sans text-[#000000] selection:bg-[#324354] selection:text-white w-full">
       <Header
         title="Historial"
         subtitle="Consulta de Observaciones"
         backUrl="/sistema-produccion"
         userEmail={session.user.email}
-        showLogout={false}
+        showLogout={true}
       />
       <SubHeader />
 
-      <main className="container" style={{ paddingTop: '50px', paddingBottom: '80px' }}>
-        <div className="animate-fade-in">
-          <h1 style={{ color: 'var(--accent)', fontSize: '2.5rem', fontWeight: 700, marginBottom: '8px' }}>
-            🕒 Historial de Observaciones
-          </h1>
-          <p style={{ color: '#666', marginBottom: '40px' }}>
-            Consulta todos los registros completos de OPT sistémica.
-          </p>
+      <main className="relative z-10 flex-1 flex flex-col justify-start px-6 py-12 md:py-16 lg:py-20 pt-28 max-w-[1700px] mx-auto w-full">
+        <div className="w-full animate-fade-in space-y-6">
+          
+          {/* Header Row: Title on the left, Search bar and records count on the right */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-[#e2ded5] pb-6">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-light tracking-wide text-[#324354] font-display">
+                Observaciones Guardadas
+              </h2>
+            </div>
+            
+            <div className="flex flex-col items-end gap-1.5 min-w-[320px] max-w-md w-full">
+              <div className="relative w-full">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+                  <Search size={18} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Buscar por usuario, módulo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-[#e2ded5] rounded-full focus:outline-none focus:ring-2 focus:ring-[#324354] focus:border-[#324354] bg-white text-sm shadow-sm"
+                />
+              </div>
+              <span className="text-[10px] font-bold text-[#7B8E90] tracking-wider uppercase">
+                {filteredRecords.length} REGISTROS ENCONTRADOS
+              </span>
+            </div>
+          </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px' }}>
-              <div className="spinner" style={{ margin: '0 auto 20px' }}></div>
-              <div style={{ color: 'var(--primary)', fontWeight: 600 }}>Cargando registros...</div>
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#324354]"></div>
+              <div className="mt-4 text-[#324354] font-semibold text-sm">Cargando registros...</div>
             </div>
-          ) : records.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: '60px' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📁</div>
-              <h3 style={{ color: '#999' }}>No se encontraron registros todavía.</h3>
-              <p style={{ color: '#bbb' }}>Los registros que guardes aparecerán aquí.</p>
+          ) : filteredRecords.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.05)] p-12 text-center">
+              <div className="text-4xl mb-4">📁</div>
+              <h3 className="text-lg font-bold text-slate-700">No se encontraron registros.</h3>
+              <p className="text-sm text-slate-400 mt-1">Los registros que coincidan con tu búsqueda aparecerán aquí.</p>
             </div>
           ) : (
-            <div className="card" style={{ padding: '0', overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
-                <thead>
-                  <tr style={{ background: '#f0f4f5', borderBottom: '2px solid #e5e7eb' }}>
-                    <th style={{ padding: '16px', color: 'var(--accent)' }}>Fecha</th>
-                    <th style={{ padding: '16px', color: 'var(--accent)' }}>Usuario</th>
-                    <th style={{ padding: '16px', color: 'var(--accent)' }}>Módulo</th>
-                    <th style={{ padding: '16px', color: 'var(--accent)', textAlign: 'center' }}>Puntaje</th>
-                    <th style={{ padding: '16px', color: 'var(--accent)', textAlign: 'right' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((record) => (
-                    <tr key={record.id} style={{ borderBottom: '1px solid #f3f4f6', transition: 'background 0.2s' }}>
-                      <td style={{ padding: '16px', fontWeight: 500 }}>{formatDate(record.created_at)}</td>
-                      <td style={{ padding: '16px', color: '#666', fontSize: '0.9rem' }}>{record.user_email}</td>
-                      <td style={{ padding: '16px' }}>
-                        <span style={{ 
-                          background: 'rgba(118, 149, 152, 0.1)', 
-                          color: 'var(--primary)', 
-                          padding: '4px 10px', 
-                          borderRadius: '6px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600
-                        }}>
-                          {record.modulo_tipo}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'center' }}>
-                        <div style={{ 
-                          fontWeight: 800, 
-                          color: record.percentage >= 80 ? 'var(--success)' : record.percentage >= 50 ? '#f59e0b' : 'var(--error)'
-                        }}>
-                          {record.percentage}%
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button 
-                          onClick={() => setSelectedRecord(record)}
-                          className="btn-primary"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                        >
-                          Ver Completa
-                        </button>
-                        {canEdit(record) && (
-                          <button 
-                            className="btn-primary"
-                            style={{ padding: '6px 12px', fontSize: '0.8rem', background: '#3b82f6' }}
-                            onClick={() => alert('Función de edición próximamente disponible.')}
-                          >
-                            ✎ Editar
-                          </button>
-                        )}
-                      </td>
+            <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.05)] overflow-hidden">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full border-collapse text-left min-w-[800px]">
+                  <thead>
+                    <tr className="bg-[#324354]">
+                      {renderSortableHeader('Fecha', 'created_at')}
+                      {renderSortableHeader('Usuario', 'user_email')}
+                      {renderSortableHeader('Módulo', 'modulo_tipo')}
+                      {renderSortableHeader('Calificación', 'percentage', 'text-center')}
+                      <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
+                        Acciones
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sortedRecords.map((record) => (
+                      <tr key={record.id} className="hover:bg-slate-50 transition-colors duration-150">
+                        <td className="px-6 py-4 text-sm font-semibold text-slate-700">{formatDate(record.created_at)}</td>
+                        <td className="px-6 py-4 text-sm text-slate-500">{record.user_email}</td>
+                        <td className="px-6 py-4">
+                          <span className="bg-slate-100 text-[#324354] px-3 py-1 rounded-lg text-xs font-bold border border-slate-200">
+                            {record.modulo_tipo}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className={`font-extrabold text-sm ${
+                            record.percentage >= 80 ? 'text-emerald-600' : record.percentage >= 50 ? 'text-amber-500' : 'text-rose-600'
+                          }`}>
+                            {record.percentage}%
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex gap-2 justify-end items-center">
+                            <button 
+                              onClick={() => setSelectedRecord(record)}
+                              className="px-4 py-2 text-xs font-semibold text-white bg-[#324354] hover:bg-[#283643] rounded-full transition shadow-sm cursor-pointer"
+                            >
+                              Ver Completa
+                            </button>
+                            {canEdit(record) && (
+                              <button 
+                                className="px-4 py-2 text-xs font-semibold text-white bg-[#7B8E90] hover:bg-[#6c7d7f] rounded-full transition shadow-sm cursor-pointer"
+                                onClick={() => alert('Función de edición próximamente disponible.')}
+                              >
+                                Editar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
