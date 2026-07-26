@@ -51,20 +51,6 @@ export default function MttoHomePage() {
       isUnderConstruction: true
     },
     { 
-      title: "Máquinas", 
-      path: "/mantenimiento/maquinas", 
-      icon: <Cpu size={32} />
-    },
-    { 
-      title: "Puestas a Punto", 
-      path: "/mantenimiento/puestas-a-punto", 
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256">
-          <path d="M228.87,83.14a28,28,0,0,0-12-16.05L202,57.17a36,36,0,0,0-62.83-9.59l-19,25.32a36,36,0,0,0-10,34.4l-64.8,64.8a28,28,0,0,0,0,39.6l10.61,10.61a28,28,0,0,0,39.6,0l64.8-64.8a36,36,0,0,0,34.4-10l25.32-19A36,36,0,0,0,228.87,83.14ZM92.11,205.51a12,12,0,0,1-17,0l-10.6-10.61a12,12,0,0,1,0-17L129.28,113a36,36,0,0,0,30.68,30.69ZM215.42,112.5l-25.31,19c-.3.23-.62.44-.94.65l-26.6-26.6a8,8,0,0,0-11.31,11.31l26.6,26.6q-.31.47-.65.94l-19,25.31a20,20,0,0,1-32.93-9c-2.48-9.88,1-20.15,8.81-26L143,124a8,8,0,0,0,0-11.32L116,85.64a8,8,0,0,0-11.31,0L95.8,94.5a20,20,0,0,1-26-8.81,20,20,0,0,1,9-32.93l25.32-19a20,20,0,0,1,34.89,5.32L148.89,59a28,28,0,0,0,12,16.05A20,20,0,0,1,215.42,112.5Z"></path>
-        </svg>
-      )
-    },
-    { 
       title: "Tarjetas de Anomalías", 
       path: "/mantenimiento/tarjetas-falla", 
       icon: (
@@ -83,6 +69,16 @@ export default function MttoHomePage() {
       )
     },
     { 
+      title: "Almacén", 
+      path: "/mantenimiento/almacen", 
+      icon: <Archive size={32} />
+    },
+    { 
+      title: "Máquinas", 
+      path: "/mantenimiento/maquinas", 
+      icon: <Cpu size={32} />
+    },
+    { 
       title: "Mantenimiento Autónomo", 
       subTitle: "LILAC",
       path: "/mantenimiento/lilac", 
@@ -93,9 +89,13 @@ export default function MttoHomePage() {
       )
     },
     { 
-      title: "Almacen", 
-      path: "/mantenimiento/almacen", 
-      icon: <Archive size={32} />
+      title: "Puestas a Punto", 
+      path: "/mantenimiento/puestas-a-punto", 
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256">
+          <path d="M228.87,83.14a28,28,0,0,0-12-16.05L202,57.17a36,36,0,0,0-62.83-9.59l-19,25.32a36,36,0,0,0-10,34.4l-64.8,64.8a28,28,0,0,0,0,39.6l10.61,10.61a28,28,0,0,0,39.6,0l64.8-64.8a36,36,0,0,0,34.4-10l25.32-19A36,36,0,0,0,228.87,83.14ZM92.11,205.51a12,12,0,0,1-17,0l-10.6-10.61a12,12,0,0,1,0-17L129.28,113a36,36,0,0,0,30.68,30.69ZM215.42,112.5l-25.31,19c-.3.23-.62.44-.94.65l-26.6-26.6a8,8,0,0,0-11.31,11.31l26.6,26.6q-.31.47-.65.94l-19,25.31a20,20,0,0,1-32.93-9c-2.48-9.88,1-20.15,8.81-26L143,124a8,8,0,0,0,0-11.32L116,85.64a8,8,0,0,0-11.31,0L95.8,94.5a20,20,0,0,1-26-8.81,20,20,0,0,1,9-32.93l25.32-19a20,20,0,0,1,34.89,5.32L148.89,59a28,28,0,0,0,12,16.05A20,20,0,0,1,215.42,112.5Z"></path>
+        </svg>
+      )
     },
     { 
       title: "Controles Visuales", 
