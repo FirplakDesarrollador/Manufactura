@@ -275,7 +275,7 @@ export default function ConsultaSAPPage() {
                     <div className="p-2.5 bg-[#f3f0ea] flex flex-col gap-2.5">
 
                         {/* HEADER DETAILS FORM - TWO COLUMNS */}
-                        <div className="flex flex-wrap lg:flex-nowrap gap-x-8 gap-y-2 items-start justify-start">
+                        <div className="flex flex-wrap lg:flex-nowrap gap-x-8 gap-y-2 items-start justify-between w-full">
                             
                             {/* LEFT COLUMN FIELDS */}
                             <div className="space-y-1.5 shrink-0">
