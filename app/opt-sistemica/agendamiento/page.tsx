@@ -3,8 +3,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
+import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/opt-sistemica/SubHeader';
+import SearchableSelect from '@/components/mtto-autonomo/SearchableSelect';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Clock, User, Target } from 'lucide-react';
 
 interface Planificacion {
@@ -39,8 +41,13 @@ export default function AgendamientoPage() {
   const [session, setSession] = useState<any>(null);
   const router = useRouter();
 
-  // Responsables from admin
-  const [responsablesList, setResponsablesList] = useState<string[]>([]);
+  // Employees list from public.empleados
+  interface Empleado {
+    id: number;
+    nombreCompleto: string;
+    correo_electronico: string;
+  }
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
 
   // Form State
   const [showForm, setShowForm] = useState(false);
@@ -57,13 +64,15 @@ export default function AgendamientoPage() {
     if (data) setPlanned(data);
   };
 
-  const fetchResponsables = async () => {
-    const { data } = await supabase
-      .from('responsables')
-      .select('nombre')
+  const fetchEmpleados = async () => {
+    const { data } = await supabaseTalentoHumano
+      .from('empleados')
+      .select('id, nombreCompleto, correo_electronico')
       .eq('activo', true)
-      .order('nombre');
-    if (data) setResponsablesList(data.map((r: any) => r.nombre));
+      .order('nombreCompleto');
+    if (data) {
+      setEmpleados(data);
+    }
   };
 
   useEffect(() => {
@@ -72,7 +81,7 @@ export default function AgendamientoPage() {
         router.push('/login');
       } else {
         setSession(session);
-        Promise.all([fetchData(), fetchResponsables()]).then(() => setLoading(false));
+        Promise.all([fetchData(), fetchEmpleados()]).then(() => setLoading(false));
       }
     });
   }, [router]);
@@ -90,10 +99,20 @@ export default function AgendamientoPage() {
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+
+    const selectedEmp = empleados.find(emp => emp.nombreCompleto === responsable);
+    const targetResponsableEmail = selectedEmp ? selectedEmp.correo_electronico : responsable;
+
+    if (!targetResponsableEmail) {
+      setError('El responsable seleccionado debe tener un correo electrónico válido.');
+      setSaving(false);
+      return;
+    }
+
     const { error: insertError } = await supabase.from('opt_planificacion').insert({
       fecha_programada: fecha,
       hora_inicio: `${hora}:00`,
-      responsable_email: responsable,
+      responsable_email: targetResponsableEmail,
       observado_nombre: observado,
       modulo_tipo: modulo,
       created_by: session.user.id
@@ -363,22 +382,25 @@ export default function AgendamientoPage() {
                     <div><label className="label">Hora</label><input type="time" className="input-field" value={hora} onChange={e => setHora(e.target.value)} required /></div>
                   </div>
                   <div>
-                    <label className="label">Responsable</label>
-                    <input 
-                      className="input-field" 
-                      list="responsables-list" 
-                      placeholder="Buscar o seleccionar responsable..." 
-                      value={responsable} 
-                      onChange={e => setResponsable(e.target.value)} 
-                      required 
+                    <label className="label" style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif", display: 'block', marginBottom: '4px' }}>Responsable</label>
+                    <SearchableSelect 
+                      label=""
+                      placeholder="Buscar o seleccionar responsable..."
+                      options={empleados.map(e => ({ id: e.id, label: e.nombreCompleto }))}
+                      value={responsable}
+                      onChange={setResponsable}
                     />
-                    <datalist id="responsables-list">
-                      {responsablesList.map(r => (
-                        <option key={r} value={r} />
-                      ))}
-                    </datalist>
                   </div>
-                  <input type="text" className="input-field" placeholder="Colaborador Observado" value={observado} onChange={e => setObservado(e.target.value)} required />
+                  <div>
+                    <label className="label" style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif", display: 'block', marginBottom: '4px' }}>Colaborador Observado</label>
+                    <SearchableSelect 
+                      label=""
+                      placeholder="Buscar o seleccionar colaborador..."
+                      options={empleados.map(e => ({ id: e.id, label: e.nombreCompleto }))}
+                      value={observado}
+                      onChange={setObservado}
+                    />
+                  </div>
                   <select className="input-field" value={modulo} onChange={e => setModulo(e.target.value)}>
                     {MODULOS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
