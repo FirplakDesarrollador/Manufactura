@@ -32,6 +32,8 @@ export default function HomePage() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
+    const [showModal, setShowModal] = useState(false)
+    const [modalModule, setModalModule] = useState<string | null>(null)
 
     const getUserData = useCallback(async () => {
         setLoading(true)
@@ -177,6 +179,24 @@ export default function HomePage() {
                                 </button>
                             </div>
                         )}
+
+                        {/* Informe de Turno Button */}
+                        <div className="w-full max-w-[290px] aspect-square">
+                            <button
+                                onClick={() => {
+                                    setModalModule('Informe de Turno')
+                                    setShowModal(true)
+                                }}
+                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Informe de Turno</span>
+                            </button>
+                        </div>
 
                         {/* Calidad Button */}
                         {hasCalidad() && (
@@ -363,6 +383,30 @@ export default function HomePage() {
             <footer className="py-6 text-center text-gray-400 text-sm">
                 &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
             </footer>
+            {/* Módulo en Construcción Modal */}
+            {showModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[#F6F3EE] border border-[#e2ded5] rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center space-y-6">
+                        <div className="w-16 h-16 bg-[#324354]/10 rounded-full flex items-center justify-center mx-auto text-[#324354]">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                            </svg>
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-bold text-[#324354]">Módulo en construcción</h3>
+                            <p className="text-sm text-slate-500">
+                                Estamos trabajando en el diseño y desarrollo de <strong>{modalModule}</strong>. ¡Próximamente disponible!
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowModal(false)}
+                            className="w-full py-3 bg-[#324354] hover:bg-[#283643] text-white rounded-xl font-semibold transition cursor-pointer"
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

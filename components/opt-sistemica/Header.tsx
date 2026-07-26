@@ -26,6 +26,8 @@ export default function Header({
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [internalEmail, setInternalEmail] = useState<string | undefined>(undefined);
+  const [showUnderConstructionModal, setShowUnderConstructionModal] = useState(false);
+  const [constructionModuleName, setConstructionModuleName] = useState('');
 
   useEffect(() => {
     if (userEmail) {
@@ -184,6 +186,16 @@ export default function Header({
               ]
             },
             { 
+              label: 'Informe de Turno', 
+              path: '#',
+              isUnderConstruction: true,
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )
+            },
+            { 
               label: 'Calidad', 
               path: '/calidad', 
               icon: (
@@ -287,11 +299,17 @@ export default function Header({
                   {/* Zona Izquierda: Clic para Navegar al Módulo */}
                   <button
                     onClick={() => {
-                      setIsOpen(false);
-                      if (item.path.startsWith('http')) {
-                        window.open(`${item.path}?email=${encodeURIComponent(userEmail || '')}`, '_blank');
+                      if (item.isUnderConstruction) {
+                        setConstructionModuleName(item.label);
+                        setShowUnderConstructionModal(true);
+                        setIsOpen(false);
                       } else {
-                        router.push(item.path);
+                        setIsOpen(false);
+                        if (item.path.startsWith('http')) {
+                          window.open(`${item.path}?email=${encodeURIComponent(userEmail || '')}`, '_blank');
+                        } else {
+                          router.push(item.path);
+                        }
                       }
                     }}
                     className="flex-1 flex items-center gap-4 px-4 py-3 text-left font-medium text-sm cursor-pointer group-hover:text-white"
@@ -388,6 +406,31 @@ export default function Header({
           scrollbar-color: #475569 transparent;
         }
       `}</style>
+      
+      {/* Módulo en Construcción Modal */}
+      {showUnderConstructionModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#F6F3EE] border border-[#e2ded5] rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center space-y-6">
+            <div className="w-16 h-16 bg-[#324354]/10 rounded-full flex items-center justify-center mx-auto text-[#324354]">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-[#324354]">Módulo en construcción</h3>
+              <p className="text-sm text-slate-500">
+                Estamos trabajando en el diseño y desarrollo de <strong>{constructionModuleName}</strong>. ¡Próximamente disponible!
+              </p>
+            </div>
+            <button
+              onClick={() => setShowUnderConstructionModal(false)}
+              className="w-full py-3 bg-[#324354] hover:bg-[#283643] text-white rounded-xl font-semibold transition cursor-pointer text-sm"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </header>
     <div className="h-20 w-full shrink-0"></div>
    </>
