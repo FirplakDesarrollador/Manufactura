@@ -56,7 +56,14 @@ Hemos completado con éxito todas las solicitudes de restructuración de diseño
 
 ---
 
-## 4. Renombramiento de "Indicadores Productividad" a "Tablero de Control"
+## 5. Rediseño del Módulo "Calidad" (`/calidad`)
+* **Alineación Visual**: Adaptado a una grilla de 5 columnas en PC, max-width de 1700px y tarjetas aspect-square de 290px.
+* **Módulo Nuevo**: Añadido **Indicadores Calidad** de primero con modal premium indicando "Módulo en Construcción" al hacer clic.
+* **Renderizado Incondicional**: Se eliminaron los condicionales de permisos (`hasCalidad`, `hasFichaRrc`) para que todos los submódulos de Calidad sean siempre visibles al usuario.
+
+---
+
+## 6. Renombramiento de "Indicadores Productividad" a "Tablero de Control"
 Se actualizó la nomenclatura del módulo a lo largo de toda la aplicación manteniendo el ruteo intacto para evitar fallas:
 * **Botón del Home**: Cambiado el texto de la tarjeta a `Tablero de Control`.
 * **Menú Lateral (Drawer)**: Modificada la etiqueta en [Header.tsx](file:///c:/Users/hector.chinchilla/OneDrive%20-%20FIRPLAK%20SA/Escritorio/Manufactura/components/opt-sistemica/Header.tsx) a `Tablero de Control`.
@@ -65,6 +72,6 @@ Se actualizó la nomenclatura del módulo a lo largo de toda la aplicación mant
 
 ---
 
-## 5. Sincronización de Repositorio
+## 7. Sincronización de Repositorio
 * **Compilación de Producción**: Probada con éxito (`npm run build` ejecutado de manera exitosa sin errores).
 * **Git Commit & Push**: Todos los cambios se encuentran guardados y subidos a la rama remota `hector` en GitHub.
