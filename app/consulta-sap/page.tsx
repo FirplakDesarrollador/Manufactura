@@ -408,21 +408,21 @@ export default function ConsultaSAPPage() {
                             <div className="space-y-1.5 shrink-0 w-full lg:w-[350px]">
                                 {/* Nº */}
                                 <div className="flex items-center justify-between w-full">
-                                    <span className="text-[11px] text-gray-800 select-none">Nº</span>
-                                    <div className="flex items-center gap-1.5 w-[180px]">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] text-gray-800 select-none">Nº</span>
                                         <input 
                                             type="text" 
                                             value="OF-Produ" 
                                             readOnly 
-                                            className="bg-[#f0ede9] border border-transparent px-1 py-0.5 text-xs text-gray-600 w-[75px] rounded-none select-none outline-none font-medium"
-                                        />
-                                        <input 
-                                            type="text" 
-                                            value={activeOrder.noOrden} 
-                                            readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black flex-1 rounded-none font-semibold text-right focus:outline-none"
+                                            className="bg-[#f0ede9] border border-transparent px-1 py-0.5 text-xs text-gray-600 w-[75px] rounded-none select-none outline-none font-medium text-center"
                                         />
                                     </div>
+                                    <input 
+                                        type="text" 
+                                        value={activeOrder.noOrden} 
+                                        readOnly 
+                                        className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[180px] rounded-none font-semibold text-right focus:outline-none"
+                                    />
                                 </div>
 
                                 {/* Fecha orden de fabricacion */}
