@@ -169,6 +169,7 @@ export default function Header({
                 </svg>
               ),
               subItems: [
+                { label: 'Indicadores Calidad', path: '/calidad' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
                 { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
                 { label: 'Criterios de Calidad', path: '/calidad/criterios' },
@@ -185,13 +186,14 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'HDT', path: '/hdt' },
+                { label: 'Estadísticas del Sistema', path: '/estadisticas-produccion' },
+                { label: 'Bitácora', path: '/sistema-produccion/bitacora' },
+                { label: 'HDT Hoja División de Trabajo', path: '/hdt' },
                 { label: 'Hora a Hora', path: '/hora-a-hora' },
                 { label: 'OPT Operativa', path: '/opt' },
                 { label: 'OPT Sistémica', path: '/opt-sistemica' },
-                { label: 'Estadísticas del Sistema', path: '/estadisticas-produccion' },
+                { label: "5'S", path: '/sistema-produccion/5s' },
                 { label: 'Tarjetas Excelencia', path: '/tarjetas-excelencia' },
-                { label: 'Bitácora', path: '/sistema-produccion/bitacora' },
                 { label: 'Auditorías', path: '/sistema-produccion/auditorias' }
               ]
             },
@@ -204,10 +206,13 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'Puestas a Punto', path: '/mantenimiento/puestas-a-punto' },
+                { label: 'Indicadores Mantenimiento', path: '/mantenimiento' },
                 { label: 'Tarjetas de Anomalías', path: '/mantenimiento/tarjetas-falla' },
                 { label: 'Gestión de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
+                { label: 'Almacén', path: '/mantenimiento/almacen' },
+                { label: 'Máquinas', path: '/mantenimiento/maquinas' },
                 { label: 'Mantenimiento Autónomo LILAC', path: '/mantenimiento/lilac' },
+                { label: 'Puestas a Punto', path: '/mantenimiento/puestas-a-punto' },
                 { label: 'Controles Visuales', path: '/mantenimiento/controles-visuales' },
                 { label: 'Lecciones LUP', path: '/mantenimiento/lecciones-lup' },
                 { label: 'Principio de Máquina', path: '/mantenimiento/principio-maquina' }
@@ -218,16 +223,6 @@ export default function Header({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             )},
-            { label: 'Asistencia', path: '/asistencia', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-            )},
-            { label: 'Cultura', path: '/cultura', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-            )},
             { label: 'Inventarios', path: '/inventarios', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4" />
@@ -236,6 +231,21 @@ export default function Header({
             { label: 'Consulta SAP', path: '/consulta-sap', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+              </svg>
+            )},
+            { label: 'Talento Humano', path: 'https://talentohumano.vercel.app', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H17m10 0v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            )},
+            { label: 'Cultura', path: '/cultura', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            )},
+            { label: 'Asistencia', path: '/asistencia', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
               </svg>
             )},
             { label: 'Configuración', path: '/configuracion', icon: (
@@ -255,7 +265,11 @@ export default function Header({
                   <button
                     onClick={() => {
                       setIsOpen(false);
-                      router.push(item.path);
+                      if (item.path.startsWith('http')) {
+                        window.open(`${item.path}?email=${encodeURIComponent(userEmail || '')}`, '_blank');
+                      } else {
+                        router.push(item.path);
+                      }
                     }}
                     className="flex-1 flex items-center gap-4 px-4 py-3 text-left font-medium text-sm cursor-pointer group-hover:text-white"
                   >
