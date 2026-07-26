@@ -229,7 +229,7 @@ export default function HomePage() {
                             </div>
                         )}
 
-                        {/* Indicadores Productividad Button */}
+                        {/* Tablero de Control Button */}
                         {hasIndicadoresProductividad() && (
                             <div className="w-full max-w-[290px] aspect-square">
                                 <button
@@ -241,7 +241,7 @@ export default function HomePage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                                         </svg>
                                     </div>
-                                    <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Indicadores<br/>Productividad</span>
+                                    <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Tablero de<br/>Control</span>
                                 </button>
                             </div>
                         )}
