@@ -115,7 +115,7 @@ export default function SistemaProduccionPage() {
                         {/* 2. Bitácora Button (Nuevo / En construcción) */}
                         <div className="w-full max-w-[290px] aspect-square">
                             <button
-                                onClick={() => handleUnderConstruction('Bitácora')}
+                                onClick={() => router.push('/sistema-produccion/bitacora')}
                                 className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
                             >
                                 <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
