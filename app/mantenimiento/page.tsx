@@ -10,6 +10,8 @@ export default function MttoHomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [modalModule, setModalModule] = useState('')
 
   useEffect(() => {
     const checkUser = async () => {
@@ -24,6 +26,11 @@ export default function MttoHomePage() {
     checkUser()
   }, [router])
 
+  const handleUnderConstruction = (moduleName: string) => {
+    setModalModule(moduleName)
+    setShowModal(true)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F6F3EE] flex items-center justify-center">
@@ -33,6 +40,16 @@ export default function MttoHomePage() {
   }
 
   const modules = [
+    { 
+      title: "Indicadores Mantenimiento", 
+      path: "#", 
+      icon: (
+        <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+        </svg>
+      ),
+      isUnderConstruction: true
+    },
     { 
       title: "Máquinas", 
       path: "/mantenimiento/maquinas", 
@@ -136,7 +153,7 @@ export default function MttoHomePage() {
             {modules.map((mod, index) => (
               <div key={index} className="w-full max-w-[290px] aspect-square">
                 <button
-                  onClick={() => mod.path !== '#' && router.push(mod.path)}
+                  onClick={() => mod.isUnderConstruction ? handleUnderConstruction(mod.title) : router.push(mod.path)}
                   className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
                 >
                   <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
@@ -158,6 +175,27 @@ export default function MttoHomePage() {
           </div>
         </div>
       </main>
+
+      {/* Premium Under Construction Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#324354]/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-[#e2ded5] text-center transform scale-100 transition-all duration-300">
+            <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-amber-50/50">
+              <svg className="w-10 h-10 text-amber-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold text-[#324354] mb-3">Módulo en Construcción</h3>
+            <p className="text-gray-500 mb-6 font-medium">El módulo <span className="font-bold text-[#324354]">"{modalModule}"</span> se encuentra actualmente en desarrollo para mejorar nuestros procesos.</p>
+            <button
+              onClick={() => setShowModal(false)}
+              className="w-full py-3 bg-[#324354] text-[#F6F3EE] font-bold rounded-2xl hover:bg-[#324354]/95 hover:shadow-lg transition-all duration-300"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="py-6 text-center text-gray-400 text-sm">
