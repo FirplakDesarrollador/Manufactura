@@ -53,7 +53,7 @@ export default function IndicadoresProductividadPage() {
                         </button>
                     </Link>
                     <h1 className="font-display font-light text-lg md:text-xl uppercase tracking-widest text-center">
-                        Indicadores de Productividad
+                        Tablero de Control
                     </h1>
                     <div className="flex flex-col items-end">
                         <div className="font-bold text-xl tracking-wider leading-none">FIRPLAK</div>

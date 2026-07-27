@@ -32,6 +32,8 @@ export default function HomePage() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
+    const [showModal, setShowModal] = useState(false)
+    const [modalModule, setModalModule] = useState<string | null>(null)
 
     const getUserData = useCallback(async () => {
         setLoading(true)
@@ -159,11 +161,11 @@ export default function HomePage() {
 
             {/* Main Content */}
             <main className="flex-1 flex items-center justify-center px-6 py-12 md:py-16 lg:py-20 pt-6 md:pt-8 lg:pt-10">
-                <div className="w-full max-w-6xl mx-auto px-4 md:px-8">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 justify-items-center w-full">
+                <div className="w-full max-w-[1700px] mx-auto px-4 md:px-8">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full">
                         {/* Control de Piso Button */}
                         {hasManufactura() && (
-                            <div className="w-full max-w-[260px] aspect-square">
+                            <div className="w-full max-w-[290px] aspect-square">
                                 <button
                                     onClick={() => router.push('/home/selection')}
                                     className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -178,9 +180,27 @@ export default function HomePage() {
                             </div>
                         )}
 
+                        {/* Informe de Turno Button */}
+                        <div className="w-full max-w-[290px] aspect-square">
+                            <button
+                                onClick={() => {
+                                    setModalModule('Informe de Turno')
+                                    setShowModal(true)
+                                }}
+                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Informe de Turno</span>
+                            </button>
+                        </div>
+
                         {/* Calidad Button */}
                         {hasCalidad() && (
-                            <div className="w-full max-w-[260px] aspect-square">
+                            <div className="w-full max-w-[290px] aspect-square">
                                 <button
                                     onClick={() => router.push('/calidad')}
                                     className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -197,7 +217,7 @@ export default function HomePage() {
 
                         {/* Sistema de Producción Button */}
                         {hasSistemaProduccion() && (
-                            <div className="w-full max-w-[260px] aspect-square">
+                            <div className="w-full max-w-[290px] aspect-square">
                                 <button
                                     onClick={() => router.push('/sistema-produccion')}
                                     className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -214,7 +234,7 @@ export default function HomePage() {
 
                         {/* Mantenimiento Button */}
                         {hasMttoAutonomo() && (
-                            <div className="w-full max-w-[260px] aspect-square">
+                            <div className="w-full max-w-[290px] aspect-square">
                                 <button
                                     onClick={() => router.push('/mantenimiento')}
                                     className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -229,9 +249,9 @@ export default function HomePage() {
                             </div>
                         )}
 
-                        {/* Indicadores Productividad Button */}
+                        {/* Tablero de Control Button */}
                         {hasIndicadoresProductividad() && (
-                            <div className="w-full max-w-[260px] aspect-square">
+                            <div className="w-full max-w-[290px] aspect-square">
                                 <button
                                     onClick={() => router.push('/indicadores-productividad')}
                                     className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -241,14 +261,77 @@ export default function HomePage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                                         </svg>
                                     </div>
-                                    <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Indicadores<br/>Productividad</span>
+                                    <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Tablero de<br/>Control</span>
                                 </button>
                             </div>
                         )}
 
+                        {/* Inventarios Button */}
+                        <div className="w-full max-w-[290px] aspect-square">
+                            <button
+                                onClick={() => router.push('/inventarios')}
+                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4" />
+                                    </svg>
+                                </div>
+                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Inventarios</span>
+                            </button>
+                        </div>
+
+                        {/* Consulta SAP Button */}
+                        <div className="w-full max-w-[290px] aspect-square">
+                            <button
+                                onClick={() => router.push('/consulta-sap')}
+                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                    </svg>
+                                </div>
+                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Consulta SAP</span>
+                            </button>
+                        </div>
+
+                        {/* Talento Humano Shortcut Button */}
+                        <div className="w-full max-w-[290px] aspect-square">
+                            <button
+                                onClick={() => window.open(`https://talentohumano.vercel.app?email=${encodeURIComponent(user?.email || '')}`, '_blank')}
+                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H17m10 0v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
+                                    Talento Humano<br />
+                                    <span className="text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">Atajo</span>
+                                </span>
+                            </button>
+                        </div>
+
+                        {/* Cultura Button */}
+                        <div className="w-full max-w-[290px] aspect-square">
+                            <button
+                                onClick={() => router.push('/cultura')}
+                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Cultura</span>
+                            </button>
+                        </div>
+
                         {/* Asistencia Button */}
                         {hasAsistencia() && (
-                            <div className="w-full max-w-[260px] aspect-square">
+                            <div className="w-full max-w-[290px] aspect-square">
                                 <button
                                     onClick={() => router.push('/asistencia')}
                                     className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -265,7 +348,7 @@ export default function HomePage() {
 
                         {/* Configuración Button */}
                         {hasConfiguracion() && (
-                            <div className="w-full max-w-[260px] aspect-square">
+                            <div className="w-full max-w-[290px] aspect-square">
                                 <button
                                     onClick={() => router.push('/configuracion')}
                                     className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -280,69 +363,6 @@ export default function HomePage() {
                                 </button>
                             </div>
                         )}
-
-                        {/* Talento Humano Shortcut Button */}
-                        <div className="w-full max-w-[260px] aspect-square">
-                            <button
-                                onClick={() => window.open(`https://talentohumano.vercel.app?email=${encodeURIComponent(user?.email || '')}`, '_blank')}
-                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
-                            >
-                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
-                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                </div>
-                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                                    Talento Humano<br />
-                                    <span className="text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">Atajo</span>
-                                </span>
-                            </button>
-                        </div>
-
-                        {/* Cultura Button */}
-                        <div className="w-full max-w-[260px] aspect-square">
-                            <button
-                                onClick={() => router.push('/cultura')}
-                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
-                            >
-                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
-                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                    </svg>
-                                </div>
-                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Cultura</span>
-                            </button>
-                        </div>
-
-                        {/* Inventarios Button */}
-                        <div className="w-full max-w-[260px] aspect-square">
-                            <button
-                                onClick={() => router.push('/inventarios')}
-                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
-                            >
-                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
-                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4" />
-                                    </svg>
-                                </div>
-                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Inventarios</span>
-                            </button>
-                        </div>
-
-                        {/* Consulta SAP Button */}
-                        <div className="w-full max-w-[260px] aspect-square">
-                            <button
-                                onClick={() => router.push('/consulta-sap')}
-                                className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
-                            >
-                                <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
-                                    <svg className="w-8 h-8 md:w-12 md:h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                                    </svg>
-                                </div>
-                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Consulta SAP</span>
-                            </button>
-                        </div>
 
                         {!hasManufactura() && !hasCalidad() && !hasConfiguracion() && !hasIndicadoresProductividad() && !hasAsistencia() && !hasMttoAutonomo() && !hasSistemaProduccion() && (
                             <div className="col-span-full py-20 text-center">
@@ -363,6 +383,30 @@ export default function HomePage() {
             <footer className="py-6 text-center text-gray-400 text-sm">
                 &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
             </footer>
+            {/* Módulo en Construcción Modal */}
+            {showModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[#F6F3EE] border border-[#e2ded5] rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center space-y-6">
+                        <div className="w-16 h-16 bg-[#324354]/10 rounded-full flex items-center justify-center mx-auto text-[#324354]">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                            </svg>
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-bold text-[#324354]">Módulo en construcción</h3>
+                            <p className="text-sm text-slate-500">
+                                Estamos trabajando en el diseño y desarrollo de <strong>{modalModule}</strong>. ¡Próximamente disponible!
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowModal(false)}
+                            className="w-full py-3 bg-[#324354] hover:bg-[#283643] text-white rounded-xl font-semibold transition cursor-pointer"
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

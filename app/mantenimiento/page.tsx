@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Cpu, Archive } from 'lucide-react'
+import { Cpu, Archive } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
 
@@ -10,6 +10,8 @@ export default function MttoHomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [modalModule, setModalModule] = useState('')
 
   useEffect(() => {
     const checkUser = async () => {
@@ -24,6 +26,11 @@ export default function MttoHomePage() {
     checkUser()
   }, [router])
 
+  const handleUnderConstruction = (moduleName: string) => {
+    setModalModule(moduleName)
+    setShowModal(true)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F6F3EE] flex items-center justify-center">
@@ -34,18 +41,14 @@ export default function MttoHomePage() {
 
   const modules = [
     { 
-      title: "Máquinas", 
-      path: "/mantenimiento/maquinas", 
-      icon: <Cpu size={32} />
-    },
-    { 
-      title: "Puestas a Punto", 
-      path: "/mantenimiento/puestas-a-punto", 
+      title: "Indicadores Mantenimiento", 
+      path: "#", 
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256">
-          <path d="M228.87,83.14a28,28,0,0,0-12-16.05L202,57.17a36,36,0,0,0-62.83-9.59l-19,25.32a36,36,0,0,0-10,34.4l-64.8,64.8a28,28,0,0,0,0,39.6l10.61,10.61a28,28,0,0,0,39.6,0l64.8-64.8a36,36,0,0,0,34.4-10l25.32-19A36,36,0,0,0,228.87,83.14ZM92.11,205.51a12,12,0,0,1-17,0l-10.6-10.61a12,12,0,0,1,0-17L129.28,113a36,36,0,0,0,30.68,30.69ZM215.42,112.5l-25.31,19c-.3.23-.62.44-.94.65l-26.6-26.6a8,8,0,0,0-11.31,11.31l26.6,26.6q-.31.47-.65.94l-19,25.31a20,20,0,0,1-32.93-9c-2.48-9.88,1-20.15,8.81-26L143,124a8,8,0,0,0,0-11.32L116,85.64a8,8,0,0,0-11.31,0L95.8,94.5a20,20,0,0,1-26-8.81,20,20,0,0,1,9-32.93l25.32-19a20,20,0,0,1,34.89,5.32L148.89,59a28,28,0,0,0,12,16.05A20,20,0,0,1,215.42,112.5Z"></path>
+        <svg className="w-8 h-8 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
         </svg>
-      )
+      ),
+      isUnderConstruction: true
     },
     { 
       title: "Tarjetas de Anomalías", 
@@ -66,6 +69,16 @@ export default function MttoHomePage() {
       )
     },
     { 
+      title: "Almacén", 
+      path: "/mantenimiento/almacen", 
+      icon: <Archive size={32} />
+    },
+    { 
+      title: "Máquinas", 
+      path: "/mantenimiento/maquinas", 
+      icon: <Cpu size={32} />
+    },
+    { 
       title: "Mantenimiento Autónomo", 
       subTitle: "LILAC",
       path: "/mantenimiento/lilac", 
@@ -76,9 +89,13 @@ export default function MttoHomePage() {
       )
     },
     { 
-      title: "Almacen", 
-      path: "/mantenimiento/almacen", 
-      icon: <Archive size={32} />
+      title: "Puestas a Punto", 
+      path: "/mantenimiento/puestas-a-punto", 
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256">
+          <path d="M228.87,83.14a28,28,0,0,0-12-16.05L202,57.17a36,36,0,0,0-62.83-9.59l-19,25.32a36,36,0,0,0-10,34.4l-64.8,64.8a28,28,0,0,0,0,39.6l10.61,10.61a28,28,0,0,0,39.6,0l64.8-64.8a36,36,0,0,0,34.4-10l25.32-19A36,36,0,0,0,228.87,83.14ZM92.11,205.51a12,12,0,0,1-17,0l-10.6-10.61a12,12,0,0,1,0-17L129.28,113a36,36,0,0,0,30.68,30.69ZM215.42,112.5l-25.31,19c-.3.23-.62.44-.94.65l-26.6-26.6a8,8,0,0,0-11.31,11.31l26.6,26.6q-.31.47-.65.94l-19,25.31a20,20,0,0,1-32.93-9c-2.48-9.88,1-20.15,8.81-26L143,124a8,8,0,0,0,0-11.32L116,85.64a8,8,0,0,0-11.31,0L95.8,94.5a20,20,0,0,1-26-8.81,20,20,0,0,1,9-32.93l25.32-19a20,20,0,0,1,34.89,5.32L148.89,59a28,28,0,0,0,12,16.05A20,20,0,0,1,215.42,112.5Z"></path>
+        </svg>
+      )
     },
     { 
       title: "Controles Visuales", 
@@ -103,7 +120,7 @@ export default function MttoHomePage() {
       path: "/mantenimiento/principio-maquina", 
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256">
-          <path d="M226.71,137.45h0l-31.54,9.66a72,72,0,0,1,0,17.78l31.54,9.66a8,8,0,0,1,5.32,9.86l-13.66,42a8,8,0,0,1-9.42,5.55l-32.55-6A72.16,72.16,0,0,1,161,236.44l-6,32.55a8,8,0,0,1-5.55,6.42l-42-13.66a8,8,0,0,1-5-9.86v0l9.66-31.54a72,72,0,0,1-17.78,0L84.69,251.89a8,8,0,0,1-9.86,5.32l-42-13.66A8,8,0,0,1,27.3,234.13l6-32.55A72.16,72.16,0,0,1,18,186.1l-32.55,6a8,8,0,0,1-6.42-5.55l-13.66-42a8,8,0,0,1,5-9.86v0l31.54-9.66a72,72,0,0,1,0-17.78l-31.54-9.66a8,8,0,0,1-5.32-9.86l13.66-42A8,8,0,0,1-6.72,40L25.83,46a72.16,72.16,0,0,1,15.42-15.42l-6-32.55A8,8,0,0,1,40.8-8.38l42,13.66a8,8,0,0,1,5,9.86v0l-9.66,31.54a72,72,0,0,1,17.78,0l9.66-31.54a8,8,0,0,1,9.86-5.32l42,13.66a8,8,0,0,1,6.42,9.42l-6,32.55A72.16,72.16,0,0,1,173.28,81.3l32.55-6a8,8,0,0,1,6.42,5.55l13.66,42A8,8,0,0,1,226.71,137.45ZM128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152Z"></path>
+          <path d="M226.71,137.45h0l-31.54,9.66a72,72,0,0,1,0,17.78l31.54,9.66a8,8,0,0,1,5.32,9.86l-13.66,42a8,8,0,0,1-9.42,5.55l-32.55-6A72.16,72.16,0,0,1,161,236.44l-6,32.55a8,8,0,0,1-5.55,6.42l-42-13.66a8,8,0,0,1-5-9.86v0l9.66-31.54a72,72,0,0,1-17.78,0L84.69,251.89a8,8,0,0,1-9.86,5.32l-42-13.66A8,8,0,0,1,27.3,234.13l6-32.55A72.16,72.16,0,0,1,18,186.1l-32.55,6a8,8,0,0,1-6.42-5.55l-13.66-42a8,8,0,0,1,5-9.86v0l31.54-9.66a72,72,0,0,1,0-17.78l-31.54-9.66a8,8,0,0,1-5.32-9.86l13.66-42a8,8,0,0,1-6.72-5.55L25.83,46a72.16,72.16,0,0,1,15.42-15.42l-6-32.55A8,8,0,0,1,40.8-8.38l42,13.66a8,8,0,0,1,5,9.86v0l-9.66,31.54a72,72,0,0,1,17.78,0l9.66-31.54a8,8,0,0,1,9.86-5.32l42,13.66a8,8,0,0,1,6.42,9.42l-6,32.55A72.16,72.16,0,0,1,173.28,81.3l32.55-6a8,8,0,0,1,6.42,5.55l13.66,42A8,8,0,0,1,226.71,137.45ZM128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152Z"></path>
         </svg>
       )
     }
@@ -111,6 +128,13 @@ export default function MttoHomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F3EE] font-sans text-[#000000] selection:bg-[#324354] selection:text-white">
+      {/* Background Decorations */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-slate-200/40 blur-[100px]"></div>
+        <div className="absolute top-[20%] -right-[10%] w-[35%] h-[35%] rounded-full bg-slate-100/50 blur-[100px]"></div>
+        <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] rounded-full bg-[#324354]/5 blur-[120px]"></div>
+      </div>
+
       <Header
         title="Mantenimiento"
         subtitle="Módulo Operativo"
@@ -123,31 +147,60 @@ export default function MttoHomePage() {
       />
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-12 lg:p-16">
-        <div className="w-full max-w-[1600px] flex flex-wrap justify-center gap-6 md:gap-8">
-          {modules.map((mod, index) => (
-             <button
-                 key={index}
-                 onClick={() => mod.path !== '#' && router.push(mod.path)}
-                 className="relative w-full max-w-[260px] aspect-[4/3] flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] hover:border-[#324354]/20 hover:-translate-y-2 transition-all duration-500 group overflow-hidden"
-             >
-                 <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-                 
-                 <div className="relative z-10 w-16 h-16 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#324354] group-hover:border-[#324354] group-hover:scale-110 transition-all duration-500 shadow-sm group-hover:shadow-lg">
-                     <div className="text-[#324354] group-hover:text-white transition-colors duration-500">
-                         {mod.icon}
-                     </div>
-                 </div>
-                 <span className="relative z-10 text-lg font-bold text-gray-700 group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                     {mod.title}
-                     {mod.subTitle && (
-                         <span className="block text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 mt-1 transition-colors duration-300">{mod.subTitle}</span>
-                     )}
-                 </span>
-             </button>
-          ))}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-12 md:py-16 lg:py-20 pt-28">
+        <div className="w-full max-w-[1700px] mx-auto px-4 md:px-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full">
+            {modules.map((mod, index) => (
+              <div key={index} className="w-full max-w-[290px] aspect-square">
+                <button
+                  onClick={() => mod.isUnderConstruction ? handleUnderConstruction(mod.title) : router.push(mod.path)}
+                  className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                >
+                  <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                    <div className="text-[#324354] group-hover:text-white transition-colors duration-300">
+                      {mod.icon}
+                    </div>
+                  </div>
+                  <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
+                    {mod.title}
+                    {mod.subTitle && (
+                      <span className="block text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 mt-1 transition-colors duration-300">
+                        {mod.subTitle}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </main>
+
+      {/* Premium Under Construction Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#324354]/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-[#e2ded5] text-center transform scale-100 transition-all duration-300">
+            <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-amber-50/50">
+              <svg className="w-10 h-10 text-amber-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold text-[#324354] mb-3">Módulo en Construcción</h3>
+            <p className="text-gray-500 mb-6 font-medium">El módulo <span className="font-bold text-[#324354]">"{modalModule}"</span> se encuentra actualmente en desarrollo para mejorar nuestros procesos.</p>
+            <button
+              onClick={() => setShowModal(false)}
+              className="w-full py-3 bg-[#324354] text-[#F6F3EE] font-bold rounded-2xl hover:bg-[#324354]/95 hover:shadow-lg transition-all duration-300"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="py-6 text-center text-gray-400 text-sm">
+        &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
+      </footer>
     </div>
   )
 }

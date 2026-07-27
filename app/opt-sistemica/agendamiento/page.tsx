@@ -3,8 +3,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
+import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/opt-sistemica/SubHeader';
+import SearchableSelect from '@/components/mtto-autonomo/SearchableSelect';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Clock, User, Target } from 'lucide-react';
 
 interface Planificacion {
@@ -30,6 +32,106 @@ const MODULOS = [
 const HOURS = Array.from({ length: 12 }, (_, i) => `${(i + 7).toString().padStart(2, '0')}:00`);
 const DAYS_OF_WEEK = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+const CARGOS_USAR_CORREO = [
+  'Analista comercial',
+  'Analista de abastecimiento',
+  'Analista de Cartera',
+  'Analista de Contabilidad',
+  'Analista de control contractual',
+  'Analista de Diseño Organizacional',
+  'Analista de formación y bienestar',
+  'Analista de infraestructura y seguridad informática',
+  'Analista de Ingeniería',
+  'Analista de manufactura',
+  'Analista de performance y desarrollo',
+  'Analista de planeación de producción y abastecimiento',
+  'Analista de planeación de producto terminado',
+  'Analista de seguridad y salud en el trabajo',
+  'Analista de TI',
+  'Analista prevención y control ambiental',
+  'Analista SGSST y cumplimiento legal',
+  'Asentador de fibra',
+  'Auxiliar de recibo',
+  'Auxiliar de retención y reactivación de clientes',
+  'Auxiliar de servicios',
+  'Auxiliar de servicios generales',
+  'Auxiliar de talento y vinculación',
+  'Auxiliar de vaciado MS',
+  'Auxiliar de ventas MAC',
+  'Auxiliar e-commerce',
+  'Auxiliar junior cartera',
+  'Auxiliar junior de abastecimiento',
+  'Auxiliar junior de almacenamiento',
+  'Auxiliar junior de comercio exterior',
+  'Auxiliar junior de contabilidad',
+  'Auxiliar junior de distribución',
+  'Auxiliar junior de facturación',
+  'Auxiliar junior de programación e inventarios',
+  'Auxiliar junior ingeniería',
+  'Auxiliar junior logística',
+  'Auxiliar junior mensajería',
+  'Auxiliar logistica',
+  'Auxiliar senior abastecimiento',
+  'Auxiliar senior cartera',
+  'Auxiliar senior comercio exterior',
+  'Auxiliar senior de ingeniería',
+  'Auxiliar senior de logística',
+  'Auxiliar senior de servicios',
+  'Coordinador de Ingeniería de Diseño',
+  'Coordinador de mantenimiento',
+  'Coordinador de planeación de producción',
+  'Coordinador de servicios técnicos',
+  'Coordinador de soporte técnico y servicios',
+  'Coordinador de tienda',
+  'Coordinador diseño muebles',
+  'Coordinador e-commerce',
+  'Coordinador exportaciones - Obras',
+  'Coordinador KAM autoservicio nacional',
+  'Coordinador MAC',
+  'Coordinador Marketplace',
+  'Coordinador moldes',
+  'Coordinadora de cartera y tesorería',
+  'Coordinadora de costos e inventarios',
+  'Coordinadora de exportaciones y distribución',
+  'Coordinadora de manufactura',
+  'Director compras y mercadeo',
+  'Director de I+D+i',
+  'Director de Logística',
+  'Director de manufactura',
+  'Director de talento y tecnología',
+  'Director de ventas',
+  'Directora de Contabilidad',
+  'Directora financiera',
+  'Diseñador gráfico',
+  'Especialista de desarrollo de producto',
+  'Especialista de diseño integral',
+  'Especialista de diseño junior',
+  'Especialista de ingeniería de diseño',
+  'Especialista junior de diseño',
+  'Especialista junior de producto',
+  'Estimador de proyectos',
+  'Gerente general',
+  'Implementador de producto',
+  'Implementador de producto y mejora continua',
+  'Jefe canal distribución',
+  'Jefe de abastecimiento MP',
+  'Jefe de Calidad y Sistema de producción',
+  'Jefe de canal obras y distribución',
+  'Jefe de comercio exterior y key account compras',
+  'Jefe de ingeniería',
+  'Jefe de mantenimiento',
+  'Jefe de mercadeo',
+  'Jefe de negociación y compras',
+  'Jefe de Producción',
+  'Jefe de servicios',
+  'Jefe de talento humano',
+  'Jefe jurídico y normativo',
+  'Jefe zona córdoba sucre urabá'
+];
+
+const normalizeString = (str: string) => 
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
 export default function AgendamientoPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,8 +141,14 @@ export default function AgendamientoPage() {
   const [session, setSession] = useState<any>(null);
   const router = useRouter();
 
-  // Responsables from admin
-  const [responsablesList, setResponsablesList] = useState<string[]>([]);
+  // Employees list from public.empleados
+  interface Empleado {
+    id: number;
+    nombreCompleto: string;
+    correo_electronico: string;
+    cargo: string | null;
+  }
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
 
   // Form State
   const [showForm, setShowForm] = useState(false);
@@ -57,13 +165,15 @@ export default function AgendamientoPage() {
     if (data) setPlanned(data);
   };
 
-  const fetchResponsables = async () => {
-    const { data } = await supabase
-      .from('responsables')
-      .select('nombre')
+  const fetchEmpleados = async () => {
+    const { data } = await supabaseTalentoHumano
+      .from('empleados')
+      .select('id, nombreCompleto, correo_electronico, cargo')
       .eq('activo', true)
-      .order('nombre');
-    if (data) setResponsablesList(data.map((r: any) => r.nombre));
+      .order('nombreCompleto');
+    if (data) {
+      setEmpleados(data);
+    }
   };
 
   useEffect(() => {
@@ -72,7 +182,7 @@ export default function AgendamientoPage() {
         router.push('/login');
       } else {
         setSession(session);
-        Promise.all([fetchData(), fetchResponsables()]).then(() => setLoading(false));
+        Promise.all([fetchData(), fetchEmpleados()]).then(() => setLoading(false));
       }
     });
   }, [router]);
@@ -90,10 +200,29 @@ export default function AgendamientoPage() {
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+
+    const selectedEmp = empleados.find(emp => emp.nombreCompleto === responsable);
+    
+    let targetResponsableEmail = responsable;
+    if (selectedEmp) {
+      const normalizedCargos = CARGOS_USAR_CORREO.map(normalizeString);
+      const cargoNormalized = normalizeString(selectedEmp.cargo || '');
+      if (normalizedCargos.includes(cargoNormalized)) {
+        targetResponsableEmail = selectedEmp.correo_electronico || selectedEmp.nombreCompleto;
+        if (!targetResponsableEmail) {
+          setError('El responsable seleccionado tiene un cargo que requiere correo electrónico, pero su correo no está registrado.');
+          setSaving(false);
+          return;
+        }
+      } else {
+        targetResponsableEmail = selectedEmp.nombreCompleto;
+      }
+    }
+
     const { error: insertError } = await supabase.from('opt_planificacion').insert({
       fecha_programada: fecha,
       hora_inicio: `${hora}:00`,
-      responsable_email: responsable,
+      responsable_email: targetResponsableEmail,
       observado_nombre: observado,
       modulo_tipo: modulo,
       created_by: session.user.id
@@ -103,7 +232,8 @@ export default function AgendamientoPage() {
       setSuccessEvent({ fecha, hora, modulo, responsable, observado });
       fetchData();
     } else {
-      setError('Error al guardar la programación.');
+      console.error("Error inserting planificacion:", insertError);
+      setError(insertError.message || 'Error al guardar la programación.');
     }
     setSaving(false);
   };
@@ -207,7 +337,7 @@ export default function AgendamientoPage() {
               </h1>
               <p style={{ color: '#666' }}>Planificación de observaciones {viewMode === 'weekly' ? 'semanal' : 'mensual'}.</p>
             </div>
-            <button onClick={() => setShowForm(true)} className="btn-primary" style={{ padding: '14px 28px', fontSize: '1.1rem' }}>
+            <button onClick={() => { setError(null); setShowForm(true); }} className="btn-primary" style={{ padding: '14px 28px', fontSize: '1.1rem' }}>
               + Nuevo
             </button>
           </div>
@@ -362,25 +492,33 @@ export default function AgendamientoPage() {
                     <div><label className="label">Hora</label><input type="time" className="input-field" value={hora} onChange={e => setHora(e.target.value)} required /></div>
                   </div>
                   <div>
-                    <label className="label">Responsable</label>
-                    <input 
-                      className="input-field" 
-                      list="responsables-list" 
-                      placeholder="Buscar o seleccionar responsable..." 
-                      value={responsable} 
-                      onChange={e => setResponsable(e.target.value)} 
-                      required 
+                    <label className="label" style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif", display: 'block', marginBottom: '4px' }}>Responsable</label>
+                    <SearchableSelect 
+                      label=""
+                      placeholder="Buscar o seleccionar responsable..."
+                      options={empleados.map(e => ({ id: e.id, label: e.nombreCompleto }))}
+                      value={responsable}
+                      onChange={setResponsable}
                     />
-                    <datalist id="responsables-list">
-                      {responsablesList.map(r => (
-                        <option key={r} value={r} />
-                      ))}
-                    </datalist>
                   </div>
-                  <input type="text" className="input-field" placeholder="Colaborador Observado" value={observado} onChange={e => setObservado(e.target.value)} required />
+                  <div>
+                    <label className="label" style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif", display: 'block', marginBottom: '4px' }}>Colaborador Observado</label>
+                    <SearchableSelect 
+                      label=""
+                      placeholder="Buscar o seleccionar colaborador..."
+                      options={empleados.map(e => ({ id: e.id, label: e.nombreCompleto }))}
+                      value={observado}
+                      onChange={setObservado}
+                    />
+                  </div>
                   <select className="input-field" value={modulo} onChange={e => setModulo(e.target.value)}>
                     {MODULOS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
+                  {error && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
+                      ⚠️ {error}
+                    </div>
+                  )}
                   <button type="submit" disabled={saving} className="btn-primary" style={{ padding: '16px' }}>
                     {saving ? 'Guardando...' : 'Confirmar Programación'}
                   </button>

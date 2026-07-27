@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 interface HeaderProps {
   title: string;
@@ -24,6 +25,30 @@ export default function Header({
 }: HeaderProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [internalEmail, setInternalEmail] = useState<string | undefined>(undefined);
+  const [showUnderConstructionModal, setShowUnderConstructionModal] = useState(false);
+  const [constructionModuleName, setConstructionModuleName] = useState('');
+
+  useEffect(() => {
+    if (userEmail) {
+      setInternalEmail(userEmail);
+    } else {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data?.session?.user?.email) {
+          setInternalEmail(data.session.user.email);
+        }
+      });
+    }
+  }, [userEmail]);
+
+  const handleSignOut = async () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      await supabase.auth.signOut();
+      router.push('/login');
+    }
+  };
   
   // Estado para controlar qué acordeones de submenús están abiertos
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
@@ -91,10 +116,10 @@ export default function Header({
             </div>
           )}
           
-          {userEmail && (
+          {(internalEmail || userEmail) && (
             <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
-              <p className="text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1" title={userEmail}>
-                {getFirstName(userEmail)}
+              <p className="text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1" title={internalEmail || userEmail}>
+                {getFirstName(internalEmail || userEmail || '')}
               </p>
               <p className="text-xs sm:text-sm italic text-[#7B8E90] tracking-wider leading-none">
                 Usuario
@@ -161,6 +186,16 @@ export default function Header({
               ]
             },
             { 
+              label: 'Informe de Turno', 
+              path: '#',
+              isUnderConstruction: true,
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )
+            },
+            { 
               label: 'Calidad', 
               path: '/calidad', 
               icon: (
@@ -169,6 +204,7 @@ export default function Header({
                 </svg>
               ),
               subItems: [
+                { label: 'Indicadores Calidad', path: '/calidad' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
                 { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
                 { label: 'Criterios de Calidad', path: '/calidad/criterios' },
@@ -185,13 +221,14 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'HDT', path: '/hdt' },
+                { label: 'Estadísticas del Sistema', path: '/estadisticas-produccion' },
+                { label: 'Bitácora', path: '/sistema-produccion/bitacora' },
+                { label: 'HDT Hoja División de Trabajo', path: '/hdt' },
                 { label: 'Hora a Hora', path: '/hora-a-hora' },
                 { label: 'OPT Operativa', path: '/opt' },
                 { label: 'OPT Sistémica', path: '/opt-sistemica' },
-                { label: 'Estadísticas del Sistema', path: '/estadisticas-produccion' },
+                { label: "5'S", path: '/sistema-produccion/5s' },
                 { label: 'Tarjetas Excelencia', path: '/tarjetas-excelencia' },
-                { label: 'Bitácora', path: '/sistema-produccion/bitacora' },
                 { label: 'Auditorías', path: '/sistema-produccion/auditorias' }
               ]
             },
@@ -204,28 +241,21 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'Puestas a Punto', path: '/mantenimiento/puestas-a-punto' },
+                { label: 'Indicadores Mantenimiento', path: '/mantenimiento' },
                 { label: 'Tarjetas de Anomalías', path: '/mantenimiento/tarjetas-falla' },
                 { label: 'Gestión de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
+                { label: 'Almacén', path: '/mantenimiento/almacen' },
+                { label: 'Máquinas', path: '/mantenimiento/maquinas' },
                 { label: 'Mantenimiento Autónomo LILAC', path: '/mantenimiento/lilac' },
+                { label: 'Puestas a Punto', path: '/mantenimiento/puestas-a-punto' },
                 { label: 'Controles Visuales', path: '/mantenimiento/controles-visuales' },
                 { label: 'Lecciones LUP', path: '/mantenimiento/lecciones-lup' },
                 { label: 'Principio de Máquina', path: '/mantenimiento/principio-maquina' }
               ]
             },
-            { label: 'Indicadores Productividad', path: '/indicadores-productividad', icon: (
+            { label: 'Tablero de Control', path: '/indicadores-productividad', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            )},
-            { label: 'Asistencia', path: '/asistencia', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-            )},
-            { label: 'Cultura', path: '/cultura', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             )},
             { label: 'Inventarios', path: '/inventarios', icon: (
@@ -236,6 +266,21 @@ export default function Header({
             { label: 'Consulta SAP', path: '/consulta-sap', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+              </svg>
+            )},
+            { label: 'Talento Humano', path: 'https://talentohumano.vercel.app', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H17m10 0v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            )},
+            { label: 'Cultura', path: '/cultura', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            )},
+            { label: 'Asistencia', path: '/asistencia', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
               </svg>
             )},
             { label: 'Configuración', path: '/configuracion', icon: (
@@ -254,8 +299,18 @@ export default function Header({
                   {/* Zona Izquierda: Clic para Navegar al Módulo */}
                   <button
                     onClick={() => {
-                      setIsOpen(false);
-                      router.push(item.path);
+                      if (item.isUnderConstruction) {
+                        setConstructionModuleName(item.label);
+                        setShowUnderConstructionModal(true);
+                        setIsOpen(false);
+                      } else {
+                        setIsOpen(false);
+                        if (item.path.startsWith('http')) {
+                          window.open(`${item.path}?email=${encodeURIComponent(userEmail || '')}`, '_blank');
+                        } else {
+                          router.push(item.path);
+                        }
+                      }
                     }}
                     className="flex-1 flex items-center gap-4 px-4 py-3 text-left font-medium text-sm cursor-pointer group-hover:text-white"
                   >
@@ -310,19 +365,19 @@ export default function Header({
         </div>
 
         {/* Drawer Footer (User Info & Logout) */}
-        {userEmail && (
+        {(internalEmail || userEmail) && (
           <div className="p-6 border-t border-slate-700/60 bg-slate-900/40 space-y-4 shrink-0">
             <div className="flex flex-col gap-0.5">
               <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Sesión Activa</span>
-              <span className="text-xs font-semibold text-slate-300 truncate" title={userEmail}>
-                {userEmail}
+              <span className="text-xs font-semibold text-slate-300 truncate" title={internalEmail || userEmail}>
+                {internalEmail || userEmail}
               </span>
             </div>
-            {showLogout && onLogout && (
+            {showLogout && (
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  onLogout();
+                  handleSignOut();
                 }}
                 className="w-full py-2.5 bg-[#7B8E90] hover:bg-[#6c7d7f] text-white rounded-xl transition font-semibold text-xs text-center cursor-pointer shadow-sm hover:shadow-md"
               >
@@ -351,6 +406,31 @@ export default function Header({
           scrollbar-color: #475569 transparent;
         }
       `}</style>
+      
+      {/* Módulo en Construcción Modal */}
+      {showUnderConstructionModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#F6F3EE] border border-[#e2ded5] rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center space-y-6">
+            <div className="w-16 h-16 bg-[#324354]/10 rounded-full flex items-center justify-center mx-auto text-[#324354]">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-[#324354]">Módulo en construcción</h3>
+              <p className="text-sm text-slate-500">
+                Estamos trabajando en el diseño y desarrollo de <strong>{constructionModuleName}</strong>. ¡Próximamente disponible!
+              </p>
+            </div>
+            <button
+              onClick={() => setShowUnderConstructionModal(false)}
+              className="w-full py-3 bg-[#324354] hover:bg-[#283643] text-white rounded-xl font-semibold transition cursor-pointer text-sm"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </header>
     <div className="h-20 w-full shrink-0"></div>
    </>

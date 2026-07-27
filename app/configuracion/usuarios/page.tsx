@@ -56,7 +56,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     configuracion_produccion: 'Configuración (Producción)',
     configuracion: 'Configuración General',
     estadisticas_produccion: 'Indicadores del Sistema',
-    indicadores_productividad: 'Indicadores Productividad',
+    indicadores_productividad: 'Tablero de Control',
     asistencia: 'Asistencia',
     mantenimiento: 'Mantenimiento (LILAC)'
 };

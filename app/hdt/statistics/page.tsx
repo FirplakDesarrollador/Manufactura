@@ -6,6 +6,8 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { createExternalClient } from '@/lib/supabase/external'
 import { HdtStatisticsDashboard } from '@/components/hdt/HdtStatisticsDashboard'
+import Header from '@/components/opt-sistemica/Header'
+import SubHeader from '@/components/hdt/SubHeader'
 
 export default function HdtStatisticsPage() {
     const [loading, setLoading] = useState(true)
@@ -13,6 +15,7 @@ export default function HdtStatisticsPage() {
     const [hdts, setHdts] = useState<any[]>([])
     const [hdtSteps, setHdtSteps] = useState<any[]>([])
     const [empleados, setEmpleados] = useState<any[]>([])
+    const [userEmail, setUserEmail] = useState('')
     const router = useRouter()
 
     useEffect(() => {
@@ -27,6 +30,7 @@ export default function HdtStatisticsPage() {
                     router.push('/login')
                     return
                 }
+                setUserEmail(user.email || '')
 
                 // 2. Fetch active HDTs (is_current = true)
                 const { data: hdtData, error: hdtErr } = await supabase
@@ -111,11 +115,24 @@ export default function HdtStatisticsPage() {
         )
     }
 
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+        router.push('/login')
+    }
+
     return (
-        <div className="min-h-screen bg-slate-50 p-6 sm:p-10">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000] w-full">
+            <Header 
+                title="HDT"
+                subtitle="Estandarización"
+                userEmail={userEmail}
+                showLogout={true}
+                onLogout={handleSignOut}
+            />
+            <SubHeader />
+            <main className="flex-1 w-full max-w-7xl mx-auto p-6 sm:p-10">
                 <HdtStatisticsDashboard hdts={hdts} hdtSteps={hdtSteps} empleados={empleados} />
-            </div>
+            </main>
         </div>
     )
 }
