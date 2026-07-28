@@ -53,6 +53,10 @@ interface OrderData {
     proyecto: string;
     comentarios: string;
     observacionesEmpaque: string;
+    cantCompletada?: number;
+    cantRechazada?: number;
+    fechaCierreReal?: string;
+    asientoContable?: string;
     componentes: ComponentItem[];
 }
 
@@ -121,6 +125,10 @@ const order2257338: OrderData = {
     proyecto: "",
     comentarios: "",
     observacionesEmpaque: "",
+    cantCompletada: 0,
+    cantRechazada: 0,
+    fechaCierreReal: "",
+    asientoContable: "",
     componentes: componentsData as ComponentItem[]
 };
 
@@ -167,6 +175,10 @@ const generateMockOrder = (no: string): OrderData => {
         proyecto: numVal % 3 === 0 ? "PROY-ESP-FPL" : "",
         comentarios: "",
         observacionesEmpaque: "",
+        cantCompletada: 0,
+        cantRechazada: 0,
+        fechaCierreReal: "",
+        asientoContable: "",
         componentes: componentPool
     };
 };
@@ -276,13 +288,36 @@ export default function ConsultaSAPPage() {
         router.push('/login')
     }
 
+    const fetchOrderFromSAP = async (orderNum: string) => {
+        const loadingId = toast.loading(`Consultando orden ${orderNum} en SAP...`);
+        try {
+            const res = await fetch(`/api/sap/production-orders/${orderNum}`);
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                toast.error(errData.error || "Orden no encontrada en SAP", { id: loadingId });
+                return;
+            }
+            const data = await res.json();
+            setActiveOrder(data);
+            setCompSortCol(null);
+            toast.success(`Orden ${orderNum} cargada correctamente`, { id: loadingId });
+        } catch (error) {
+            console.error(error);
+            toast.error("Error de conexión con SAP", { id: loadingId });
+        }
+    }
+
     const handleSearch = (e?: React.FormEvent) => {
         if (e) e.preventDefault()
         if (searchQuery.trim() === "") return
-        const newOrder = generateMockOrder(searchQuery.trim())
-        setActiveOrder(newOrder)
-        setCompSortCol(null)
+        fetchOrderFromSAP(searchQuery.trim());
     }
+
+    useEffect(() => {
+        // Cargar orden inicial al montar el componente
+        fetchOrderFromSAP(searchQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Lógica para arrastrar y redimensionar ancho de columnas (Tabla Componentes)
     const handleCompResizeStart = (colKey: string, e: React.MouseEvent) => {
@@ -1186,7 +1221,7 @@ export default function ConsultaSAPPage() {
                                                         <span className="text-gray-800 text-[11px]">Asiento contable</span>
                                                         <input 
                                                             type="text" 
-                                                            value="Basado en Ofertas de ventas 5008." 
+                                                            value={activeOrder.asientoContable || ""} 
                                                             readOnly 
                                                             className="bg-white border border-[#b2b2b2] px-1 py-0.5 w-[210px] text-xs text-black rounded-none focus:outline-none truncate" 
                                                         />
@@ -1215,12 +1250,12 @@ export default function ConsultaSAPPage() {
 
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-gray-800 text-[11px]">Cantidad completada</span>
-                                                            <input type="text" readOnly className="bg-white border border-[#b2b2b2] px-1 py-0.5 w-[120px] text-right text-xs rounded-none focus:outline-none" />
+                                                            <input type="text" value={activeOrder.cantCompletada ?? ""} readOnly className="bg-white border border-[#b2b2b2] px-1 py-0.5 w-[120px] text-right text-xs rounded-none focus:outline-none" />
                                                         </div>
 
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-gray-800 text-[11px]">Cantidad rechazada</span>
-                                                            <input type="text" readOnly className="bg-white border border-[#b2b2b2] px-1 py-0.5 w-[120px] text-right text-xs rounded-none focus:outline-none" />
+                                                            <input type="text" value={activeOrder.cantRechazada ?? ""} readOnly className="bg-white border border-[#b2b2b2] px-1 py-0.5 w-[120px] text-right text-xs rounded-none focus:outline-none" />
                                                         </div>
                                                     </div>
 
@@ -1235,7 +1270,7 @@ export default function ConsultaSAPPage() {
 
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-gray-800 text-[11px]">Fecha de cierre real</span>
-                                                            <input type="text" readOnly className="bg-white border border-[#b2b2b2] px-1 py-0.5 w-[120px] text-center text-xs rounded-none focus:outline-none" />
+                                                            <input type="text" value={activeOrder.fechaCierreReal || ""} readOnly className="bg-white border border-[#b2b2b2] px-1 py-0.5 w-[120px] text-center text-xs rounded-none focus:outline-none" />
                                                         </div>
 
                                                         <div className="flex items-center justify-between">
