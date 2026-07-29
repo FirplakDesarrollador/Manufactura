@@ -7,7 +7,7 @@ import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2 } from 'lucide-react'
 
 interface ComponentItem {
     id: number;
@@ -99,6 +99,152 @@ const SEMAFORO_MOCK_DATA: SemaforoItem[] = [
     { id: 21, originnum: "160026", nroOp: "10071461", sku: "VBAN05-0125-000-0437", descripcion: "MUEBLE DA VINCI PISO LVM 48X43 SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "4.00" },
     { id: 22, originnum: "159915", nroOp: "10071365", sku: "VBAN05-0127-000-0439", descripcion: "MUEBLE MACAO LIFE LVM 48X43 CANTO 2MM FULL EXTENSION MITTE/TAMBO", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "5.00" }
 ];
+
+interface SapItemWarehouse {
+    warehouseCode: string;
+    warehouseName?: string;
+    locked?: boolean;
+    inStock: number;
+    committed: number;
+    ordered: number;
+    available?: number;
+    minStock?: number;
+    maxStock?: number;
+    requiredStock?: number;
+    itemCost?: number;
+    dispReal?: number;
+}
+
+const DEFAULT_WAREHOUSES_LIST: SapItemWarehouse[] = [
+    { warehouseCode: "CN-01", warehouseName: "Sala Exhibición FPK Medellín", locked: false, inStock: 1, committed: 0, ordered: 0, available: 1, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 185455.01, dispReal: 1.00 },
+    { warehouseCode: "CN-02", warehouseName: "Consignación Maquila", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "CN-03", warehouseName: "Sala Exhibición FPK Bogotá", locked: false, inStock: 3, committed: 0, ordered: 0, available: 3, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 148128.30, dispReal: 3.00 },
+    { warehouseCode: "CO-01", warehouseName: "Contabilidad", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "CT-01", warehouseName: "Consignación Proveedores", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "CT-02", warehouseName: "Recuperación de Producto", locked: false, inStock: 1, committed: 0, ordered: 0, available: 1, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 94142.26, dispReal: 1.00 },
+    { warehouseCode: "CT-08", warehouseName: "Devoluciones Consignaciones", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-01", warehouseName: "Materias Primas", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-02", warehouseName: "Importaciones - Mercancía", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-03", warehouseName: "Planta Fibra de Vidrio", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 59482.58, dispReal: 0.00 },
+    { warehouseCode: "MP-04", warehouseName: "Producción Muebles", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-05", warehouseName: "Planta RTM", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-06", warehouseName: "Moldes", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 89598.20, dispReal: 0.00 },
+    { warehouseCode: "MP-07", warehouseName: "Servicios", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-08", warehouseName: "Devoluciones de Materias Primas", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-09", warehouseName: "I+D+I", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-10", warehouseName: "Planta Mármol Sintético", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 66464.74, dispReal: 0.00 },
+    { warehouseCode: "MP-11", warehouseName: "Materias Primas CEFI", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "MP-12", warehouseName: "Producción Muebles CEFI", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "PT-01", warehouseName: "Producto Terminado Decorado", locked: false, inStock: 38, committed: 35, ordered: 14, available: 17, minStock: 17, maxStock: 0, requiredStock: 0, itemCost: 94817.37, dispReal: 3.00 },
+    { warehouseCode: "PT-02", warehouseName: "Producto Terminado", locked: false, inStock: 33, committed: 55, ordered: 21, available: -1, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 95173.50, dispReal: -22.00 },
+    { warehouseCode: "PT-03", warehouseName: "Devoluciones en sitio", locked: false, inStock: 2, committed: 0, ordered: 0, available: 2, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 94597.24, dispReal: 2.00 },
+    { warehouseCode: "PT-04", warehouseName: "Devoluciones en tránsito", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 94163.94, dispReal: 0.00 },
+    { warehouseCode: "PT-05", warehouseName: "Devoluciones cambio", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 93547.46, dispReal: 0.00 },
+    { warehouseCode: "PT-06", warehouseName: "Saldos", locked: false, inStock: 6, committed: 0, ordered: 0, available: 6, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 92383.51, dispReal: 6.00 },
+    { warehouseCode: "PT-07", warehouseName: "Ferias", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 99747.23, dispReal: 0.00 },
+    { warehouseCode: "PT-08", warehouseName: "Eventos", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 93619.29, dispReal: 0.00 },
+    { warehouseCode: "PT-09", warehouseName: "Fulfillment", locked: false, inStock: 0, committed: 0, ordered: 0, available: 0, minStock: 0, maxStock: 0, requiredStock: 0, itemCost: 0, dispReal: 0.00 },
+    { warehouseCode: "PT-10", warehouseName: "Sala Disponible FPK Medellín", locked: false, inStock: 5, committed: 0, ordered: 0, available: 5, minStock: 2, maxStock: 0, requiredStock: 0, itemCost: 94135.89, dispReal: 5.00 },
+    { warehouseCode: "PT-11", warehouseName: "Sala Disponible FPK Bogotá", locked: false, inStock: 5, committed: 0, ordered: 0, available: 5, minStock: 2, maxStock: 0, requiredStock: 0, itemCost: 94577.04, dispReal: 5.00 }
+];
+
+const DEFAULT_ITEM_MOCK: SapItemData = {
+    itemCode: "VBAN01-0039-000-0100",
+    itemName: "LAVAMANOS SIENA 79X48 BRILLANTE BLANCO",
+    foreignName: "SIENA LAVATORY 31INX19IN WHITE 100",
+    itemClass: "Artículos",
+    itemsGroupCode: "BAN01-Lavam FIRPLAK",
+    uomGroup: "Manual",
+    priceList: "1. Lista Base 2020",
+    price: "$ 433,791.00",
+    barCode: "7707324386799",
+    inventoryItem: true,
+    salesItem: true,
+    purchaseItem: false,
+    assetItem: false,
+    manufacturer: "FIRPLAK",
+    valid: true,
+    frozen: false,
+    activeStatus: "Activo",
+    vatLiable: true,
+    taxSubject: true,
+    defaultWarehouse: "PT-02",
+    salesUnit: "UN",
+    purchaseUnit: "UN",
+    inventoryUOM: "UN",
+    quantityOnStock: 103,
+    quantityOrderedFromVendors: 35,
+    quantityOrderedByCustomers: 90,
+    warehouses: DEFAULT_WAREHOUSES_LIST
+};
+
+const BOM_SAMPLE_DATA = [
+    { id: 1, tipo: "Artículo", no: "PZCO01-0002-000-0000", descripcion: "CIF POR MINUTO", cantidad: "50", uom: "MIN", almacen: "MP-10", metodoEmision: "Notificación", costoEst: "****", listaPrecios: "**** Último precio de compra", costoEstTotal: "****", precioUnitario: "", total: "", ctaWip: "0" },
+    { id: 2, tipo: "Artículo", no: "PZCO01-0001-000-0000", descripcion: "MANO OBRA POR MIN MARMOL SINTETICO", cantidad: "50", uom: "MIN", almacen: "MP-10", metodoEmision: "Notificación", costoEst: "****", listaPrecios: "**** Último precio de compra", costoEstTotal: "****", precioUnitario: "", total: "", ctaWip: "0" },
+    { id: 3, tipo: "Artículo", no: "PINP01-0006-000-0000", descripcion: "MEZCLA POLIMERO COLADO", cantidad: "12", uom: "KG", almacen: "MP-10", metodoEmision: "Notificación", costoEst: "****", listaPrecios: "**** Último precio de compra", costoEstTotal: "****", precioUnitario: "", total: "", ctaWip: "0" },
+    { id: 4, tipo: "Artículo", no: "CMPD01-0048-000-0000", descripcion: "PEROXIDO NOROX 925H", cantidad: "14", uom: "GR", almacen: "MP-10", metodoEmision: "Manual", costoEst: "****", listaPrecios: "**** 1. Lista Base 2020", costoEstTotal: "****", precioUnitario: "", total: "", ctaWip: "0" },
+    { id: 5, tipo: "Artículo", no: "CEMP02-0250-000-0000", descripcion: "INSTRUCCIONES LAVAMANOS ESP/ING NUEVA CON INSTR PERF Y CUIDADO FPK", cantidad: "1", uom: "UN", almacen: "MP-10", metodoEmision: "Manual", costoEst: "****", listaPrecios: "**** Último precio de compra", costoEstTotal: "****", precioUnitario: "$ 75.00", total: "$ 75.00", ctaWip: "0" },
+    { id: 6, tipo: "Artículo", no: "PGEL01-0003-000-0100", descripcion: "GELCOAT BLANCO 888 EN PROCESO (MARMOL SINTETICO)", cantidad: "0.56", uom: "KG", almacen: "MP-10", metodoEmision: "Manual", costoEst: "****", listaPrecios: "**** Último precio de compra", costoEstTotal: "****", precioUnitario: "$ 19,015.00", total: "$ 10,648.40", ctaWip: "0" },
+    { id: 7, tipo: "Artículo", no: "CEMP02-0255-000-0000", descripcion: "CAJA LVM SIENA 79X48 (31X19IN)", cantidad: "1", uom: "UN", almacen: "MP-10", metodoEmision: "Manual", costoEst: "****", listaPrecios: "**** 1. Lista Base 2020", costoEstTotal: "****", precioUnitario: "", total: "", ctaWip: "0" },
+    { id: 8, tipo: "Artículo", no: "CEMP02-0226-000-0000", descripcion: "ETIQUETA REVISION CALIDAD PC", cantidad: "1", uom: "UN", almacen: "MP-10", metodoEmision: "Manual", costoEst: "****", listaPrecios: "**** 1. Lista Base 2020", costoEstTotal: "****", precioUnitario: "", total: "", ctaWip: "0" }
+];
+
+const EMPTY_ITEM: SapItemData = {
+    itemCode: "",
+    itemName: "",
+    foreignName: "",
+    itemClass: "Artículos",
+    itemsGroupCode: "",
+    uomGroup: "",
+    priceList: "",
+    price: "",
+    barCode: "",
+    inventoryItem: false,
+    salesItem: false,
+    purchaseItem: false,
+    assetItem: false,
+    manufacturer: "",
+    valid: false,
+    frozen: false,
+    activeStatus: "",
+    vatLiable: false,
+    taxSubject: false,
+    defaultWarehouse: "",
+    salesUnit: "",
+    purchaseUnit: "",
+    inventoryUOM: "",
+    quantityOnStock: 0,
+    quantityOrderedFromVendors: 0,
+    quantityOrderedByCustomers: 0,
+    warehouses: []
+};
+
+const EMPTY_ORDER: OrderData = {
+    tipo: "",
+    estado: "",
+    noProducto: "",
+    descripcionProducto: "",
+    cantPlanificada: 0,
+    nombreUN: "",
+    almacen: "",
+    socioNegocio: "",
+    metodoEnrutamiento: "",
+    aprovisionarArticulos: false,
+    noOrden: "",
+    fechaOrden: "",
+    fechaInicio: "",
+    fechaFinalizacion: "",
+    usuario: "",
+    origen: "",
+    vinculadoA: "",
+    pedidoVinculado: "",
+    cliente: "",
+    centroCostos: "",
+    proyecto: "",
+    comentarios: "",
+    observacionesEmpaque: "",
+    componentes: []
+};
 
 // Orden del pantallazo exacto de SAP
 const order2257338: OrderData = {
@@ -200,12 +346,49 @@ export default function ConsultaSAPPage() {
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
-    // SubHeader Tabs: Consulta Ordenes vs Query - Semáforo
-    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'query-semaforo'>('consulta-ordenes')
+    // SubHeader Tabs: Consulta Ordenes vs Query - Semáforo vs Consulta por Producto
+    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'query-semaforo' | 'consulta-producto'>('consulta-ordenes')
 
-    // Estados de búsqueda e interfaz SAP (Consulta Ordenes)
-    const [searchQuery, setSearchQuery] = useState("2257338")
-    const [activeOrder, setActiveOrder] = useState<OrderData>(order2257338)
+    // Estados Consulta por Producto (Datos maestros de artículo) - Inicialmente Vacíos
+    const [itemCodeInput, setItemCodeInput] = useState("")
+    const [itemNameInput, setItemNameInput] = useState("")
+    const [activeItem, setActiveItem] = useState<SapItemData>(EMPTY_ITEM)
+    const [itemLoading, setItemLoading] = useState(false)
+    const [itemInnerTab, setItemInnerTab] = useState<'inventario' | 'lista-materiales'>('inventario')
+    const [itemMatches, setItemMatches] = useState<Array<{ itemCode: string; itemName: string }>>([])
+
+    const handleItemSearch = async (byField: 'code' | 'name', searchTermOverride?: string) => {
+        const val = searchTermOverride || (byField === 'code' ? itemCodeInput.trim() : itemNameInput.trim());
+        if (!val) {
+            toast.error("Por favor ingresa un número de artículo o descripción");
+            return;
+        }
+        setItemLoading(true);
+        setItemMatches([]);
+        try {
+            const param = byField === 'code' ? `code=${encodeURIComponent(val)}` : `query=${encodeURIComponent(val)}`;
+            const res = await fetch(`/api/sap/items?${param}`);
+            const data = await res.json();
+            if (res.ok && data.item) {
+                setActiveItem(data.item);
+                setItemCodeInput(data.item.itemCode);
+                setItemNameInput(data.item.itemName);
+                setItemMatches(data.matches || []);
+                toast.success(`Artículo ${data.item.itemCode} cargado desde SAP B1`);
+            } else {
+                toast.error(data.error || "No se encontró el artículo en SAP B1");
+            }
+        } catch (err: any) {
+            console.error("Error al consultar artículo SAP:", err);
+            toast.error("Error al conectar con SAP B1");
+        } finally {
+            setItemLoading(false);
+        }
+    };
+
+    // Estados de búsqueda e interfaz SAP (Consulta Ordenes) - Inicialmente Vacíos
+    const [searchQuery, setSearchQuery] = useState("")
+    const [activeOrder, setActiveOrder] = useState<OrderData>(EMPTY_ORDER)
     const [tabActive, setTabActive] = useState<'componentes' | 'resumen' | 'anexos'>('componentes')
     const [currentTime, setCurrentTime] = useState("")
 
@@ -314,9 +497,7 @@ export default function ConsultaSAPPage() {
     }
 
     useEffect(() => {
-        // Cargar orden inicial al montar el componente
-        fetchOrderFromSAP(searchQuery);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Al abrir por primera vez los campos salen vacíos
     }, []);
 
     // Lógica para arrastrar y redimensionar ancho de columnas (Tabla Componentes)
@@ -547,48 +728,66 @@ export default function ConsultaSAPPage() {
                         <FileSpreadsheet size={16} />
                         <span>Query - Semáforo</span>
                     </button>
+
+                    <button
+                        onClick={() => setSubHeaderTab('consulta-producto')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                            subHeaderTab === 'consulta-producto'
+                                ? 'bg-[#324354] text-white shadow-md'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                    >
+                        <PackageSearch size={16} />
+                        <span>Consulta por Producto</span>
+                    </button>
                 </div>
             </div>
 
             {/* MAIN CONTENT AREA */}
             {subHeaderTab === 'consulta-ordenes' ? (
                 /* TAB 1: CONSULTA ORDENES (VISTA ORIGINAL DE ORDEN DE FABRICACION SAP) */
-                <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
+                <main className="flex-1 max-w-[1700px] w-full mx-auto p-1 md:p-1.5 flex flex-col font-sans">
                     
                     {/* SAP CLIENT WINDOW REPLICA CONTAINER */}
                     <div className="bg-[#eceae6] border border-[#a3a3a3] shadow-2xl flex flex-col font-sans select-none text-xs w-full text-black overflow-hidden relative">
                         
                         {/* SAP WINDOW TITLE BAR */}
-                        <div className="bg-gradient-to-r from-[#eceae6] to-[#d6d3cc] px-3 py-1.5 flex items-center justify-between border-b border-[#a3a3a3]">
+                        <div className="bg-gradient-to-r from-[#eceae6] to-[#d6d3cc] px-2.5 py-1 flex items-center justify-between border-b border-[#a3a3a3]">
                             <div className="flex items-center gap-2">
                                 {/* SAP Business One Icon Mock */}
                                 <div className="w-4 h-4 bg-amber-500 rounded-sm flex items-center justify-center text-[10px] text-white font-black select-none shadow-sm">
                                     S
                                 </div>
                                 <span className="font-semibold text-gray-800 text-[11px] tracking-wide">
-                                    Orden de fabricación - {activeOrder.noOrden}
+                                    Orden de fabricación{activeOrder.noOrden ? ` - ${activeOrder.noOrden}` : ''}
                                 </span>
                             </div>
                             
-                            {/* Search container */}
+                            {/* Search container con botón Buscar estilizado */}
                             <div>
                                 <form 
                                     onSubmit={(e) => {
                                         e.preventDefault();
                                         handleSearch();
                                     }} 
-                                    className="flex items-center bg-white border border-[#c0beb9] px-1.5 py-0.5 shadow-inner"
+                                    className="flex items-center gap-1.5"
                                 >
-                                    <span className="text-[10px] text-gray-500 font-semibold select-none mr-1.5 pl-0.5">Buscar OF:</span>
+                                    <span className="text-[10px] text-gray-800 font-bold select-none">Buscar OF:</span>
                                     <input
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="bg-transparent text-black text-[11px] font-bold w-20 outline-none border-none p-0 focus:ring-0 select-text"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                        className="bg-[#fffde6] text-black text-xs font-mono font-bold px-1.5 py-0.5 outline-none border border-[#b2b2b2] rounded-none focus:bg-white select-text w-24"
                                         placeholder="Nº Orden"
                                     />
-                                    <button type="submit" className="text-gray-500 hover:text-black font-semibold text-[10px] px-1 hover:bg-gray-100 transition-colors">
-                                        🔍
+                                    <button 
+                                        type="submit" 
+                                        className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-0.5 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0 rounded-none cursor-pointer"
+                                        title="Buscar Orden de Fabricación en SAP"
+                                    >
+                                        <Search size={12} />
+                                        <span>Buscar</span>
                                     </button>
                                 </form>
                             </div>
@@ -598,20 +797,20 @@ export default function ConsultaSAPPage() {
                         <div className="h-[3px] bg-[#f4b000] w-full"></div>
 
                         {/* SAP WINDOW BODY */}
-                        <div className="py-1 px-2.5 bg-[#f3f0ea] flex flex-col gap-1">
+                        <div className="py-0.5 px-2 bg-[#f3f0ea] flex flex-col gap-0.5">
 
-                            {/* HEADER DETAILS FORM - TWO COLUMNS */}
-                            <div className="flex flex-wrap lg:flex-nowrap gap-x-8 gap-y-2 items-start justify-between w-full">
+                            {/* HEADER DETAILS FORM - TWO COLUMNS (COMPACT SIZING) */}
+                            <div className="flex flex-wrap lg:flex-nowrap gap-x-6 gap-y-0.5 items-start justify-between w-full">
                                 
                                 {/* LEFT COLUMN FIELDS */}
-                                <div className="space-y-0.5 shrink-0">
+                                <div className="space-y-0 shrink-0">
                                     {/* Tipo */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none">Tipo</span>
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none">Tipo</span>
                                         <select 
                                             value={activeOrder.tipo} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
                                         >
                                             <option>Estándar</option>
                                             <option>Especial</option>
@@ -620,12 +819,12 @@ export default function ConsultaSAPPage() {
                                     </div>
 
                                     {/* Estado */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none">Estado</span>
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none">Estado</span>
                                         <select 
                                             value={activeOrder.estado} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd] font-semibold text-emerald-800"
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd] font-semibold text-emerald-800"
                                         >
                                             <option>Liberado</option>
                                             <option>Planificado</option>
@@ -634,78 +833,78 @@ export default function ConsultaSAPPage() {
                                     </div>
 
                                     {/* Nº producto */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none flex items-center">
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none flex items-center">
                                             Nº producto <SapLinkArrow />
                                         </span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.noProducto} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs font-mono font-bold text-black w-[200px] rounded-none focus:outline-none select-text" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] font-mono font-bold text-black w-[190px] rounded-none focus:outline-none select-text" 
                                         />
                                     </div>
 
                                     {/* Descripción producto */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none">Descripción producto</span>
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none">Descripción producto</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.descripcionProducto} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[450px] rounded-none focus:outline-none select-text truncate font-medium" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[420px] rounded-none focus:outline-none select-text truncate font-medium" 
                                         />
                                     </div>
 
                                     {/* Cantidad planificada y Nombre de */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none">Cantidad planificada</span>
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none">Cantidad planificada</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.cantPlanificada} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs font-semibold text-black w-[60px] text-right rounded-none focus:outline-none select-text" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] font-semibold text-black w-[55px] text-right rounded-none focus:outline-none select-text" 
                                         />
-                                        <span className="ml-3 text-[11px] text-gray-800 select-none mr-1">Nombre de</span>
+                                        <span className="ml-2 text-[10px] text-gray-800 select-none mr-1">Nombre de</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.nombreUN} 
                                             readOnly 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none" 
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[130px] rounded-none focus:outline-none" 
                                         />
                                     </div>
 
                                     {/* Almacén */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none flex items-center">
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none flex items-center">
                                             Almacén <SapLinkArrow />
                                         </span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.almacen} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[100px] rounded-none focus:outline-none font-bold" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[90px] rounded-none focus:outline-none font-bold" 
                                         />
                                     </div>
 
                                     {/* Socio de negocio */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none">Socio de negocio</span>
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none">Socio de negocio</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.socioNegocio} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[200px] rounded-none focus:outline-none font-mono" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[190px] rounded-none focus:outline-none font-mono" 
                                         />
                                     </div>
 
                                     {/* Cálculo de fecha enr. */}
-                                    <div className="flex items-center">
-                                        <span className="w-[130px] shrink-0 text-[11px] text-gray-800 select-none">Cálculo de fecha enr.</span>
+                                    <div className="flex items-center h-5">
+                                        <span className="w-[125px] shrink-0 text-[10px] text-gray-800 select-none">Cálculo de fecha enr.</span>
                                         <select 
                                             value={activeOrder.metodoEnrutamiento} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
                                         >
                                             <option>En Fecha de inicio</option>
                                             <option>En Fecha de finalización</option>
@@ -713,82 +912,82 @@ export default function ConsultaSAPPage() {
                                     </div>
 
                                     {/* Aprovisionar artículos */}
-                                    <div className="flex items-center pt-0.5">
+                                    <div className="flex items-center h-5 pt-0.5">
                                         <input 
                                             type="checkbox" 
                                             checked={activeOrder.aprovisionarArticulos} 
                                             disabled 
-                                            className="w-3.5 h-3.5 border-[#b2b2b2] rounded-none text-amber-600 focus:ring-0 mr-2" 
+                                            className="w-3 h-3 border-[#b2b2b2] rounded-none text-amber-600 focus:ring-0 mr-1.5" 
                                         />
-                                        <span className="text-[11px] text-gray-800 select-none">Aprovisionar artículos no almacenados</span>
+                                        <span className="text-[10px] text-gray-800 select-none">Aprovisionar artículos no almacenados</span>
                                     </div>
                                 </div>
 
                                 {/* RIGHT COLUMN FIELDS */}
-                                <div className="space-y-0.5 shrink-0">
+                                <div className="space-y-0 shrink-0">
                                     {/* Nº OF-Produ */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Nº OF-Produ</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Nº OF-Produ</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.noOrden} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs font-bold text-black w-[150px] text-right rounded-none focus:outline-none select-text" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] font-bold text-black w-[140px] text-right rounded-none focus:outline-none select-text" 
                                         />
                                     </div>
 
                                     {/* Fecha orden de fabricac */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Fecha orden de fabricac</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Fecha orden de fabricac</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.fechaOrden} 
                                             readOnly 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] text-right rounded-none focus:outline-none" 
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] text-right rounded-none focus:outline-none" 
                                         />
                                     </div>
 
                                     {/* Fecha de inicio */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Fecha de inicio</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Fecha de inicio</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.fechaInicio} 
                                             readOnly 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] text-right rounded-none focus:outline-none" 
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] text-right rounded-none focus:outline-none" 
                                         />
                                     </div>
 
                                     {/* Fecha de finalización */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Fecha de finalización</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Fecha de finalización</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.fechaFinalizacion} 
                                             readOnly 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] text-right rounded-none focus:outline-none" 
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] text-right rounded-none focus:outline-none" 
                                         />
                                     </div>
 
                                     {/* Usuario */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Usuario</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Usuario</span>
                                         <select 
                                             value={activeOrder.usuario} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
                                         >
                                             <option>{activeOrder.usuario}</option>
                                         </select>
                                     </div>
 
                                     {/* Origen */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Origen</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Origen</span>
                                         <select 
                                             value={activeOrder.origen} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
                                         >
                                             <option>Pedido de cliente</option>
                                             <option>Manual</option>
@@ -796,62 +995,62 @@ export default function ConsultaSAPPage() {
                                     </div>
 
                                     {/* Vinculados a */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Vinculados a</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Vinculados a</span>
                                         <select 
                                             value={activeOrder.vinculadoA} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
+                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd]"
                                         >
                                             <option>Pedido de cliente</option>
                                         </select>
                                     </div>
 
                                     {/* Pedido vinculado */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none flex items-center justify-end">
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none flex items-center justify-end">
                                             Pedido vinculado <SapLinkArrow />
                                         </span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.pedidoVinculado} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs font-mono font-bold text-black w-[150px] text-right rounded-none focus:outline-none select-text" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] font-mono font-bold text-black w-[140px] text-right rounded-none focus:outline-none select-text" 
                                         />
                                     </div>
 
                                     {/* Cliente */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none flex items-center justify-end">
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none flex items-center justify-end">
                                             Cliente <SapLinkArrow />
                                         </span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.cliente} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs font-mono text-black w-[150px] text-right rounded-none focus:outline-none select-text" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] font-mono text-black w-[140px] text-right rounded-none focus:outline-none select-text" 
                                         />
                                     </div>
 
                                     {/* Centro de Costos */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Centro de Costos</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Centro de Costos</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.centroCostos} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] text-right rounded-none focus:outline-none select-text" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] text-right rounded-none focus:outline-none select-text" 
                                         />
                                     </div>
 
                                     {/* Proyecto */}
-                                    <div className="flex items-center justify-end">
-                                        <span className="w-[140px] text-[11px] text-gray-800 text-right mr-2 select-none">Proyecto</span>
+                                    <div className="flex items-center justify-end h-5">
+                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Proyecto</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.proyecto} 
                                             readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-[150px] text-right rounded-none focus:outline-none select-text" 
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] text-right rounded-none focus:outline-none select-text" 
                                         />
                                     </div>
                                 </div>
@@ -893,10 +1092,10 @@ export default function ConsultaSAPPage() {
                                 </div>
 
                                 {/* TAB CONTENT CONTAINER WITH RESIZABLE COLUMNS */}
-                                <div className="bg-white border-x border-b border-[#a3a3a3] shadow-inner min-h-[350px] overflow-hidden">
+                                <div className="bg-white border-x border-b border-[#a3a3a3] shadow-inner min-h-[280px] overflow-hidden">
                                     
                                     {tabActive === 'componentes' && (
-                                        <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                                        <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
                                             <table className="border-collapse text-[11px] font-sans table-fixed w-max">
                                                 <thead className="sticky top-0 bg-[#eceae6] border-b border-[#c2c0bb] shadow-sm select-none z-10">
                                                     <tr className="text-gray-700 font-semibold">
@@ -1387,27 +1586,27 @@ export default function ConsultaSAPPage() {
                             {/* COMMENTS & PACKAGING AREA */}
                             <div className="flex items-start justify-between w-full mt-1.5">
                                 <div className="flex items-start gap-1">
-                                    <span className="text-[11px] text-gray-800 select-none w-[75px] shrink-0 pt-1">Comentarios</span>
+                                    <span className="text-[11px] text-gray-800 select-none w-[75px] shrink-0 pt-0.5">Comentarios</span>
                                     <textarea
                                         value={activeOrder.comentarios}
                                         readOnly
-                                        className="bg-white border border-[#b2b2b2] p-1 text-xs text-black w-[250px] h-[50px] rounded-none focus:outline-none resize-none font-sans leading-normal"
+                                        className="bg-white border border-[#b2b2b2] p-1 text-[11px] text-black w-[250px] h-[34px] rounded-none focus:outline-none resize-none font-sans leading-tight"
                                     />
                                 </div>
 
                                 <div className="flex items-start gap-1">
-                                    <span className="text-[11px] text-gray-800 select-none w-[150px] shrink-0 pt-1 text-right">Observaciones sobre empaque</span>
+                                    <span className="text-[11px] text-gray-800 select-none w-[150px] shrink-0 pt-0.5 text-right">Observaciones sobre empaque</span>
                                     <textarea
                                         value={activeOrder.observacionesEmpaque}
                                         readOnly
-                                        className="bg-white border border-[#b2b2b2] p-1 text-xs text-black w-[250px] h-[50px] rounded-none focus:outline-none resize-none font-sans leading-normal"
+                                        className="bg-white border border-[#b2b2b2] p-1 text-[11px] text-black w-[250px] h-[34px] rounded-none focus:outline-none resize-none font-sans leading-tight"
                                     />
                                 </div>
                             </div>
                         </div>
                     </div>
                 </main>
-            ) : (
+            ) : subHeaderTab === 'query-semaforo' ? (
                 /* TAB 2: QUERY - SEMAFORO (QUERY MANAGER DE SAP) */
                 <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
                     
@@ -1691,7 +1890,445 @@ export default function ConsultaSAPPage() {
                         </div>
                     </div>
                 </main>
-            )}
+            ) : subHeaderTab === 'consulta-producto' ? (
+                /* TAB 3: CONSULTA POR PRODUCTO (DATOS MAESTROS DE ARTÍCULO SAP) */
+                <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
+                    {/* SAP CLIENT WINDOW REPLICA CONTAINER */}
+                    <div className="bg-[#eceae6] border border-[#a3a3a3] shadow-2xl flex flex-col font-sans select-none text-xs w-full text-black overflow-hidden relative">
+                        
+                        {/* SAP WINDOW TITLE BAR */}
+                        <div className="bg-gradient-to-r from-[#eceae6] to-[#d6d3cc] px-3 py-1.5 flex items-center justify-between border-b border-[#a3a3a3]">
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 bg-amber-500 rounded-sm flex items-center justify-center text-[10px] text-white font-black select-none shadow-sm">
+                                    S
+                                </div>
+                                <span className="font-semibold text-gray-800 text-[11px] tracking-wide">
+                                    Datos maestros de artículo{activeItem.itemCode ? ` - ${activeItem.itemCode}` : ''}
+                                </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                {itemLoading && (
+                                    <span className="text-[11px] text-amber-700 font-semibold flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 animate-pulse">
+                                        <Loader2 size={12} className="animate-spin" />
+                                        Consultando SAP B1...
+                                    </span>
+                                )}
+                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold border border-emerald-300">
+                                    SAP Conectado Live
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* SAP GOLD SHARP ACCENT BORDER */}
+                        <div className="h-[3px] bg-[#f4b000] w-full"></div>
+
+                        {/* SAP WINDOW BODY */}
+                        <div className="py-2 px-3 bg-[#f3f0ea] flex flex-col gap-2">
+
+                            {/* HEADER DETAILS FORM WITH RED HIGHLIGHTED SEARCH FIELDS */}
+                            <div className="bg-[#eceae6] p-2.5 border border-[#d0cdcf] rounded-none flex flex-col gap-3 shadow-inner">
+                                
+                                <div className="flex flex-wrap lg:flex-nowrap gap-x-8 gap-y-3 justify-between items-start">
+                                    {/* LEFT COLUMN FIELDS */}
+                                    <div className="space-y-1.5 shrink-0 max-w-xl w-full">
+                                        
+                                        {/* NÚMERO DE ARTÍCULO (SEARCHABLE - RED HIGHLIGHT BOX) */}
+                                        <div className="flex items-center">
+                                            <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none flex items-center">
+                                                Número de artículo <SapLinkArrow />
+                                            </span>
+                                            <div className="flex items-center gap-1 flex-1 relative">
+                                                <div className="relative flex-1 p-0.5 rounded border-2 border-red-500 bg-red-50/20 shadow-sm transition-all focus-within:ring-2 focus-within:ring-red-400">
+                                                    <input
+                                                        type="text"
+                                                        value={itemCodeInput}
+                                                        onChange={(e) => setItemCodeInput(e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('code')}
+                                                        className="w-full bg-[#fffde6] text-black text-xs font-mono font-bold px-2 py-1 outline-none border border-[#b2b2b2] rounded-none focus:bg-white select-text"
+                                                        placeholder="Ej: VBAN01-0039-000-0100"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={() => handleItemSearch('code')}
+                                                    disabled={itemLoading}
+                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0"
+                                                    title="Buscar por Número de artículo"
+                                                >
+                                                    <Search size={13} />
+                                                    <span>Buscar</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* DESCRIPCIÓN (SEARCHABLE - RED HIGHLIGHT BOX) */}
+                                        <div className="flex items-center">
+                                            <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none">Descripción</span>
+                                            <div className="flex items-center gap-1 flex-1">
+                                                <div className="relative flex-1 p-0.5 rounded border-2 border-red-500 bg-red-50/20 shadow-sm transition-all focus-within:ring-2 focus-within:ring-red-400">
+                                                    <input
+                                                        type="text"
+                                                        value={itemNameInput}
+                                                        onChange={(e) => setItemNameInput(e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('name')}
+                                                        className="w-full bg-[#fffde6] text-black text-xs font-medium px-2 py-1 outline-none border border-[#b2b2b2] rounded-none focus:bg-white select-text"
+                                                        placeholder="Ej: LAVAMANOS SIENA 79X48"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={() => handleItemSearch('name')}
+                                                    disabled={itemLoading}
+                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0"
+                                                    title="Buscar por Descripción de artículo"
+                                                >
+                                                    <Search size={13} />
+                                                    <span>Buscar</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* COINCIDENCIAS DE BÚSQUEDA */}
+                                        {itemMatches.length > 1 && (
+                                            <div className="ml-[140px] bg-white border border-amber-300 p-1.5 shadow-md max-h-36 overflow-y-auto text-[11px]">
+                                                <span className="font-bold text-amber-800 block mb-1">Coincidencias encontradas en SAP ({itemMatches.length}):</span>
+                                                <div className="space-y-0.5">
+                                                    {itemMatches.map((m, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            onClick={() => handleItemSearch('code', m.itemCode)}
+                                                            className="hover:bg-amber-50 p-1 cursor-pointer rounded flex items-center justify-between border-b border-gray-100 font-sans"
+                                                        >
+                                                            <span className="font-mono font-bold text-blue-900">{m.itemCode}</span>
+                                                            <span className="text-gray-700 truncate max-w-xs">{m.itemName}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+
+
+                                        {/* Lista de precios */}
+                                        <div className="flex items-center">
+                                            <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none">Lista de precios</span>
+                                            <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-48 rounded-none">
+                                                <option>{activeItem.priceList}</option>
+                                            </select>
+                                            <span className="ml-3 text-[11px] text-gray-800 mr-1 select-none">Precio por unidad</span>
+                                            <input
+                                                type="text"
+                                                value={activeItem.price}
+                                                readOnly
+                                                className="bg-white border border-[#b2b2b2] px-2 py-0.5 text-xs font-bold text-black w-36 text-right rounded-none select-text"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* TABS INTERNAS DE DATOS MAESTROS DE ARTÍCULO (SOLO INVENTARIO Y LISTA DE MATERIALES) */}
+                            <div className="mt-1">
+                                <div className="flex border-b border-[#a3a3a3] bg-[#e0ddd5] text-xs font-semibold overflow-x-auto scrollbar-hide">
+                                    {[
+                                        { id: 'inventario', label: 'Datos de inventario' },
+                                        { id: 'lista-materiales', label: 'Lista de Materiales' }
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setItemInnerTab(tab.id as any)}
+                                            className={`px-4 py-1.5 border-t border-l border-r border-[#a3a3a3] -mb-[1px] transition-colors whitespace-nowrap ${
+                                                itemInnerTab === tab.id
+                                                    ? 'bg-[#f3f0ea] border-b-[#f3f0ea] font-bold text-black shadow-sm'
+                                                    : 'bg-[#d6d3cb] text-gray-700 hover:bg-[#e6e3db]'
+                                            }`}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* TAB CONTENT BODY */}
+                                <div className="bg-[#f3f0ea] border-x border-b border-[#a3a3a3] p-2.5 min-h-[320px]">
+                                    
+                                    {/* PESTAÑA 1: DATOS DE INVENTARIO (RÉPLICA CON LAS 21 COLUMNAS EXACTAS DE SAP B1) */}
+                                    {itemInnerTab === 'inventario' && (
+                                        <div className="space-y-2 font-sans select-none text-[11px]">
+                                            
+                                            {/* SECCIÓN SUPERIOR DE CAMPOS CONFIGURATIVOS Y NIVEL DE STOCK */}
+                                            <div className="flex flex-wrap lg:flex-nowrap justify-between gap-6 items-start bg-[#f3f0ea] p-1.5 border-b border-[#c8c5bc]">
+                                                
+                                                {/* IZQUIERDA: MÉTODOS Y UNIDADES DE MEDIDA */}
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center">
+                                                        <span className="w-36 text-gray-800">Fijar ctas de mayor según</span>
+                                                        <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
+                                                            <option>Grupo de artículos</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                        <span className="w-36 text-gray-800">Nombre unid. de medida</span>
+                                                        <input type="text" value={activeItem.inventoryUOM || ''} readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none" />
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                        <span className="w-36 text-gray-800">Peso</span>
+                                                        <input type="text" value="" readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none" />
+                                                    </div>
+                                                    <div className="flex items-center pt-2">
+                                                        <span className="w-36 text-gray-800">Método de valoración</span>
+                                                        <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
+                                                            <option>{activeItem.itemCode ? 'Promedio ponderado' : ''}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* DERECHA: GESTIÓN DE STOCKS Y NIVELES */}
+                                                <div className="space-y-1">
+                                                    <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-gray-800">
+                                                        <input type="checkbox" checked={Boolean(activeItem.itemCode)} readOnly className="w-3.5 h-3.5 text-amber-600 rounded-none" />
+                                                        <span>Gestión de stocks por almacén</span>
+                                                    </label>
+                                                    <div className="pl-5 pt-1 space-y-1">
+                                                        <span className="font-semibold text-gray-700 block border-b border-gray-300 pb-0.5 text-[10.5px]">Nivel de stock</span>
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <span className="text-gray-800">Necesario (UdM de Compras)</span>
+                                                            <input type="text" value="" readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-24 text-right rounded-none" />
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <span className="text-gray-800">Mínimo</span>
+                                                            <input type="text" value="" readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-24 text-right rounded-none" />
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <span className="text-gray-800">Máximo</span>
+                                                            <input type="text" value={activeItem.itemCode ? '22' : ''} readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs font-semibold text-black w-24 text-right rounded-none" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* TABLA DE ALMACENES CON LAS 21 COLUMNAS COMPLETAS DE SAP B1 */}
+                                            <div className="bg-white border border-[#a3a3a3] shadow-inner overflow-x-auto max-h-[350px] overflow-y-auto">
+                                                <table className="w-full border-collapse text-[11px] font-sans table-auto whitespace-nowrap">
+                                                    <thead className="sticky top-0 bg-[#eceae6] border-b border-[#c2c0bb] shadow-sm select-none z-10">
+                                                        <tr className="text-gray-800 font-semibold">
+                                                            <th className="px-1.5 py-1 border-r border-[#c2c0bb] text-center w-8">#</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Código de almacén</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Nombre del almacén</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Bloqueado</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">En stock</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Comprometido</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Pedido</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Disponible</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-right">Stock mínimo</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-right">Stock máximo</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-right">Nivel de stock necesario</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo del artículo</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Cuerpo</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Modulo</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Piso</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Disp Real</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Amortiguador TOC</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-right">MINORDRQTY</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-right">Tiempo Lead</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-right">Reabastecimiento Mínimo</th>
+                                                            <th className="px-2 py-1 text-center">Tiempo de Reabastecimiento</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-[#e0ddd5]">
+                                                        {activeItem.warehouses && activeItem.warehouses.length > 0 ? (
+                                                            activeItem.warehouses.map((wh, idx) => {
+                                                                const disp = wh.available !== undefined ? wh.available : (wh.inStock - wh.committed + wh.ordered);
+                                                                const dispReal = wh.dispReal !== undefined ? wh.dispReal : disp;
+                                                                const isHighlight = wh.warehouseCode === 'PT-02';
+                                                                return (
+                                                                    <tr 
+                                                                        key={idx} 
+                                                                        className={`h-5 hover:bg-[#fff9e6] ${isHighlight ? 'bg-amber-100/60 font-bold' : idx % 2 === 0 ? 'bg-white' : 'bg-[#faf9f5]'}`}
+                                                                    >
+                                                                        <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600">{idx + 1}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] font-mono text-gray-900">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <SapLinkArrow />
+                                                                                <span>{wh.warehouseCode}</span>
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800">{wh.warehouseName || wh.warehouseCode}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center">
+                                                                            <input type="checkbox" checked={wh.locked || false} readOnly className="w-3 h-3 text-amber-600 rounded-none" />
+                                                                        </td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black">{wh.inStock > 0 ? wh.inStock : ''}</td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black">{wh.committed > 0 ? wh.committed : ''}</td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black">{wh.ordered > 0 ? wh.ordered : ''}</td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black font-semibold">{disp !== 0 ? disp : ''}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-600">{wh.minStock && wh.minStock > 0 ? wh.minStock : ''}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-600">{wh.maxStock && wh.maxStock > 0 ? wh.maxStock : ''}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-600">{wh.requiredStock && wh.requiredStock > 0 ? wh.requiredStock : ''}</td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-700">{wh.itemCost && wh.itemCost > 0 ? wh.itemCost.toLocaleString('es-CO', { minimumFractionDigits: 2 }) : ''}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black font-semibold">{dispReal.toFixed(2)}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono">{wh.amortiguadorToc || ''}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono">{wh.minOrderQty && wh.minOrderQty > 0 ? wh.minOrderQty : ''}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono">{wh.leadTime && wh.leadTime > 0 ? wh.leadTime : ''}</td>
+                                                                        <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono">{wh.reabastecimientoMin && wh.reabastecimientoMin > 0 ? wh.reabastecimientoMin : ''}</td>
+                                                                        <td className="px-2 py-0.5 text-center font-mono">{wh.tiempoReabastecimiento || ''}</td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        ) : (
+                                                            <tr>
+                                                                <td colSpan={21} className="py-6 text-center text-gray-500 italic">
+                                                                    No hay almacenes registrados para este artículo.
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                    {/* FILA CONSOLIDADA DE TOTALES DE SAP B1 */}
+                                                    <tfoot className="sticky bottom-0 bg-[#eceae6] border-t-2 border-[#a3a3a3] font-bold font-mono text-[11px] z-10 text-black">
+                                                        <tr>
+                                                            <td className="px-1.5 py-1 border-r border-[#c2c0bb] text-center"></td>
+                                                            <td className="px-2 py-1 border-r border-[#c2c0bb]"></td>
+                                                            <td className="px-2 py-1 border-r border-[#c2c0bb]"></td>
+                                                            <td className="px-2 py-1 border-r border-[#c2c0bb]"></td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses.reduce((acc, curr) => acc + curr.inStock, 0) || activeItem.quantityOnStock}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses.reduce((acc, curr) => acc + curr.committed, 0) || activeItem.quantityOrderedByCustomers}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses.reduce((acc, curr) => acc + curr.ordered, 0) || activeItem.quantityOrderedFromVendors}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">
+                                                                {activeItem.warehouses.reduce((acc, curr) => acc + (curr.available !== undefined ? curr.available : (curr.inStock - curr.committed + curr.ordered)), 0) || (activeItem.quantityOnStock - activeItem.quantityOrderedByCustomers + activeItem.quantityOrderedFromVendors)}
+                                                            </td>
+                                                            <td className="px-2 py-1 border-r border-[#c2c0bb]" colSpan={13}></td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        <div className="flex justify-end pt-1">
+                                                <button disabled className="bg-[#dedbd5] border border-[#a3a3a3] px-3 py-0.5 text-xs text-gray-700 font-medium cursor-not-allowed shadow-xs hover:bg-gray-200">
+                                                    Fijar almacén estándar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* PESTAÑA 2: LISTA DE MATERIALES (RÉPLICA EXACTA DE LA VENTANA 'LISTA DE MATERIALES' DE SAP B1 - IMÁGENES 1 Y 2) */}
+                                    {itemInnerTab === 'lista-materiales' && (
+                                        <div className="bg-[#f3f0ea] border border-[#a3a3a3] shadow-sm font-sans text-[11px] select-none">
+                                            
+                                            {/* TABLA DE COMPONENTES LdM (LAS 16 COLUMNAS IDÉNTICAS A IMÁGENES 1 Y 2 DE SAP B1) */}
+                                            <div className="bg-white border border-[#a3a3a3] shadow-inner overflow-x-auto max-h-[300px] overflow-y-auto">
+                                                <table className="w-full border-collapse text-[11px] font-sans table-auto whitespace-nowrap">
+                                                    <thead className="sticky top-0 bg-[#eceae6] border-b border-[#c2c0bb] shadow-sm select-none z-10">
+                                                        <tr className="text-gray-800 font-semibold">
+                                                            <th className="px-1.5 py-1 border-r border-[#c2c0bb] text-center w-8">#</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Tipo</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Nº</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Descripción</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Cantidad</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Nombre de unidad de medida</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Almacén</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Método emisión</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Lista de precios</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción total</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Precio unitario</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Total</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Comentarios</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Cta.WIP</th>
+                                                            <th className="px-2 py-1 text-center">Secuen...</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-[#e0ddd5]">
+                                                        {activeItem.itemCode ? (
+                                                            BOM_SAMPLE_DATA.map((row, idx) => (
+                                                                <tr key={idx} className="h-5 hover:bg-[#fff9e6]">
+                                                                    <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600">{row.id}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800">{row.tipo}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] font-mono text-gray-900">
+                                                                        <span className="flex items-center gap-1">
+                                                                            <SapLinkArrow />
+                                                                            <span>{row.no}</span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-gray-900 font-medium">{row.descripcion}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono font-bold text-black">{row.cantidad}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800">{row.uom}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] font-mono text-amber-900">
+                                                                        <span className="flex items-center gap-1">
+                                                                            <SapLinkArrow />
+                                                                            <span>{row.almacen}</span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center text-gray-700">{row.metodoEmision}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500">{row.costoEst}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-gray-700">{row.listaPrecios}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500">{row.costoEstTotal}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-semibold">{row.precioUnitario}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-bold">{row.total}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5]"></td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono text-gray-600">{row.ctaWip}</td>
+                                                                    <td className="px-2 py-0.5 text-center"></td>
+                                                                </tr>
+                                                            ))
+                                                        ) : (
+                                                            <tr>
+                                                                <td colSpan={16} className="py-6 text-center text-gray-500 italic font-sans">
+                                                                    No hay componentes registrados. Realiza una búsqueda por número o descripción de artículo.
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                    {/* FILA DE TOTALES CONSOLIDADOS AL PIE DE LA TABLA */}
+                                                    <tfoot className="sticky bottom-0 bg-[#eceae6] border-t-2 border-[#a3a3a3] font-bold font-mono text-[11px] z-10 text-black">
+                                                        <tr>
+                                                            <td colSpan={10} className="px-2 py-1 border-r border-[#c2c0bb] text-right text-gray-600 font-sans">Totales:</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono">{activeItem.itemCode ? '$ 0.00' : ''}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right"></td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono text-emerald-800">{activeItem.itemCode ? '$ 10,723.40' : ''}</td>
+                                                            <td colSpan={3} className="px-2 py-1"></td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+
+                                            {/* PIE DE FORMULARIO: PRECIO DE PRODUCTO Y BOTONES OK/CANCELAR */}
+                                            <div className="p-2 bg-[#f3f0ea] flex items-center justify-between border-t border-[#c8c5bc]">
+                                                <div className="flex items-center gap-2">
+                                                    <button disabled className="bg-[#dedbd5] border border-[#a3a3a3] px-4 py-0.5 text-xs font-bold text-gray-800 cursor-not-allowed shadow-xs hover:bg-gray-200">
+                                                        OK
+                                                    </button>
+                                                    <button disabled className="bg-[#dedbd5] border border-[#a3a3a3] px-3 py-0.5 text-xs text-gray-700 cursor-not-allowed shadow-xs hover:bg-gray-200">
+                                                        Cancelar
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-800 font-semibold">Precio de producto</span>
+                                                    <input type="text" value={activeItem.price || ''} readOnly className="bg-white border border-[#b2b2b2] px-2 py-0.5 text-xs font-mono font-bold text-black w-32 text-right rounded-none" />
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    )}
+
+                                </div>
+                            </div>
+
+                            {/* SAP BOTTOM FOOTER BAR */}
+                            <div className="bg-[#eceae6] border border-[#a3a3a3] px-3 py-1 flex items-center justify-between text-[11px] text-gray-700 mt-1">
+                                <div className="flex items-center gap-4">
+                                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                        Artículo consultado desde SAP B1 Service Layer
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-mono text-gray-500">{currentTime || '2026-07-28'}</span>
+                                    <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </main>
+            ) : null}
         </div>
     )
 }
