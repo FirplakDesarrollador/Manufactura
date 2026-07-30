@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
+import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import Header from '@/components/opt-sistemica/Header';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Clock, User, Target } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export default function AgendamientoPage() {
   const router = useRouter();
 
   // Responsables from admin
-  const [responsablesList, setResponsablesList] = useState<string[]>([]);
+  const [empleadosList, setEmpleadosList] = useState<string[]>([]);
 
   // Form State
   const [showForm, setShowForm] = useState(false);
@@ -56,13 +57,13 @@ export default function AgendamientoPage() {
     if (data) setPlanned(data);
   };
 
-  const fetchResponsables = async () => {
-    const { data } = await supabase
-      .from('responsables')
-      .select('nombre')
+  const fetchEmpleados = async () => {
+    const { data } = await supabaseTalentoHumano
+      .from('empleados')
+      .select('nombreCompleto')
       .eq('activo', true)
-      .order('nombre');
-    if (data) setResponsablesList(data.map((r: any) => r.nombre));
+      .order('nombreCompleto');
+    if (data) setEmpleadosList(data.map((e: any) => e.nombreCompleto));
   };
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function AgendamientoPage() {
         router.push('/login');
       } else {
         setSession(session);
-        Promise.all([fetchData(), fetchResponsables()]).then(() => setLoading(false));
+        Promise.all([fetchData(), fetchEmpleados()]).then(() => setLoading(false));
       }
     });
   }, [router]);
@@ -387,19 +388,34 @@ export default function AgendamientoPage() {
                     <label className="label">Responsable</label>
                     <input 
                       className="input-field" 
-                      list="responsables-list" 
+                      list="empleados-responsable-list" 
                       placeholder="Buscar o seleccionar responsable..." 
                       value={responsable} 
                       onChange={e => setResponsable(e.target.value)} 
                       required 
                     />
-                    <datalist id="responsables-list">
-                      {responsablesList.map(r => (
-                        <option key={r} value={r} />
+                    <datalist id="empleados-responsable-list">
+                      {empleadosList.map(name => (
+                        <option key={name} value={name} />
                       ))}
                     </datalist>
                   </div>
-                  <input type="text" className="input-field" placeholder="Colaborador Observado" value={observado} onChange={e => setObservado(e.target.value)} required />
+                  <div>
+                    <label className="label">Colaborador Observado</label>
+                    <input 
+                      className="input-field" 
+                      list="empleados-observado-list" 
+                      placeholder="Buscar o seleccionar colaborador..." 
+                      value={observado} 
+                      onChange={e => setObservado(e.target.value)} 
+                      required 
+                    />
+                    <datalist id="empleados-observado-list">
+                      {empleadosList.map(name => (
+                        <option key={name} value={name} />
+                      ))}
+                    </datalist>
+                  </div>
                   <select className="input-field" value={modulo} onChange={e => setModulo(e.target.value)}>
                     {MODULOS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
