@@ -645,7 +645,7 @@ export default function ConsultaSAPPage() {
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "FPK - Semaforo");
             XLSX.writeFile(wb, "FPK_Semaforo_DJP.xlsx");
-            toast.success(`Query FPK-Semaforo descargado a Excel (${exportRows.length} registros, 39 columnas)`);
+            toast.success(`Query FPK-Semaforo descargado a Excel (${exportRows.length.toLocaleString('es-CO')} registros, 39 columnas)`);
         } catch (err) {
             console.error(err);
             toast.error("Error al generar el archivo Excel");
@@ -658,7 +658,7 @@ export default function ConsultaSAPPage() {
         const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP' en SAP B1...");
         try {
             await new Promise(resolve => setTimeout(resolve, 800));
-            toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length} registros cargados)`, { id: toastId });
+            toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
         } catch (err) {
             toast.error("Error al actualizar Semáforo desde SAP", { id: toastId });
         } finally {
@@ -2148,7 +2148,7 @@ export default function ConsultaSAPPage() {
                             {/* SAP BOTTOM FOOTER BAR */}
                             <div className="bg-[#eceae6] border border-[#a3a3a3] px-3 py-1 flex items-center justify-between text-[11px] text-gray-700">
                                 <div className="flex items-center gap-4">
-                                    <span>({sortedSemaforoData.length} registros cargados de 39 columnas)</span>
+                                    <span>({sortedSemaforoData.length.toLocaleString('es-CO')} registros cargados de 39 columnas)</span>
                                     <span className="text-gray-400">|</span>
                                     <span className="text-emerald-700 font-semibold flex items-center gap-1">
                                         <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
