@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
+import semaforoData from './semaforo_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2 } from 'lucide-react'
@@ -75,30 +76,7 @@ interface SemaforoItem {
 }
 
 // Datos del Query Manager SAP: FPK - Semaforo - DJP (Proceso Produccion)
-const SEMAFORO_MOCK_DATA: SemaforoItem[] = [
-    { id: 1, originnum: "160954", nroOp: "10072539", sku: "VBAN05-0069-000-0437", descripcion: "MUEBLE BASICO PISO LVM 40X30 CON MANIJAS SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "8.00" },
-    { id: 2, originnum: "160936", nroOp: "2257438", sku: "VCOC04-0018-B2C-0500", descripcion: "LAVAPLATOS KOA 84X56 GRIS NIEBLA BRILLANTE (CAJA INDIVIDUAL)", planta: "MS", familia: "PC", tipoOrden: "STOCK", cantPendiente: "1.00", cantPendItem: "1.00", cantTotal: "1.00" },
-    { id: 3, originnum: "2003500", nroOp: "2257243", sku: "VROP02-0003-000-0300", descripcion: "LAVARROPAS ECO 48X60 NATURAL", planta: "MS", familia: "PA", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "10.00", cantTotal: "13.00" },
-    { id: 4, originnum: "160512", nroOp: "10071978", sku: "VCOC01-0134-000-0321", descripcion: "MUEBLE INFERIOR COCINA OBSI 150X55CM CANTO 2MM BLANCO CARB2/SODER MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "2.00" },
-    { id: 5, originnum: "158421", nroOp: "10070138", sku: "VROP03-0003-000-0100", descripcion: "MUEBLE LVR 60X60 BLANCO CARB2-PUR", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "45.00" },
-    { id: 6, originnum: "161110", nroOp: "2257748", sku: "VROP01-0002-000-0100", descripcion: "LAVARROPAS AQUA 48X60 BRILLANTE CON FLAUTA BLANCO", planta: "MS", familia: "PC", tipoOrden: "STOCK", cantPendiente: "3.00", cantPendItem: "3.00", cantTotal: "3.00" },
-    { id: 7, originnum: "2003470", nroOp: "2255974", sku: "VBAN01-0039-000-0100", descripcion: "LAVAMANOS SIENA 79X48 BRILLANTE BLANCO", planta: "MS", familia: "PC", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "9.00" },
-    { id: 8, originnum: "2003474", nroOp: "10071701", sku: "VROP03-0033-000-1379", descripcion: "MUEBLE LVR 40X35 LOTO LISO CARB2", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "11.00" },
-    { id: 9, originnum: "2003496", nroOp: "20005990", sku: "VCOC08-3015-000-1342", descripcion: "TABLERO COMPUESTO - PN24 3/436", planta: "CEFI", familia: "PFZ-CEMA", tipoOrden: "STANDARD", cantPendiente: "17.00", cantPendItem: "17.00", cantTotal: "17.00" },
-    { id: 10, originnum: "2003496", nroOp: "20005989", sku: "VCOC08-3014-000-1342", descripcion: "TABLERO COMPUESTO - PN14 3/436", planta: "CEFI", familia: "PFZ-CEMA", tipoOrden: "STANDARD", cantPendiente: "14.00", cantPendItem: "14.00", cantTotal: "14.00" },
-    { id: 11, originnum: "2003496", nroOp: "20005966", sku: "VCOC08-3110-000-1358", descripcion: "TABLERO COMPUESTO - WSM152514-18MM", planta: "CEFI", familia: "PFZ-CEMA", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "8.00" },
-    { id: 12, originnum: "160654", nroOp: "10072191", sku: "VCOC01-0138-000-0322", descripcion: "MUEBLE SUPERIOR COCINA AGATA 180X60CM CANTO 2MM BLANCO CARB2/GRACIA SIKUANI", planta: "MBL", familia: "MBL", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "9.00" },
-    { id: 13, originnum: "160854", nroOp: "2257340", sku: "VHPT03-0003-000-0100", descripcion: "HIDROMASAJE NORUEGA ISLA 156 BLANCO-C2-KT-CP-PULSADOR", planta: "FV", familia: "FVH", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "5.00", cantTotal: "1.00" },
-    { id: 14, originnum: "2003486", nroOp: "20005869", sku: "VCOC08-3239-000-0408", descripcion: "HRJ CC249622 1/2 TK4 1/2 3S-R + DFE - C601 MBL CLOSET 1 PUERTA 3 ENTREPAÑOS BLANCO CARB2", planta: "CEFI", familia: "MBL CEFI", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "1.00" },
-    { id: 15, originnum: "160501", nroOp: "10072027", sku: "VBAN05-0128-000-0442", descripcion: "MUEBLE POLOCK ELEVADO LVM 48X38 GRACIA/SIKUANI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "2.00" },
-    { id: 16, originnum: "160887", nroOp: "10072513", sku: "VBAN05-0137-000-0437", descripcion: "MUEBLE ELEVADO LVM 44.5X43.5 SIN MANIJAS SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "1.00" },
-    { id: 17, originnum: "159726", nroOp: "10071135", sku: "VBAN05-0137-000-0437", descripcion: "MUEBLE ELEVADO LVM 44.5X43.5 SIN MANIJAS SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "1.00" },
-    { id: 18, originnum: "160704", nroOp: "10072284", sku: "VBAN05-0133-000-0437", descripcion: "MUEBLE VAN GOGH ELEVADO 63X38 SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "2.00" },
-    { id: 19, originnum: "160418", nroOp: "2256648", sku: "VBAN01-0056-000-0100", descripcion: "LAVAMANOS OSLO 48X38 BRILLANTE BLANCO", planta: "MS", familia: "PC", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "15.00" },
-    { id: 20, originnum: "160700", nroOp: "10072280", sku: "VBAN05-0072-000-0439", descripcion: "MUEBLE RAYO 48X38 MITTE/TAMBO", planta: "MBL", familia: "MBL", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "13.00" },
-    { id: 21, originnum: "160026", nroOp: "10071461", sku: "VBAN05-0125-000-0437", descripcion: "MUEBLE DA VINCI PISO LVM 48X43 SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "4.00" },
-    { id: 22, originnum: "159915", nroOp: "10071365", sku: "VBAN05-0127-000-0439", descripcion: "MUEBLE MACAO LIFE LVM 48X43 CANTO 2MM FULL EXTENSION MITTE/TAMBO", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "5.00" }
-];
+const SEMAFORO_MOCK_DATA: SemaforoItem[] = semaforoData as SemaforoItem[];
 
 interface SapItemWarehouse {
     warehouseCode: string;
@@ -673,6 +651,17 @@ export default function ConsultaSAPPage() {
     };
 
     // Componente visual para la línea divisoria vertical redimensionable
+        const renderColorBadge = (val: string) => {
+        if (!val) return <span className="text-gray-400 font-normal">-</span>;
+        const v = val.toUpperCase().trim();
+        if (v === 'CYAN') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-cyan-100 text-cyan-900 border border-cyan-300">CYAN</span>;
+        if (v === 'GREEN') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-900 border border-emerald-300">GREEN</span>;
+        if (v === 'YELLOW') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-900 border border-amber-300">YELLOW</span>;
+        if (v === 'RED') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-900 border border-red-300">RED</span>;
+        if (v === 'BLACK') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-gray-900 text-white">BLACK</span>;
+        return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-800 border border-gray-300">{val}</span>;
+    };
+
     const ResizerHandle = ({ colKey, onResize }: { colKey: string; onResize: (colKey: string, e: React.MouseEvent) => void }) => (
         <div
             onMouseDown={(e) => onResize(colKey, e)}
@@ -1626,6 +1615,16 @@ export default function ConsultaSAPPage() {
                             
                             <div className="flex items-center gap-2">
                                 <button
+                                    onClick={handleUpdateSemaforo}
+                                    disabled={isExecuting}
+                                    className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#233140] text-white font-bold px-3 py-1 rounded text-xs transition-all shadow-sm cursor-pointer active:scale-95"
+                                    title="Consultar y actualizar la consulta FPK - Semaforo - DJP desde SAP"
+                                >
+                                    <RefreshCw size={14} className={isExecuting ? "animate-spin" : ""} />
+                                    <span>Actualizar Semáforo</span>
+                                </button>
+
+                                <button
                                     onClick={handleExportExcel}
                                     className="flex items-center gap-1.5 bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-3 py-1 rounded text-xs transition-colors shadow-sm cursor-pointer"
                                     title="Exportar consulta a Excel"
@@ -1642,7 +1641,7 @@ export default function ConsultaSAPPage() {
                         {/* QUERY MANAGER BODY */}
                         <div className="p-3 bg-[#f3f0ea] flex flex-col gap-3">
                             
-                            {/* SQL QUERY BOX (MOCK EXEC STATEMENT FROM IMAGE 4) */}
+                            {/* SQL QUERY BOX (EXEC STATEMENT FROM SAP QUERY MANAGER) */}
                             <div className="bg-white border border-[#b2b2b2] p-2 flex flex-col gap-1 shadow-inner">
                                 <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex justify-between items-center">
                                     <span>Sentencia SQL — Query Manager SAP</span>
@@ -1662,8 +1661,8 @@ export default function ConsultaSAPPage() {
                                             type="text"
                                             value={semaforoFilter}
                                             onChange={(e) => setSemaforoFilter(e.target.value)}
-                                            placeholder="SKU, N° OP, Planta, Artículo..."
-                                            className="bg-white border border-[#b2b2b2] px-2 py-1 text-xs text-black w-64 outline-none focus:border-[#324354]"
+                                            placeholder="SKU, N° OP, Planta, Artículo, Cliente..."
+                                            className="bg-white border border-[#b2b2b2] px-2 py-1 text-xs text-black w-72 outline-none focus:border-[#324354]"
                                         />
                                         {semaforoFilter && (
                                             <button
@@ -1678,12 +1677,12 @@ export default function ConsultaSAPPage() {
 
                                 <div className="flex items-center gap-2">
                                     <button
-                                        onClick={handleExecuteQuery}
+                                        onClick={handleUpdateSemaforo}
                                         disabled={isExecuting}
-                                        className="bg-[#e1e1e1] hover:bg-[#d0d0d0] border border-gray-400 px-3 py-1 font-semibold text-xs text-black cursor-pointer flex items-center gap-1 active:bg-[#c5c5c5]"
+                                        className="bg-[#324354] hover:bg-[#233140] text-white border border-[#1b2633] px-3.5 py-1 font-bold text-xs cursor-pointer flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
                                     >
                                         <RefreshCw size={13} className={isExecuting ? "animate-spin" : ""} />
-                                        <span>Ejecutar</span>
+                                        <span>Actualizar Semáforo</span>
                                     </button>
 
                                     <button
@@ -1704,131 +1703,330 @@ export default function ConsultaSAPPage() {
                                 </div>
                             </div>
 
-                            {/* RESULTS TABLE WITH SORTABLE & RESIZABLE HEADERS (SAP STYLE) */}
-                            <div className="border border-[#a3a3a3] bg-white overflow-x-auto max-h-[550px] shadow-sm select-text">
+                            {/* RESULTS TABLE WITH ALL 39 COLUMNS */}
+                            <div className="border border-[#a3a3a3] bg-white overflow-x-auto max-h-[600px] shadow-sm select-text">
                                 <table className="border-collapse text-xs font-sans text-left table-fixed w-max">
                                     <thead className="sticky top-0 bg-[#eceae6] border-b border-[#a3a3a3] z-10 shadow-sm select-none">
                                         <tr className="text-gray-700 font-semibold">
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.id}px` }}
-                                                onClick={() => handleSemaforoSort('id')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 1. # */}
+                                            <th style={{ width: `${semaforoColWidths.id}px` }} onClick={() => handleSemaforoSort('id')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-center">
                                                     <span>#</span>
                                                     {renderSortIcon('id', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="id" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.originnum}px` }}
-                                                onClick={() => handleSemaforoSort('originnum')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 2. Originnum */}
+                                            <th style={{ width: `${semaforoColWidths.originnum}px` }} onClick={() => handleSemaforoSort('originnum')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-start overflow-hidden">
                                                     <span className="truncate">Originnum</span>
                                                     {renderSortIcon('originnum', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="originnum" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.nroOp}px` }}
-                                                onClick={() => handleSemaforoSort('nroOp')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 3. Nro OP */}
+                                            <th style={{ width: `${semaforoColWidths.nroOp}px` }} onClick={() => handleSemaforoSort('nroOp')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-start overflow-hidden">
                                                     <span className="truncate">Nro OP</span>
                                                     {renderSortIcon('nroOp', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="nroOp" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.sku}px` }}
-                                                onClick={() => handleSemaforoSort('sku')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 4. SKU */}
+                                            <th style={{ width: `${semaforoColWidths.sku}px` }} onClick={() => handleSemaforoSort('sku')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-start overflow-hidden">
                                                     <span className="truncate">SKU</span>
                                                     {renderSortIcon('sku', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="sku" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.descripcion}px` }}
-                                                onClick={() => handleSemaforoSort('descripcion')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 5. Descripción Artículo */}
+                                            <th style={{ width: `${semaforoColWidths.descripcion}px` }} onClick={() => handleSemaforoSort('descripcion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-start overflow-hidden">
                                                     <span className="truncate">Descripción Artículo</span>
                                                     {renderSortIcon('descripcion', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="descripcion" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.planta}px` }}
-                                                onClick={() => handleSemaforoSort('planta')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 6. Planta */}
+                                            <th style={{ width: `${semaforoColWidths.planta}px` }} onClick={() => handleSemaforoSort('planta')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-center overflow-hidden">
                                                     <span className="truncate">Planta</span>
                                                     {renderSortIcon('planta', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="planta" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.familia}px` }}
-                                                onClick={() => handleSemaforoSort('familia')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 7. Familia */}
+                                            <th style={{ width: `${semaforoColWidths.familia}px` }} onClick={() => handleSemaforoSort('familia')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-center overflow-hidden">
                                                     <span className="truncate">Familia</span>
                                                     {renderSortIcon('familia', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="familia" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.tipoOrden}px` }}
-                                                onClick={() => handleSemaforoSort('tipoOrden')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 8. Tipo Orden */}
+                                            <th style={{ width: `${semaforoColWidths.tipoOrden}px` }} onClick={() => handleSemaforoSort('tipoOrden')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-start overflow-hidden">
                                                     <span className="truncate">Tipo Orden</span>
                                                     {renderSortIcon('tipoOrden', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="tipoOrden" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.cantPendiente}px` }}
-                                                onClick={() => handleSemaforoSort('cantPendiente')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 9. Cant. Pendiente */}
+                                            <th style={{ width: `${semaforoColWidths.cantPendiente}px` }} onClick={() => handleSemaforoSort('cantPendiente')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-end overflow-hidden">
                                                     <span className="truncate">Cant. Pendiente</span>
                                                     {renderSortIcon('cantPendiente', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="cantPendiente" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.cantPendItem}px` }}
-                                                onClick={() => handleSemaforoSort('cantPendItem')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 10. Cant. Pend. Item */}
+                                            <th style={{ width: `${semaforoColWidths.cantPendItem}px` }} onClick={() => handleSemaforoSort('cantPendItem')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-end overflow-hidden">
                                                     <span className="truncate">Cant. Pend. Item</span>
                                                     {renderSortIcon('cantPendItem', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="cantPendItem" onResize={handleSemaforoResizeStart} />
                                             </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.cantTotal}px` }}
-                                                onClick={() => handleSemaforoSort('cantTotal')}
-                                                className="relative px-2 py-1.5 font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]"
-                                            >
+                                            {/* 11. Cantidad total */}
+                                            <th style={{ width: `${semaforoColWidths.cantTotal}px` }} onClick={() => handleSemaforoSort('cantTotal')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
                                                 <div className="flex items-center justify-end overflow-hidden">
                                                     <span className="truncate">Cantidad total</span>
                                                     {renderSortIcon('cantTotal', semaforoSortCol, semaforoSortDir)}
                                                 </div>
                                                 <ResizerHandle colKey="cantTotal" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 12. Disponible PT01 */}
+                                            <th style={{ width: `${semaforoColWidths.disponiblePt01}px` }} onClick={() => handleSemaforoSort('disponiblePt01')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Disponible PT01</span>
+                                                    {renderSortIcon('disponiblePt01', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="disponiblePt01" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 13. Fecha Creación OP */}
+                                            <th style={{ width: `${semaforoColWidths.fechaCreacionOp}px` }} onClick={() => handleSemaforoSort('fechaCreacionOp')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Creación OP</span>
+                                                    {renderSortIcon('fechaCreacionOp', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaCreacionOp" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 14. Estado */}
+                                            <th style={{ width: `${semaforoColWidths.estado}px` }} onClick={() => handleSemaforoSort('estado')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Estado</span>
+                                                    {renderSortIcon('estado', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="estado" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 15. Fecha Recomendada Liberación */}
+                                            <th style={{ width: `${semaforoColWidths.fechaRecomendadaLiberacion}px` }} onClick={() => handleSemaforoSort('fechaRecomendadaLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Recom. Lib.</span>
+                                                    {renderSortIcon('fechaRecomendadaLiberacion', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaRecomendadaLiberacion" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 16. Fecha Real Liberación */}
+                                            <th style={{ width: `${semaforoColWidths.fechaRealLiberacion}px` }} onClick={() => handleSemaforoSort('fechaRealLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Real Lib.</span>
+                                                    {renderSortIcon('fechaRealLiberacion', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaRealLiberacion" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 17. Consumo Para Liberar */}
+                                            <th style={{ width: `${semaforoColWidths.consumoParaLiberar}px` }} onClick={() => handleSemaforoSort('consumoParaLiberar')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Consumo Para Lib.</span>
+                                                    {renderSortIcon('consumoParaLiberar', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="consumoParaLiberar" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 18. Color Liberación Txt */}
+                                            <th style={{ width: `${semaforoColWidths.colorLiberacionTxt}px` }} onClick={() => handleSemaforoSort('colorLiberacionTxt')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Color Lib. Txt</span>
+                                                    {renderSortIcon('colorLiberacionTxt', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="colorLiberacionTxt" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 19. Color Liberación */}
+                                            <th style={{ width: `${semaforoColWidths.colorLiberacion}px` }} onClick={() => handleSemaforoSort('colorLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Color Lib.</span>
+                                                    {renderSortIcon('colorLiberacion', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="colorLiberacion" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 20. Cumplimiento Liberación */}
+                                            <th style={{ width: `${semaforoColWidths.cumplimientoLiberacion}px` }} onClick={() => handleSemaforoSort('cumplimientoLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Cumplimiento Lib.</span>
+                                                    {renderSortIcon('cumplimientoLiberacion', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="cumplimientoLiberacion" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 21. Fecha Entrega Lote */}
+                                            <th style={{ width: `${semaforoColWidths.fechaEntregaLote}px` }} onClick={() => handleSemaforoSort('fechaEntregaLote')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Entrega Lote</span>
+                                                    {renderSortIcon('fechaEntregaLote', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaEntregaLote" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 22. Fecha Recomendada de Entrega */}
+                                            <th style={{ width: `${semaforoColWidths.fechaRecomendadaEntrega}px` }} onClick={() => handleSemaforoSort('fechaRecomendadaEntrega')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Recom. Entrega</span>
+                                                    {renderSortIcon('fechaRecomendadaEntrega', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaRecomendadaEntrega" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 23. Fecha Cierre OP */}
+                                            <th style={{ width: `${semaforoColWidths.fechaCierreOp}px` }} onClick={() => handleSemaforoSort('fechaCierreOp')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Cierre OP</span>
+                                                    {renderSortIcon('fechaCierreOp', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaCierreOp" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 24. Fecha Ideal Entrega Producción */}
+                                            <th style={{ width: `${semaforoColWidths.fechaIdealEntregaProduccion}px` }} onClick={() => handleSemaforoSort('fechaIdealEntregaProduccion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Ideal Ent. Prod.</span>
+                                                    {renderSortIcon('fechaIdealEntregaProduccion', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaIdealEntregaProduccion" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 25. Consumo Amortiguador Planta */}
+                                            <th style={{ width: `${semaforoColWidths.consumoAmortiguadorPlanta}px` }} onClick={() => handleSemaforoSort('consumoAmortiguadorPlanta')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Consumo Amort. Planta</span>
+                                                    {renderSortIcon('consumoAmortiguadorPlanta', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="consumoAmortiguadorPlanta" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 26. Color Producción Txt */}
+                                            <th style={{ width: `${semaforoColWidths.colorProduccionTxt}px` }} onClick={() => handleSemaforoSort('colorProduccionTxt')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Color Prod. Txt</span>
+                                                    {renderSortIcon('colorProduccionTxt', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="colorProduccionTxt" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 27. Color Producción */}
+                                            <th style={{ width: `${semaforoColWidths.colorProduccion}px` }} onClick={() => handleSemaforoSort('colorProduccion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Color Producción</span>
+                                                    {renderSortIcon('colorProduccion', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="colorProduccion" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 28. Cumplimiento Planta */}
+                                            <th style={{ width: `${semaforoColWidths.cumplimientoPlanta}px` }} onClick={() => handleSemaforoSort('cumplimientoPlanta')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Cumplimiento Planta</span>
+                                                    {renderSortIcon('cumplimientoPlanta', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="cumplimientoPlanta" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 29. Dias Retrazo Firplak */}
+                                            <th style={{ width: `${semaforoColWidths.diasRetrazoFirplak}px` }} onClick={() => handleSemaforoSort('diasRetrazoFirplak')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Días Retraso Firplak</span>
+                                                    {renderSortIcon('diasRetrazoFirplak', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="diasRetrazoFirplak" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 30. Color Firplak Txt */}
+                                            <th style={{ width: `${semaforoColWidths.colorFirplakTxt}px` }} onClick={() => handleSemaforoSort('colorFirplakTxt')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Color Firplak Txt</span>
+                                                    {renderSortIcon('colorFirplakTxt', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="colorFirplakTxt" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 31. Color Firplak */}
+                                            <th style={{ width: `${semaforoColWidths.colorFirplak}px` }} onClick={() => handleSemaforoSort('colorFirplak')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Color Firplak</span>
+                                                    {renderSortIcon('colorFirplak', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="colorFirplak" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 32. Cumplimiento Firplak */}
+                                            <th style={{ width: `${semaforoColWidths.cumplimientoFirplak}px` }} onClick={() => handleSemaforoSort('cumplimientoFirplak')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Cumplimiento Firplak</span>
+                                                    {renderSortIcon('cumplimientoFirplak', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="cumplimientoFirplak" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 33. Fecha Prometida Entrega Item */}
+                                            <th style={{ width: `${semaforoColWidths.fechaPrometidaEntregaItem}px` }} onClick={() => handleSemaforoSort('fechaPrometidaEntregaItem')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Prometida Ent.</span>
+                                                    {renderSortIcon('fechaPrometidaEntregaItem', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaPrometidaEntregaItem" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 34. Destino */}
+                                            <th style={{ width: `${semaforoColWidths.destino}px` }} onClick={() => handleSemaforoSort('destino')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Destino</span>
+                                                    {renderSortIcon('destino', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="destino" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 35. NumLote */}
+                                            <th style={{ width: `${semaforoColWidths.numLote}px` }} onClick={() => handleSemaforoSort('numLote')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-start overflow-hidden">
+                                                    <span className="truncate">NumLote</span>
+                                                    {renderSortIcon('numLote', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="numLote" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 36. Molde */}
+                                            <th style={{ width: `${semaforoColWidths.molde}px` }} onClick={() => handleSemaforoSort('molde')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-start overflow-hidden">
+                                                    <span className="truncate">Molde</span>
+                                                    {renderSortIcon('molde', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="molde" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 37. Capacidad Molde */}
+                                            <th style={{ width: `${semaforoColWidths.capacidadMolde}px` }} onClick={() => handleSemaforoSort('capacidadMolde')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Capacidad Molde</span>
+                                                    {renderSortIcon('capacidadMolde', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="capacidadMolde" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 38. Fecha Carga Molde */}
+                                            <th style={{ width: `${semaforoColWidths.fechaCargaMolde}px` }} onClick={() => handleSemaforoSort('fechaCargaMolde')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-center overflow-hidden">
+                                                    <span className="truncate">Fecha Carga Molde</span>
+                                                    {renderSortIcon('fechaCargaMolde', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="fechaCargaMolde" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 39. Amortiguador */}
+                                            <th style={{ width: `${semaforoColWidths.amortiguador}px` }} onClick={() => handleSemaforoSort('amortiguador')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-end overflow-hidden">
+                                                    <span className="truncate">Amortiguador</span>
+                                                    {renderSortIcon('amortiguador', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="amortiguador" onResize={handleSemaforoResizeStart} />
+                                            </th>
+                                            {/* 40. Cliente */}
+                                            <th style={{ width: `${semaforoColWidths.cliente}px` }} onClick={() => handleSemaforoSort('cliente')} className="relative px-2 py-1.5 font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
+                                                <div className="flex items-center justify-start overflow-hidden">
+                                                    <span className="truncate">Cliente</span>
+                                                    {renderSortIcon('cliente', semaforoSortCol, semaforoSortDir)}
+                                                </div>
+                                                <ResizerHandle colKey="cliente" onResize={handleSemaforoResizeStart} />
                                             </th>
                                         </tr>
                                     </thead>
@@ -1857,12 +2055,49 @@ export default function ConsultaSAPPage() {
                                                     </td>
                                                     <td style={{ width: `${semaforoColWidths.cantPendiente}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono font-semibold text-slate-800 overflow-hidden truncate">{row.cantPendiente}</td>
                                                     <td style={{ width: `${semaforoColWidths.cantPendItem}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.cantPendItem}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cantTotal}px` }} className="px-2 py-1.5 text-right font-mono font-bold text-slate-900 overflow-hidden truncate">{row.cantTotal}</td>
+                                                    <td style={{ width: `${semaforoColWidths.cantTotal}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono font-bold text-slate-900 overflow-hidden truncate">{row.cantTotal}</td>
+                                                    
+                                                    {/* 12-39 Additional Columns */}
+                                                    <td style={{ width: `${semaforoColWidths.disponiblePt01}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono overflow-hidden truncate">{row.disponiblePt01}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaCreacionOp}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaCreacionOp}</td>
+                                                    <td style={{ width: `${semaforoColWidths.estado}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-semibold overflow-hidden truncate">
+                                                        <span className={`inline-block px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                                                            row.estado === 'Cerrado' ? 'bg-slate-200 text-slate-800' : row.estado === 'Liberado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                                        }`}>
+                                                            {row.estado}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaRecomendadaLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaRecomendadaLiberacion}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaRealLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaRealLiberacion || '-'}</td>
+                                                    <td style={{ width: `${semaforoColWidths.consumoParaLiberar}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono font-medium text-slate-800 overflow-hidden truncate">{row.consumoParaLiberar}</td>
+                                                    <td style={{ width: `${semaforoColWidths.colorLiberacionTxt}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center overflow-hidden truncate">{renderColorBadge(row.colorLiberacionTxt)}</td>
+                                                    <td style={{ width: `${semaforoColWidths.colorLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.colorLiberacion}</td>
+                                                    <td style={{ width: `${semaforoColWidths.cumplimientoLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-700 overflow-hidden truncate">{row.cumplimientoLiberacion}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaEntregaLote}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaEntregaLote}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaRecomendadaEntrega}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaRecomendadaEntrega}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaCierreOp}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaCierreOp || '-'}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaIdealEntregaProduccion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaIdealEntregaProduccion || '-'}</td>
+                                                    <td style={{ width: `${semaforoColWidths.consumoAmortiguadorPlanta}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-800 overflow-hidden truncate">{row.consumoAmortiguadorPlanta}</td>
+                                                    <td style={{ width: `${semaforoColWidths.colorProduccionTxt}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center overflow-hidden truncate">{renderColorBadge(row.colorProduccionTxt)}</td>
+                                                    <td style={{ width: `${semaforoColWidths.colorProduccion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.colorProduccion}</td>
+                                                    <td style={{ width: `${semaforoColWidths.cumplimientoPlanta}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-700 overflow-hidden truncate">{row.cumplimientoPlanta}</td>
+                                                    <td style={{ width: `${semaforoColWidths.diasRetrazoFirplak}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-800 overflow-hidden truncate">{row.diasRetrazoFirplak}</td>
+                                                    <td style={{ width: `${semaforoColWidths.colorFirplakTxt}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center overflow-hidden truncate">{renderColorBadge(row.colorFirplakTxt)}</td>
+                                                    <td style={{ width: `${semaforoColWidths.colorFirplak}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.colorFirplak}</td>
+                                                    <td style={{ width: `${semaforoColWidths.cumplimientoFirplak}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-700 overflow-hidden truncate">{row.cumplimientoFirplak}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaPrometidaEntregaItem}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaPrometidaEntregaItem}</td>
+                                                    <td style={{ width: `${semaforoColWidths.destino}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono font-bold text-slate-800 overflow-hidden truncate">{row.destino}</td>
+                                                    <td style={{ width: `${semaforoColWidths.numLote}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono text-slate-700 overflow-hidden truncate">{row.numLote}</td>
+                                                    <td style={{ width: `${semaforoColWidths.molde}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-medium text-slate-800 overflow-hidden truncate" title={row.molde}>{row.molde}</td>
+                                                    <td style={{ width: `${semaforoColWidths.capacidadMolde}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.capacidadMolde || '-'}</td>
+                                                    <td style={{ width: `${semaforoColWidths.fechaCargaMolde}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaCargaMolde}</td>
+                                                    <td style={{ width: `${semaforoColWidths.amortiguador}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-800 overflow-hidden truncate">{row.amortiguador}</td>
+                                                    <td style={{ width: `${semaforoColWidths.cliente}px` }} className="px-2 py-1.5 font-medium text-slate-900 overflow-hidden truncate" title={row.cliente}>{row.cliente}</td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={11} className="py-8 text-center text-gray-500 italic bg-white">
+                                                <td colSpan={40} className="py-8 text-center text-gray-500 italic bg-white">
                                                     No se encontraron registros que coincidan con la búsqueda.
                                                 </td>
                                             </tr>
@@ -1874,23 +2109,22 @@ export default function ConsultaSAPPage() {
                             {/* SAP BOTTOM FOOTER BAR */}
                             <div className="bg-[#eceae6] border border-[#a3a3a3] px-3 py-1 flex items-center justify-between text-[11px] text-gray-700">
                                 <div className="flex items-center gap-4">
-                                    <span>({sortedSemaforoData.length} registros cargados)</span>
+                                    <span>({sortedSemaforoData.length} registros cargados de 39 columnas)</span>
                                     <span className="text-gray-400">|</span>
                                     <span className="text-emerald-700 font-semibold flex items-center gap-1">
                                         <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                                        Operación finalizada con éxito [Mensaje 200-48]
+                                        Consulta EXEC [Planos_Symphony].[dbo].[SEMAFORO] ejecutada con éxito [200 OK]
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="font-mono text-gray-500">27/07/2026</span>
+                                    <span className="font-mono text-gray-500">{currentTime || '29/07/2026'}</span>
                                     <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
                                 </div>
                             </div>
 
                         </div>
                     </div>
-                </main>
-            ) : subHeaderTab === 'consulta-producto' ? (
+                </main>) : subHeaderTab === 'consulta-producto' ? (
                 /* TAB 3: CONSULTA POR PRODUCTO (DATOS MAESTROS DE ARTÍCULO SAP) */
                 <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
                     {/* SAP CLIENT WINDOW REPLICA CONTAINER */}
