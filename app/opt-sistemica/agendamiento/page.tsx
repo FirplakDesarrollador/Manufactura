@@ -102,7 +102,7 @@ export default function AgendamientoPage() {
       setSuccessEvent({ fecha, hora, modulo, responsable, observado });
       fetchData();
     } else {
-      setError('Error al guardar la programación.');
+      setError(insertError.message || 'Error al guardar la programación.');
     }
     setSaving(false);
   };
