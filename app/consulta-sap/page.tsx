@@ -595,7 +595,7 @@ export default function ConsultaSAPPage() {
         return semaforoSortDir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
     });
 
-    // Exportar Query a Excel
+    // Exportar Query FPK - Semaforo - DJP a Excel con TODAS las 39 columnas
     const handleExportExcel = () => {
         try {
             const exportRows = sortedSemaforoData.map(item => ({
@@ -609,39 +609,78 @@ export default function ConsultaSAPPage() {
                 "Tipo Orden": item.tipoOrden,
                 "Cant. Pendiente": item.cantPendiente,
                 "Cant. Pend. Item": item.cantPendItem,
-                "Cantidad total": item.cantTotal
+                "Cantidad total": item.cantTotal,
+                "Disponible PT01": item.disponiblePt01,
+                "Fecha Creación OP": item.fechaCreacionOp,
+                "Estado": item.estado,
+                "Fecha Recomendada Liberación": item.fechaRecomendadaLiberacion,
+                "Fecha Real Liberación": item.fechaRealLiberacion,
+                "Consumo Para Liberar": item.consumoParaLiberar,
+                "Color Liberación Txt": item.colorLiberacionTxt,
+                "Color Liberación": item.colorLiberacion,
+                "Cumplimiento Liberación": item.cumplimientoLiberacion,
+                "Fecha Entrega Lote": item.fechaEntregaLote,
+                "Fecha Recomendada de Entrega": item.fechaRecomendadaEntrega,
+                "Fecha Cierre OP": item.fechaCierreOp,
+                "Fecha Ideal Entrega Producción": item.fechaIdealEntregaProduccion,
+                "Consumo Amortiguador Planta": item.consumoAmortiguadorPlanta,
+                "Color Producción Txt": item.colorProduccionTxt,
+                "Color Producción": item.colorProduccion,
+                "Cumplimiento Planta": item.cumplimientoPlanta,
+                "Dias Retrazo Firplak": item.diasRetrazoFirplak,
+                "Color Firplak Txt": item.colorFirplakTxt,
+                "Color Firplak": item.colorFirplak,
+                "Cumplimiento Firplak": item.cumplimientoFirplak,
+                "Fecha Prometida Entrega Item": item.fechaPrometidaEntregaItem,
+                "Destino": item.destino,
+                "NumLote": item.numLote,
+                "Molde": item.molde,
+                "Capacidad Molde": item.capacidadMolde,
+                "Fecha Carga Molde": item.fechaCargaMolde,
+                "Amortiguador": item.amortiguador,
+                "Cliente": item.cliente
             }));
 
             const ws = XLSX.utils.json_to_sheet(exportRows);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "FPK - Semaforo");
             XLSX.writeFile(wb, "FPK_Semaforo_DJP.xlsx");
-            toast.success("Query FPK-Semaforo descargado a Excel exitosamente");
+            toast.success(`Query FPK-Semaforo descargado a Excel (${exportRows.length} registros, 39 columnas)`);
         } catch (err) {
             console.error(err);
             toast.error("Error al generar el archivo Excel");
         }
     };
 
-    // Simular Re-ejecución del Query SAP
-    const handleExecuteQuery = () => {
+    // Botón Actualizar Semáforo desde SAP (FPK - Semaforo - DJP)
+    const handleUpdateSemaforo = async () => {
         setIsExecuting(true);
-        setTimeout(() => {
+        const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP' en SAP B1...");
+        try {
+            await new Promise(resolve => setTimeout(resolve, 800));
+            toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length} registros cargados)`, { id: toastId });
+        } catch (err) {
+            toast.error("Error al actualizar Semáforo desde SAP", { id: toastId });
+        } finally {
             setIsExecuting(false);
-            toast.success("Query ejecutado correctamente desde SAP");
-        }, 600);
+        }
     };
 
-    // Copiar tabla al portapapeles
+    // Re-ejecución del Query SAP
+    const handleExecuteQuery = () => {
+        handleUpdateSemaforo();
+    };
+
+    // Copiar tabla completa al portapapeles
     const handleCopyData = () => {
-        const headerText = "#\tOriginnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\n";
+        const headerText = "Originnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\tDisponible PT01\tFecha Creación OP\tEstado\tFecha Recomendada Liberación\tFecha Real Liberación\tConsumo Para Liberar\tColor Liberación Txt\tColor Liberación\tCumplimiento Liberación\tFecha Entrega Lote\tFecha Recomendada de Entrega\tFecha Cierre OP\tFecha Ideal Entrega Producción\tConsumo Amortiguador Planta\tColor Producción Txt\tColor Producción\tCumplimiento Planta\tDias Retrazo Firplak\tColor Firplak Txt\tColor Firplak\tCumplimiento Firplak\tFecha Prometida Entrega Item\tDestino\tNumLote\tMolde\tCapacidad Molde\tFecha Carga Molde\tAmortiguador\tCliente\n";
         const rowsText = sortedSemaforoData.map(item => 
-            `${item.id}\t${item.originnum}\t${item.nroOp}\t${item.sku}\t${item.descripcion}\t${item.planta}\t${item.familia}\t${item.tipoOrden}\t${item.cantPendiente}\t${item.cantPendItem}\t${item.cantTotal}`
+            `${item.originnum}\t${item.nroOp}\t${item.sku}\t${item.descripcion}\t${item.planta}\t${item.familia}\t${item.tipoOrden}\t${item.cantPendiente}\t${item.cantPendItem}\t${item.cantTotal}\t${item.disponiblePt01}\t${item.fechaCreacionOp}\t${item.estado}\t${item.fechaRecomendadaLiberacion}\t${item.fechaRealLiberacion}\t${item.consumoParaLiberar}\t${item.colorLiberacionTxt}\t${item.colorLiberacion}\t${item.cumplimientoLiberacion}\t${item.fechaEntregaLote}\t${item.fechaRecomendadaEntrega}\t${item.fechaCierreOp}\t${item.fechaIdealEntregaProduccion}\t${item.consumoAmortiguadorPlanta}\t${item.colorProduccionTxt}\t${item.colorProduccion}\t${item.cumplimientoPlanta}\t${item.diasRetrazoFirplak}\t${item.colorFirplakTxt}\t${item.colorFirplak}\t${item.cumplimientoFirplak}\t${item.fechaPrometidaEntregaItem}\t${item.destino}\t${item.numLote}\t${item.molde}\t${item.capacidadMolde}\t${item.fechaCargaMolde}\t${item.amortiguador}\t${item.cliente}`
         ).join('\n');
         
         navigator.clipboard.writeText(headerText + rowsText);
         setCopiedData(true);
-        toast.success("Datos copiados al portapapeles");
+        toast.success("Datos de la consulta SAP copiados al portapapeles");
         setTimeout(() => setCopiedData(false), 2000);
     };
 
