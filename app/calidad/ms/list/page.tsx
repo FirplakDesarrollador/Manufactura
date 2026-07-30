@@ -41,9 +41,11 @@ export default function ReportedDefectsListPage() {
         defecto: string | DefectItem[]
         producto_id: number
         Molde: string
+        Molde: string
         producto?: {
             Referencia: string
         }
+        fotoUrl?: string
     }
 
     interface ReportDefectItem {
@@ -56,12 +58,14 @@ export default function ReportedDefectsListPage() {
         productos: Set<string>
         hora_registro: string
         Molde: string
+        fotos: { url: string, referencia: string, hora: string }[]
     }
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+    const [selectedPhotos, setSelectedPhotos] = useState<{title: string, items: { url: string, referencia: string, hora: string }[]} | null>(null)
 
     // Stats for total pieces
     const [pieceStats, setPieceStats] = useState({
@@ -179,13 +183,14 @@ export default function ReportedDefectsListPage() {
                             creado_por: '',
                             reporters: new Set(),
                             productos: new Set(),
-                            hora_registro: new Date(r.created_at).toLocaleTimeString('es-CO', {
+                            hora_registro: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 hour12: true,
-                                timeZone: 'America/Bogota'
+                                timeZone: 'UTC'
                             }),
-                            Molde: r.Molde
+                            Molde: r.Molde,
+                            fotos: []
                         }
                     }
 
@@ -193,6 +198,18 @@ export default function ReportedDefectsListPage() {
                     groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
                     if (!groupedMap[key].reporters.has(usersMap[r.create_by] || 'Anónimo')) {
                         groupedMap[key].reporters.add(usersMap[r.create_by] || 'Anónimo')
+                    }
+                    if (r.fotoUrl) {
+                        groupedMap[key].fotos.push({
+                            url: r.fotoUrl,
+                            referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                            hora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true,
+                                timeZone: 'UTC'
+                            })
+                        })
                     }
                 })
             })
@@ -368,11 +385,22 @@ export default function ReportedDefectsListPage() {
                             {filteredReports.map((report) => (
                                 <div
                                     key={report.id}
-                                    className="bg-white border border-gray-100 border-l-4 border-l-red-600 p-3 hover:shadow-lg transition-all flex flex-col justify-between aspect-square group overflow-hidden relative shadow-sm"
+                                    onClick={() => {
+                                        if (report.fotos && report.fotos.length > 0) {
+                                            setSelectedPhotos({ title: report.defecto_especifico, items: report.fotos })
+                                        }
+                                    }}
+                                    className={`bg-white border border-gray-100 border-l-4 border-l-red-600 p-3 transition-all flex flex-col justify-between aspect-square group overflow-hidden relative shadow-sm ${report.fotos && report.fotos.length > 0 ? 'cursor-pointer hover:shadow-lg hover:border-l-blue-600' : ''}`}
                                 >
-                                    <div className="absolute top-0 right-0 bg-red-600 text-white px-2 py-0.5 text-[14px] font-bold z-20 shadow-sm">
+                                    <div className="absolute top-0 right-0 bg-red-600 text-white px-2 py-0.5 text-[14px] font-bold z-20 shadow-sm group-hover:bg-blue-600 transition-colors">
                                         {report.cantidad}
                                     </div>
+                                    
+                                    {report.fotos && report.fotos.length > 0 && (
+                                        <div className="absolute bottom-1 right-1 text-blue-500 opacity-50 group-hover:opacity-100">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        </div>
+                                    )}
 
                                     <div className="relative z-10 h-full flex flex-col pt-1">
                                         <div className="text-center px-1 flex-1 flex flex-col justify-center">
@@ -489,6 +517,38 @@ export default function ReportedDefectsListPage() {
             <footer className="p-3 bg-[#254153] text-[9px] font-black text-white/20 uppercase tracking-[1em] flex justify-center items-center">
                 ESTACIÓN DE CALIDAD MS • SISTEMA CENTRALIZADO
             </footer>
+
+            {/* Modal for Photos */}
+            {selectedPhotos && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-white w-full max-w-4xl max-h-[90vh] flex flex-col rounded-none shadow-2xl border-4 border-[#254153]">
+                        <div className="flex justify-between items-center p-4 bg-[#254153] text-white">
+                            <h3 className="font-black tracking-widest uppercase text-sm">FOTOS: {selectedPhotos.title}</h3>
+                            <button onClick={() => setSelectedPhotos(null)} className="p-1 hover:bg-white/10 transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-4 flex-1 overflow-y-auto bg-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {selectedPhotos.items?.map((item, i) => (
+                                <div key={i} className="flex flex-col bg-white border border-gray-300 shadow-sm overflow-hidden">
+                                    <div className="aspect-square bg-gray-200 relative flex items-center justify-center">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={item.url} alt={`Defecto ${i+1}`} className="w-full h-full object-contain" />
+                                    </div>
+                                    <div className="p-3 bg-white border-t border-gray-200">
+                                        <p className="text-[10px] font-black text-[#254153] uppercase mb-1 truncate" title={item.referencia}>
+                                            Ref: {item.referencia}
+                                        </p>
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase">
+                                            Hora: {item.hora}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

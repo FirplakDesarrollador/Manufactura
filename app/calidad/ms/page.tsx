@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Camera, X, Settings } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -31,6 +33,11 @@ export default function CalidadMsReportPage() {
         Defecto?: string
         nombre?: string
         Nombre?: string
+        Al_amarilla?: number
+        Al_roja?: number
+        Al_azul?: number
+        Requiere_Foto?: boolean
+        Requiere_Referencia_Molde?: boolean
     }
     const [stats, setStats] = useState({
         buenos: 0,
@@ -41,6 +48,15 @@ export default function CalidadMsReportPage() {
 
     const [selectedProduct, setSelectedProduct] = useState<string>('')
     const [selectedDefects, setSelectedDefects] = useState<Record<number, boolean>>({})
+
+    const [photoFile, setPhotoFile] = useState<File | null>(null)
+    const [isUploading, setIsUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    
+    // New states for custom Molde prompt
+    const [isMoldeModalOpen, setIsMoldeModalOpen] = useState(false)
+    const [moldeInputValue, setMoldeInputValue] = useState('')
 
     const fetchData = useCallback(async () => {
         const { data: userData } = await supabase.auth.getUser()
@@ -122,24 +138,45 @@ export default function CalidadMsReportPage() {
         }))
     }
 
-    const handleSave = async () => {
-        if (!selectedProduct) {
-            alert('Por favor selecciona un producto')
-            return
-        }
+    const executeSave = async (fileToUpload: File | null = photoFile, moldeRef?: string) => {
+        if (!selectedProduct) return
+        
+        const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
+        const selectedDefectNames = selectedDefectsList.map(d => ({ defecto: d.defecto || d.Defecto || d.nombre || d.Nombre }))
 
-        const selectedDefectNames = defects
-            .filter(d => selectedDefects[d.id])
-            .map(d => ({ defecto: d.defecto || d.Defecto || d.nombre || d.Nombre }))
+        setIsUploading(true)
+        let fotoUrl = null
+
+        if (fileToUpload) {
+            const fileName = `ms-defectos/${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+            const { error: uploadError } = await supabase.storage
+                .from('fichas-media')
+                .upload(fileName, fileToUpload)
+
+            if (uploadError) {
+                console.error('Error uploading photo:', uploadError)
+                alert('Error al subir la foto')
+                setIsUploading(false)
+                return
+            }
+
+            const { data } = supabase.storage.from('fichas-media').getPublicUrl(fileName)
+            fotoUrl = data.publicUrl
+        }
 
         const reportData = {
             producto_id: parseInt(selectedProduct),
             create_by: user?.localId,
             defecto: selectedDefectNames,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            ...(fotoUrl ? { fotoUrl } : {}),
+            ...(moldeRef ? { Molde: moldeRef } : {})
         }
 
         const { error } = await supabase.from('ms_reporte_defectos').insert(reportData)
+        
+        setIsUploading(false)
+        
         if (error) {
             console.error('Error saving report:', error)
             alert('Error al guardar el reporte')
@@ -148,7 +185,79 @@ export default function CalidadMsReportPage() {
             await fetchData()
             setSelectedDefects({})
             setSelectedProduct('')
+            setPhotoFile(null)
             alert('Reporte guardado exitosamente')
+        }
+    }
+
+    const handleSave = async () => {
+        if (!selectedProduct) {
+            alert('Por favor selecciona un producto')
+            return
+        }
+
+        const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
+        
+        const requiresMolde = selectedDefectsList.some(d => d.Requiere_Referencia_Molde)
+        if (requiresMolde) {
+            setMoldeInputValue('')
+            setIsMoldeModalOpen(true)
+            return
+        }
+
+        await continueSave(undefined)
+    }
+
+    const continueSave = async (moldeRef?: string) => {
+        const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
+        const requiresPhoto = selectedDefectsList.some(d => d.Requiere_Foto)
+        
+        if (requiresPhoto && !photoFile) {
+            // Trigger photo capture automatically instead of alerting
+            moldeRefForUpload.current = moldeRef
+            fileInputRef.current?.click()
+            return
+        }
+
+        await executeSave(photoFile, moldeRef)
+    }
+
+    const handleMoldeSubmit = () => {
+        if (moldeInputValue.trim() === '') {
+            alert('La referencia del molde es obligatoria para estos defectos.')
+            return
+        }
+        setIsMoldeModalOpen(false)
+        void continueSave(moldeInputValue.trim())
+    }
+
+    const moldeRefForUpload = useRef<string | undefined>(undefined)
+
+    const handleSaveSettings = async (updatedDefects: DefectoMS[]) => {
+        try {
+            // Update each defect in supabase.
+            // Ideally this would be a bulk upsert.
+            const updates = updatedDefects.map(d => ({
+                id: d.id,
+                Al_amarilla: d.Al_amarilla,
+                Al_azul: d.Al_azul,
+                Al_roja: d.Al_roja,
+                Requiere_Foto: d.Requiere_Foto,
+                Requiere_Referencia_Molde: d.Requiere_Referencia_Molde,
+            }))
+            
+            const { error } = await supabase.from('ms_defectos').upsert(updates)
+            
+            if (error) {
+                console.error('Error updating defects settings:', error)
+                alert('Error al guardar la configuración')
+            } else {
+                alert('Configuración guardada exitosamente')
+                await fetchData()
+            }
+        } catch (err) {
+            console.error(err)
+            alert('Error inesperado al guardar')
         }
     }
 
@@ -221,12 +330,17 @@ export default function CalidadMsReportPage() {
                     <div className="flex items-center space-x-2">
                         <button
                             onClick={handleSave}
-                            className="flex items-center space-x-2 px-6 py-2.5 bg-[#254153] text-white font-black uppercase tracking-widest text-xs hover:bg-black transition-all"
+                            disabled={isUploading}
+                            className={`flex items-center space-x-2 px-6 py-2.5 text-white font-black uppercase tracking-widest text-xs transition-all ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
-                            </svg>
-                            <span>Ejecutar Registro</span>
+                            {isUploading ? (
+                                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                                </svg>
+                            )}
+                            <span>{isUploading ? 'Guardando...' : 'Ejecutar Registro'}</span>
                         </button>
                         <button
                             onClick={() => router.push('/calidad/ms/list')}
@@ -237,7 +351,32 @@ export default function CalidadMsReportPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
                         </button>
+                        <button
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 rounded-r"
+                            title="Configurar Defectos"
+                        >
+                            <Settings className="w-5 h-5" />
+                        </button>
                     </div>
+
+                    {/* Hidden Photo Upload Input */}
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                                const file = e.target.files[0]
+                                setPhotoFile(file)
+                                // Execute save automatically after picking a photo
+                                void executeSave(file, moldeRefForUpload.current)
+                                moldeRefForUpload.current = undefined
+                            }
+                        }}
+                    />
 
                     <div className="h-10 w-px bg-gray-200 hidden lg:block" />
 
@@ -272,14 +411,25 @@ export default function CalidadMsReportPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                     {defects.map((defect, index) => {
                         const defectName = defect.defecto || defect.Defecto || defect.nombre || defect.Nombre || 'Defecto'
+                        const count = getDefectCount(defectName)
+                        let alarmColor: 'none' | 'yellow' | 'blue' | 'red' = 'none'
+                        if (defect.Al_roja && count >= defect.Al_roja) {
+                            alarmColor = 'red'
+                        } else if (defect.Al_azul && count >= defect.Al_azul) {
+                            alarmColor = 'blue'
+                        } else if (defect.Al_amarilla && count >= defect.Al_amarilla) {
+                            alarmColor = 'yellow'
+                        }
+
                         return (
                             <DefectCard
                                 key={defect.id}
                                 index={defect.id || index + 1}
                                 title={defectName}
-                                count={getDefectCount(defectName)}
+                                count={count}
                                 isSelected={!!selectedDefects[defect.id]}
                                 onToggle={() => handleToggleDefect(defect.id)}
+                                alarmColor={alarmColor}
                             />
                         )
                     })}
@@ -290,6 +440,57 @@ export default function CalidadMsReportPage() {
                 <span>© {new Date().getFullYear()} Firplak Engineering</span>
                 <span>Secure Terminal v4.0.2</span>
             </footer>
+
+            <DefectsSettingsModal 
+                isOpen={isSettingsOpen} 
+                onClose={() => setIsSettingsOpen(false)} 
+                defects={defects}
+                onSave={handleSaveSettings}
+            />
+
+            {/* Custom Modal for Molde Reference */}
+            {isMoldeModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden">
+                        <div className="bg-[#254153] px-4 py-3 flex items-center justify-between">
+                            <h3 className="text-white font-bold text-sm uppercase tracking-wider">Referencia de Molde</h3>
+                            <button onClick={() => setIsMoldeModalOpen(false)} className="text-white/70 hover:text-white transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-sm text-gray-600 mb-4">
+                                Este defecto requiere que ingreses la Referencia del Molde:
+                            </p>
+                            <input
+                                type="text"
+                                autoFocus
+                                value={moldeInputValue}
+                                onChange={(e) => setMoldeInputValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleMoldeSubmit()
+                                }}
+                                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#254153] focus:ring-1 focus:ring-[#254153] transition-all"
+                                placeholder="Escribe la referencia..."
+                            />
+                            <div className="flex justify-end space-x-3 mt-6">
+                                <button
+                                    onClick={() => setIsMoldeModalOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleMoldeSubmit}
+                                    className="px-4 py-2 bg-[#36A284] text-white text-sm font-bold rounded hover:bg-[#2b856b] transition-colors"
+                                >
+                                    Aceptar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
