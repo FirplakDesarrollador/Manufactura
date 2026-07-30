@@ -125,7 +125,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
     const [canDelete, setCanDelete] = useState(false)
     // Form State
     const [formData, setFormData] = useState<Partial<HdtRow>>({
-        planta: '',
+        planta: 'CEFI',
         labor: '',
         version: 1,
         fecha_elaboracion: new Date().toISOString().split('T')[0],
@@ -228,12 +228,15 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
 
             if (error) {
                 console.error('Error fetching plants:', error)
+                setPlantasOptions(['CEFI'])
             } else {
                 const plants = data?.map(p => p.planta) || []
-                setPlantasOptions(plants)
+                const mergedPlants = Array.from(new Set(['CEFI', ...plants]))
+                setPlantasOptions(mergedPlants)
             }
         } catch (err) {
             console.error('Exception fetching plants:', err)
+            setPlantasOptions(['CEFI'])
         } finally {
             setLoadingPlantas(false)
         }

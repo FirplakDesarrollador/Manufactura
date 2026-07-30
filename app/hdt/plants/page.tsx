@@ -50,15 +50,21 @@ function PlantsContent() {
 
                 if (data) {
                     setTotalCount(data.length)
-                    const firstRow = data[0]
-                    const plantaKey = firstRow ? Object.keys(firstRow).find(key => key.toLowerCase() === 'planta') : 'planta'
-                    const uniquePlants = Array.from(new Set(
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        data.map((item: any) => item[plantaKey || 'planta'])
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            .filter((p: any) => p !== null && p !== undefined && String(p).trim() !== '')
-                    )) as string[]
-                    setPlants(uniquePlants.sort())
+                    const plantMap = new Map<string, string>()
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    data.forEach((item: any) => {
+                        const rawPlant = item.planta
+                        if (rawPlant && String(rawPlant).trim() !== '') {
+                            const trimmed = String(rawPlant).trim()
+                            const normalized = trimmed.toLowerCase() === 'cefi' ? 'CEFI' : trimmed
+                            const key = normalized.toLowerCase()
+                            if (!plantMap.has(key)) {
+                                plantMap.set(key, normalized)
+                            }
+                        }
+                    })
+                    const uniquePlants = Array.from(plantMap.values()).sort()
+                    setPlants(uniquePlants)
                 }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (err: any) {
@@ -145,8 +151,8 @@ function PlantsContent() {
                                         <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-slate-50 transition-colors duration-300 group-hover:bg-[#324354]/10">
                                             <Factory className="h-7 w-7 text-[#324354]" />
                                         </div>
-                                        <span className="text-xl font-bold capitalize text-[#324354]">
-                                            {planta.toLowerCase()}
+                                        <span className="text-xl font-bold uppercase tracking-wider text-[#324354]">
+                                            {planta}
                                         </span>
                                     </div>
                                     <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-[#324354] transition-colors" />
