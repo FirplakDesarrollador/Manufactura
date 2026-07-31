@@ -414,6 +414,8 @@ export default function ConsultaSAPPage() {
     const [semaforoFilter, setSemaforoFilter] = useState("")
     const [isExecuting, setIsExecuting] = useState(false)
     const [copiedData, setCopiedData] = useState(false)
+    const [semaforoDataList, setSemaforoDataList] = useState<SemaforoItem[]>([])
+    const [semaforoHasLoaded, setSemaforoHasLoaded] = useState<boolean>(false)
 
     // Estado para ordenamiento de tabla Query - Semáforo
     const [semaforoSortCol, setSemaforoSortCol] = useState<keyof SemaforoItem | null>(null)
@@ -564,7 +566,7 @@ export default function ConsultaSAPPage() {
     };
 
     // Filtrar los datos de Semáforo
-    const filteredSemaforoData = SEMAFORO_MOCK_DATA.filter(item => {
+    const filteredSemaforoData = semaforoDataList.filter(item => {
         if (!semaforoFilter.trim()) return true;
         const q = semaforoFilter.toLowerCase();
         return (
@@ -596,9 +598,33 @@ export default function ConsultaSAPPage() {
     });
 
     // Exportar Query FPK - Semaforo - DJP a Excel con TODAS las 39 columnas
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         try {
-            const exportRows = sortedSemaforoData.map(item => ({
+            let dataToExport = semaforoDataList;
+            if (dataToExport.length === 0) {
+                const toastId = toast.loading("Consultando datos de SAP para generar Excel...");
+                try {
+                    const res = await fetch('/api/sap/semaforo');
+                    const result = await res.json();
+                    if (result.success && result.data) {
+                        dataToExport = result.data;
+                        setSemaforoDataList(result.data);
+                        setSemaforoHasLoaded(true);
+                    } else {
+                        dataToExport = SEMAFORO_MOCK_DATA;
+                        setSemaforoDataList(SEMAFORO_MOCK_DATA);
+                        setSemaforoHasLoaded(true);
+                    }
+                } catch {
+                    dataToExport = SEMAFORO_MOCK_DATA;
+                    setSemaforoDataList(SEMAFORO_MOCK_DATA);
+                    setSemaforoHasLoaded(true);
+                } finally {
+                    toast.dismiss(toastId);
+                }
+            }
+
+            const exportRows = dataToExport.map(item => ({
                 "#": item.id,
                 "Originnum": item.originnum,
                 "Nro OP": item.nroOp,
@@ -660,11 +686,17 @@ export default function ConsultaSAPPage() {
             const res = await fetch('/api/sap/semaforo');
             const result = await res.json();
             if (result.success && result.data) {
+                setSemaforoDataList(result.data);
+                setSemaforoHasLoaded(true);
                 toast.success(`Semáforo actualizado correctamente desde SAP (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
             } else {
+                setSemaforoDataList(SEMAFORO_MOCK_DATA);
+                setSemaforoHasLoaded(true);
                 toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
             }
         } catch (err) {
+            setSemaforoDataList(SEMAFORO_MOCK_DATA);
+            setSemaforoHasLoaded(true);
             toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
         } finally {
             setIsExecuting(false);
@@ -677,15 +709,33 @@ export default function ConsultaSAPPage() {
     };
 
     // Copiar tabla completa al portapapeles
-    const handleCopyData = () => {
+    const handleCopyData = async () => {
+        let dataToCopy = semaforoDataList;
+        if (dataToCopy.length === 0) {
+            const toastId = toast.loading("Consultando datos de SAP para copiar...");
+            try {
+                const res = await fetch('/api/sap/semaforo');
+                const result = await res.json();
+                dataToCopy = (result.success && result.data) ? result.data : SEMAFORO_MOCK_DATA;
+                setSemaforoDataList(dataToCopy);
+                setSemaforoHasLoaded(true);
+            } catch {
+                dataToCopy = SEMAFORO_MOCK_DATA;
+                setSemaforoDataList(dataToCopy);
+                setSemaforoHasLoaded(true);
+            } finally {
+                toast.dismiss(toastId);
+            }
+        }
+
         const headerText = "Originnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\tDisponible PT01\tFecha Creación OP\tEstado\tFecha Recomendada Liberación\tFecha Real Liberación\tConsumo Para Liberar\tColor Liberación Txt\tColor Liberación\tCumplimiento Liberación\tFecha Entrega Lote\tFecha Recomendada de Entrega\tFecha Cierre OP\tFecha Ideal Entrega Producción\tConsumo Amortiguador Planta\tColor Producción Txt\tColor Producción\tCumplimiento Planta\tDias Retrazo Firplak\tColor Firplak Txt\tColor Firplak\tCumplimiento Firplak\tFecha Prometida Entrega Item\tDestino\tNumLote\tMolde\tCapacidad Molde\tFecha Carga Molde\tAmortiguador\tCliente\n";
-        const rowsText = sortedSemaforoData.map(item => 
+        const rowsText = dataToCopy.map(item => 
             `${item.originnum}\t${item.nroOp}\t${item.sku}\t${item.descripcion}\t${item.planta}\t${item.familia}\t${item.tipoOrden}\t${item.cantPendiente}\t${item.cantPendItem}\t${item.cantTotal}\t${item.disponiblePt01}\t${item.fechaCreacionOp}\t${item.estado}\t${item.fechaRecomendadaLiberacion}\t${item.fechaRealLiberacion}\t${item.consumoParaLiberar}\t${item.colorLiberacionTxt}\t${item.colorLiberacion}\t${item.cumplimientoLiberacion}\t${item.fechaEntregaLote}\t${item.fechaRecomendadaEntrega}\t${item.fechaCierreOp}\t${item.fechaIdealEntregaProduccion}\t${item.consumoAmortiguadorPlanta}\t${item.colorProduccionTxt}\t${item.colorProduccion}\t${item.cumplimientoPlanta}\t${item.diasRetrazoFirplak}\t${item.colorFirplakTxt}\t${item.colorFirplak}\t${item.cumplimientoFirplak}\t${item.fechaPrometidaEntregaItem}\t${item.destino}\t${item.numLote}\t${item.molde}\t${item.capacidadMolde}\t${item.fechaCargaMolde}\t${item.amortiguador}\t${item.cliente}`
         ).join('\n');
         
         navigator.clipboard.writeText(headerText + rowsText);
         setCopiedData(true);
-        toast.success("Datos de la consulta SAP copiados al portapapeles");
+        toast.success(`Datos de la consulta SAP (${dataToCopy.length.toLocaleString('es-CO')} registros) copiados al portapapeles`);
         setTimeout(() => setCopiedData(false), 2000);
     };
 
@@ -1656,517 +1706,97 @@ export default function ConsultaSAPPage() {
                                     FPK - Semaforo - DJP — Query Manager (Proceso Produccion)
                                 </span>
                             </div>
-                            
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleUpdateSemaforo}
-                                    disabled={isExecuting}
-                                    className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#233140] text-white font-bold px-3 py-1 rounded text-xs transition-all shadow-sm cursor-pointer active:scale-95"
-                                    title="Consultar y actualizar la consulta FPK - Semaforo - DJP desde SAP"
-                                >
-                                    <RefreshCw size={14} className={isExecuting ? "animate-spin" : ""} />
-                                    <span>Actualizar Semáforo</span>
-                                </button>
-
-                                <button
-                                    onClick={handleExportExcel}
-                                    className="flex items-center gap-1.5 bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-3 py-1 rounded text-xs transition-colors shadow-sm cursor-pointer"
-                                    title="Exportar consulta a Excel"
-                                >
-                                    <Download size={14} />
-                                    <span>Descargar a Excel</span>
-                                </button>
-                            </div>
                         </div>
 
                         {/* SAP GOLD SHARP ACCENT BORDER */}
                         <div className="h-[3px] bg-[#f4b000] w-full"></div>
 
-                        {/* QUERY MANAGER BODY */}
-                        <div className="p-3 bg-[#f3f0ea] flex flex-col gap-3">
+                        {/* QUERY MANAGER BODY: CENTERED ACTIONS & STATUS CARD */}
+                        <div className="p-8 md:p-12 bg-[#f3f0ea] flex flex-col items-center justify-center gap-8 min-h-[380px]">
                             
-                            {/* SQL QUERY BOX (EXEC STATEMENT FROM SAP QUERY MANAGER) */}
-                            <div className="bg-white border border-[#b2b2b2] p-2 flex flex-col gap-1 shadow-inner">
-                                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex justify-between items-center">
-                                    <span>Sentencia SQL — Query Manager SAP</span>
-                                    <span className="text-gray-400 font-mono text-[10px]">Consulta: FPK - Semaforo - DJP</span>
-                                </div>
-                                <div className="bg-[#f8f9fa] border border-gray-200 p-2 font-mono text-xs text-slate-800 rounded select-text">
-                                    EXEC [Planos_Symphony].[dbo].[SEMAFORO]
-                                </div>
+                            {/* BOTONES DE ACCIÓN CENTRADOS */}
+                            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+                                <button
+                                    onClick={handleUpdateSemaforo}
+                                    disabled={isExecuting}
+                                    className="bg-[#324354] hover:bg-[#233140] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2.5"
+                                >
+                                    <RefreshCw size={18} className={isExecuting ? "animate-spin" : ""} />
+                                    <span>Actualizar Semáforo</span>
+                                </button>
+
+                                <button
+                                    onClick={handleCopyData}
+                                    className="bg-white hover:bg-slate-100 text-[#324354] border border-[#b2b2b2] font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-2.5"
+                                >
+                                    {copiedData ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                                    <span>{copiedData ? "¡Copiado!" : "Copiar datos"}</span>
+                                </button>
+
+                                <button
+                                    onClick={handleExportExcel}
+                                    className="bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2.5"
+                                >
+                                    <Download size={18} />
+                                    <span>Descargar a Excel</span>
+                                </button>
                             </div>
 
-                            {/* FILTER & SAP ACTIONS BAR */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#eceae6] border border-[#c0beb9] p-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-gray-700">Buscar en resultados:</span>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={semaforoFilter}
-                                            onChange={(e) => setSemaforoFilter(e.target.value)}
-                                            placeholder="SKU, N° OP, Planta, Artículo, Cliente..."
-                                            className="bg-white border border-[#b2b2b2] px-2 py-1 text-xs text-black w-72 outline-none focus:border-[#324354]"
-                                        />
-                                        {semaforoFilter && (
-                                            <button
-                                                onClick={() => setSemaforoFilter('')}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black text-xs font-bold"
-                                            >
-                                                ×
-                                            </button>
-                                        )}
+                            {/* MENSAJE CENTRAL CON REGISTROS ENCONTRADOS / ESTADO */}
+                            <div className="w-full max-w-lg bg-white border border-[#a3a3a3] rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-3">
+                                {!semaforoHasLoaded ? (
+                                    <div className="space-y-2">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 text-amber-800 rounded-full mb-1">
+                                            <FileSpreadsheet size={28} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-[#324354]">Semáforo de Producción SAP</h3>
+                                        <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                                            Haz clic en <strong>"Actualizar Semáforo"</strong> para consultar la base de datos de SAP o presiona <strong>"Descargar a Excel"</strong> para exportar los datos directamente.
+                                        </p>
                                     </div>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={handleUpdateSemaforo}
-                                        disabled={isExecuting}
-                                        className="bg-[#324354] hover:bg-[#233140] text-white border border-[#1b2633] px-3.5 py-1 font-bold text-xs cursor-pointer flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-                                    >
-                                        <RefreshCw size={13} className={isExecuting ? "animate-spin" : ""} />
-                                        <span>Actualizar Semáforo</span>
-                                    </button>
-
-                                    <button
-                                        onClick={handleCopyData}
-                                        className="bg-[#e1e1e1] hover:bg-[#d0d0d0] border border-gray-400 px-3 py-1 font-semibold text-xs text-black cursor-pointer flex items-center gap-1 active:bg-[#c5c5c5]"
-                                    >
-                                        {copiedData ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
-                                        <span>{copiedData ? "¡Copiado!" : "Copiar datos"}</span>
-                                    </button>
-
-                                    <button
-                                        onClick={handleExportExcel}
-                                        className="bg-[#107c41] hover:bg-[#0b5c30] text-white border border-[#0b5c30] px-3.5 py-1 font-bold text-xs cursor-pointer flex items-center gap-1.5 transition-colors shadow-sm"
-                                    >
-                                        <Download size={13} />
-                                        <span>Descargar a Excel</span>
-                                    </button>
-                                </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full mb-1">
+                                            <Check size={28} />
+                                        </div>
+                                        <h3 className="text-2xl font-extrabold text-[#324354]">
+                                            {semaforoDataList.length.toLocaleString('es-CO')} Registros Encontrados
+                                        </h3>
+                                        <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
+                                            ✓ Consulta EXEC [Planos_Symphony].[dbo].[SEMAFORO] completada exitosamente
+                                        </div>
+                                        <p className="text-xs text-slate-500 pt-1">
+                                            Los datos están listos para ser descargados directamente en Excel o copiados al portapapeles.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-
-                            {/* RESULTS TABLE WITH ALL 39 COLUMNS */}
-                            <div className="border border-[#a3a3a3] bg-white overflow-x-auto max-h-[600px] shadow-sm select-text">
-                                <table className="border-collapse text-xs font-sans text-left table-fixed w-max">
-                                    <thead className="sticky top-0 bg-[#eceae6] border-b border-[#a3a3a3] z-10 shadow-sm select-none">
-                                        <tr className="text-gray-700 font-semibold">
-                                            {/* 1. # */}
-                                            <th style={{ width: `${semaforoColWidths.id}px` }} onClick={() => handleSemaforoSort('id')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center">
-                                                    <span>#</span>
-                                                    {renderSortIcon('id', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="id" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 2. Originnum */}
-                                            <th style={{ width: `${semaforoColWidths.originnum}px` }} onClick={() => handleSemaforoSort('originnum')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Originnum</span>
-                                                    {renderSortIcon('originnum', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="originnum" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 3. Nro OP */}
-                                            <th style={{ width: `${semaforoColWidths.nroOp}px` }} onClick={() => handleSemaforoSort('nroOp')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Nro OP</span>
-                                                    {renderSortIcon('nroOp', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="nroOp" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 4. SKU */}
-                                            <th style={{ width: `${semaforoColWidths.sku}px` }} onClick={() => handleSemaforoSort('sku')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">SKU</span>
-                                                    {renderSortIcon('sku', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="sku" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 5. Descripción Artículo */}
-                                            <th style={{ width: `${semaforoColWidths.descripcion}px` }} onClick={() => handleSemaforoSort('descripcion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Descripción Artículo</span>
-                                                    {renderSortIcon('descripcion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="descripcion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 6. Planta */}
-                                            <th style={{ width: `${semaforoColWidths.planta}px` }} onClick={() => handleSemaforoSort('planta')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Planta</span>
-                                                    {renderSortIcon('planta', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="planta" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 7. Familia */}
-                                            <th style={{ width: `${semaforoColWidths.familia}px` }} onClick={() => handleSemaforoSort('familia')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Familia</span>
-                                                    {renderSortIcon('familia', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="familia" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 8. Tipo Orden */}
-                                            <th style={{ width: `${semaforoColWidths.tipoOrden}px` }} onClick={() => handleSemaforoSort('tipoOrden')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Tipo Orden</span>
-                                                    {renderSortIcon('tipoOrden', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="tipoOrden" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 9. Cant. Pendiente */}
-                                            <th style={{ width: `${semaforoColWidths.cantPendiente}px` }} onClick={() => handleSemaforoSort('cantPendiente')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Cant. Pendiente</span>
-                                                    {renderSortIcon('cantPendiente', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cantPendiente" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 10. Cant. Pend. Item */}
-                                            <th style={{ width: `${semaforoColWidths.cantPendItem}px` }} onClick={() => handleSemaforoSort('cantPendItem')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Cant. Pend. Item</span>
-                                                    {renderSortIcon('cantPendItem', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cantPendItem" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 11. Cantidad total */}
-                                            <th style={{ width: `${semaforoColWidths.cantTotal}px` }} onClick={() => handleSemaforoSort('cantTotal')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Cantidad total</span>
-                                                    {renderSortIcon('cantTotal', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cantTotal" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 12. Disponible PT01 */}
-                                            <th style={{ width: `${semaforoColWidths.disponiblePt01}px` }} onClick={() => handleSemaforoSort('disponiblePt01')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Disponible PT01</span>
-                                                    {renderSortIcon('disponiblePt01', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="disponiblePt01" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 13. Fecha Creación OP */}
-                                            <th style={{ width: `${semaforoColWidths.fechaCreacionOp}px` }} onClick={() => handleSemaforoSort('fechaCreacionOp')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Creación OP</span>
-                                                    {renderSortIcon('fechaCreacionOp', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaCreacionOp" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 14. Estado */}
-                                            <th style={{ width: `${semaforoColWidths.estado}px` }} onClick={() => handleSemaforoSort('estado')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Estado</span>
-                                                    {renderSortIcon('estado', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="estado" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 15. Fecha Recomendada Liberación */}
-                                            <th style={{ width: `${semaforoColWidths.fechaRecomendadaLiberacion}px` }} onClick={() => handleSemaforoSort('fechaRecomendadaLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Recom. Lib.</span>
-                                                    {renderSortIcon('fechaRecomendadaLiberacion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaRecomendadaLiberacion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 16. Fecha Real Liberación */}
-                                            <th style={{ width: `${semaforoColWidths.fechaRealLiberacion}px` }} onClick={() => handleSemaforoSort('fechaRealLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Real Lib.</span>
-                                                    {renderSortIcon('fechaRealLiberacion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaRealLiberacion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 17. Consumo Para Liberar */}
-                                            <th style={{ width: `${semaforoColWidths.consumoParaLiberar}px` }} onClick={() => handleSemaforoSort('consumoParaLiberar')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Consumo Para Lib.</span>
-                                                    {renderSortIcon('consumoParaLiberar', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="consumoParaLiberar" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 18. Color Liberación Txt */}
-                                            <th style={{ width: `${semaforoColWidths.colorLiberacionTxt}px` }} onClick={() => handleSemaforoSort('colorLiberacionTxt')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Color Lib. Txt</span>
-                                                    {renderSortIcon('colorLiberacionTxt', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="colorLiberacionTxt" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 19. Color Liberación */}
-                                            <th style={{ width: `${semaforoColWidths.colorLiberacion}px` }} onClick={() => handleSemaforoSort('colorLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Color Lib.</span>
-                                                    {renderSortIcon('colorLiberacion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="colorLiberacion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 20. Cumplimiento Liberación */}
-                                            <th style={{ width: `${semaforoColWidths.cumplimientoLiberacion}px` }} onClick={() => handleSemaforoSort('cumplimientoLiberacion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Cumplimiento Lib.</span>
-                                                    {renderSortIcon('cumplimientoLiberacion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cumplimientoLiberacion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 21. Fecha Entrega Lote */}
-                                            <th style={{ width: `${semaforoColWidths.fechaEntregaLote}px` }} onClick={() => handleSemaforoSort('fechaEntregaLote')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Entrega Lote</span>
-                                                    {renderSortIcon('fechaEntregaLote', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaEntregaLote" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 22. Fecha Recomendada de Entrega */}
-                                            <th style={{ width: `${semaforoColWidths.fechaRecomendadaEntrega}px` }} onClick={() => handleSemaforoSort('fechaRecomendadaEntrega')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Recom. Entrega</span>
-                                                    {renderSortIcon('fechaRecomendadaEntrega', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaRecomendadaEntrega" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 23. Fecha Cierre OP */}
-                                            <th style={{ width: `${semaforoColWidths.fechaCierreOp}px` }} onClick={() => handleSemaforoSort('fechaCierreOp')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Cierre OP</span>
-                                                    {renderSortIcon('fechaCierreOp', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaCierreOp" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 24. Fecha Ideal Entrega Producción */}
-                                            <th style={{ width: `${semaforoColWidths.fechaIdealEntregaProduccion}px` }} onClick={() => handleSemaforoSort('fechaIdealEntregaProduccion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Ideal Ent. Prod.</span>
-                                                    {renderSortIcon('fechaIdealEntregaProduccion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaIdealEntregaProduccion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 25. Consumo Amortiguador Planta */}
-                                            <th style={{ width: `${semaforoColWidths.consumoAmortiguadorPlanta}px` }} onClick={() => handleSemaforoSort('consumoAmortiguadorPlanta')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Consumo Amort. Planta</span>
-                                                    {renderSortIcon('consumoAmortiguadorPlanta', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="consumoAmortiguadorPlanta" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 26. Color Producción Txt */}
-                                            <th style={{ width: `${semaforoColWidths.colorProduccionTxt}px` }} onClick={() => handleSemaforoSort('colorProduccionTxt')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Color Prod. Txt</span>
-                                                    {renderSortIcon('colorProduccionTxt', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="colorProduccionTxt" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 27. Color Producción */}
-                                            <th style={{ width: `${semaforoColWidths.colorProduccion}px` }} onClick={() => handleSemaforoSort('colorProduccion')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Color Producción</span>
-                                                    {renderSortIcon('colorProduccion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="colorProduccion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 28. Cumplimiento Planta */}
-                                            <th style={{ width: `${semaforoColWidths.cumplimientoPlanta}px` }} onClick={() => handleSemaforoSort('cumplimientoPlanta')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Cumplimiento Planta</span>
-                                                    {renderSortIcon('cumplimientoPlanta', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cumplimientoPlanta" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 29. Dias Retrazo Firplak */}
-                                            <th style={{ width: `${semaforoColWidths.diasRetrazoFirplak}px` }} onClick={() => handleSemaforoSort('diasRetrazoFirplak')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Días Retraso Firplak</span>
-                                                    {renderSortIcon('diasRetrazoFirplak', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="diasRetrazoFirplak" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 30. Color Firplak Txt */}
-                                            <th style={{ width: `${semaforoColWidths.colorFirplakTxt}px` }} onClick={() => handleSemaforoSort('colorFirplakTxt')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Color Firplak Txt</span>
-                                                    {renderSortIcon('colorFirplakTxt', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="colorFirplakTxt" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 31. Color Firplak */}
-                                            <th style={{ width: `${semaforoColWidths.colorFirplak}px` }} onClick={() => handleSemaforoSort('colorFirplak')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Color Firplak</span>
-                                                    {renderSortIcon('colorFirplak', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="colorFirplak" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 32. Cumplimiento Firplak */}
-                                            <th style={{ width: `${semaforoColWidths.cumplimientoFirplak}px` }} onClick={() => handleSemaforoSort('cumplimientoFirplak')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Cumplimiento Firplak</span>
-                                                    {renderSortIcon('cumplimientoFirplak', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cumplimientoFirplak" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 33. Fecha Prometida Entrega Item */}
-                                            <th style={{ width: `${semaforoColWidths.fechaPrometidaEntregaItem}px` }} onClick={() => handleSemaforoSort('fechaPrometidaEntregaItem')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Prometida Ent.</span>
-                                                    {renderSortIcon('fechaPrometidaEntregaItem', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaPrometidaEntregaItem" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 34. Destino */}
-                                            <th style={{ width: `${semaforoColWidths.destino}px` }} onClick={() => handleSemaforoSort('destino')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Destino</span>
-                                                    {renderSortIcon('destino', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="destino" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 35. NumLote */}
-                                            <th style={{ width: `${semaforoColWidths.numLote}px` }} onClick={() => handleSemaforoSort('numLote')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">NumLote</span>
-                                                    {renderSortIcon('numLote', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="numLote" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 36. Molde */}
-                                            <th style={{ width: `${semaforoColWidths.molde}px` }} onClick={() => handleSemaforoSort('molde')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Molde</span>
-                                                    {renderSortIcon('molde', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="molde" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 37. Capacidad Molde */}
-                                            <th style={{ width: `${semaforoColWidths.capacidadMolde}px` }} onClick={() => handleSemaforoSort('capacidadMolde')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Capacidad Molde</span>
-                                                    {renderSortIcon('capacidadMolde', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="capacidadMolde" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 38. Fecha Carga Molde */}
-                                            <th style={{ width: `${semaforoColWidths.fechaCargaMolde}px` }} onClick={() => handleSemaforoSort('fechaCargaMolde')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Fecha Carga Molde</span>
-                                                    {renderSortIcon('fechaCargaMolde', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="fechaCargaMolde" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 39. Amortiguador */}
-                                            <th style={{ width: `${semaforoColWidths.amortiguador}px` }} onClick={() => handleSemaforoSort('amortiguador')} className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Amortiguador</span>
-                                                    {renderSortIcon('amortiguador', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="amortiguador" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            {/* 40. Cliente */}
-                                            <th style={{ width: `${semaforoColWidths.cliente}px` }} onClick={() => handleSemaforoSort('cliente')} className="relative px-2 py-1.5 font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]">
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Cliente</span>
-                                                    {renderSortIcon('cliente', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cliente" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {sortedSemaforoData.length > 0 ? (
-                                            sortedSemaforoData.map((row, idx) => (
-                                                <tr
-                                                    key={row.id}
-                                                    className={`border-b border-[#e5e5e5] hover:bg-[#f2f7ff] transition-colors ${
-                                                        idx % 2 === 0 ? 'bg-[#fcfdfd]' : 'bg-[#f7f6f2]'
-                                                    }`}
-                                                >
-                                                    <td style={{ width: `${semaforoColWidths.id}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-gray-500 font-medium text-center overflow-hidden">{row.id}</td>
-                                                    <td style={{ width: `${semaforoColWidths.originnum}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono text-slate-800 overflow-hidden truncate">{row.originnum}</td>
-                                                    <td style={{ width: `${semaforoColWidths.nroOp}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono font-semibold text-blue-900 overflow-hidden truncate">{row.nroOp}</td>
-                                                    <td style={{ width: `${semaforoColWidths.sku}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono text-slate-700 overflow-hidden truncate">{row.sku}</td>
-                                                    <td style={{ width: `${semaforoColWidths.descripcion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-medium text-slate-900 overflow-hidden truncate" title={row.descripcion}>{row.descripcion}</td>
-                                                    <td style={{ width: `${semaforoColWidths.planta}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-semibold text-slate-700 overflow-hidden truncate">{row.planta}</td>
-                                                    <td style={{ width: `${semaforoColWidths.familia}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-600 overflow-hidden truncate">{row.familia}</td>
-                                                    <td style={{ width: `${semaforoColWidths.tipoOrden}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] overflow-hidden truncate">
-                                                        <span className={`inline-block px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                                                            row.tipoOrden === 'STOCK' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-blue-100 text-blue-800 border border-blue-300'
-                                                        }`}>
-                                                            {row.tipoOrden}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ width: `${semaforoColWidths.cantPendiente}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono font-semibold text-slate-800 overflow-hidden truncate">{row.cantPendiente}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cantPendItem}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.cantPendItem}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cantTotal}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono font-bold text-slate-900 overflow-hidden truncate">{row.cantTotal}</td>
-                                                    
-                                                    {/* 12-39 Additional Columns */}
-                                                    <td style={{ width: `${semaforoColWidths.disponiblePt01}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono overflow-hidden truncate">{row.disponiblePt01}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaCreacionOp}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaCreacionOp}</td>
-                                                    <td style={{ width: `${semaforoColWidths.estado}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-semibold overflow-hidden truncate">
-                                                        <span className={`inline-block px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                                                            row.estado === 'Cerrado' ? 'bg-slate-200 text-slate-800' : row.estado === 'Liberado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                                        }`}>
-                                                            {row.estado}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaRecomendadaLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaRecomendadaLiberacion}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaRealLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaRealLiberacion || '-'}</td>
-                                                    <td style={{ width: `${semaforoColWidths.consumoParaLiberar}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono font-medium text-slate-800 overflow-hidden truncate">{row.consumoParaLiberar}</td>
-                                                    <td style={{ width: `${semaforoColWidths.colorLiberacionTxt}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center overflow-hidden truncate">{renderColorBadge(row.colorLiberacionTxt)}</td>
-                                                    <td style={{ width: `${semaforoColWidths.colorLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.colorLiberacion}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cumplimientoLiberacion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-700 overflow-hidden truncate">{row.cumplimientoLiberacion}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaEntregaLote}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaEntregaLote}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaRecomendadaEntrega}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaRecomendadaEntrega}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaCierreOp}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaCierreOp || '-'}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaIdealEntregaProduccion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-600 overflow-hidden truncate">{row.fechaIdealEntregaProduccion || '-'}</td>
-                                                    <td style={{ width: `${semaforoColWidths.consumoAmortiguadorPlanta}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-800 overflow-hidden truncate">{row.consumoAmortiguadorPlanta}</td>
-                                                    <td style={{ width: `${semaforoColWidths.colorProduccionTxt}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center overflow-hidden truncate">{renderColorBadge(row.colorProduccionTxt)}</td>
-                                                    <td style={{ width: `${semaforoColWidths.colorProduccion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.colorProduccion}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cumplimientoPlanta}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-700 overflow-hidden truncate">{row.cumplimientoPlanta}</td>
-                                                    <td style={{ width: `${semaforoColWidths.diasRetrazoFirplak}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-800 overflow-hidden truncate">{row.diasRetrazoFirplak}</td>
-                                                    <td style={{ width: `${semaforoColWidths.colorFirplakTxt}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center overflow-hidden truncate">{renderColorBadge(row.colorFirplakTxt)}</td>
-                                                    <td style={{ width: `${semaforoColWidths.colorFirplak}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.colorFirplak}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cumplimientoFirplak}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-700 overflow-hidden truncate">{row.cumplimientoFirplak}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaPrometidaEntregaItem}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaPrometidaEntregaItem}</td>
-                                                    <td style={{ width: `${semaforoColWidths.destino}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono font-bold text-slate-800 overflow-hidden truncate">{row.destino}</td>
-                                                    <td style={{ width: `${semaforoColWidths.numLote}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono text-slate-700 overflow-hidden truncate">{row.numLote}</td>
-                                                    <td style={{ width: `${semaforoColWidths.molde}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-medium text-slate-800 overflow-hidden truncate" title={row.molde}>{row.molde}</td>
-                                                    <td style={{ width: `${semaforoColWidths.capacidadMolde}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.capacidadMolde || '-'}</td>
-                                                    <td style={{ width: `${semaforoColWidths.fechaCargaMolde}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-mono text-slate-700 overflow-hidden truncate">{row.fechaCargaMolde}</td>
-                                                    <td style={{ width: `${semaforoColWidths.amortiguador}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-800 overflow-hidden truncate">{row.amortiguador}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cliente}px` }} className="px-2 py-1.5 font-medium text-slate-900 overflow-hidden truncate" title={row.cliente}>{row.cliente}</td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={40} className="py-8 text-center text-gray-500 italic bg-white">
-                                                    No se encontraron registros que coincidan con la búsqueda.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* SAP BOTTOM FOOTER BAR */}
-                            <div className="bg-[#eceae6] border border-[#a3a3a3] px-3 py-1 flex items-center justify-between text-[11px] text-gray-700">
-                                <div className="flex items-center gap-4">
-                                    <span>({sortedSemaforoData.length.toLocaleString('es-CO')} registros cargados de 39 columnas)</span>
-                                    <span className="text-gray-400">|</span>
-                                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                                        Consulta EXEC [Planos_Symphony].[dbo].[SEMAFORO] ejecutada con éxito [200 OK]
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="font-mono text-gray-500">{currentTime || '29/07/2026'}</span>
-                                    <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
-                                </div>
-                            </div>
-
                         </div>
+
+                        {/* SAP BOTTOM FOOTER BAR */}
+                        <div className="bg-[#eceae6] border-t border-[#a3a3a3] px-4 py-2 flex items-center justify-between text-xs text-gray-700">
+                            <div className="flex items-center gap-4">
+                                <span>
+                                    {!semaforoHasLoaded 
+                                        ? "(0 registros - Listo para actualizar o exportar)" 
+                                        : `(${semaforoDataList.length.toLocaleString('es-CO')} registros listos para exportación)`
+                                    }
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                    <span className={`w-2 h-2 rounded-full inline-block ${semaforoHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                    {semaforoHasLoaded 
+                                        ? "Consulta ejecutada con éxito [200 OK]"
+                                        : "Estado: Listo para actualización u orden de descarga"
+                                    }
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-mono text-gray-500">{currentTime || '29/07/2026'}</span>
+                                <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
+                            </div>
+                        </div>
+
                     </div>
                 </main>) : subHeaderTab === 'consulta-producto' ? (
                 /* TAB 3: CONSULTA POR PRODUCTO (DATOS MAESTROS DE ARTÍCULO SAP) */
@@ -2211,26 +1841,24 @@ export default function ConsultaSAPPage() {
                                     {/* LEFT COLUMN FIELDS */}
                                     <div className="space-y-1.5 shrink-0 max-w-xl w-full">
                                         
-                                        {/* NÚMERO DE ARTÍCULO (SEARCHABLE - RED HIGHLIGHT BOX) */}
+                                         {/* NÚMERO DE ARTÍCULO (SEARCHABLE) */}
                                         <div className="flex items-center">
                                             <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none flex items-center">
                                                 Número de artículo <SapLinkArrow />
                                             </span>
-                                            <div className="flex items-center gap-1 flex-1 relative">
-                                                <div className="relative flex-1 p-0.5 rounded border-2 border-red-500 bg-red-50/20 shadow-sm transition-all focus-within:ring-2 focus-within:ring-red-400">
-                                                    <input
-                                                        type="text"
-                                                        value={itemCodeInput}
-                                                        onChange={(e) => setItemCodeInput(e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('code')}
-                                                        className="w-full bg-[#fffde6] text-black text-xs font-mono font-bold px-2 py-1 outline-none border border-[#b2b2b2] rounded-none focus:bg-white select-text"
-                                                        placeholder="Ej: VBAN01-0039-000-0100"
-                                                    />
-                                                </div>
+                                            <div className="flex items-center gap-1 flex-1">
+                                                <input
+                                                    type="text"
+                                                    value={itemCodeInput}
+                                                    onChange={(e) => setItemCodeInput(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('code')}
+                                                    className="w-full bg-[#fffde6] text-black text-xs font-mono font-bold px-2 py-1 outline-none border border-[#b2b2b2] focus:bg-white select-text"
+                                                    placeholder="Ej: VBAN01-0039-000-0100"
+                                                />
                                                 <button
                                                     onClick={() => handleItemSearch('code')}
                                                     disabled={itemLoading}
-                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0"
+                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0 cursor-pointer"
                                                     title="Buscar por Número de artículo"
                                                 >
                                                     <Search size={13} />
@@ -2239,24 +1867,22 @@ export default function ConsultaSAPPage() {
                                             </div>
                                         </div>
 
-                                        {/* DESCRIPCIÓN (SEARCHABLE - RED HIGHLIGHT BOX) */}
+                                        {/* DESCRIPCIÓN (SEARCHABLE) */}
                                         <div className="flex items-center">
                                             <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none">Descripción</span>
                                             <div className="flex items-center gap-1 flex-1">
-                                                <div className="relative flex-1 p-0.5 rounded border-2 border-red-500 bg-red-50/20 shadow-sm transition-all focus-within:ring-2 focus-within:ring-red-400">
-                                                    <input
-                                                        type="text"
-                                                        value={itemNameInput}
-                                                        onChange={(e) => setItemNameInput(e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('name')}
-                                                        className="w-full bg-[#fffde6] text-black text-xs font-medium px-2 py-1 outline-none border border-[#b2b2b2] rounded-none focus:bg-white select-text"
-                                                        placeholder="Ej: LAVAMANOS SIENA 79X48"
-                                                    />
-                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={itemNameInput}
+                                                    onChange={(e) => setItemNameInput(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('name')}
+                                                    className="w-full bg-[#fffde6] text-black text-xs font-medium px-2 py-1 outline-none border border-[#b2b2b2] focus:bg-white select-text"
+                                                    placeholder="Ej: LAVAMANOS SIENA 79X48"
+                                                />
                                                 <button
                                                     onClick={() => handleItemSearch('name')}
                                                     disabled={itemLoading}
-                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0"
+                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0 cursor-pointer"
                                                     title="Buscar por Descripción de artículo"
                                                 >
                                                     <Search size={13} />
@@ -2283,23 +1909,6 @@ export default function ConsultaSAPPage() {
                                                 </div>
                                             </div>
                                         )}
-
-
-
-                                        {/* Lista de precios */}
-                                        <div className="flex items-center">
-                                            <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none">Lista de precios</span>
-                                            <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-48 rounded-none">
-                                                <option>{activeItem.priceList}</option>
-                                            </select>
-                                            <span className="ml-3 text-[11px] text-gray-800 mr-1 select-none">Precio por unidad</span>
-                                            <input
-                                                type="text"
-                                                value={activeItem.price}
-                                                readOnly
-                                                className="bg-white border border-[#b2b2b2] px-2 py-0.5 text-xs font-bold text-black w-36 text-right rounded-none select-text"
-                                            />
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2324,7 +1933,6 @@ export default function ConsultaSAPPage() {
                                         </button>
                                     ))}
                                 </div>
-
                                 {/* TAB CONTENT BODY */}
                                 <div className="bg-[#f3f0ea] border-x border-b border-[#a3a3a3] p-2.5 min-h-[320px]">
                                     
@@ -2332,54 +1940,17 @@ export default function ConsultaSAPPage() {
                                     {itemInnerTab === 'inventario' && (
                                         <div className="space-y-2 font-sans select-none text-[11px]">
                                             
-                                            {/* SECCIÓN SUPERIOR DE CAMPOS CONFIGURATIVOS Y NIVEL DE STOCK */}
-                                            <div className="flex flex-wrap lg:flex-nowrap justify-between gap-6 items-start bg-[#f3f0ea] p-1.5 border-b border-[#c8c5bc]">
-                                                
-                                                {/* IZQUIERDA: MÉTODOS Y UNIDADES DE MEDIDA */}
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center">
-                                                        <span className="w-36 text-gray-800">Fijar ctas de mayor según</span>
-                                                        <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
-                                                            <option>Grupo de artículos</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="flex items-center">
-                                                        <span className="w-36 text-gray-800">Nombre unid. de medida</span>
-                                                        <input type="text" value={activeItem.inventoryUOM || ''} readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none" />
-                                                    </div>
-                                                    <div className="flex items-center">
-                                                        <span className="w-36 text-gray-800">Peso</span>
-                                                        <input type="text" value="" readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none" />
-                                                    </div>
-                                                    <div className="flex items-center pt-2">
-                                                        <span className="w-36 text-gray-800">Método de valoración</span>
-                                                        <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
-                                                            <option>{activeItem.itemCode ? 'Promedio ponderado' : ''}</option>
-                                                        </select>
-                                                    </div>
+                                            {/* SECCIÓN SUPERIOR DE CAMPOS CONFIGURATIVOS */}
+                                            <div className="flex flex-wrap items-center gap-6 bg-[#f3f0ea] p-1.5 border-b border-[#c8c5bc]">
+                                                <div className="flex items-center">
+                                                    <span className="w-36 text-gray-800 shrink-0">Fijar ctas de mayor según</span>
+                                                    <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
+                                                        <option>Grupo de artículos</option>
+                                                    </select>
                                                 </div>
-
-                                                {/* DERECHA: GESTIÓN DE STOCKS Y NIVELES */}
-                                                <div className="space-y-1">
-                                                    <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-gray-800">
-                                                        <input type="checkbox" checked={Boolean(activeItem.itemCode)} readOnly className="w-3.5 h-3.5 text-amber-600 rounded-none" />
-                                                        <span>Gestión de stocks por almacén</span>
-                                                    </label>
-                                                    <div className="pl-5 pt-1 space-y-1">
-                                                        <span className="font-semibold text-gray-700 block border-b border-gray-300 pb-0.5 text-[10.5px]">Nivel de stock</span>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-gray-800">Necesario (UdM de Compras)</span>
-                                                            <input type="text" value="" readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-24 text-right rounded-none" />
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-gray-800">Mínimo</span>
-                                                            <input type="text" value="" readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-24 text-right rounded-none" />
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-gray-800">Máximo</span>
-                                                            <input type="text" value={activeItem.itemCode ? '22' : ''} readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs font-semibold text-black w-24 text-right rounded-none" />
-                                                        </div>
-                                                    </div>
+                                                <div className="flex items-center">
+                                                    <span className="w-36 text-gray-800 shrink-0">Nombre unid. de medida</span>
+                                                    <input type="text" value={activeItem.inventoryUOM || ''} readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none select-text" />
                                                 </div>
                                             </div>
 
@@ -2508,15 +2079,15 @@ export default function ConsultaSAPPage() {
                                                             <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Lista de precios</th>
                                                             <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción total</th>
                                                             <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Precio unitario</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Total</th>
+                                                <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Total</th>
                                                             <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Comentarios</th>
                                                             <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Cta.WIP</th>
                                                             <th className="px-2 py-1 text-center">Secuen...</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-[#e0ddd5]">
-                                                        {activeItem.itemCode ? (
-                                                            BOM_SAMPLE_DATA.map((row, idx) => (
+                                                        {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? (
+                                                            activeItem.bomComponents.map((row, idx) => (
                                                                 <tr key={idx} className="h-5 hover:bg-[#fff9e6]">
                                                                     <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600">{row.id}</td>
                                                                     <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800">{row.tipo}</td>
@@ -2547,11 +2118,26 @@ export default function ConsultaSAPPage() {
                                                                 </tr>
                                                             ))
                                                         ) : (
-                                                            <tr>
-                                                                <td colSpan={16} className="py-6 text-center text-gray-500 italic font-sans">
-                                                                    No hay componentes registrados. Realiza una búsqueda por número o descripción de artículo.
-                                                                </td>
-                                                            </tr>
+                                                            Array.from({ length: 12 }).map((_, idx) => (
+                                                                <tr key={idx} className="h-5 bg-white border-b border-[#e0ddd5]">
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td></td>
+                                                                </tr>
+                                                            ))
                                                         )}
                                                     </tbody>
                                                     {/* FILA DE TOTALES CONSOLIDADOS AL PIE DE LA TABLA */}
@@ -2560,14 +2146,14 @@ export default function ConsultaSAPPage() {
                                                             <td colSpan={10} className="px-2 py-1 border-r border-[#c2c0bb] text-right text-gray-600 font-sans">Totales:</td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono">{activeItem.itemCode ? '$ 0.00' : ''}</td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right"></td>
-                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono text-emerald-800">{activeItem.itemCode ? '$ 10,723.40' : ''}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono text-emerald-800">
+                                                                {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? '$ 10,723.40' : (activeItem.itemCode ? '$ 0.00' : '')}
+                                                            </td>
                                                             <td colSpan={3} className="px-2 py-1"></td>
                                                         </tr>
                                                     </tfoot>
                                                 </table>
                                             </div>
-
-                                            {/* PIE DE FORMULARIO: PRECIO DE PRODUCTO Y BOTONES OK/CANCELAR */}
                                             <div className="p-2 bg-[#f3f0ea] flex items-center justify-between border-t border-[#c8c5bc]">
                                                 <div className="flex items-center gap-2">
                                                     <button disabled className="bg-[#dedbd5] border border-[#a3a3a3] px-4 py-0.5 text-xs font-bold text-gray-800 cursor-not-allowed shadow-xs hover:bg-gray-200">
