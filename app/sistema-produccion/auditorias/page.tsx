@@ -56,7 +56,7 @@ export default function AuditoriasPage() {
       {/* Header Premium */}
       <Header
         title="Auditorías"
-        subtitle="Módulo en Desarrollo"
+        subtitle="Módulo en Construcción"
         backUrl="/sistema-produccion"
         userEmail={session?.user?.email}
         showLogout={true}
@@ -83,7 +83,7 @@ export default function AuditoriasPage() {
             {/* Info Texts */}
             <div className="flex flex-col gap-3">
               <h2 className="text-2xl md:text-3xl font-display font-light text-[#324354] tracking-widest uppercase">
-                Auditorías en Construcción
+                Módulo en Construcción
               </h2>
               <p className="text-sm md:text-base text-slate-500 leading-relaxed max-w-sm mx-auto">
                 Estamos trabajando en la programación del panel de auditorías operativas y de procesos para ayudarte a mantener los estándares más altos en la planta de producción.

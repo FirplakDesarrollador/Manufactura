@@ -52,13 +52,46 @@ export async function GET(request: Request) {
         }
 
         const data = await response.json();
+        let primaryItemRaw = data.value ? data.value[0] : data;
+        let bomComponents: any[] = [];
+
+        if (primaryItemRaw && primaryItemRaw.ItemCode) {
+            try {
+                const treeUrl = `${baseUrl}/ProductTrees('${encodeURIComponent(primaryItemRaw.ItemCode)}')`;
+                const treeRes = await fetch(treeUrl, {
+                    headers: { 'Cookie': loginData.cookieHeader, 'Content-Type': 'application/json' }
+                });
+                if (treeRes.ok) {
+                    const treeData = await treeRes.json();
+                    const lines = treeData.ProductTreeLines || treeData.ProductTreeItems || [];
+                    bomComponents = lines.map((line: any, index: number) => ({
+                        id: index + 1,
+                        tipo: line.ItemType === 'pit_Resource' ? 'Recurso' : 'Artículo',
+                        no: line.ItemCode,
+                        descripcion: line.ItemName || line.ItemCode,
+                        cantidad: String(line.Quantity || 1),
+                        uom: line.UoMCode || 'UN',
+                        almacen: line.Warehouse || 'MP-10',
+                        metodoEmision: line.IssueMethod === 'im_Manual' ? 'Manual' : 'Notificación',
+                        costoEst: "****",
+                        listaPrecios: "****",
+                        costoEstTotal: "****",
+                        precioUnitario: line.Price ? `$ ${line.Price.toLocaleString('es-CO')}` : '',
+                        total: line.Price ? `$ ${(line.Price * (line.Quantity || 1)).toLocaleString('es-CO')}` : '',
+                        ctaWip: "0"
+                    }));
+                }
+            } catch (e) {
+                console.log("Artículo no tiene Lista de Materiales en SAP:", primaryItemRaw.ItemCode);
+            }
+        }
 
         // Si la respuesta es un arreglo de coincidencias (cuando se usa $filter)
         if (data.value) {
             if (data.value.length === 0) {
                 return NextResponse.json({ error: 'Artículo no encontrado en SAP' }, { status: 404 });
             }
-            const matches = data.value.map(mapSapItem);
+            const matches = data.value.map((item: any) => mapSapItem(item, item.ItemCode === primaryItemRaw.ItemCode ? bomComponents : []));
             return NextResponse.json({
                 item: matches[0],
                 matches: matches.map(m => ({ itemCode: m.itemCode, itemName: m.itemName }))
@@ -66,7 +99,7 @@ export async function GET(request: Request) {
         }
 
         // Si la respuesta es un objeto único (búsqueda directa por ID)
-        const mappedItem = mapSapItem(data);
+        const mappedItem = mapSapItem(data, bomComponents);
         return NextResponse.json({ item: mappedItem, matches: [] });
 
     } catch (error: any) {
@@ -75,7 +108,7 @@ export async function GET(request: Request) {
     }
 }
 
-function mapSapItem(sapItem: any) {
+function mapSapItem(sapItem: any, bomComponents: any[] = []) {
     const mainPrice = sapItem.ItemPrices && sapItem.ItemPrices.length > 0
         ? sapItem.ItemPrices[0].Price
         : 0;
@@ -113,6 +146,9 @@ function mapSapItem(sapItem: any) {
         quantityOnStock: sapItem.QuantityOnStock || 0,
         quantityOrderedFromVendors: sapItem.QuantityOrderedFromVendors || 0,
         quantityOrderedByCustomers: sapItem.QuantityOrderedByCustomers || 0,
+
+        // Lista de Materiales (BOM)
+        bomComponents: bomComponents,
 
         // Lista de almacenes (ItemWarehouseInfoCollection)
         warehouses: (sapItem.ItemWarehouseInfoCollection || []).map((wh: any) => ({

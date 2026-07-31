@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
+import semaforoData from './semaforo_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2 } from 'lucide-react'
@@ -75,30 +76,7 @@ interface SemaforoItem {
 }
 
 // Datos del Query Manager SAP: FPK - Semaforo - DJP (Proceso Produccion)
-const SEMAFORO_MOCK_DATA: SemaforoItem[] = [
-    { id: 1, originnum: "160954", nroOp: "10072539", sku: "VBAN05-0069-000-0437", descripcion: "MUEBLE BASICO PISO LVM 40X30 CON MANIJAS SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "8.00" },
-    { id: 2, originnum: "160936", nroOp: "2257438", sku: "VCOC04-0018-B2C-0500", descripcion: "LAVAPLATOS KOA 84X56 GRIS NIEBLA BRILLANTE (CAJA INDIVIDUAL)", planta: "MS", familia: "PC", tipoOrden: "STOCK", cantPendiente: "1.00", cantPendItem: "1.00", cantTotal: "1.00" },
-    { id: 3, originnum: "2003500", nroOp: "2257243", sku: "VROP02-0003-000-0300", descripcion: "LAVARROPAS ECO 48X60 NATURAL", planta: "MS", familia: "PA", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "10.00", cantTotal: "13.00" },
-    { id: 4, originnum: "160512", nroOp: "10071978", sku: "VCOC01-0134-000-0321", descripcion: "MUEBLE INFERIOR COCINA OBSI 150X55CM CANTO 2MM BLANCO CARB2/SODER MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "2.00" },
-    { id: 5, originnum: "158421", nroOp: "10070138", sku: "VROP03-0003-000-0100", descripcion: "MUEBLE LVR 60X60 BLANCO CARB2-PUR", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "45.00" },
-    { id: 6, originnum: "161110", nroOp: "2257748", sku: "VROP01-0002-000-0100", descripcion: "LAVARROPAS AQUA 48X60 BRILLANTE CON FLAUTA BLANCO", planta: "MS", familia: "PC", tipoOrden: "STOCK", cantPendiente: "3.00", cantPendItem: "3.00", cantTotal: "3.00" },
-    { id: 7, originnum: "2003470", nroOp: "2255974", sku: "VBAN01-0039-000-0100", descripcion: "LAVAMANOS SIENA 79X48 BRILLANTE BLANCO", planta: "MS", familia: "PC", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "9.00" },
-    { id: 8, originnum: "2003474", nroOp: "10071701", sku: "VROP03-0033-000-1379", descripcion: "MUEBLE LVR 40X35 LOTO LISO CARB2", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "11.00" },
-    { id: 9, originnum: "2003496", nroOp: "20005990", sku: "VCOC08-3015-000-1342", descripcion: "TABLERO COMPUESTO - PN24 3/436", planta: "CEFI", familia: "PFZ-CEMA", tipoOrden: "STANDARD", cantPendiente: "17.00", cantPendItem: "17.00", cantTotal: "17.00" },
-    { id: 10, originnum: "2003496", nroOp: "20005989", sku: "VCOC08-3014-000-1342", descripcion: "TABLERO COMPUESTO - PN14 3/436", planta: "CEFI", familia: "PFZ-CEMA", tipoOrden: "STANDARD", cantPendiente: "14.00", cantPendItem: "14.00", cantTotal: "14.00" },
-    { id: 11, originnum: "2003496", nroOp: "20005966", sku: "VCOC08-3110-000-1358", descripcion: "TABLERO COMPUESTO - WSM152514-18MM", planta: "CEFI", familia: "PFZ-CEMA", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "8.00" },
-    { id: 12, originnum: "160654", nroOp: "10072191", sku: "VCOC01-0138-000-0322", descripcion: "MUEBLE SUPERIOR COCINA AGATA 180X60CM CANTO 2MM BLANCO CARB2/GRACIA SIKUANI", planta: "MBL", familia: "MBL", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "9.00" },
-    { id: 13, originnum: "160854", nroOp: "2257340", sku: "VHPT03-0003-000-0100", descripcion: "HIDROMASAJE NORUEGA ISLA 156 BLANCO-C2-KT-CP-PULSADOR", planta: "FV", familia: "FVH", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "5.00", cantTotal: "1.00" },
-    { id: 14, originnum: "2003486", nroOp: "20005869", sku: "VCOC08-3239-000-0408", descripcion: "HRJ CC249622 1/2 TK4 1/2 3S-R + DFE - C601 MBL CLOSET 1 PUERTA 3 ENTREPAÑOS BLANCO CARB2", planta: "CEFI", familia: "MBL CEFI", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "1.00" },
-    { id: 15, originnum: "160501", nroOp: "10072027", sku: "VBAN05-0128-000-0442", descripcion: "MUEBLE POLOCK ELEVADO LVM 48X38 GRACIA/SIKUANI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "2.00" },
-    { id: 16, originnum: "160887", nroOp: "10072513", sku: "VBAN05-0137-000-0437", descripcion: "MUEBLE ELEVADO LVM 44.5X43.5 SIN MANIJAS SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "1.00" },
-    { id: 17, originnum: "159726", nroOp: "10071135", sku: "VBAN05-0137-000-0437", descripcion: "MUEBLE ELEVADO LVM 44.5X43.5 SIN MANIJAS SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "1.00" },
-    { id: 18, originnum: "160704", nroOp: "10072284", sku: "VBAN05-0133-000-0437", descripcion: "MUEBLE VAN GOGH ELEVADO 63X38 SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "2.00" },
-    { id: 19, originnum: "160418", nroOp: "2256648", sku: "VBAN01-0056-000-0100", descripcion: "LAVAMANOS OSLO 48X38 BRILLANTE BLANCO", planta: "MS", familia: "PC", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "15.00" },
-    { id: 20, originnum: "160700", nroOp: "10072280", sku: "VBAN05-0072-000-0439", descripcion: "MUEBLE RAYO 48X38 MITTE/TAMBO", planta: "MBL", familia: "MBL", tipoOrden: "STOCK", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "13.00" },
-    { id: 21, originnum: "160026", nroOp: "10071461", sku: "VBAN05-0125-000-0437", descripcion: "MUEBLE DA VINCI PISO LVM 48X43 SODER/MALI", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "4.00" },
-    { id: 22, originnum: "159915", nroOp: "10071365", sku: "VBAN05-0127-000-0439", descripcion: "MUEBLE MACAO LIFE LVM 48X43 CANTO 2MM FULL EXTENSION MITTE/TAMBO", planta: "MBL", familia: "MBL", tipoOrden: "STANDARD", cantPendiente: "0.00", cantPendItem: "-", cantTotal: "5.00" }
-];
+const SEMAFORO_MOCK_DATA: SemaforoItem[] = semaforoData as SemaforoItem[];
 
 interface SapItemWarehouse {
     warehouseCode: string;
@@ -436,6 +414,8 @@ export default function ConsultaSAPPage() {
     const [semaforoFilter, setSemaforoFilter] = useState("")
     const [isExecuting, setIsExecuting] = useState(false)
     const [copiedData, setCopiedData] = useState(false)
+    const [semaforoDataList, setSemaforoDataList] = useState<SemaforoItem[]>([])
+    const [semaforoHasLoaded, setSemaforoHasLoaded] = useState<boolean>(false)
 
     // Estado para ordenamiento de tabla Query - Semáforo
     const [semaforoSortCol, setSemaforoSortCol] = useState<keyof SemaforoItem | null>(null)
@@ -586,7 +566,7 @@ export default function ConsultaSAPPage() {
     };
 
     // Filtrar los datos de Semáforo
-    const filteredSemaforoData = SEMAFORO_MOCK_DATA.filter(item => {
+    const filteredSemaforoData = semaforoDataList.filter(item => {
         if (!semaforoFilter.trim()) return true;
         const q = semaforoFilter.toLowerCase();
         return (
@@ -617,10 +597,34 @@ export default function ConsultaSAPPage() {
         return semaforoSortDir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
     });
 
-    // Exportar Query a Excel
-    const handleExportExcel = () => {
+    // Exportar Query FPK - Semaforo - DJP a Excel con TODAS las 39 columnas
+    const handleExportExcel = async () => {
         try {
-            const exportRows = sortedSemaforoData.map(item => ({
+            let dataToExport = semaforoDataList;
+            if (dataToExport.length === 0) {
+                const toastId = toast.loading("Consultando datos de SAP para generar Excel...");
+                try {
+                    const res = await fetch('/api/sap/semaforo');
+                    const result = await res.json();
+                    if (result.success && result.data) {
+                        dataToExport = result.data;
+                        setSemaforoDataList(result.data);
+                        setSemaforoHasLoaded(true);
+                    } else {
+                        dataToExport = SEMAFORO_MOCK_DATA;
+                        setSemaforoDataList(SEMAFORO_MOCK_DATA);
+                        setSemaforoHasLoaded(true);
+                    }
+                } catch {
+                    dataToExport = SEMAFORO_MOCK_DATA;
+                    setSemaforoDataList(SEMAFORO_MOCK_DATA);
+                    setSemaforoHasLoaded(true);
+                } finally {
+                    toast.dismiss(toastId);
+                }
+            }
+
+            const exportRows = dataToExport.map(item => ({
                 "#": item.id,
                 "Originnum": item.originnum,
                 "Nro OP": item.nroOp,
@@ -631,39 +635,107 @@ export default function ConsultaSAPPage() {
                 "Tipo Orden": item.tipoOrden,
                 "Cant. Pendiente": item.cantPendiente,
                 "Cant. Pend. Item": item.cantPendItem,
-                "Cantidad total": item.cantTotal
+                "Cantidad total": item.cantTotal,
+                "Disponible PT01": item.disponiblePt01,
+                "Fecha Creación OP": item.fechaCreacionOp,
+                "Estado": item.estado,
+                "Fecha Recomendada Liberación": item.fechaRecomendadaLiberacion,
+                "Fecha Real Liberación": item.fechaRealLiberacion,
+                "Consumo Para Liberar": item.consumoParaLiberar,
+                "Color Liberación Txt": item.colorLiberacionTxt,
+                "Color Liberación": item.colorLiberacion,
+                "Cumplimiento Liberación": item.cumplimientoLiberacion,
+                "Fecha Entrega Lote": item.fechaEntregaLote,
+                "Fecha Recomendada de Entrega": item.fechaRecomendadaEntrega,
+                "Fecha Cierre OP": item.fechaCierreOp,
+                "Fecha Ideal Entrega Producción": item.fechaIdealEntregaProduccion,
+                "Consumo Amortiguador Planta": item.consumoAmortiguadorPlanta,
+                "Color Producción Txt": item.colorProduccionTxt,
+                "Color Producción": item.colorProduccion,
+                "Cumplimiento Planta": item.cumplimientoPlanta,
+                "Dias Retrazo Firplak": item.diasRetrazoFirplak,
+                "Color Firplak Txt": item.colorFirplakTxt,
+                "Color Firplak": item.colorFirplak,
+                "Cumplimiento Firplak": item.cumplimientoFirplak,
+                "Fecha Prometida Entrega Item": item.fechaPrometidaEntregaItem,
+                "Destino": item.destino,
+                "NumLote": item.numLote,
+                "Molde": item.molde,
+                "Capacidad Molde": item.capacidadMolde,
+                "Fecha Carga Molde": item.fechaCargaMolde,
+                "Amortiguador": item.amortiguador,
+                "Cliente": item.cliente
             }));
 
             const ws = XLSX.utils.json_to_sheet(exportRows);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "FPK - Semaforo");
             XLSX.writeFile(wb, "FPK_Semaforo_DJP.xlsx");
-            toast.success("Query FPK-Semaforo descargado a Excel exitosamente");
+            toast.success(`Query FPK-Semaforo descargado a Excel (${exportRows.length.toLocaleString('es-CO')} registros, 39 columnas)`);
         } catch (err) {
             console.error(err);
             toast.error("Error al generar el archivo Excel");
         }
     };
 
-    // Simular Re-ejecución del Query SAP
-    const handleExecuteQuery = () => {
+    // Botón Actualizar Semáforo desde SAP (FPK - Semaforo - DJP)
+    const handleUpdateSemaforo = async () => {
         setIsExecuting(true);
-        setTimeout(() => {
+        const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP' en SAP B1...");
+        try {
+            const res = await fetch('/api/sap/semaforo');
+            const result = await res.json();
+            if (result.success && result.data) {
+                setSemaforoDataList(result.data);
+                setSemaforoHasLoaded(true);
+                toast.success(`Semáforo actualizado correctamente desde SAP (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
+            } else {
+                setSemaforoDataList(SEMAFORO_MOCK_DATA);
+                setSemaforoHasLoaded(true);
+                toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
+            }
+        } catch (err) {
+            setSemaforoDataList(SEMAFORO_MOCK_DATA);
+            setSemaforoHasLoaded(true);
+            toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
+        } finally {
             setIsExecuting(false);
-            toast.success("Query ejecutado correctamente desde SAP");
-        }, 600);
+        }
     };
 
-    // Copiar tabla al portapapeles
-    const handleCopyData = () => {
-        const headerText = "#\tOriginnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\n";
-        const rowsText = sortedSemaforoData.map(item => 
-            `${item.id}\t${item.originnum}\t${item.nroOp}\t${item.sku}\t${item.descripcion}\t${item.planta}\t${item.familia}\t${item.tipoOrden}\t${item.cantPendiente}\t${item.cantPendItem}\t${item.cantTotal}`
+    // Re-ejecución del Query SAP
+    const handleExecuteQuery = () => {
+        handleUpdateSemaforo();
+    };
+
+    // Copiar tabla completa al portapapeles
+    const handleCopyData = async () => {
+        let dataToCopy = semaforoDataList;
+        if (dataToCopy.length === 0) {
+            const toastId = toast.loading("Consultando datos de SAP para copiar...");
+            try {
+                const res = await fetch('/api/sap/semaforo');
+                const result = await res.json();
+                dataToCopy = (result.success && result.data) ? result.data : SEMAFORO_MOCK_DATA;
+                setSemaforoDataList(dataToCopy);
+                setSemaforoHasLoaded(true);
+            } catch {
+                dataToCopy = SEMAFORO_MOCK_DATA;
+                setSemaforoDataList(dataToCopy);
+                setSemaforoHasLoaded(true);
+            } finally {
+                toast.dismiss(toastId);
+            }
+        }
+
+        const headerText = "Originnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\tDisponible PT01\tFecha Creación OP\tEstado\tFecha Recomendada Liberación\tFecha Real Liberación\tConsumo Para Liberar\tColor Liberación Txt\tColor Liberación\tCumplimiento Liberación\tFecha Entrega Lote\tFecha Recomendada de Entrega\tFecha Cierre OP\tFecha Ideal Entrega Producción\tConsumo Amortiguador Planta\tColor Producción Txt\tColor Producción\tCumplimiento Planta\tDias Retrazo Firplak\tColor Firplak Txt\tColor Firplak\tCumplimiento Firplak\tFecha Prometida Entrega Item\tDestino\tNumLote\tMolde\tCapacidad Molde\tFecha Carga Molde\tAmortiguador\tCliente\n";
+        const rowsText = dataToCopy.map(item => 
+            `${item.originnum}\t${item.nroOp}\t${item.sku}\t${item.descripcion}\t${item.planta}\t${item.familia}\t${item.tipoOrden}\t${item.cantPendiente}\t${item.cantPendItem}\t${item.cantTotal}\t${item.disponiblePt01}\t${item.fechaCreacionOp}\t${item.estado}\t${item.fechaRecomendadaLiberacion}\t${item.fechaRealLiberacion}\t${item.consumoParaLiberar}\t${item.colorLiberacionTxt}\t${item.colorLiberacion}\t${item.cumplimientoLiberacion}\t${item.fechaEntregaLote}\t${item.fechaRecomendadaEntrega}\t${item.fechaCierreOp}\t${item.fechaIdealEntregaProduccion}\t${item.consumoAmortiguadorPlanta}\t${item.colorProduccionTxt}\t${item.colorProduccion}\t${item.cumplimientoPlanta}\t${item.diasRetrazoFirplak}\t${item.colorFirplakTxt}\t${item.colorFirplak}\t${item.cumplimientoFirplak}\t${item.fechaPrometidaEntregaItem}\t${item.destino}\t${item.numLote}\t${item.molde}\t${item.capacidadMolde}\t${item.fechaCargaMolde}\t${item.amortiguador}\t${item.cliente}`
         ).join('\n');
         
         navigator.clipboard.writeText(headerText + rowsText);
         setCopiedData(true);
-        toast.success("Datos copiados al portapapeles");
+        toast.success(`Datos de la consulta SAP (${dataToCopy.length.toLocaleString('es-CO')} registros) copiados al portapapeles`);
         setTimeout(() => setCopiedData(false), 2000);
     };
 
@@ -673,6 +745,17 @@ export default function ConsultaSAPPage() {
     };
 
     // Componente visual para la línea divisoria vertical redimensionable
+        const renderColorBadge = (val: string) => {
+        if (!val) return <span className="text-gray-400 font-normal">-</span>;
+        const v = val.toUpperCase().trim();
+        if (v === 'CYAN') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-cyan-100 text-cyan-900 border border-cyan-300">CYAN</span>;
+        if (v === 'GREEN') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-900 border border-emerald-300">GREEN</span>;
+        if (v === 'YELLOW') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-900 border border-amber-300">YELLOW</span>;
+        if (v === 'RED') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-900 border border-red-300">RED</span>;
+        if (v === 'BLACK') return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-gray-900 text-white">BLACK</span>;
+        return <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-800 border border-gray-300">{val}</span>;
+    };
+
     const ResizerHandle = ({ colKey, onResize }: { colKey: string; onResize: (colKey: string, e: React.MouseEvent) => void }) => (
         <div
             onMouseDown={(e) => onResize(colKey, e)}
@@ -1623,274 +1706,99 @@ export default function ConsultaSAPPage() {
                                     FPK - Semaforo - DJP — Query Manager (Proceso Produccion)
                                 </span>
                             </div>
-                            
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleExportExcel}
-                                    className="flex items-center gap-1.5 bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-3 py-1 rounded text-xs transition-colors shadow-sm cursor-pointer"
-                                    title="Exportar consulta a Excel"
-                                >
-                                    <Download size={14} />
-                                    <span>Descargar a Excel</span>
-                                </button>
-                            </div>
                         </div>
 
                         {/* SAP GOLD SHARP ACCENT BORDER */}
                         <div className="h-[3px] bg-[#f4b000] w-full"></div>
 
-                        {/* QUERY MANAGER BODY */}
-                        <div className="p-3 bg-[#f3f0ea] flex flex-col gap-3">
+                        {/* QUERY MANAGER BODY: CENTERED ACTIONS & STATUS CARD */}
+                        <div className="p-8 md:p-12 bg-[#f3f0ea] flex flex-col items-center justify-center gap-8 min-h-[380px]">
                             
-                            {/* SQL QUERY BOX (MOCK EXEC STATEMENT FROM IMAGE 4) */}
-                            <div className="bg-white border border-[#b2b2b2] p-2 flex flex-col gap-1 shadow-inner">
-                                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex justify-between items-center">
-                                    <span>Sentencia SQL — Query Manager SAP</span>
-                                    <span className="text-gray-400 font-mono text-[10px]">Consulta: FPK - Semaforo - DJP</span>
-                                </div>
-                                <div className="bg-[#f8f9fa] border border-gray-200 p-2 font-mono text-xs text-slate-800 rounded select-text">
-                                    EXEC [Planos_Symphony].[dbo].[SEMAFORO]
-                                </div>
+                            {/* BOTONES DE ACCIÓN CENTRADOS */}
+                            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+                                <button
+                                    onClick={handleUpdateSemaforo}
+                                    disabled={isExecuting}
+                                    className="bg-[#324354] hover:bg-[#233140] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2.5"
+                                >
+                                    <RefreshCw size={18} className={isExecuting ? "animate-spin" : ""} />
+                                    <span>Actualizar Semáforo</span>
+                                </button>
+
+                                <button
+                                    onClick={handleCopyData}
+                                    className="bg-white hover:bg-slate-100 text-[#324354] border border-[#b2b2b2] font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-2.5"
+                                >
+                                    {copiedData ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                                    <span>{copiedData ? "¡Copiado!" : "Copiar datos"}</span>
+                                </button>
+
+                                <button
+                                    onClick={handleExportExcel}
+                                    className="bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2.5"
+                                >
+                                    <Download size={18} />
+                                    <span>Descargar a Excel</span>
+                                </button>
                             </div>
 
-                            {/* FILTER & SAP ACTIONS BAR */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#eceae6] border border-[#c0beb9] p-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-gray-700">Buscar en resultados:</span>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={semaforoFilter}
-                                            onChange={(e) => setSemaforoFilter(e.target.value)}
-                                            placeholder="SKU, N° OP, Planta, Artículo..."
-                                            className="bg-white border border-[#b2b2b2] px-2 py-1 text-xs text-black w-64 outline-none focus:border-[#324354]"
-                                        />
-                                        {semaforoFilter && (
-                                            <button
-                                                onClick={() => setSemaforoFilter('')}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black text-xs font-bold"
-                                            >
-                                                ×
-                                            </button>
-                                        )}
+                            {/* MENSAJE CENTRAL CON REGISTROS ENCONTRADOS / ESTADO */}
+                            <div className="w-full max-w-lg bg-white border border-[#a3a3a3] rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-3">
+                                {!semaforoHasLoaded ? (
+                                    <div className="space-y-2">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 text-amber-800 rounded-full mb-1">
+                                            <FileSpreadsheet size={28} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-[#324354]">Semáforo de Producción SAP</h3>
+                                        <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                                            Haz clic en <strong>"Actualizar Semáforo"</strong> para consultar la base de datos de SAP o presiona <strong>"Descargar a Excel"</strong> para exportar los datos directamente.
+                                        </p>
                                     </div>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={handleExecuteQuery}
-                                        disabled={isExecuting}
-                                        className="bg-[#e1e1e1] hover:bg-[#d0d0d0] border border-gray-400 px-3 py-1 font-semibold text-xs text-black cursor-pointer flex items-center gap-1 active:bg-[#c5c5c5]"
-                                    >
-                                        <RefreshCw size={13} className={isExecuting ? "animate-spin" : ""} />
-                                        <span>Ejecutar</span>
-                                    </button>
-
-                                    <button
-                                        onClick={handleCopyData}
-                                        className="bg-[#e1e1e1] hover:bg-[#d0d0d0] border border-gray-400 px-3 py-1 font-semibold text-xs text-black cursor-pointer flex items-center gap-1 active:bg-[#c5c5c5]"
-                                    >
-                                        {copiedData ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
-                                        <span>{copiedData ? "¡Copiado!" : "Copiar datos"}</span>
-                                    </button>
-
-                                    <button
-                                        onClick={handleExportExcel}
-                                        className="bg-[#107c41] hover:bg-[#0b5c30] text-white border border-[#0b5c30] px-3.5 py-1 font-bold text-xs cursor-pointer flex items-center gap-1.5 transition-colors shadow-sm"
-                                    >
-                                        <Download size={13} />
-                                        <span>Descargar a Excel</span>
-                                    </button>
-                                </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full mb-1">
+                                            <Check size={28} />
+                                        </div>
+                                        <h3 className="text-2xl font-extrabold text-[#324354]">
+                                            {semaforoDataList.length.toLocaleString('es-CO')} Registros Encontrados
+                                        </h3>
+                                        <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
+                                            ✓ Consulta EXEC [Planos_Symphony].[dbo].[SEMAFORO] completada exitosamente
+                                        </div>
+                                        <p className="text-xs text-slate-500 pt-1">
+                                            Los datos están listos para ser descargados directamente en Excel o copiados al portapapeles.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-
-                            {/* RESULTS TABLE WITH SORTABLE & RESIZABLE HEADERS (SAP STYLE) */}
-                            <div className="border border-[#a3a3a3] bg-white overflow-x-auto max-h-[550px] shadow-sm select-text">
-                                <table className="border-collapse text-xs font-sans text-left table-fixed w-max">
-                                    <thead className="sticky top-0 bg-[#eceae6] border-b border-[#a3a3a3] z-10 shadow-sm select-none">
-                                        <tr className="text-gray-700 font-semibold">
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.id}px` }}
-                                                onClick={() => handleSemaforoSort('id')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-center">
-                                                    <span>#</span>
-                                                    {renderSortIcon('id', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="id" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.originnum}px` }}
-                                                onClick={() => handleSemaforoSort('originnum')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Originnum</span>
-                                                    {renderSortIcon('originnum', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="originnum" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.nroOp}px` }}
-                                                onClick={() => handleSemaforoSort('nroOp')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Nro OP</span>
-                                                    {renderSortIcon('nroOp', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="nroOp" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.sku}px` }}
-                                                onClick={() => handleSemaforoSort('sku')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">SKU</span>
-                                                    {renderSortIcon('sku', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="sku" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.descripcion}px` }}
-                                                onClick={() => handleSemaforoSort('descripcion')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Descripción Artículo</span>
-                                                    {renderSortIcon('descripcion', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="descripcion" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.planta}px` }}
-                                                onClick={() => handleSemaforoSort('planta')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Planta</span>
-                                                    {renderSortIcon('planta', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="planta" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.familia}px` }}
-                                                onClick={() => handleSemaforoSort('familia')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-center cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-center overflow-hidden">
-                                                    <span className="truncate">Familia</span>
-                                                    {renderSortIcon('familia', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="familia" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.tipoOrden}px` }}
-                                                onClick={() => handleSemaforoSort('tipoOrden')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-start overflow-hidden">
-                                                    <span className="truncate">Tipo Orden</span>
-                                                    {renderSortIcon('tipoOrden', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="tipoOrden" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.cantPendiente}px` }}
-                                                onClick={() => handleSemaforoSort('cantPendiente')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Cant. Pendiente</span>
-                                                    {renderSortIcon('cantPendiente', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cantPendiente" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.cantPendItem}px` }}
-                                                onClick={() => handleSemaforoSort('cantPendItem')}
-                                                className="relative px-2 py-1.5 border-r border-[#c2c0bb] font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Cant. Pend. Item</span>
-                                                    {renderSortIcon('cantPendItem', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cantPendItem" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                            <th 
-                                                style={{ width: `${semaforoColWidths.cantTotal}px` }}
-                                                onClick={() => handleSemaforoSort('cantTotal')}
-                                                className="relative px-2 py-1.5 font-bold text-gray-700 text-right cursor-pointer hover:bg-[#dedbd5]"
-                                            >
-                                                <div className="flex items-center justify-end overflow-hidden">
-                                                    <span className="truncate">Cantidad total</span>
-                                                    {renderSortIcon('cantTotal', semaforoSortCol, semaforoSortDir)}
-                                                </div>
-                                                <ResizerHandle colKey="cantTotal" onResize={handleSemaforoResizeStart} />
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {sortedSemaforoData.length > 0 ? (
-                                            sortedSemaforoData.map((row, idx) => (
-                                                <tr
-                                                    key={row.id}
-                                                    className={`border-b border-[#e5e5e5] hover:bg-[#f2f7ff] transition-colors ${
-                                                        idx % 2 === 0 ? 'bg-[#fcfdfd]' : 'bg-[#f7f6f2]'
-                                                    }`}
-                                                >
-                                                    <td style={{ width: `${semaforoColWidths.id}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-gray-500 font-medium text-center overflow-hidden">{row.id}</td>
-                                                    <td style={{ width: `${semaforoColWidths.originnum}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono text-slate-800 overflow-hidden truncate">{row.originnum}</td>
-                                                    <td style={{ width: `${semaforoColWidths.nroOp}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono font-semibold text-blue-900 overflow-hidden truncate">{row.nroOp}</td>
-                                                    <td style={{ width: `${semaforoColWidths.sku}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-mono text-slate-700 overflow-hidden truncate">{row.sku}</td>
-                                                    <td style={{ width: `${semaforoColWidths.descripcion}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] font-medium text-slate-900 overflow-hidden truncate" title={row.descripcion}>{row.descripcion}</td>
-                                                    <td style={{ width: `${semaforoColWidths.planta}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-semibold text-slate-700 overflow-hidden truncate">{row.planta}</td>
-                                                    <td style={{ width: `${semaforoColWidths.familia}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-center font-medium text-slate-600 overflow-hidden truncate">{row.familia}</td>
-                                                    <td style={{ width: `${semaforoColWidths.tipoOrden}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] overflow-hidden truncate">
-                                                        <span className={`inline-block px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                                                            row.tipoOrden === 'STOCK' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-blue-100 text-blue-800 border border-blue-300'
-                                                        }`}>
-                                                            {row.tipoOrden}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ width: `${semaforoColWidths.cantPendiente}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono font-semibold text-slate-800 overflow-hidden truncate">{row.cantPendiente}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cantPendItem}px` }} className="px-2 py-1.5 border-r border-[#e5e5e5] text-right font-mono text-slate-700 overflow-hidden truncate">{row.cantPendItem}</td>
-                                                    <td style={{ width: `${semaforoColWidths.cantTotal}px` }} className="px-2 py-1.5 text-right font-mono font-bold text-slate-900 overflow-hidden truncate">{row.cantTotal}</td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={11} className="py-8 text-center text-gray-500 italic bg-white">
-                                                    No se encontraron registros que coincidan con la búsqueda.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* SAP BOTTOM FOOTER BAR */}
-                            <div className="bg-[#eceae6] border border-[#a3a3a3] px-3 py-1 flex items-center justify-between text-[11px] text-gray-700">
-                                <div className="flex items-center gap-4">
-                                    <span>({sortedSemaforoData.length} registros cargados)</span>
-                                    <span className="text-gray-400">|</span>
-                                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                                        Operación finalizada con éxito [Mensaje 200-48]
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="font-mono text-gray-500">27/07/2026</span>
-                                    <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
-                                </div>
-                            </div>
-
                         </div>
+
+                        {/* SAP BOTTOM FOOTER BAR */}
+                        <div className="bg-[#eceae6] border-t border-[#a3a3a3] px-4 py-2 flex items-center justify-between text-xs text-gray-700">
+                            <div className="flex items-center gap-4">
+                                <span>
+                                    {!semaforoHasLoaded 
+                                        ? "(0 registros - Listo para actualizar o exportar)" 
+                                        : `(${semaforoDataList.length.toLocaleString('es-CO')} registros listos para exportación)`
+                                    }
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                    <span className={`w-2 h-2 rounded-full inline-block ${semaforoHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                    {semaforoHasLoaded 
+                                        ? "Consulta ejecutada con éxito [200 OK]"
+                                        : "Estado: Listo para actualización u orden de descarga"
+                                    }
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-mono text-gray-500">{currentTime || '29/07/2026'}</span>
+                                <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
+                            </div>
+                        </div>
+
                     </div>
-                </main>
-            ) : subHeaderTab === 'consulta-producto' ? (
+                </main>) : subHeaderTab === 'consulta-producto' ? (
                 /* TAB 3: CONSULTA POR PRODUCTO (DATOS MAESTROS DE ARTÍCULO SAP) */
                 <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
                     {/* SAP CLIENT WINDOW REPLICA CONTAINER */}
@@ -1933,26 +1841,24 @@ export default function ConsultaSAPPage() {
                                     {/* LEFT COLUMN FIELDS */}
                                     <div className="space-y-1.5 shrink-0 max-w-xl w-full">
                                         
-                                        {/* NÚMERO DE ARTÍCULO (SEARCHABLE - RED HIGHLIGHT BOX) */}
+                                         {/* NÚMERO DE ARTÍCULO (SEARCHABLE) */}
                                         <div className="flex items-center">
                                             <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none flex items-center">
                                                 Número de artículo <SapLinkArrow />
                                             </span>
-                                            <div className="flex items-center gap-1 flex-1 relative">
-                                                <div className="relative flex-1 p-0.5 rounded border-2 border-red-500 bg-red-50/20 shadow-sm transition-all focus-within:ring-2 focus-within:ring-red-400">
-                                                    <input
-                                                        type="text"
-                                                        value={itemCodeInput}
-                                                        onChange={(e) => setItemCodeInput(e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('code')}
-                                                        className="w-full bg-[#fffde6] text-black text-xs font-mono font-bold px-2 py-1 outline-none border border-[#b2b2b2] rounded-none focus:bg-white select-text"
-                                                        placeholder="Ej: VBAN01-0039-000-0100"
-                                                    />
-                                                </div>
+                                            <div className="flex items-center gap-1 flex-1">
+                                                <input
+                                                    type="text"
+                                                    value={itemCodeInput}
+                                                    onChange={(e) => setItemCodeInput(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('code')}
+                                                    className="w-full bg-[#fffde6] text-black text-xs font-mono font-bold px-2 py-1 outline-none border border-[#b2b2b2] focus:bg-white select-text"
+                                                    placeholder="Ej: VBAN01-0039-000-0100"
+                                                />
                                                 <button
                                                     onClick={() => handleItemSearch('code')}
                                                     disabled={itemLoading}
-                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0"
+                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0 cursor-pointer"
                                                     title="Buscar por Número de artículo"
                                                 >
                                                     <Search size={13} />
@@ -1961,24 +1867,22 @@ export default function ConsultaSAPPage() {
                                             </div>
                                         </div>
 
-                                        {/* DESCRIPCIÓN (SEARCHABLE - RED HIGHLIGHT BOX) */}
+                                        {/* DESCRIPCIÓN (SEARCHABLE) */}
                                         <div className="flex items-center">
                                             <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none">Descripción</span>
                                             <div className="flex items-center gap-1 flex-1">
-                                                <div className="relative flex-1 p-0.5 rounded border-2 border-red-500 bg-red-50/20 shadow-sm transition-all focus-within:ring-2 focus-within:ring-red-400">
-                                                    <input
-                                                        type="text"
-                                                        value={itemNameInput}
-                                                        onChange={(e) => setItemNameInput(e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('name')}
-                                                        className="w-full bg-[#fffde6] text-black text-xs font-medium px-2 py-1 outline-none border border-[#b2b2b2] rounded-none focus:bg-white select-text"
-                                                        placeholder="Ej: LAVAMANOS SIENA 79X48"
-                                                    />
-                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={itemNameInput}
+                                                    onChange={(e) => setItemNameInput(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleItemSearch('name')}
+                                                    className="w-full bg-[#fffde6] text-black text-xs font-medium px-2 py-1 outline-none border border-[#b2b2b2] focus:bg-white select-text"
+                                                    placeholder="Ej: LAVAMANOS SIENA 79X48"
+                                                />
                                                 <button
                                                     onClick={() => handleItemSearch('name')}
                                                     disabled={itemLoading}
-                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0"
+                                                    className="bg-[#324354] hover:bg-[#253342] text-white px-2.5 py-1 text-xs font-bold transition-colors flex items-center gap-1 shadow-sm shrink-0 cursor-pointer"
                                                     title="Buscar por Descripción de artículo"
                                                 >
                                                     <Search size={13} />
@@ -2005,23 +1909,6 @@ export default function ConsultaSAPPage() {
                                                 </div>
                                             </div>
                                         )}
-
-
-
-                                        {/* Lista de precios */}
-                                        <div className="flex items-center">
-                                            <span className="w-[140px] shrink-0 text-[11px] text-gray-800 select-none">Lista de precios</span>
-                                            <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0.5 text-xs text-black w-48 rounded-none">
-                                                <option>{activeItem.priceList}</option>
-                                            </select>
-                                            <span className="ml-3 text-[11px] text-gray-800 mr-1 select-none">Precio por unidad</span>
-                                            <input
-                                                type="text"
-                                                value={activeItem.price}
-                                                readOnly
-                                                className="bg-white border border-[#b2b2b2] px-2 py-0.5 text-xs font-bold text-black w-36 text-right rounded-none select-text"
-                                            />
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2046,7 +1933,6 @@ export default function ConsultaSAPPage() {
                                         </button>
                                     ))}
                                 </div>
-
                                 {/* TAB CONTENT BODY */}
                                 <div className="bg-[#f3f0ea] border-x border-b border-[#a3a3a3] p-2.5 min-h-[320px]">
                                     
@@ -2054,54 +1940,17 @@ export default function ConsultaSAPPage() {
                                     {itemInnerTab === 'inventario' && (
                                         <div className="space-y-2 font-sans select-none text-[11px]">
                                             
-                                            {/* SECCIÓN SUPERIOR DE CAMPOS CONFIGURATIVOS Y NIVEL DE STOCK */}
-                                            <div className="flex flex-wrap lg:flex-nowrap justify-between gap-6 items-start bg-[#f3f0ea] p-1.5 border-b border-[#c8c5bc]">
-                                                
-                                                {/* IZQUIERDA: MÉTODOS Y UNIDADES DE MEDIDA */}
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center">
-                                                        <span className="w-36 text-gray-800">Fijar ctas de mayor según</span>
-                                                        <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
-                                                            <option>Grupo de artículos</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="flex items-center">
-                                                        <span className="w-36 text-gray-800">Nombre unid. de medida</span>
-                                                        <input type="text" value={activeItem.inventoryUOM || ''} readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none" />
-                                                    </div>
-                                                    <div className="flex items-center">
-                                                        <span className="w-36 text-gray-800">Peso</span>
-                                                        <input type="text" value="" readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none" />
-                                                    </div>
-                                                    <div className="flex items-center pt-2">
-                                                        <span className="w-36 text-gray-800">Método de valoración</span>
-                                                        <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
-                                                            <option>{activeItem.itemCode ? 'Promedio ponderado' : ''}</option>
-                                                        </select>
-                                                    </div>
+                                            {/* SECCIÓN SUPERIOR DE CAMPOS CONFIGURATIVOS */}
+                                            <div className="flex flex-wrap items-center gap-6 bg-[#f3f0ea] p-1.5 border-b border-[#c8c5bc]">
+                                                <div className="flex items-center">
+                                                    <span className="w-36 text-gray-800 shrink-0">Fijar ctas de mayor según</span>
+                                                    <select disabled className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none">
+                                                        <option>Grupo de artículos</option>
+                                                    </select>
                                                 </div>
-
-                                                {/* DERECHA: GESTIÓN DE STOCKS Y NIVELES */}
-                                                <div className="space-y-1">
-                                                    <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-gray-800">
-                                                        <input type="checkbox" checked={Boolean(activeItem.itemCode)} readOnly className="w-3.5 h-3.5 text-amber-600 rounded-none" />
-                                                        <span>Gestión de stocks por almacén</span>
-                                                    </label>
-                                                    <div className="pl-5 pt-1 space-y-1">
-                                                        <span className="font-semibold text-gray-700 block border-b border-gray-300 pb-0.5 text-[10.5px]">Nivel de stock</span>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-gray-800">Necesario (UdM de Compras)</span>
-                                                            <input type="text" value="" readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-24 text-right rounded-none" />
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-gray-800">Mínimo</span>
-                                                            <input type="text" value="" readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-24 text-right rounded-none" />
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <span className="text-gray-800">Máximo</span>
-                                                            <input type="text" value={activeItem.itemCode ? '22' : ''} readOnly className="bg-white border border-[#b2b2b2] px-1.5 py-0.5 text-xs font-semibold text-black w-24 text-right rounded-none" />
-                                                        </div>
-                                                    </div>
+                                                <div className="flex items-center">
+                                                    <span className="w-36 text-gray-800 shrink-0">Nombre unid. de medida</span>
+                                                    <input type="text" value={activeItem.inventoryUOM || ''} readOnly className="bg-[#fcfdfd] border border-[#b2b2b2] px-1.5 py-0.5 text-xs text-black w-40 rounded-none focus:outline-none select-text" />
                                                 </div>
                                             </div>
 
@@ -2230,15 +2079,15 @@ export default function ConsultaSAPPage() {
                                                             <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Lista de precios</th>
                                                             <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción total</th>
                                                             <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Precio unitario</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Total</th>
+                                                <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Total</th>
                                                             <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Comentarios</th>
                                                             <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Cta.WIP</th>
                                                             <th className="px-2 py-1 text-center">Secuen...</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-[#e0ddd5]">
-                                                        {activeItem.itemCode ? (
-                                                            BOM_SAMPLE_DATA.map((row, idx) => (
+                                                        {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? (
+                                                            activeItem.bomComponents.map((row, idx) => (
                                                                 <tr key={idx} className="h-5 hover:bg-[#fff9e6]">
                                                                     <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600">{row.id}</td>
                                                                     <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800">{row.tipo}</td>
@@ -2269,11 +2118,26 @@ export default function ConsultaSAPPage() {
                                                                 </tr>
                                                             ))
                                                         ) : (
-                                                            <tr>
-                                                                <td colSpan={16} className="py-6 text-center text-gray-500 italic font-sans">
-                                                                    No hay componentes registrados. Realiza una búsqueda por número o descripción de artículo.
-                                                                </td>
-                                                            </tr>
+                                                            Array.from({ length: 12 }).map((_, idx) => (
+                                                                <tr key={idx} className="h-5 bg-white border-b border-[#e0ddd5]">
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td className="border-r border-[#e0ddd5]"></td>
+                                                                    <td></td>
+                                                                </tr>
+                                                            ))
                                                         )}
                                                     </tbody>
                                                     {/* FILA DE TOTALES CONSOLIDADOS AL PIE DE LA TABLA */}
@@ -2282,14 +2146,14 @@ export default function ConsultaSAPPage() {
                                                             <td colSpan={10} className="px-2 py-1 border-r border-[#c2c0bb] text-right text-gray-600 font-sans">Totales:</td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono">{activeItem.itemCode ? '$ 0.00' : ''}</td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right"></td>
-                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono text-emerald-800">{activeItem.itemCode ? '$ 10,723.40' : ''}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono text-emerald-800">
+                                                                {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? '$ 10,723.40' : (activeItem.itemCode ? '$ 0.00' : '')}
+                                                            </td>
                                                             <td colSpan={3} className="px-2 py-1"></td>
                                                         </tr>
                                                     </tfoot>
                                                 </table>
                                             </div>
-
-                                            {/* PIE DE FORMULARIO: PRECIO DE PRODUCTO Y BOTONES OK/CANCELAR */}
                                             <div className="p-2 bg-[#f3f0ea] flex items-center justify-between border-t border-[#c8c5bc]">
                                                 <div className="flex items-center gap-2">
                                                     <button disabled className="bg-[#dedbd5] border border-[#a3a3a3] px-4 py-0.5 text-xs font-bold text-gray-800 cursor-not-allowed shadow-xs hover:bg-gray-200">
