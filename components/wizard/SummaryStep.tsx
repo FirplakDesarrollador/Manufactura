@@ -52,6 +52,20 @@ export default function SummaryStep() {
     const rProps = getKPIProps(evaluacionActual.rendimiento);
     const qProps = getKPIProps(evaluacionActual.calidad);
 
+    // Shrinks the font size as the displayed text gets longer, so long numbers never overflow their box
+    const fitFontSize = (text: string, base: "4xl" | "2xl" = "4xl") => {
+        const len = text.length;
+        if (base === "4xl") {
+            if (len <= 6) return "text-4xl";
+            if (len <= 7) return "text-3xl";
+            if (len <= 9) return "text-2xl";
+            return "text-xl";
+        }
+        if (len <= 6) return "text-2xl";
+        if (len <= 8) return "text-xl";
+        return "text-lg";
+    };
+
     return (
         <div className="space-y-6 animate-in slide-in-from-right fade-in duration-500">
 
@@ -91,20 +105,20 @@ export default function SummaryStep() {
 
                 {/* Global KPIs */}
                 <div className="flex flex-col gap-6">
-                    <div className={`p-6 rounded-2xl border-2 flex items-center justify-between shadow-md transition-all ${rProps.bg} ${rProps.border}`}>
-                        <div>
+                    <div className={`p-6 rounded-2xl border-2 flex items-center justify-between gap-3 shadow-md transition-all ${rProps.bg} ${rProps.border}`}>
+                        <div className="min-w-0">
                             <p className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-1">Rendimiento</p>
-                            <p className={`text-4xl font-black tabular-nums ${rProps.color}`}>
+                            <p className={`${fitFontSize(`${evaluacionActual.rendimiento.toFixed(1)}%`)} font-black tabular-nums truncate ${rProps.color}`}>
                                 {evaluacionActual.rendimiento.toFixed(1)}%
                             </p>
                         </div>
                         {rProps.icon}
                     </div>
 
-                    <div className={`p-6 rounded-2xl border-2 flex items-center justify-between shadow-md transition-all ${qProps.bg} ${qProps.border}`}>
-                        <div>
+                    <div className={`p-6 rounded-2xl border-2 flex items-center justify-between gap-3 shadow-md transition-all ${qProps.bg} ${qProps.border}`}>
+                        <div className="min-w-0">
                             <p className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-1">Calidad</p>
-                            <p className={`text-4xl font-black tabular-nums ${qProps.color}`}>
+                            <p className={`${fitFontSize(`${evaluacionActual.calidad.toFixed(1)}%`)} font-black tabular-nums truncate ${qProps.color}`}>
                                 {evaluacionActual.calidad.toFixed(1)}%
                             </p>
                         </div>
@@ -119,14 +133,14 @@ export default function SummaryStep() {
                     </CardHeader>
                     <CardContent>
                         <div className="flex justify-between items-center mb-6">
-                            <div className="text-center bg-slate-50 p-4 rounded-xl flex-1 border border-slate-100">
+                            <div className="text-center bg-slate-50 p-4 rounded-xl flex-1 border border-slate-100 min-w-0">
                                 <span className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Teórico</span>
-                                <span className="text-2xl font-black text-slate-700">{evaluacionActual.tiempoCicloTeorico}s</span>
+                                <span className={`${fitFontSize(`${evaluacionActual.tiempoCicloTeorico}s`, "2xl")} font-black text-slate-700 truncate block`}>{evaluacionActual.tiempoCicloTeorico}s</span>
                             </div>
                             <div className="mx-4 text-slate-300 font-bold">VS</div>
-                            <div className="text-center bg-blue-50 p-4 rounded-xl flex-1 border border-blue-100">
+                            <div className="text-center bg-blue-50 p-4 rounded-xl flex-1 border border-blue-100 min-w-0">
                                 <span className="block text-xs font-bold text-blue-500 uppercase tracking-widest mb-1">Prom. Real</span>
-                                <span className="text-2xl font-black text-blue-700">{evaluacionActual.tiempoPromedio.toFixed(1)}s</span>
+                                <span className={`${fitFontSize(`${evaluacionActual.tiempoPromedio.toFixed(1)}s`, "2xl")} font-black text-blue-700 truncate block`}>{evaluacionActual.tiempoPromedio.toFixed(1)}s</span>
                             </div>
                         </div>
                         <p className="text-center text-sm font-bold text-slate-500 uppercase tracking-wider">

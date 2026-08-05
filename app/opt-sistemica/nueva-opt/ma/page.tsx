@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { createExternalClient } from '@/lib/supabase/external';
 import { Wrench, Search, Upload, Info, CheckCircle2, AlertTriangle, XCircle, Eye } from 'lucide-react';
 
 interface Machine {
@@ -38,6 +40,10 @@ export default function MantenimientoAutonomoPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Persona a quien se le realiza la OPT
+  const [personas, setPersonas] = useState<string[]>([]);
+  const [personaEvaluada, setPersonaEvaluada] = useState('');
 
   // Data sources
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -89,6 +95,25 @@ export default function MantenimientoAutonomoPage() {
       }
     });
   }, [router]);
+
+  useEffect(() => {
+    const fetchPersonas = async () => {
+      try {
+        const externalSupabase = createExternalClient();
+        const { data, error: err } = await externalSupabase
+          .from('empleados')
+          .select('nombreCompleto')
+          .eq('activo', true)
+          .order('nombreCompleto', { ascending: true });
+        if (!err && data) {
+          setPersonas(data.map((d: any) => d.nombreCompleto));
+        }
+      } catch (err) {
+        console.error('Error fetching empleados:', err);
+      }
+    };
+    fetchPersonas();
+  }, []);
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -276,6 +301,12 @@ export default function MantenimientoAutonomoPage() {
   }, [chkResponses, staticResponses]);
 
   const handleSave = async () => {
+    if (!personaEvaluada) {
+      setError('Por favor selecciona la persona a quien se le realiza la OPT.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (!selectedMachineId) {
       setError('Por favor selecciona una máquina antes de guardar.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -364,6 +395,7 @@ export default function MantenimientoAutonomoPage() {
           user_id: session.user.id,
           user_email: session.user.email,
           modulo_tipo: 'MA',
+          persona_evaluada: personaEvaluada,
           percentage: parseFloat(percentage),
           responses: responses,
           action_plans: actionPlans
@@ -442,6 +474,22 @@ export default function MantenimientoAutonomoPage() {
             </div>
           </div>
         )}
+
+        {/* Sección 0: Persona a quien se le realiza la OPT */}
+        <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] p-6 md:p-8 mb-8">
+          <h2 className="text-lg font-bold text-[#324354] mb-4 flex items-center gap-2">
+            <span className="bg-[#324354]/5 w-8 h-8 rounded-full flex items-center justify-center text-xs">0</span>
+            Persona a quien se le realiza la OPT
+          </h2>
+          <SearchableSelect
+            name="persona_evaluada"
+            options={personas}
+            placeholder="Buscar y seleccionar persona..."
+            required={true}
+            defaultValue={personaEvaluada}
+            onValueChange={setPersonaEvaluada}
+          />
+        </div>
 
         {/* Sección 1: Selección de Máquina */}
         <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] p-6 md:p-8 mb-8 relative">

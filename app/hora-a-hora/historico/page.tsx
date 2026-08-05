@@ -28,6 +28,20 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
     const rSt = getKPIStyle(item.rendimiento);
     const qSt = getKPIStyle(item.calidad);
 
+    // Shrinks the font size as the displayed text gets longer, so long numbers never overflow their box
+    const fitFontSize = (text: string, base: "4xl" | "2xl" = "4xl") => {
+        const len = text.length;
+        if (base === "4xl") {
+            if (len <= 6) return "text-4xl";
+            if (len <= 7) return "text-3xl";
+            if (len <= 9) return "text-2xl";
+            return "text-xl";
+        }
+        if (len <= 6) return "text-2xl";
+        if (len <= 8) return "text-xl";
+        return "text-lg";
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden animate-in zoom-in-95 fade-in duration-300">
@@ -76,7 +90,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                                 </span>
                                 <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${rSt.labelBg}`}>{rSt.label}</span>
                             </div>
-                            <p className={`text-4xl font-black tabular-nums mt-1 ${rSt.color}`}>{item.rendimiento.toFixed(1)}%</p>
+                            <p className={`${fitFontSize(`${item.rendimiento.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${rSt.color}`}>{item.rendimiento.toFixed(1)}%</p>
                             <div className="w-full bg-slate-100 rounded-full h-2.5 mt-3 overflow-hidden">
                                 <div className={`h-full rounded-full ${rSt.bar}`} style={{ width: `${Math.min(item.rendimiento, 100)}%` }} />
                             </div>
@@ -88,7 +102,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                                 </span>
                                 <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${qSt.labelBg}`}>{qSt.label}</span>
                             </div>
-                            <p className={`text-4xl font-black tabular-nums mt-1 ${qSt.color}`}>{item.calidad.toFixed(1)}%</p>
+                            <p className={`${fitFontSize(`${item.calidad.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${qSt.color}`}>{item.calidad.toFixed(1)}%</p>
                             <div className="w-full bg-slate-100 rounded-full h-2.5 mt-3 overflow-hidden">
                                 <div className={`h-full rounded-full ${qSt.bar}`} style={{ width: `${Math.min(item.calidad, 100)}%` }} />
                             </div>
@@ -101,14 +115,14 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                             <Clock size={13} /> Tiempos de Ciclo
                         </p>
                         <div className="grid grid-cols-3 gap-3 text-center">
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Teórico</p>
-                                <p className="text-2xl font-black text-slate-700">{item.tiempoCicloTeorico}s</p>
+                                <p className={`${fitFontSize(`${item.tiempoCicloTeorico}s`, "2xl")} font-black text-slate-700 truncate`}>{item.tiempoCicloTeorico}s</p>
                             </div>
                             <div className="flex items-center justify-center text-slate-300 font-bold text-lg">VS</div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-blue-500 font-semibold uppercase tracking-wider mb-1">Prom. Real</p>
-                                <p className="text-2xl font-black text-blue-700">{item.tiempoPromedio.toFixed(1)}s</p>
+                                <p className={`${fitFontSize(`${item.tiempoPromedio.toFixed(1)}s`, "2xl")} font-black text-blue-700 truncate`}>{item.tiempoPromedio.toFixed(1)}s</p>
                             </div>
                         </div>
                         <p className="text-center text-xs text-slate-500 font-semibold mt-3 uppercase tracking-wider">
@@ -120,17 +134,17 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Detalle de Calidad</p>
                         <div className="grid grid-cols-3 gap-3 text-center">
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-slate-400 font-semibold mb-1">Inspeccionadas</p>
-                                <p className="text-2xl font-black text-slate-700">{item.piezasTotalesCalidad}</p>
+                                <p className={`${fitFontSize(`${item.piezasTotalesCalidad}`, "2xl")} font-black text-slate-700 truncate`}>{item.piezasTotalesCalidad}</p>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-emerald-500 font-semibold mb-1">Buenas</p>
-                                <p className="text-2xl font-black text-emerald-700">{item.piezasBuenas}</p>
+                                <p className={`${fitFontSize(`${item.piezasBuenas}`, "2xl")} font-black text-emerald-700 truncate`}>{item.piezasBuenas}</p>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-slate-400 font-semibold mb-1">Defectos</p>
-                                <p className="text-2xl font-black text-slate-600">{item.piezasDefectuosas}</p>
+                                <p className={`${fitFontSize(`${item.piezasDefectuosas}`, "2xl")} font-black text-slate-600 truncate`}>{item.piezasDefectuosas}</p>
                             </div>
                         </div>
                     </div>

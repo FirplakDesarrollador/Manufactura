@@ -6,6 +6,8 @@ import { supabase } from '@/lib/opt-sistemica/supabase';
 // import { supabaseFPK } from '@/lib/opt-sistemica/supabase-fpk'; // No longer needed
 import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { createExternalClient } from '@/lib/supabase/external';
 
 const questions = [
   { id: '1.1', text: "¿Tiene el tablero actualizado con la información del día anterior?" },
@@ -28,6 +30,9 @@ export default function GIPage() {
   const [showGuide, setShowGuide] = useState(false);
   const router = useRouter();
 
+  const [personas, setPersonas] = useState<string[]>([]);
+  const [personaEvaluada, setPersonaEvaluada] = useState('');
+
   // State for responses: { [id]: { value: 'SI' | 'NO' | null, comment: string } }
   const [responses, setResponses] = useState<Record<string, { value: 'SI' | 'NO' | null, comment: string }>>(
     questions.reduce((acc, q) => ({ ...acc, [q.id]: { value: null, comment: '' } }), {})
@@ -45,6 +50,25 @@ export default function GIPage() {
       }
     });
   }, [router]);
+
+  useEffect(() => {
+    const fetchPersonas = async () => {
+      try {
+        const externalSupabase = createExternalClient();
+        const { data, error: err } = await externalSupabase
+          .from('empleados')
+          .select('nombreCompleto')
+          .eq('activo', true)
+          .order('nombreCompleto', { ascending: true });
+        if (!err && data) {
+          setPersonas(data.map((d: any) => d.nombreCompleto));
+        }
+      } catch (err) {
+        console.error('Error fetching empleados:', err);
+      }
+    };
+    fetchPersonas();
+  }, []);
 
   // Calculate percentage
   const percentage = useMemo(() => {
@@ -67,6 +91,12 @@ export default function GIPage() {
   };
 
   const handleSave = async () => {
+    if (!personaEvaluada) {
+      setError('Por favor selecciona la persona a quien se le realiza la OPT.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     // Check if all questions are answered
     const unanswered = Object.entries(responses).filter(([_, r]) => r.value === null);
     if (unanswered.length > 0) {
@@ -85,6 +115,7 @@ export default function GIPage() {
           user_id: session.user.id,
           user_email: session.user.email,
           modulo_tipo: 'GI',
+          persona_evaluada: personaEvaluada,
           percentage: parseFloat(percentage),
           responses: responses,
           action_plans: actionPlans
@@ -280,6 +311,18 @@ export default function GIPage() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <SearchableSelect
+                name="persona_evaluada"
+                label="Persona a quien se le realiza la OPT"
+                options={personas}
+                placeholder="Buscar y seleccionar persona..."
+                required={true}
+                defaultValue={personaEvaluada}
+                onValueChange={setPersonaEvaluada}
+              />
+            </div>
+
             {questions.map((q) => (
               <div key={q.id} style={{ 
                 background: 'white', 

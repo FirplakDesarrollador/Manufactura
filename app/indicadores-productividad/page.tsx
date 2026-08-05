@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Share2, Download, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Share2, Download, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
+import Header from "@/components/opt-sistemica/Header";
 
 // Datos Simulados Nivel de Servicio
 const nivelServicioDaily = [
@@ -109,14 +109,18 @@ const POWERBI_URLS = {
     tableroBI: process.env.NEXT_PUBLIC_POWERBI_TABLERO_BI ?? "",
     nivelServicio: process.env.NEXT_PUBLIC_POWERBI_NIVEL_SERVICIO ?? "",
     productividad: process.env.NEXT_PUBLIC_POWERBI_PRODUCTIVIDAD ?? "",
+    calidadGeneral: process.env.NEXT_PUBLIC_POWERBI_CALIDAD_GENERAL ?? "",
     calidadMS: process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MS ?? "",
     calidadFV: process.env.NEXT_PUBLIC_POWERBI_CALIDAD_FV ?? "",
+    calidadMBL: process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MBL ?? "",
+    calidadCEFI: process.env.NEXT_PUBLIC_POWERBI_CALIDAD_CEFI ?? "",
+    calidadMoldes: process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MOLDES ?? "",
     ausentismo: process.env.NEXT_PUBLIC_POWERBI_AUSENTISMO ?? "",
 };
 
 export default function IndicadoresProductividadPage() {
     const [viewMode, setViewMode] = useState<"bi" | "manual" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("bi");
-    const [calidadSubTab, setCalidadSubTab] = useState<"ms" | "fv">("ms");
+    const [calidadSubTab, setCalidadSubTab] = useState<"general" | "ms" | "fv" | "mbl" | "cefi" | "moldes">("ms");
 
     // States for manual indicators
     const [nivelServicio, setNivelServicio] = useState<number>(72.4);
@@ -155,23 +159,12 @@ export default function IndicadoresProductividadPage() {
     return (
         <div className="min-h-screen bg-[#F6F3EE] flex flex-col justify-between font-sans text-[#000000]">
             {/* Header */}
-            <header className="w-full bg-[#324354] text-white shadow-md p-4">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/home">
-                        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 text-white font-bold text-sm transition cursor-pointer">
-                            <ArrowLeft size={18} />
-                            <span>Volver al Home</span>
-                        </button>
-                    </Link>
-                    <h1 className="font-display font-light text-lg md:text-xl uppercase tracking-widest text-center">
-                        Tablero de Control
-                    </h1>
-                    <div className="flex flex-col items-end">
-                        <div className="font-bold text-xl tracking-wider leading-none">FIRPLAK</div>
-                        <div className="text-[9px] opacity-70 uppercase tracking-widest">inspiring homes</div>
-                    </div>
-                </div>
-            </header>
+            <Header
+                title="Tablero de Control"
+                subtitle="Indicadores de Productividad"
+                backUrl="/home"
+                showLogout={false}
+            />
 
             {/* Sub-Header Actions: 5 PESTAÑAS (BI, MANUAL, NIVEL DE SERVICIO, PRODUCTIVIDAD, CALIDAD) */}
             <div className="w-full bg-white border-b border-[#e2ded5] py-3 px-4 shadow-sm">
@@ -297,7 +290,17 @@ export default function IndicadoresProductividadPage() {
                     </div>
                 ) : viewMode === "calidad" ? (
                     <div className="space-y-4">
-                        <div className="flex justify-center gap-3">
+                        <div className="flex flex-wrap justify-center gap-3">
+                            <button
+                                onClick={() => setCalidadSubTab("general")}
+                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+                                    calidadSubTab === "general"
+                                        ? "bg-[#324354] text-white shadow-md"
+                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+                                }`}
+                            >
+                                Calidad General Plantas
+                            </button>
                             <button
                                 onClick={() => setCalidadSubTab("ms")}
                                 className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
@@ -318,13 +321,50 @@ export default function IndicadoresProductividadPage() {
                             >
                                 Calidad FV
                             </button>
+                            <button
+                                onClick={() => setCalidadSubTab("mbl")}
+                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+                                    calidadSubTab === "mbl"
+                                        ? "bg-[#324354] text-white shadow-md"
+                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+                                }`}
+                            >
+                                Calidad MBL
+                            </button>
+                            <button
+                                onClick={() => setCalidadSubTab("cefi")}
+                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+                                    calidadSubTab === "cefi"
+                                        ? "bg-[#324354] text-white shadow-md"
+                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+                                }`}
+                            >
+                                Calidad CEFI
+                            </button>
+                            <button
+                                onClick={() => setCalidadSubTab("moldes")}
+                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+                                    calidadSubTab === "moldes"
+                                        ? "bg-[#324354] text-white shadow-md"
+                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+                                }`}
+                            >
+                                Calidad Moldes
+                            </button>
                         </div>
                         <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
                             <iframe
-                                title={calidadSubTab === "ms" ? "Power BI Calidad MS" : "Power BI Calidad FV"}
+                                title={`Power BI Calidad ${calidadSubTab}`}
                                 width="100%"
                                 height="100%"
-                                src={calidadSubTab === "ms" ? POWERBI_URLS.calidadMS : POWERBI_URLS.calidadFV}
+                                src={
+                                    calidadSubTab === "general" ? POWERBI_URLS.calidadGeneral :
+                                    calidadSubTab === "ms" ? POWERBI_URLS.calidadMS :
+                                    calidadSubTab === "fv" ? POWERBI_URLS.calidadFV :
+                                    calidadSubTab === "mbl" ? POWERBI_URLS.calidadMBL :
+                                    calidadSubTab === "cefi" ? POWERBI_URLS.calidadCEFI :
+                                    POWERBI_URLS.calidadMoldes
+                                }
                                 frameBorder="0"
                                 allowFullScreen={true}
                             ></iframe>
