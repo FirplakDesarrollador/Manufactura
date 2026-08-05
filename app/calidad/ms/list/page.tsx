@@ -24,7 +24,9 @@ export default function ReportedDefectsListPage() {
     const [defectsList, setDefectsList] = useState<{ id: number, defecto?: string, Defecto?: string, nombre?: string, Nombre?: string }[]>([])
     const [editingReportId, setEditingReportId] = useState<number | null>(null)
     const [editingItemData, setEditingItemData] = useState<any>(null)
+    const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
     const [editForm, setEditForm] = useState<{producto_id: number, defectos: string[], photoFile?: File | null, localPhotoUrl?: string | null}>({ producto_id: 0, defectos: [] })
+    const [editDefectSearchTerm, setEditDefectSearchTerm] = useState('')
     const [isUploading, setIsUploading] = useState(false)
     const [hasEditPermission, setHasEditPermission] = useState(false)
     const [hasDeletePermission, setHasDeletePermission] = useState(false)
@@ -65,14 +67,14 @@ export default function ReportedDefectsListPage() {
         productos: Set<string>
         hora_registro: string
         Molde: string
-        fotos: { id: number, producto_id: number, defecto_nombre: string, url?: string, referencia: string, hora: string }[]
+        fotos: { id: number, producto_id: number, defecto_nombre: string, url?: string, referencia: string, hora: string, molde?: string }[]
     }
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-    const [selectedPhotos, setSelectedPhotos] = useState<{title: string, items: { id: number, producto_id: number, defecto_nombre: string, url?: string, referencia: string, hora: string }[]} | null>(null)
+    const [selectedPhotos, setSelectedPhotos] = useState<{title: string, items: { id: number, producto_id: number, defecto_nombre: string, url?: string, referencia: string, hora: string, molde?: string }[]} | null>(null)
 
     // Stats for total pieces
     const [pieceStats, setPieceStats] = useState({
@@ -218,7 +220,8 @@ export default function ReportedDefectsListPage() {
                             minute: '2-digit',
                             hour12: true,
                             timeZone: 'UTC'
-                        })
+                        }),
+                        molde: r.Molde
                     })
                 })
             })
@@ -628,56 +631,68 @@ export default function ReportedDefectsListPage() {
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-                        <div className="p-4 flex-1 overflow-y-auto bg-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {selectedPhotos.items?.map((item, i) => (
-                                <div key={i} className="flex flex-col bg-white border border-gray-300 shadow-sm overflow-hidden">
-                                    <div className="aspect-square bg-gray-200 relative flex items-center justify-center">
-                                        {item.url ? (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={item.url} alt={`Defecto ${i+1}`} className="w-full h-full object-contain" />
-                                        ) : (
-                                            <div className="flex flex-col items-center justify-center opacity-30">
-                                                <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                                <span className="text-xs font-black uppercase tracking-widest">Sin Foto</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="p-3 bg-white border-t border-gray-200 flex-1 flex flex-col justify-between">
-                                        <div>
-                                            <p className="text-[10px] font-black text-[#254153] uppercase mb-1 truncate" title={item.referencia}>
-                                                Ref: {item.referencia}
-                                            </p>
-                                            <p className="text-[10px] font-bold text-gray-500 uppercase">
-                                                Hora: {item.hora}
-                                            </p>
+                        <div className="p-4 flex-1 overflow-y-auto bg-gray-100">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {selectedPhotos.items?.map((item, i) => (
+                                    <div key={i} className="flex flex-col bg-white border border-gray-300 shadow-sm overflow-hidden">
+                                        <div className="aspect-square bg-gray-200 relative flex items-center justify-center overflow-hidden shrink-0">
+                                            {item.url ? (
+                                                /* eslint-disable-next-line @next/next/no-img-element */
+                                                <img 
+                                                    src={item.url} 
+                                                    alt={`Defecto ${i+1}`} 
+                                                    className="absolute inset-0 w-full h-full object-contain cursor-pointer transition-transform hover:scale-105" 
+                                                    onClick={() => setFullscreenImage(item.url || null)}
+                                                />
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center opacity-30">
+                                                    <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            <span className="text-xs font-black uppercase tracking-widest">Sin Foto</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        {(hasEditPermission || hasDeletePermission) && (
-                                            <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
-                                                {hasEditPermission ? (
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingReportId(item.id)
-                                                            setEditingItemData(item)
-                                                            setEditForm({ producto_id: item.producto_id, defectos: [item.defecto_nombre] })
-                                                        }}
-                                                        className="text-blue-600 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
-                                                    >
-                                                        ✏️ Editar
-                                                    </button>
-                                                ) : <div />}
-                                                {hasDeletePermission && (
-                                                    <button
-                                                        onClick={() => handleDeleteReport(item.id)}
-                                                        className="text-red-500 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
-                                                    >
-                                                        🗑️ Borrar
-                                                    </button>
+                                        <div className="p-3 bg-white border-t border-gray-200 shrink-0">
+                                            <div className="mb-2">
+                                                <p className="text-[10px] font-black text-[#254153] uppercase mb-1 truncate" title={item.referencia}>
+                                                    Ref: {item.referencia}
+                                                </p>
+                                                {item.molde && (
+                                                    <p className="text-[10px] font-bold text-gray-700 uppercase mb-1 truncate" title={item.molde}>
+                                                        Molde: {item.molde}
+                                                    </p>
                                                 )}
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase">
+                                                    Hora: {item.hora}
+                                                </p>
                                             </div>
-                                        )}
+                                            {(hasEditPermission || hasDeletePermission) && (
+                                                <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
+                                                    {hasEditPermission ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingReportId(item.id)
+                                                                setEditingItemData(item)
+                                                                setEditForm({ producto_id: item.producto_id, defectos: [item.defecto_nombre] })
+                                                            }}
+                                                            className="text-blue-600 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
+                                                        >
+                                                            ✏️ Editar
+                                                        </button>
+                                                    ) : <div />}
+                                                    {hasDeletePermission && (
+                                                        <button
+                                                            onClick={() => handleDeleteReport(item.id)}
+                                                            className="text-red-500 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
+                                                        >
+                                                            🗑️ Borrar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -755,8 +770,23 @@ export default function ReportedDefectsListPage() {
 
                                 <div>
                                     <label className="block text-xs font-black text-[#254153] uppercase mb-2">Defectos ({editForm.defectos.length} seleccionados)</label>
+                                    <div className="relative mb-2">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <Search className="h-4 w-4 text-gray-400" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={editDefectSearchTerm}
+                                            onChange={(e) => setEditDefectSearchTerm(e.target.value)}
+                                            className="w-full pl-10 pr-3 py-2 border border-gray-300 bg-white text-sm focus:outline-none focus:border-[#254153]"
+                                            placeholder="Buscar defecto..."
+                                        />
+                                    </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1 border border-gray-200 bg-gray-50">
-                                        {defectsList.map(d => {
+                                        {defectsList.filter(d => {
+                                            const name = d.defecto || d.Defecto || d.nombre || d.Nombre || ''
+                                            return name.toLowerCase().includes(editDefectSearchTerm.toLowerCase())
+                                        }).map(d => {
                                             const name = d.defecto || d.Defecto || d.nombre || d.Nombre || ''
                                             const isSelected = editForm.defectos.includes(name)
                                             return (
@@ -800,6 +830,27 @@ export default function ReportedDefectsListPage() {
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Fullscreen Image Modal */}
+            {fullscreenImage && (
+                <div 
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-md cursor-zoom-out p-4"
+                    onClick={() => setFullscreenImage(null)}
+                >
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setFullscreenImage(null) }} 
+                        className="absolute top-4 right-4 p-2 text-white/50 hover:text-white transition-colors z-[210] bg-black/50 rounded-full"
+                    >
+                        <X className="w-8 h-8" />
+                    </button>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                        src={fullscreenImage} 
+                        alt="Vista ampliada" 
+                        className="w-full h-full object-contain pointer-events-none" 
+                    />
                 </div>
             )}
         </div>
