@@ -223,6 +223,9 @@ export default function ReportedDefectsListPage() {
                         }),
                         molde: r.Molde
                     })
+                    if (r.Molde) {
+                        console.log('Found Molde:', r.Molde, 'for record:', r.id);
+                    }
                 })
             })
 
@@ -345,10 +348,8 @@ export default function ReportedDefectsListPage() {
             console.error('Error deleting report:', error)
             alert('Error al eliminar el reporte')
         } else {
-            setEditingReportId(null)
-            setEditingItemData(null)
-            setLoading(true)
-            await fetchData()
+            alert('Registro eliminado correctamente')
+            window.location.reload()
         }
     }
 
