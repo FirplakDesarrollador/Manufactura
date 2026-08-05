@@ -1,12 +1,35 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/opt-sistemica/Header';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { createExternalClient } from '@/lib/supabase/external';
 
 export default function BitacoraPage() {
   const [selection, setSelection] = useState<'MS_FV' | 'MBL_CEFI' | null>(null);
+  const [personas, setPersonas] = useState<string[]>([]);
+  const [personaEvaluada, setPersonaEvaluada] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchPersonas = async () => {
+      try {
+        const externalSupabase = createExternalClient();
+        const { data, error: err } = await externalSupabase
+          .from('empleados')
+          .select('nombreCompleto')
+          .eq('activo', true)
+          .order('nombreCompleto', { ascending: true });
+        if (!err && data) {
+          setPersonas(data.map((d: any) => d.nombreCompleto));
+        }
+      } catch (err) {
+        console.error('Error fetching empleados:', err);
+      }
+    };
+    fetchPersonas();
+  }, []);
 
   if (!selection) {
     return (
@@ -114,10 +137,21 @@ export default function BitacoraPage() {
           <h1 style={{ color: 'var(--accent)', fontSize: '2.5rem', fontWeight: 700, marginBottom: '20px' }}>
             📔 Bitácora: {selection === 'MS_FV' ? 'MS y FV' : 'MBL y CEFI'}
           </h1>
+          <div className="card" style={{ marginBottom: '24px' }}>
+            <SearchableSelect
+              name="persona_evaluada"
+              label="Persona a quien se le realiza la OPT"
+              options={personas}
+              placeholder="Buscar y seleccionar persona..."
+              required={true}
+              defaultValue={personaEvaluada}
+              onValueChange={setPersonaEvaluada}
+            />
+          </div>
           <div className="card">
             <p style={{ color: '#666', fontSize: '1.2rem' }}>
-              {selection === 'MS_FV' 
-                ? 'Módulo de Seguimiento diario de novedades y eventos relevantes para MS y FV.' 
+              {selection === 'MS_FV'
+                ? 'Módulo de Seguimiento diario de novedades y eventos relevantes para MS y FV.'
                 : 'Módulo de Seguimiento diario de novedades y eventos relevantes para MBL y CEFI.'}
             </p>
             <div style={{ marginTop: '40px', padding: '20px', border: '2px dashed #ddd', borderRadius: '12px', textAlign: 'center', color: '#999' }}>

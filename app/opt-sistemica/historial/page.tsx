@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
+import { createExternalClient } from '@/lib/supabase/external';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/opt-sistemica/SubHeader';
-import { Search } from 'lucide-react';
+import { Search, Eye, Edit2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 
 interface OPTRecord {
   id: string;
@@ -13,6 +14,7 @@ interface OPTRecord {
   user_id: string;
   user_email: string;
   modulo_tipo: string;
+  persona_evaluada?: string | null;
   percentage: number;
   responses: any;
   action_plans: string;
@@ -67,39 +69,79 @@ const QUESTION_MAPPING: Record<string, Record<string, string>> = {
   }
 };
 
+const MODULE_INFO: Record<string, { label: string; emoji: string }> = {
+  'GI': { label: 'Gestión de Indicadores', emoji: '📊' },
+  'EE': { label: 'Entrenamiento Estandarizado', emoji: '🎓' },
+  'BE': { label: 'Gestión de Bajas Estadísticas', emoji: '📉' },
+  'AF': { label: 'Acompañamiento Frecuente', emoji: '🤝' },
+  '5S': { label: "5'S", emoji: '🧹' },
+  'MA': { label: 'Mantenimiento Autónomo', emoji: '🔧' },
+  'OPT': { label: 'Observación de Puesto de Trabajo', emoji: '🔍' },
+  'TE': { label: 'Trabajo Estandarizado', emoji: '📋' },
+  'BIT': { label: 'Bitácora', emoji: '📔' },
+};
+
+const getModuleInfo = (type: string) => MODULE_INFO[type] || { label: type, emoji: '' };
+
+type SortKey = 'numero' | 'created_at' | 'modulo_tipo' | 'realizadoPor' | 'persona_evaluada' | 'percentage';
+
 export default function HistorialPage() {
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<OPTRecord[]>([]);
+  const [numeroMap, setNumeroMap] = useState<Record<string, number>>({});
+  const [nameMap, setNameMap] = useState<Record<string, string>>({});
   const [selectedRecord, setSelectedRecord] = useState<OPTRecord | null>(null);
   const [session, setSession] = useState<any>(null);
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState<'created_at' | 'user_email' | 'modulo_tipo' | 'percentage'>('created_at');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey, direction: 'asc' | 'desc' }>({
+    key: 'created_at',
+    direction: 'desc'
+  });
 
-  const requestSort = (field: 'created_at' | 'user_email' | 'modulo_tipo' | 'percentage') => {
+  const requestSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
-    if (sortField === field && sortDirection === 'asc') {
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    setSortField(field);
-    setSortDirection(direction);
+    setSortConfig({ key, direction });
   };
 
   const fetchRecords = async () => {
     setLoading(true);
+    // Fetch ascending first so we can assign a stable sequential "#" to each record
     const { data, error } = await supabase
       .from('opt_registros')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching records:', error);
     } else {
+      const map: Record<string, number> = {};
+      (data || []).forEach((r: any, idx: number) => { map[r.id] = idx + 1; });
+      setNumeroMap(map);
       setRecords(data || []);
     }
     setLoading(false);
+  };
+
+  const fetchNames = async () => {
+    const { data: usuarios } = await supabase.from('usuarios').select('correo, nombre');
+    if (usuarios && usuarios.length > 0) {
+      const map: Record<string, string> = {};
+      usuarios.forEach((u: any) => { if (u.correo && u.nombre) map[u.correo] = u.nombre; });
+      setNameMap(map);
+    } else {
+      const ext = createExternalClient();
+      const { data: extUsuarios } = await ext.from('usuarios').select('correo, nombre');
+      if (extUsuarios) {
+        const map: Record<string, string> = {};
+        extUsuarios.forEach((u: any) => { if (u.correo && u.nombre) map[u.correo] = u.nombre; });
+        setNameMap(map);
+      }
+    }
   };
 
   useEffect(() => {
@@ -109,80 +151,88 @@ export default function HistorialPage() {
       } else {
         setSession(session);
         fetchRecords();
+        fetchNames();
       }
     });
   }, [router]);
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const resolveUserName = (email: string | undefined) => {
+    if (!email) return '—';
+    return nameMap[email] || email;
   };
 
-  const filteredRecords = records.filter(record => {
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return {
+      date: d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      time: d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+    };
+  };
+
+  const filteredAndSortedData = useMemo(() => {
     const term = searchTerm.toLowerCase();
-    return (
-      record.user_email.toLowerCase().includes(term) ||
-      record.modulo_tipo.toLowerCase().includes(term) ||
-      formatDate(record.created_at).toLowerCase().includes(term) ||
-      `${record.percentage}%`.includes(term)
-    );
-  });
+    let result = records.filter(record => {
+      const moduleInfo = getModuleInfo(record.modulo_tipo);
+      return (
+        (numeroMap[record.id]?.toString() || '').includes(term) ||
+        record.modulo_tipo.toLowerCase().includes(term) ||
+        moduleInfo.label.toLowerCase().includes(term) ||
+        (record.persona_evaluada || '').toLowerCase().includes(term) ||
+        record.user_email.toLowerCase().includes(term) ||
+        resolveUserName(record.user_email).toLowerCase().includes(term) ||
+        `${record.percentage}%`.includes(term)
+      );
+    });
 
-  const sortedRecords = [...filteredRecords].sort((a, b) => {
-    let aVal: any = a[sortField];
-    let bVal: any = b[sortField];
-    
-    if (sortField === 'created_at') {
-      aVal = new Date(a.created_at).getTime();
-      bVal = new Date(b.created_at).getTime();
-    }
-    
-    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+    result.sort((a, b) => {
+      let valA: any, valB: any;
+      switch (sortConfig.key) {
+        case 'numero':
+          valA = numeroMap[a.id] || 0; valB = numeroMap[b.id] || 0;
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        case 'created_at':
+          valA = new Date(a.created_at).getTime(); valB = new Date(b.created_at).getTime();
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        case 'percentage':
+          valA = a.percentage || 0; valB = b.percentage || 0;
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        case 'modulo_tipo':
+          valA = a.modulo_tipo.toLowerCase(); valB = b.modulo_tipo.toLowerCase();
+          break;
+        case 'persona_evaluada':
+          valA = (a.persona_evaluada || '').toLowerCase(); valB = (b.persona_evaluada || '').toLowerCase();
+          break;
+        case 'realizadoPor':
+          valA = resolveUserName(a.user_email).toLowerCase(); valB = resolveUserName(b.user_email).toLowerCase();
+          break;
+        default:
+          valA = ''; valB = '';
+      }
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
-  const renderSortableHeader = (label: string, field: 'created_at' | 'user_email' | 'modulo_tipo' | 'percentage', alignClass: string = 'text-left') => {
-    const isActive = sortField === field;
-    return (
-      <th 
-        onClick={() => requestSort(field)}
-        className={`px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-slate-700/50 transition-colors ${alignClass}`}
-      >
-        <div className={`flex items-center gap-1.5 ${alignClass === 'text-center' ? 'justify-center' : alignClass === 'text-right' ? 'justify-end' : ''}`}>
-          <span>{label}</span>
-          <span className="text-[10px] opacity-80 font-normal">
-            {isActive ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : ' ↕'}
-          </span>
-        </div>
-      </th>
-    );
+    return result;
+  }, [records, searchTerm, sortConfig, numeroMap, nameMap]);
+
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortConfig.key !== columnKey) return <ArrowUpDown size={13} className="opacity-40 ml-1 inline-block align-middle" />;
+    return sortConfig.direction === 'asc'
+      ? <ArrowUp size={13} className="ml-1 text-white inline-block align-middle" />
+      : <ArrowDown size={13} className="ml-1 text-white inline-block align-middle" />;
   };
 
   const canEdit = (record: OPTRecord) => {
     if (!session?.user) return false;
     return (
-      record.user_id === session.user.id || 
+      record.user_id === session.user.id ||
       AUTHORIZED_ADMINS.includes(session.user.email || '')
     );
   };
 
-  const getModuleLabel = (type: string) => {
-    switch (type) {
-      case 'GI': return '📊 Gestión de Indicadores';
-      case 'EE': return '🎓 Entrenamiento Estandarizado';
-      case 'BE': return '📉 Gestión de Bajas Estadísticas';
-      case 'AF': return '🤝 Acompañamiento Frecuente';
-      case '5S': return "🧹 5'S";
-      case 'MA': return "🔧 Mantenimiento Autónomo";
-      default: return type;
-    }
-  };
+  const percentageColor = (val: number) =>
+    val >= 80 ? 'text-emerald-600' : val >= 50 ? 'text-amber-500' : 'text-rose-600';
 
   if (!session) return null;
 
@@ -197,17 +247,16 @@ export default function HistorialPage() {
       />
       <SubHeader />
 
-      <main className="relative z-10 flex-1 flex flex-col justify-start px-6 py-12 md:py-16 lg:py-20 pt-28 max-w-[1700px] mx-auto w-full">
+      <main className="relative z-10 flex-1 flex flex-col justify-start px-6 pt-6 pb-12 md:pb-16 lg:pb-20 max-w-[1700px] mx-auto w-full">
         <div className="w-full animate-fade-in space-y-6">
-          
-          {/* Header Row: Title on the left, Search bar and records count on the right */}
+
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-[#e2ded5] pb-6">
             <div>
               <h2 className="text-2xl md:text-3xl font-light tracking-wide text-[#324354] font-display">
                 Observaciones Guardadas
               </h2>
             </div>
-            
+
             <div className="flex flex-col items-end gap-1.5 min-w-[320px] max-w-md w-full">
               <div className="relative w-full">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -215,14 +264,14 @@ export default function HistorialPage() {
                 </span>
                 <input
                   type="text"
-                  placeholder="Buscar por usuario, módulo..."
+                  placeholder="Buscar por #, módulo, operario, realizado por..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-[#e2ded5] rounded-full focus:outline-none focus:ring-2 focus:ring-[#324354] focus:border-[#324354] bg-white text-sm shadow-sm"
                 />
               </div>
               <span className="text-[10px] font-bold text-[#7B8E90] tracking-wider uppercase">
-                {filteredRecords.length} REGISTROS ENCONTRADOS
+                {filteredAndSortedData.length} REGISTROS ENCONTRADOS
               </span>
             </div>
           </div>
@@ -232,64 +281,109 @@ export default function HistorialPage() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#324354]"></div>
               <div className="mt-4 text-[#324354] font-semibold text-sm">Cargando registros...</div>
             </div>
-          ) : filteredRecords.length === 0 ? (
+          ) : filteredAndSortedData.length === 0 ? (
             <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.05)] p-12 text-center">
               <div className="text-4xl mb-4">📁</div>
               <h3 className="text-lg font-bold text-slate-700">No se encontraron registros.</h3>
               <p className="text-sm text-slate-400 mt-1">Los registros que coincidan con tu búsqueda aparecerán aquí.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.05)] overflow-hidden">
+            <div className="bg-white border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.05)]">
               <div className="overflow-x-auto w-full">
-                <table className="w-full border-collapse text-left min-w-[800px]">
+                <table className="w-full border-collapse text-left min-w-[1000px]">
                   <thead>
                     <tr className="bg-[#324354]">
-                      {renderSortableHeader('Fecha', 'created_at')}
-                      {renderSortableHeader('Usuario', 'user_email')}
-                      {renderSortableHeader('Módulo', 'modulo_tipo')}
-                      {renderSortableHeader('Calificación', 'percentage', 'text-center')}
+                      <th
+                        onClick={() => requestSort('numero')}
+                        className="px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-[#3b4e63] transition-colors w-16"
+                      >
+                        # <SortIcon columnKey="numero" />
+                      </th>
+                      <th
+                        onClick={() => requestSort('created_at')}
+                        className="px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-[#3b4e63] transition-colors"
+                      >
+                        Fecha <SortIcon columnKey="created_at" />
+                      </th>
+                      <th
+                        onClick={() => requestSort('modulo_tipo')}
+                        className="px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-[#3b4e63] transition-colors"
+                      >
+                        Módulo <SortIcon columnKey="modulo_tipo" />
+                      </th>
+                      <th
+                        onClick={() => requestSort('realizadoPor')}
+                        className="px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-[#3b4e63] transition-colors"
+                      >
+                        Realizado por <SortIcon columnKey="realizadoPor" />
+                      </th>
+                      <th
+                        onClick={() => requestSort('persona_evaluada')}
+                        className="px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-[#3b4e63] transition-colors"
+                      >
+                        Operario <SortIcon columnKey="persona_evaluada" />
+                      </th>
+                      <th
+                        onClick={() => requestSort('percentage')}
+                        className="px-6 py-4 text-xs font-bold text-white uppercase tracking-wider cursor-pointer select-none hover:bg-[#3b4e63] transition-colors"
+                      >
+                        KPIs <SortIcon columnKey="percentage" />
+                      </th>
                       <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wider">
                         Acciones
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {sortedRecords.map((record) => (
-                      <tr key={record.id} className="hover:bg-slate-50 transition-colors duration-150">
-                        <td className="px-6 py-4 text-sm font-semibold text-slate-700">{formatDate(record.created_at)}</td>
-                        <td className="px-6 py-4 text-sm text-slate-500">{record.user_email}</td>
-                        <td className="px-6 py-4">
-                          <span className="bg-slate-100 text-[#324354] px-3 py-1 rounded-lg text-xs font-bold border border-slate-200">
-                            {record.modulo_tipo}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className={`font-extrabold text-sm ${
-                            record.percentage >= 80 ? 'text-emerald-600' : record.percentage >= 50 ? 'text-amber-500' : 'text-rose-600'
-                          }`}>
-                            {record.percentage}%
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex gap-2 justify-end items-center">
-                            <button 
-                              onClick={() => setSelectedRecord(record)}
-                              className="px-4 py-2 text-xs font-semibold text-white bg-[#324354] hover:bg-[#283643] rounded-full transition shadow-sm cursor-pointer"
-                            >
-                              Ver Completa
-                            </button>
-                            {canEdit(record) && (
-                              <button 
-                                className="px-4 py-2 text-xs font-semibold text-white bg-[#7B8E90] hover:bg-[#6c7d7f] rounded-full transition shadow-sm cursor-pointer"
-                                onClick={() => alert('Función de edición próximamente disponible.')}
+                    {filteredAndSortedData.map((record) => {
+                      const { date, time } = formatDate(record.created_at);
+                      const moduleInfo = getModuleInfo(record.modulo_tipo);
+                      return (
+                        <tr key={record.id} className="hover:bg-slate-50 transition-colors duration-150">
+                          <td className="px-6 py-4">
+                            <span className="font-black text-[#324354] text-sm">{numeroMap[record.id] || '—'}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-slate-800 text-sm">{date}</div>
+                            <div className="text-xs text-slate-500">{time}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-slate-800 text-sm">{record.modulo_tipo}</div>
+                            <div className="text-xs text-slate-500">{moduleInfo.emoji} {moduleInfo.label}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-xs text-slate-600 font-medium truncate max-w-[180px]">{resolveUserName(record.user_email)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-xs text-slate-600 font-medium truncate max-w-[180px]">{record.persona_evaluada || '—'}</div>
+                          </td>
+                          <td className="px-6 py-4 text-xs">
+                            <span className="font-semibold">Calificación:</span>{' '}
+                            <span className={`font-mono font-bold ${percentageColor(record.percentage)}`}>{record.percentage}%</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => setSelectedRecord(record)}
+                                title="Ver detalle"
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer"
                               >
-                                Editar
+                                <Eye size={16} />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {canEdit(record) && (
+                                <button
+                                  onClick={() => alert('Función de edición próximamente disponible.')}
+                                  title="Editar registro"
+                                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-amber-600 border border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-pointer"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -300,21 +394,21 @@ export default function HistorialPage() {
 
       {/* Full OPT Detail Modal */}
       {selectedRecord && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, left: 0, right: 0, bottom: 0, 
-          background: 'rgba(0,0,0,0.6)', 
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
           backdropFilter: 'blur(6px)',
-          display: 'flex', 
-          alignItems: 'center', 
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
           padding: '20px'
         }}>
-          <div className="card animate-fade-in" style={{ 
-            width: '100%', 
-            maxWidth: '850px', 
-            maxHeight: '90vh', 
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: '850px',
+            maxHeight: '90vh',
             overflowY: 'auto',
             padding: '40px',
             position: 'relative',
@@ -324,22 +418,24 @@ export default function HistorialPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', borderBottom: '1px solid #eee', paddingBottom: '20px' }}>
               <div>
                 <h2 style={{ color: 'var(--header-bg)', fontSize: '1.8rem', fontWeight: 800 }}>
-                  {getModuleLabel(selectedRecord.modulo_tipo)}
+                  {getModuleInfo(selectedRecord.modulo_tipo).emoji} {getModuleInfo(selectedRecord.modulo_tipo).label}
                 </h2>
                 <div style={{ marginTop: '4px', color: '#666', fontSize: '0.95rem' }}>
-                  <strong>Realizado por:</strong> {selectedRecord.user_email} 
+                  <strong>Operario:</strong> {selectedRecord.persona_evaluada || '—'}
                   <span style={{ margin: '0 8px', color: '#ccc' }}>|</span>
-                  <strong>Fecha:</strong> {formatDate(selectedRecord.created_at)}
+                  <strong>Realizado por:</strong> {resolveUserName(selectedRecord.user_email)}
+                  <span style={{ margin: '0 8px', color: '#ccc' }}>|</span>
+                  <strong>Fecha:</strong> {formatDate(selectedRecord.created_at).date} {formatDate(selectedRecord.created_at).time}
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedRecord(null)}
                 style={{ background: '#f3f4f6', border: 'none', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#666', fontSize: '1.2rem' }}
               >
                 ✕
               </button>
             </div>
-            
+
             {/* Full Form Appearance */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {Object.entries(selectedRecord.responses).sort().map(([id, res]: [string, any]) => (
@@ -353,9 +449,9 @@ export default function HistorialPage() {
                         {QUESTION_MAPPING[selectedRecord.modulo_tipo]?.[id] || res.text || 'Pregunta no identificada'}
                       </span>
                     </div>
-                    <div style={{ 
-                      padding: '6px 20px', 
-                      borderRadius: '8px', 
+                    <div style={{
+                      padding: '6px 20px',
+                      borderRadius: '8px',
                       fontWeight: 800,
                       background: res.value === 'SI' ? 'var(--header-bg)' : '#dc2626',
                       color: 'white',
@@ -365,9 +461,9 @@ export default function HistorialPage() {
                     </div>
                   </div>
                   {res.comment ? (
-                    <div style={{ 
-                      background: '#f8fafc', padding: '16px', borderRadius: '10px', 
-                      borderLeft: '4px solid #cbd5e1', color: '#475569', fontSize: '1rem', fontStyle: 'italic' 
+                    <div style={{
+                      background: '#f8fafc', padding: '16px', borderRadius: '10px',
+                      borderLeft: '4px solid #cbd5e1', color: '#475569', fontSize: '1rem', fontStyle: 'italic'
                     }}>
                       "{res.comment}"
                     </div>
@@ -383,7 +479,7 @@ export default function HistorialPage() {
               <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ color: 'var(--accent)', marginBottom: '12px', fontSize: '1.1rem' }}>Puntaje Total</h4>
                 <div style={{ fontSize: '3rem', fontWeight: 900, color: 'var(--header-bg)' }}>{selectedRecord.percentage}%</div>
-                <div style={{ color: '#666', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Cumplimiento General</div>
+                <div style={{ color: '#666', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Calificación General</div>
               </div>
               <div style={{ background: 'var(--header-bg)', padding: '24px', borderRadius: '20px', color: 'white' }}>
                 <h4 style={{ marginBottom: '12px', fontSize: '1.1rem' }}>Planes de Acción</h4>
@@ -392,7 +488,7 @@ export default function HistorialPage() {
             </div>
 
             <div style={{ marginTop: '48px', textAlign: 'center' }}>
-              <button 
+              <button
                 onClick={() => setSelectedRecord(null)}
                 className="btn-primary"
                 style={{ width: '100%', padding: '16px', fontSize: '1.1rem', background: 'var(--accent)' }}

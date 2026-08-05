@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, PenLine, BookOpen, TrendingUp, ShieldCheck, ShieldX, Trash2, BarChart2 } from "lucide-react";
+import { RotateCcw, PenLine, BookOpen, TrendingUp, ShieldCheck, ShieldX, Trash2, BarChart2, Clock, MessageSquare } from "lucide-react";
 
 // ─── Guía data con highlights ─────────────────────────────────────────────────
 type GuiaItem = {
@@ -214,12 +214,30 @@ function ResultsSummary() {
     const { evaluacionActual } = useStore();
     if (!evaluacionActual) return null;
 
-    const { rendimiento, calidad, hdtCumple, desperdicios, operario, puesto, planta, linea } = evaluacionActual;
+    const {
+        rendimiento, calidad, hdtCumple, hdtComentario, desperdicios, operario, puesto, planta, linea,
+        ciclosTotales, tiempoPromedio, tiempoCicloTeorico, piezasTeoricas, piezasReales,
+        piezasTotalesCalidad, piezasBuenas, piezasDefectuosas, comentarioGeneral,
+    } = evaluacionActual;
 
     const getStatus = (val: number) => {
         if (val >= 90) return { label: "CUMPLE", bg: "bg-emerald-500", text: "text-emerald-700", light: "bg-emerald-50 border-emerald-200", bar: "bg-emerald-500" };
         if (val >= 80) return { label: "ATENCIÓN", bg: "bg-amber-400", text: "text-amber-700", light: "bg-amber-50 border-amber-200", bar: "bg-amber-400" };
         return { label: "EN PROCESO", bg: "bg-slate-500", text: "text-slate-700", light: "bg-slate-50 border-slate-200", bar: "bg-slate-400" };
+    };
+
+    // Shrinks the font size as the displayed text gets longer, so long numbers never overflow their box
+    const fitFontSize = (text: string, base: "4xl" | "2xl" = "4xl") => {
+        const len = text.length;
+        if (base === "4xl") {
+            if (len <= 6) return "text-4xl";
+            if (len <= 7) return "text-3xl";
+            if (len <= 9) return "text-2xl";
+            return "text-xl";
+        }
+        if (len <= 6) return "text-2xl";
+        if (len <= 8) return "text-xl";
+        return "text-lg";
     };
 
     const rSt = getStatus(rendimiento);
@@ -260,7 +278,7 @@ function ResultsSummary() {
                             </span>
                             <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${rSt.bg}`}>{rSt.label}</span>
                         </div>
-                        <p className={`text-4xl font-black tabular-nums mt-1 ${rSt.text}`}>{rendimiento.toFixed(1)}%</p>
+                        <p className={`${fitFontSize(`${rendimiento.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${rSt.text}`}>{rendimiento.toFixed(1)}%</p>
                         <div className="mt-3">
                             <KpiBar value={rendimiento} color={rSt.bar} />
                         </div>
@@ -274,30 +292,76 @@ function ResultsSummary() {
                             </span>
                             <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${qSt.bg}`}>{qSt.label}</span>
                         </div>
-                        <p className={`text-4xl font-black tabular-nums mt-1 ${qSt.text}`}>{calidad.toFixed(1)}%</p>
+                        <p className={`${fitFontSize(`${calidad.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${qSt.text}`}>{calidad.toFixed(1)}%</p>
                         <div className="mt-3">
                             <KpiBar value={calidad} color={qSt.bar} />
                         </div>
                     </div>
                 </div>
 
-                {/* HDT Row */}
-                <div className={`flex items-center justify-between p-4 rounded-xl border-2 ${hdtCumple ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
-                    <div className="flex items-center gap-3">
-                        {hdtCumple
-                            ? <ShieldCheck size={24} className="text-emerald-600 shrink-0" />
-                            : <ShieldX size={24} className="text-slate-400 shrink-0" />
-                        }
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Desglose de Trabajo (HDT)</p>
-                            <p className={`font-black text-base ${hdtCumple ? "text-emerald-700" : "text-slate-600"}`}>
-                                {hdtCumple ? "Cumple el estándar" : "En proceso de mejora"}
-                            </p>
+                {/* Tiempos de Ciclo */}
+                <div className="bg-blue-50 border-2 border-blue-100 rounded-2xl p-4">
+                    <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3 flex items-center gap-1">
+                        <Clock size={13} /> Tiempos de Ciclo
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 text-center mb-3">
+                        <div className="bg-white p-3 rounded-xl border border-slate-100">
+                            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Teórico</p>
+                            <p className={`${fitFontSize(`${tiempoCicloTeorico}s`, "2xl")} font-black text-slate-700 truncate`}>{tiempoCicloTeorico}s</p>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-blue-100">
+                            <p className="text-xs text-blue-500 font-semibold uppercase tracking-wider mb-1">Prom. Real</p>
+                            <p className={`${fitFontSize(`${tiempoPromedio.toFixed(1)}s`, "2xl")} font-black text-blue-700 truncate`}>{tiempoPromedio.toFixed(1)}s</p>
                         </div>
                     </div>
-                    <span className={`text-2xl font-black ${hdtCumple ? "text-emerald-600" : "text-slate-400"}`}>
-                        {hdtCumple ? "✓" : "○"}
-                    </span>
+                    <p className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        {ciclosTotales} ciclos válidos · {piezasReales} piezas reales de {Math.round(piezasTeoricas)} teóricas
+                    </p>
+                </div>
+
+                {/* Calidad detalle */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Detalle de Calidad</p>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                            <p className="text-xs text-slate-400 font-semibold mb-1">Inspeccionadas</p>
+                            <p className={`${fitFontSize(`${piezasTotalesCalidad}`, "2xl")} font-black text-slate-700 truncate`}>{piezasTotalesCalidad}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-emerald-500 font-semibold mb-1">Buenas</p>
+                            <p className={`${fitFontSize(`${piezasBuenas}`, "2xl")} font-black text-emerald-700 truncate`}>{piezasBuenas}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-rose-500 font-semibold mb-1">Defectos</p>
+                            <p className={`${fitFontSize(`${piezasDefectuosas}`, "2xl")} font-black text-rose-600 truncate`}>{piezasDefectuosas}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* HDT Row */}
+                <div className={`rounded-xl border-2 p-4 ${hdtCumple ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            {hdtCumple
+                                ? <ShieldCheck size={24} className="text-emerald-600 shrink-0" />
+                                : <ShieldX size={24} className="text-slate-400 shrink-0" />
+                            }
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Desglose de Trabajo (HDT)</p>
+                                <p className={`font-black text-base ${hdtCumple ? "text-emerald-700" : "text-slate-600"}`}>
+                                    {hdtCumple ? "Cumple el estándar" : "En proceso de mejora"}
+                                </p>
+                            </div>
+                        </div>
+                        <span className={`text-2xl font-black ${hdtCumple ? "text-emerald-600" : "text-slate-400"}`}>
+                            {hdtCumple ? "✓" : "○"}
+                        </span>
+                    </div>
+                    {!hdtCumple && hdtComentario && (
+                        <p className="text-sm bg-white/70 p-3 rounded text-slate-700 border-l-2 border-slate-300 italic mt-3">
+                            "{hdtComentario}"
+                        </p>
+                    )}
                 </div>
 
                 {/* Desperdicios */}
@@ -315,6 +379,18 @@ function ResultsSummary() {
                         </div>
                     </div>
                 )}
+
+                {/* Comentarios y Observaciones */}
+                <div className="p-4 rounded-xl border-2 bg-white border-slate-200">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
+                        <MessageSquare size={13} /> Comentarios y Observaciones
+                    </p>
+                    {comentarioGeneral ? (
+                        <p className="text-sm text-slate-700 italic">"{comentarioGeneral}"</p>
+                    ) : (
+                        <p className="text-sm text-slate-400 italic">Sin comentarios registrados.</p>
+                    )}
+                </div>
 
                 <p className="text-xs text-center text-slate-400 italic">
                     Al firmar, el colaborador confirma que recibió retroalimentación sobre estos resultados.

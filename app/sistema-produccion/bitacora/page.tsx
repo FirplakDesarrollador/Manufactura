@@ -340,97 +340,84 @@ export default function BitacoraPage() {
           from { opacity: 0; transform: translateY(12px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        .bitacora-scope .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .bitacora-scope .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
       `}} />
 
-      {/* Main Container */}
-      <main className="relative z-10 flex-1 flex items-center justify-center p-6 md:p-12 pt-28 max-w-[1700px] mx-auto w-full">
-        
-        {/* Pantalla de Selección de Planta */}
-        {!selectedPlanta && (
-          <div className="w-full animate-fade-in px-4 md:px-8">
-            <header className="mb-10 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <button 
-                  onClick={() => router.push('/sistema-produccion')} 
-                  className="flex items-center gap-2 text-[#324354] hover:text-[#324354]/80 font-bold text-sm transition cursor-pointer"
-                >
-                  <ChevronLeft size={18} />
-                  <span>Volver a Sistema de Producción</span>
-                </button>
-              </div>
-              <h2 className="text-3xl font-display font-light text-[#324354] tracking-widest uppercase mt-4">Selecciona tu Proceso</h2>
-              <p className="text-slate-500 font-medium text-base">Elige la planta o área de producción que deseas consultar hoy.</p>
-            </header>
+      {/* Breadcrumb */}
+      <div className="w-full max-w-7xl mx-auto px-4 md:px-8 pt-4 relative z-10">
+        <button
+          onClick={() => router.push('/sistema-produccion')}
+          className="flex items-center gap-2 text-[#324354] hover:text-[#324354]/80 font-bold text-xs transition cursor-pointer"
+        >
+          <ChevronLeft size={16} />
+          <span>Volver a Sistema de Producción</span>
+        </button>
+      </div>
 
-            {/* Grid aligned to 5 columns per row, matching main landing style */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full">
-              {plantas.map((planta) => (
-                <div key={planta.id} className="w-full max-w-[290px] aspect-square">
-                  <button 
-                    className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group" 
-                    onClick={() => setSelectedPlanta(planta)}
-                  >
-                    <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
-                      <div className="text-[#324354] group-hover:text-white transition-colors duration-300">
-                        <ProcessIcon name={planta.nombre} size={36} className="w-8 h-8 md:w-12 md:h-12" />
-                      </div>
-                    </div>
-                    <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                      {planta.nombre}
-                    </span>
-                  </button>
-                </div>
-              ))}
-            </div>
+      {/* Pestañas de Procesos */}
+      {plantas.length > 0 && (
+        <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans mt-4">
+          <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
+            {plantas.map((planta) => {
+              const isActive = selectedPlanta?.id === planta.id;
+              return (
+                <button
+                  key={planta.id}
+                  onClick={() => { setSelectedPlanta(planta); setSubSelection(null); }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                    isActive
+                      ? 'bg-[#324354] text-white shadow-md'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <ProcessIcon name={planta.nombre} size={16} />
+                  <span>{planta.nombre}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Main Container */}
+      <main className="relative z-10 flex-1 flex items-center justify-center p-6 md:p-12 pt-8 max-w-[1700px] mx-auto w-full">
+
+        {/* Estado vacío: ningún proceso seleccionado */}
+        {!selectedPlanta && (
+          <div className="w-full animate-fade-in px-4 md:px-8 py-16 text-center">
+            <p className="text-slate-400 italic font-medium">Selecciona un proceso en las pestañas superiores para ver la bitácora de hoy.</p>
           </div>
         )}
 
         {/* Sub-selección para Calidad */}
         {selectedPlanta && selectedPlanta.nombre === 'Calidad' && !subSelection && (
           <div className="w-full animate-fade-in px-4 md:px-8">
-            <header className="mb-10 flex flex-col gap-2">
-              <button 
-                onClick={() => setSelectedPlanta(null)} 
-                className="flex items-center gap-2 text-[#324354] hover:text-[#324354]/80 font-bold text-sm transition cursor-pointer"
-              >
-                <ChevronLeft size={18} />
-                <span>Volver a Procesos</span>
-              </button>
-              <h2 className="text-3xl font-display font-light text-[#324354] tracking-widest uppercase mt-4">Calidad</h2>
+            <header className="mb-8 flex flex-col gap-2 items-center text-center">
+              <h2 className="text-2xl font-display font-light text-[#324354] tracking-widest uppercase">Calidad</h2>
               <p className="text-slate-500 font-medium text-base">Selecciona el sub-proceso de calidad correspondiente.</p>
             </header>
 
-            {/* Grid aligned to 5 columns per row, matching main landing style */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full pt-4">
-              
-              <div className="w-full max-w-[290px] aspect-square">
-                <button 
-                  onClick={() => setSubSelection('MS_FV')} 
-                  className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
-                >
-                  <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
-                    <div className="text-[#324354] group-hover:text-white transition-colors duration-300">
-                      <ProcessIcon name="MS_FV" size={36} className="w-8 h-8 md:w-12 md:h-12" />
-                    </div>
-                  </div>
-                  <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">MS y FV</span>
-                </button>
-              </div>
-
-              <div className="w-full max-w-[290px] aspect-square">
-                <button 
-                  onClick={() => setSubSelection('MBL_CEFI')} 
-                  className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
-                >
-                  <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">
-                    <div className="text-[#324354] group-hover:text-white transition-colors duration-300">
-                      <ProcessIcon name="MBL_CEFI" size={36} className="w-8 h-8 md:w-12 md:h-12" />
-                    </div>
-                  </div>
-                  <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">MBL y CEFI</span>
-                </button>
-              </div>
-              
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                onClick={() => setSubSelection('MS_FV')}
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm bg-white border border-[#e2ded5] hover:border-[#324354] hover:shadow-md transition-all cursor-pointer text-[#324354]"
+              >
+                <ProcessIcon name="MS_FV" size={18} />
+                MS y FV
+              </button>
+              <button
+                onClick={() => setSubSelection('MBL_CEFI')}
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm bg-white border border-[#e2ded5] hover:border-[#324354] hover:shadow-md transition-all cursor-pointer text-[#324354]"
+              >
+                <ProcessIcon name="MBL_CEFI" size={18} />
+                MBL y CEFI
+              </button>
             </div>
           </div>
         )}
@@ -439,16 +426,16 @@ export default function BitacoraPage() {
         {selectedPlanta && (selectedPlanta.nombre !== 'Calidad' || subSelection) && (
           <div className="w-full animate-fade-in pb-28 max-w-4xl mx-auto">
             <header className="mb-8 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <button 
-                  onClick={() => { setSelectedPlanta(null); setSubSelection(null); }} 
-                  className="flex items-center gap-2 text-[#324354] hover:text-[#324354]/80 font-bold text-sm transition cursor-pointer"
+              {selectedPlanta.nombre === 'Calidad' && (
+                <button
+                  onClick={() => setSubSelection(null)}
+                  className="flex items-center gap-2 text-[#324354] hover:text-[#324354]/80 font-bold text-sm transition cursor-pointer w-fit"
                 >
                   <ChevronLeft size={18} />
-                  <span>Volver a Selección</span>
+                  <span>Cambiar sub-proceso</span>
                 </button>
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4">
+              )}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
                 <div>
                   <h2 className="text-3xl font-display font-light text-[#324354] tracking-widest uppercase">Bitácora de Hoy</h2>
                   <p className="text-slate-500 font-medium text-base mt-1">
@@ -465,7 +452,7 @@ export default function BitacoraPage() {
             </header>
 
             {/* Progress summary card */}
-            <div className="card bg-[#324354] text-white flex flex-col sm:flex-row items-center gap-6 mb-8 shadow-lg border-none relative overflow-hidden">
+            <div className="card flex flex-col sm:flex-row items-center gap-6 mb-8 shadow-lg border-none relative overflow-hidden" style={{ background: '#324354', color: '#ffffff' }}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
               <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
                 <svg className="w-20 h-20 -rotate-90">
