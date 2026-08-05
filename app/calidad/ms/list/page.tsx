@@ -63,14 +63,14 @@ export default function ReportedDefectsListPage() {
         productos: Set<string>
         hora_registro: string
         Molde: string
-        fotos: { id: number, producto_id: number, defecto_nombre: string, url: string, referencia: string, hora: string }[]
+        fotos: { id: number, producto_id: number, defecto_nombre: string, url?: string, referencia: string, hora: string }[]
     }
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-    const [selectedPhotos, setSelectedPhotos] = useState<{title: string, items: { id: number, producto_id: number, defecto_nombre: string, url: string, referencia: string, hora: string }[]} | null>(null)
+    const [selectedPhotos, setSelectedPhotos] = useState<{title: string, items: { id: number, producto_id: number, defecto_nombre: string, url?: string, referencia: string, hora: string }[]} | null>(null)
 
     // Stats for total pieces
     const [pieceStats, setPieceStats] = useState({
@@ -205,21 +205,19 @@ export default function ReportedDefectsListPage() {
                     if (!groupedMap[key].reporters.has(usersMap[r.create_by] || 'Anónimo')) {
                         groupedMap[key].reporters.add(usersMap[r.create_by] || 'Anónimo')
                     }
-                    if (r.fotoUrl) {
-                        groupedMap[key].fotos.push({
-                            id: r.id,
-                            producto_id: r.producto_id,
-                            defecto_nombre: defectName,
-                            url: r.fotoUrl,
-                            referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
-                            hora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: true,
-                                timeZone: 'UTC'
-                            })
+                    groupedMap[key].fotos.push({
+                        id: r.id,
+                        producto_id: r.producto_id,
+                        defecto_nombre: defectName,
+                        url: r.fotoUrl,
+                        referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                        hora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
+                            timeZone: 'UTC'
                         })
-                    }
+                    })
                 })
             })
 
@@ -467,17 +465,15 @@ export default function ReportedDefectsListPage() {
                                 <div
                                     key={report.id}
                                     onClick={() => {
-                                        if (report.fotos && report.fotos.length > 0) {
-                                            setSelectedPhotos({ title: report.defecto_especifico, items: report.fotos })
-                                        }
+                                        setSelectedPhotos({ title: report.defecto_especifico, items: report.fotos || [] })
                                     }}
-                                    className={`bg-white border border-gray-100 border-l-4 border-l-red-600 p-3 transition-all flex flex-col justify-between aspect-square group overflow-hidden relative shadow-sm ${report.fotos && report.fotos.length > 0 ? 'cursor-pointer hover:shadow-lg hover:border-l-blue-600' : ''}`}
+                                    className="bg-white border border-gray-100 border-l-4 border-l-red-600 p-3 transition-all flex flex-col justify-between aspect-square group overflow-hidden relative shadow-sm cursor-pointer hover:shadow-lg hover:border-l-blue-600"
                                 >
                                     <div className="absolute top-0 right-0 bg-red-600 text-white px-2 py-0.5 text-[14px] font-bold z-20 shadow-sm group-hover:bg-blue-600 transition-colors">
                                         {report.cantidad}
                                     </div>
                                     
-                                    {report.fotos && report.fotos.length > 0 && (
+                                    {report.fotos && report.fotos.some(f => f.url) && (
                                         <div className="absolute bottom-1 right-1 text-blue-500 opacity-50 group-hover:opacity-100">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                         </div>
@@ -613,8 +609,15 @@ export default function ReportedDefectsListPage() {
                             {selectedPhotos.items?.map((item, i) => (
                                 <div key={i} className="flex flex-col bg-white border border-gray-300 shadow-sm overflow-hidden">
                                     <div className="aspect-square bg-gray-200 relative flex items-center justify-center">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={item.url} alt={`Defecto ${i+1}`} className="w-full h-full object-contain" />
+                                        {item.url ? (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img src={item.url} alt={`Defecto ${i+1}`} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center opacity-30">
+                                                <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                <span className="text-xs font-black uppercase tracking-widest">Sin Foto</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="p-3 bg-white border-t border-gray-200 flex-1 flex flex-col justify-between">
                                         <div>
@@ -663,9 +666,16 @@ export default function ReportedDefectsListPage() {
                                     <X className="w-6 h-6" />
                                 </button>
                             </div>
-                            <div className="flex-1 relative min-h-[300px] group">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={editForm.localPhotoUrl || editingItemData.url} alt="Defecto" className="absolute inset-0 w-full h-full object-contain" />
+                            <div className="flex-1 relative min-h-[300px] group flex items-center justify-center">
+                                {(editForm.localPhotoUrl || editingItemData.url) ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img src={editForm.localPhotoUrl || editingItemData.url} alt="Defecto" className="absolute inset-0 w-full h-full object-contain" />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center opacity-30">
+                                        <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        <span className="text-sm font-black uppercase tracking-widest">Sin Foto</span>
+                                    </div>
+                                )}
                                 
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <label className="cursor-pointer bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded border border-white/50 font-black text-sm uppercase flex items-center gap-2">
