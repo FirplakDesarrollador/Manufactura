@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings, Archive } from 'lucide-react'
+import { Camera, X, Settings, Archive, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -366,21 +366,19 @@ export default function CalidadMsReportPage() {
                         {hasSettingsPermission && (
                             <button
                                 onClick={() => setIsSettingsOpen(true)}
-                                className={`p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 ${hasSaldosPermission ? '' : 'rounded-r'}`}
+                                className={`p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 border-l-0`}
                                 title="Configurar Defectos"
                             >
                                 <Settings className="w-5 h-5" />
                             </button>
                         )}
-                        {hasSaldosPermission && (
-                            <button
-                                onClick={() => router.push('/calidad/ms/saldos')}
-                                className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 rounded-r border-l-0"
-                                title="Saldos y Destrucciones"
-                            >
-                                <Archive className="w-5 h-5" />
-                            </button>
-                        )}
+                        <button
+                            onClick={() => router.push('/calidad/ms/saldos')}
+                            className="p-2.5 bg-white border border-gray-300 text-red-500 hover:bg-red-50 rounded-r border-l-0"
+                            title="Saldos y Destrucciones"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
                     </div>
 
                     {/* Hidden Photo Upload Input */}
