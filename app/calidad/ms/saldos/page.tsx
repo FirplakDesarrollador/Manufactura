@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Calendar as CalendarIcon, Filter } from 'lucide-react'
+import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Calendar as CalendarIcon, Filter, Pencil } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -38,6 +38,9 @@ export default function SaldosYDestruccionesPage() {
     const [selectedDefect, setSelectedDefect] = useState<string>('')
     const [isUploading, setIsUploading] = useState(false)
     const [selectedReport, setSelectedReport] = useState<ReporteSaldo | null>(null)
+    const [hasEditPermission, setHasEditPermission] = useState(false)
+    const [hasDeletePermission, setHasDeletePermission] = useState(false)
+    const [editingReportId, setEditingReportId] = useState<number | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     
     // Auth
@@ -121,6 +124,11 @@ export default function SaldosYDestruccionesPage() {
                 localId: localUser?.id
             })
 
+            if (localUser?.permisos?.calidad) {
+                setHasEditPermission(!!localUser.permisos.calidad.editar)
+                setHasDeletePermission(!!localUser.permisos.calidad.eliminar)
+            }
+
             const [productsRes, defectsRes] = await Promise.all([
                 supabase.from('productos_defectos_ms').select('*').order('Referencia'),
                 supabase.from('ms_lista_saldos_destrucciones').select('*').order('defecto')
@@ -144,6 +152,28 @@ export default function SaldosYDestruccionesPage() {
         }
         if (!selectedDefect) {
             alert('Por favor selecciona el defecto causante')
+            return
+        }
+
+        if (editingReportId) {
+            setIsUploading(true)
+            const reportData = {
+                producto_id: parseInt(saldosProduct),
+                defecto: [{ defecto: `${saldosType} - ${selectedDefect}` }]
+            }
+            const { error } = await supabase.from('ms_reporte_defectos').update(reportData).eq('id', editingReportId)
+            setIsUploading(false)
+            if (error) {
+                console.error('Error updating:', error)
+                alert('Error al actualizar el registro')
+            } else {
+                alert('Registro actualizado exitosamente')
+                setSaldosProduct('')
+                setSelectedDefect('')
+                setIsModalOpen(false)
+                setEditingReportId(null)
+                fetchData()
+            }
             return
         }
 
@@ -194,6 +224,33 @@ export default function SaldosYDestruccionesPage() {
         }
     }
 
+    const handleEditReport = (report: ReporteSaldo, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setEditingReportId(report.id)
+        setSaldosProduct(report.producto_id.toString())
+        const defects = Array.isArray(report.defecto) ? report.defecto : []
+        const defectName = defects.map(d => typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)).join(' ')
+        const isDest = defectName.includes('Destrucción')
+        setSaldosType(isDest ? 'Destrucción' : 'Saldo')
+        const causante = defectName.split(' - ')[1] || defectName
+        setSelectedDefect(causante)
+        setIsModalOpen(true)
+    }
+
+    const handleDeleteReport = async (id: number, e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (window.confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+            const { error } = await supabase.from('ms_reporte_defectos').delete().eq('id', id)
+            if (error) {
+                console.error('Error deleting report:', error)
+                alert('Error al eliminar el registro')
+            } else {
+                alert('Registro eliminado exitosamente')
+                fetchData()
+            }
+        }
+    }
+
     const displayedReports = reports.filter(r => {
         const searchLower = searchTerm.toLowerCase()
         if (!searchTerm) return true
@@ -228,7 +285,12 @@ export default function SaldosYDestruccionesPage() {
                 </div>
                 <div>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => {
+                            setEditingReportId(null)
+                            setSaldosProduct('')
+                            setSelectedDefect('')
+                            setIsModalOpen(true)
+                        }}
                         className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-black text-sm uppercase tracking-wider flex items-center gap-2 shadow-md transition-all"
                     >
                         <Plus className="w-4 h-4" />
@@ -299,6 +361,9 @@ export default function SaldosYDestruccionesPage() {
                                     <th scope="col" className="px-6 py-3 text-left text-[10px] font-black text-white uppercase tracking-wider">Referencia</th>
                                     <th scope="col" className="px-6 py-3 text-left text-[10px] font-black text-white uppercase tracking-wider">Causante</th>
                                     <th scope="col" className="px-6 py-3 text-left text-[10px] font-black text-white uppercase tracking-wider">Registrado Por</th>
+                                    {(hasEditPermission || hasDeletePermission) && (
+                                        <th scope="col" className="px-6 py-3 text-right text-[10px] font-black text-white uppercase tracking-wider">Acciones</th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -339,6 +404,30 @@ export default function SaldosYDestruccionesPage() {
                                             <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500 font-medium">
                                                 {usersMap[report.create_by] || 'Anónimo'}
                                             </td>
+                                            {(hasEditPermission || hasDeletePermission) && (
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {hasEditPermission && (
+                                                            <button
+                                                                onClick={(e) => handleEditReport(report, e)}
+                                                                className="text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-2 rounded-full transition-colors"
+                                                                title="Editar"
+                                                            >
+                                                                <Pencil className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        {hasDeletePermission && (
+                                                            <button
+                                                                onClick={(e) => handleDeleteReport(report.id, e)}
+                                                                className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-full transition-colors"
+                                                                title="Eliminar"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     )
                                 })}
@@ -431,7 +520,12 @@ export default function SaldosYDestruccionesPage() {
                             
                             <div className="pt-6 border-t border-gray-100 flex justify-end gap-3 mt-4">
                                 <button
-                                    onClick={() => setIsModalOpen(false)}
+                                    onClick={() => {
+                                        setIsModalOpen(false)
+                                        setEditingReportId(null)
+                                        setSaldosProduct('')
+                                        setSelectedDefect('')
+                                    }}
                                     className="px-5 py-3 text-sm font-black text-gray-500 hover:text-gray-800 transition-colors uppercase tracking-widest"
                                 >
                                     Cancelar
@@ -444,9 +538,9 @@ export default function SaldosYDestruccionesPage() {
                                     {isUploading ? (
                                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
-                                        <Trash2 className="w-4 h-4" />
+                                        editingReportId ? <Pencil className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />
                                     )}
-                                    <span>{isUploading ? 'Guardando...' : 'Registrar'}</span>
+                                    <span>{isUploading ? 'Guardando...' : (editingReportId ? 'Guardar Cambios' : 'Registrar')}</span>
                                 </button>
                             </div>
                         </div>
