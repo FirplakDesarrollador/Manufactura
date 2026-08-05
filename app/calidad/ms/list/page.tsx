@@ -21,6 +21,11 @@ export default function ReportedDefectsListPage() {
     const [loading, setLoading] = useState(true)
     const [reports, setReports] = useState<ReportDefectItem[]>([])
     const [products, setProducts] = useState<ProductMS[]>([])
+    const [defectsList, setDefectsList] = useState<{ id: number, defecto?: string, Defecto?: string, nombre?: string, Nombre?: string }[]>([])
+    const [editingReportId, setEditingReportId] = useState<number | null>(null)
+    const [editingItemData, setEditingItemData] = useState<any>(null)
+    const [editForm, setEditForm] = useState<{producto_id: number, defectos: string[], photoFile?: File | null, localPhotoUrl?: string | null}>({ producto_id: 0, defectos: [] })
+    const [isUploading, setIsUploading] = useState(false)
 
     interface ProductMS {
         id: number
@@ -58,14 +63,14 @@ export default function ReportedDefectsListPage() {
         productos: Set<string>
         hora_registro: string
         Molde: string
-        fotos: { url: string, referencia: string, hora: string }[]
+        fotos: { id: number, producto_id: number, defecto_nombre: string, url: string, referencia: string, hora: string }[]
     }
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-    const [selectedPhotos, setSelectedPhotos] = useState<{title: string, items: { url: string, referencia: string, hora: string }[]} | null>(null)
+    const [selectedPhotos, setSelectedPhotos] = useState<{title: string, items: { id: number, producto_id: number, defecto_nombre: string, url: string, referencia: string, hora: string }[]} | null>(null)
 
     // Stats for total pieces
     const [pieceStats, setPieceStats] = useState({
@@ -86,7 +91,7 @@ export default function ReportedDefectsListPage() {
         const queryStart = `${selectedDate}T00:00:00Z`
         const queryEnd = `${nextDayStr}T12:00:00Z`
 
-        const [reportsRes, productsRes] = await Promise.all([
+        const [reportsRes, productsRes, defectsRes] = await Promise.all([
             supabase
                 .from('ms_reporte_defectos')
                 .select(`
@@ -96,7 +101,8 @@ export default function ReportedDefectsListPage() {
                 .gte('created_at', queryStart)
                 .lte('created_at', queryEnd)
                 .order('created_at', { ascending: false }),
-            supabase.from('productos_defectos_ms').select('*').order('Referencia')
+            supabase.from('productos_defectos_ms').select('*').order('Referencia'),
+            supabase.from('ms_defectos').select('*').order('id')
         ])
 
         if (reportsRes.data) {
@@ -201,6 +207,9 @@ export default function ReportedDefectsListPage() {
                     }
                     if (r.fotoUrl) {
                         groupedMap[key].fotos.push({
+                            id: r.id,
+                            producto_id: r.producto_id,
+                            defecto_nombre: defectName,
                             url: r.fotoUrl,
                             referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
                             hora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
@@ -226,6 +235,7 @@ export default function ReportedDefectsListPage() {
         }
 
         if (productsRes.data) setProducts(productsRes.data)
+        if (defectsRes.data) setDefectsList(defectsRes.data)
         setLoading(false)
     }, [selectedDate])
 
@@ -247,6 +257,77 @@ export default function ReportedDefectsListPage() {
         return matchesProductFilter && matchesSearch
     })
 
+    const handleUpdateReport = async (id: number) => {
+        if (!editForm.producto_id || editForm.defectos.length === 0) {
+            alert('Debe seleccionar producto y al menos un defecto')
+            return
+        }
+        
+        setIsUploading(true)
+        let newFotoUrl = undefined
+
+        if (editForm.photoFile) {
+            const fileName = `ms-defectos/${Date.now()}-${editForm.photoFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+            const { error: uploadError } = await supabase.storage
+                .from('fichas-media')
+                .upload(fileName, editForm.photoFile)
+
+            if (uploadError) {
+                console.error('Error uploading photo:', uploadError)
+                alert('Error al subir la nueva foto')
+                setIsUploading(false)
+                return
+            }
+
+            const { data } = supabase.storage.from('fichas-media').getPublicUrl(fileName)
+            newFotoUrl = data.publicUrl
+        }
+
+        const updateData: any = {
+            producto_id: editForm.producto_id,
+            defecto: editForm.defectos.map(d => ({ defecto: d }))
+        }
+        if (newFotoUrl) {
+            updateData.fotoUrl = newFotoUrl
+        }
+        
+        const { error } = await supabase
+            .from('ms_reporte_defectos')
+            .update(updateData)
+            .eq('id', id)
+
+        setIsUploading(false)
+
+        if (error) {
+            console.error('Error updating report:', error)
+            alert('Error al actualizar el reporte')
+        } else {
+            setEditingReportId(null)
+            setEditingItemData(null)
+            setLoading(true)
+            await fetchData()
+        }
+    }
+
+    const handleDeleteReport = async (id: number) => {
+        if (!confirm('¿Estás seguro de eliminar este reporte permanentemente?')) return
+        
+        const { error } = await supabase
+            .from('ms_reporte_defectos')
+            .delete()
+            .eq('id', id)
+
+        if (error) {
+            console.error('Error deleting report:', error)
+            alert('Error al eliminar el reporte')
+        } else {
+            setEditingReportId(null)
+            setEditingItemData(null)
+            setLoading(true)
+            await fetchData()
+        }
+    }
+
     if (loading && reports.length === 0) {
         return (
             <div className="min-h-screen bg-[#254153] flex items-center justify-center">
@@ -261,7 +342,7 @@ export default function ReportedDefectsListPage() {
             <header className="bg-[#254153] text-white px-4 h-14 flex items-center justify-between sticky top-0 z-50">
                 <div className="flex items-center space-x-4">
                     <button
-                        onClick={() => router.push('/home')}
+                        onClick={() => router.push('/calidad/ms')}
                         className="p-1 hover:bg-white/10 transition-colors"
                     >
                         <ChevronLeft className="w-6 h-6" />
@@ -535,16 +616,149 @@ export default function ReportedDefectsListPage() {
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={item.url} alt={`Defecto ${i+1}`} className="w-full h-full object-contain" />
                                     </div>
-                                    <div className="p-3 bg-white border-t border-gray-200">
-                                        <p className="text-[10px] font-black text-[#254153] uppercase mb-1 truncate" title={item.referencia}>
-                                            Ref: {item.referencia}
-                                        </p>
-                                        <p className="text-[10px] font-bold text-gray-500 uppercase">
-                                            Hora: {item.hora}
-                                        </p>
+                                    <div className="p-3 bg-white border-t border-gray-200 flex-1 flex flex-col justify-between">
+                                        <div>
+                                            <p className="text-[10px] font-black text-[#254153] uppercase mb-1 truncate" title={item.referencia}>
+                                                Ref: {item.referencia}
+                                            </p>
+                                            <p className="text-[10px] font-bold text-gray-500 uppercase">
+                                                Hora: {item.hora}
+                                            </p>
+                                        </div>
+                                        <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
+                                            <button
+                                                onClick={() => {
+                                                    setEditingReportId(item.id)
+                                                    setEditingItemData(item)
+                                                    setEditForm({ producto_id: item.producto_id, defectos: [item.defecto_nombre] })
+                                                }}
+                                                className="text-blue-600 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
+                                            >
+                                                ✏️ Editar
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteReport(item.id)}
+                                                className="text-red-500 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
+                                            >
+                                                🗑️ Borrar
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal for Editing Report */}
+            {editingReportId && editingItemData && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-white w-full max-w-5xl max-h-[90vh] flex flex-col md:flex-row rounded-none shadow-2xl border-4 border-[#254153]">
+                        {/* Left Side: Photo */}
+                        <div className="w-full md:w-1/2 bg-gray-200 flex flex-col">
+                            <div className="p-3 bg-[#254153] text-white flex justify-between items-center md:hidden">
+                                <h3 className="font-black tracking-widest uppercase text-sm">Editar Reporte</h3>
+                                <button onClick={() => { setEditingReportId(null); setEditingItemData(null) }} className="p-1 hover:bg-white/10">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            <div className="flex-1 relative min-h-[300px] group">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={editForm.localPhotoUrl || editingItemData.url} alt="Defecto" className="absolute inset-0 w-full h-full object-contain" />
+                                
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <label className="cursor-pointer bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded border border-white/50 font-black text-sm uppercase flex items-center gap-2">
+                                        📸 Cambiar Foto
+                                        <input 
+                                            type="file" 
+                                            accept="image/*" 
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0]
+                                                if (file) {
+                                                    setEditForm(prev => ({
+                                                        ...prev,
+                                                        photoFile: file,
+                                                        localPhotoUrl: URL.createObjectURL(file)
+                                                    }))
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Right Side: Form */}
+                        <div className="w-full md:w-1/2 bg-white flex flex-col max-h-[50vh] md:max-h-none">
+                            <div className="hidden md:flex justify-between items-center p-4 bg-[#254153] text-white">
+                                <h3 className="font-black tracking-widest uppercase text-sm">Editar Reporte</h3>
+                                <button onClick={() => { setEditingReportId(null); setEditingItemData(null) }} className="p-1 hover:bg-white/10 transition-colors">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            
+                            <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                                <div>
+                                    <label className="block text-xs font-black text-[#254153] uppercase mb-2">Referencia de Producto</label>
+                                    <select
+                                        value={editForm.producto_id}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, producto_id: parseInt(e.target.value) }))}
+                                        className="w-full p-3 bg-gray-50 border border-gray-300 rounded-none font-bold text-sm text-[#254153] outline-none focus:border-[#254153]"
+                                    >
+                                        <option value="0">SELECCIONA PRODUCTO</option>
+                                        {products.map(p => (
+                                            <option key={p.id} value={p.id}>{p.Referencia}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-black text-[#254153] uppercase mb-2">Defectos ({editForm.defectos.length} seleccionados)</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1 border border-gray-200 bg-gray-50">
+                                        {defectsList.map(d => {
+                                            const name = d.defecto || d.Defecto || d.nombre || d.Nombre || ''
+                                            const isSelected = editForm.defectos.includes(name)
+                                            return (
+                                                <label key={d.id} className={`flex items-center gap-2 p-2 border cursor-pointer transition-colors ${isSelected ? 'bg-[#36A284]/10 border-[#36A284]' : 'bg-white border-gray-300 hover:bg-gray-100'}`}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 accent-[#36A284]"
+                                                        checked={isSelected}
+                                                        onChange={(e) => {
+                                                            setEditForm(prev => {
+                                                                if (e.target.checked) {
+                                                                    return { ...prev, defectos: [...prev.defectos, name] }
+                                                                } else {
+                                                                    return { ...prev, defectos: prev.defectos.filter(x => x !== name) }
+                                                                }
+                                                            })
+                                                        }}
+                                                    />
+                                                    <span className={`text-xs font-bold uppercase truncate ${isSelected ? 'text-[#254153]' : 'text-gray-600'}`}>{name}</span>
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+                                <button 
+                                    onClick={() => handleUpdateReport(editingReportId)}
+                                    disabled={isUploading}
+                                    className={`flex-1 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-[#1a2d3a]'} text-white font-black uppercase py-3 transition-colors`}
+                                >
+                                    {isUploading ? 'Guardando...' : 'Guardar Cambios'}
+                                </button>
+                                <button 
+                                    onClick={() => { setEditingReportId(null); setEditingItemData(null) }}
+                                    className="flex-1 bg-white border-2 border-gray-300 text-gray-600 hover:bg-gray-100 font-black uppercase py-3 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
