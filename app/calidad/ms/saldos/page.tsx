@@ -20,6 +20,7 @@ interface ReporteSaldo {
     producto_id: number
     producto?: { Referencia: string }
     usuario?: { nombre: string }
+    fotoUrl?: string
 }
 
 export default function SaldosYDestruccionesPage() {
@@ -36,6 +37,7 @@ export default function SaldosYDestruccionesPage() {
     const [saldosType, setSaldosType] = useState<'Saldo' | 'Destrucción'>('Saldo')
     const [selectedDefect, setSelectedDefect] = useState<string>('')
     const [isUploading, setIsUploading] = useState(false)
+    const [selectedReport, setSelectedReport] = useState<ReporteSaldo | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     
     // Auth
@@ -315,7 +317,11 @@ export default function SaldosYDestruccionesPage() {
                                     })
 
                                     return (
-                                        <tr key={report.id} className="hover:bg-gray-50 transition-colors">
+                                        <tr 
+                                            key={report.id} 
+                                            className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                            onClick={() => setSelectedReport(report)}
+                                        >
                                             <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-gray-600">
                                                 {dateStr}
                                             </td>
@@ -459,6 +465,72 @@ export default function SaldosYDestruccionesPage() {
                             }
                         }}
                     />
+                </div>
+            )}
+
+            {/* Modal Detalle Evento */}
+            {selectedReport && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="bg-[#254153] p-4 flex justify-between items-center text-white">
+                            <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                                <Search className="w-5 h-5" />
+                                Detalle de Evento
+                            </h2>
+                            <button onClick={() => setSelectedReport(null)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-1 bg-gray-50">
+                            {selectedReport.fotoUrl ? (
+                                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 overflow-hidden shadow-inner border border-gray-300">
+                                    <img 
+                                        src={selectedReport.fotoUrl} 
+                                        alt="Evidencia" 
+                                        className="w-full h-full object-contain"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="w-full h-40 bg-gray-200 rounded-lg mb-4 flex items-center justify-center border border-dashed border-gray-400">
+                                    <span className="text-gray-400 font-bold text-xs uppercase tracking-widest">Sin Foto</span>
+                                </div>
+                            )}
+                            <div className="space-y-3 bg-white p-4 rounded shadow-sm border border-gray-100">
+                                <div>
+                                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Referencia</p>
+                                    <p className="text-sm font-bold text-[#254153]">{selectedReport.producto?.Referencia || 'Sin Referencia'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Defecto / Causante</p>
+                                    <p className="text-sm font-bold text-[#254153]">
+                                        {Array.isArray(selectedReport.defecto) ? selectedReport.defecto.map(d => typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)).join(', ') : 'Desconocido'}
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Fecha y Hora</p>
+                                        <p className="text-xs font-bold text-gray-600">
+                                            {new Date(selectedReport.created_at.endsWith('Z') || selectedReport.created_at.includes('+') ? selectedReport.created_at : selectedReport.created_at + 'Z').toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Bogota' })}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Registrado Por</p>
+                                        <p className="text-xs font-bold text-gray-600 truncate" title={usersMap[selectedReport.create_by] || 'Anónimo'}>
+                                            {usersMap[selectedReport.create_by] || 'Anónimo'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-gray-200 bg-white">
+                            <button
+                                onClick={() => setSelectedReport(null)}
+                                className="w-full bg-[#254153] hover:bg-black text-white py-3 rounded text-xs font-black uppercase tracking-widest shadow-md transition-all"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
