@@ -53,6 +53,7 @@ export default function CalidadMsReportPage() {
     const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
     
     // New states for custom Molde prompt
     const [isMoldeModalOpen, setIsMoldeModalOpen] = useState(false)
@@ -67,15 +68,24 @@ export default function CalidadMsReportPage() {
         
         const { data: localUser } = await supabase
             .from('usuarios')
-            .select('id')
+            .select('id, permisos')
             .eq('uuid', userData.user.id)
             .single()
+
+        if (!localUser?.permisos?.calidad?.ms) {
+            router.push('/home')
+            return
+        }
 
         setUser({
             id: userData.user.id,
             email: userData.user.email,
             localId: localUser?.id
         })
+
+        if (localUser?.permisos?.calidad) {
+            setHasSettingsPermission(!!localUser.permisos.calidad.configurar_defectos)
+        }
 
         const [productsRes, defectsRes, reportsRes] = await Promise.all([
             supabase.from('productos_defectos_ms').select('*').order('Referencia'),
@@ -351,13 +361,15 @@ export default function CalidadMsReportPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
                         </button>
-                        <button
-                            onClick={() => setIsSettingsOpen(true)}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 rounded-r"
-                            title="Configurar Defectos"
-                        >
-                            <Settings className="w-5 h-5" />
-                        </button>
+                        {hasSettingsPermission && (
+                            <button
+                                onClick={() => setIsSettingsOpen(true)}
+                                className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 rounded-r"
+                                title="Configurar Defectos"
+                            >
+                                <Settings className="w-5 h-5" />
+                            </button>
+                        )}
                     </div>
 
                     {/* Hidden Photo Upload Input */}

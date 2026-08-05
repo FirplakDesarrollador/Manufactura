@@ -26,6 +26,8 @@ export default function ReportedDefectsListPage() {
     const [editingItemData, setEditingItemData] = useState<any>(null)
     const [editForm, setEditForm] = useState<{producto_id: number, defectos: string[], photoFile?: File | null, localPhotoUrl?: string | null}>({ producto_id: 0, defectos: [] })
     const [isUploading, setIsUploading] = useState(false)
+    const [hasEditPermission, setHasEditPermission] = useState(false)
+    const [hasDeletePermission, setHasDeletePermission] = useState(false)
 
     interface ProductMS {
         id: number
@@ -238,8 +240,29 @@ export default function ReportedDefectsListPage() {
     }, [selectedDate])
 
     useEffect(() => {
+        const loadUserAndPermissions = async () => {
+            const { data: authData } = await supabase.auth.getUser()
+            if (authData?.user?.email) {
+                const { data: userData } = await supabase
+                    .from('usuarios')
+                    .select('permisos')
+                    .eq('correo', authData.user.email)
+                    .single()
+                
+                if (!userData?.permisos?.calidad?.ms) {
+                    router.push('/home')
+                    return
+                }
+
+                if (userData?.permisos?.calidad) {
+                    setHasEditPermission(!!userData.permisos.calidad.editar)
+                    setHasDeletePermission(!!userData.permisos.calidad.eliminar)
+                }
+            }
+        }
+
         const load = async () => {
-            await fetchData()
+            await Promise.all([fetchData(), loadUserAndPermissions()])
         }
         void load()
     }, [fetchData])
@@ -628,24 +651,30 @@ export default function ReportedDefectsListPage() {
                                                 Hora: {item.hora}
                                             </p>
                                         </div>
-                                        <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingReportId(item.id)
-                                                    setEditingItemData(item)
-                                                    setEditForm({ producto_id: item.producto_id, defectos: [item.defecto_nombre] })
-                                                }}
-                                                className="text-blue-600 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
-                                            >
-                                                ✏️ Editar
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteReport(item.id)}
-                                                className="text-red-500 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
-                                            >
-                                                🗑️ Borrar
-                                            </button>
-                                        </div>
+                                        {(hasEditPermission || hasDeletePermission) && (
+                                            <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
+                                                {hasEditPermission ? (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingReportId(item.id)
+                                                            setEditingItemData(item)
+                                                            setEditForm({ producto_id: item.producto_id, defectos: [item.defecto_nombre] })
+                                                        }}
+                                                        className="text-blue-600 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
+                                                    >
+                                                        ✏️ Editar
+                                                    </button>
+                                                ) : <div />}
+                                                {hasDeletePermission && (
+                                                    <button
+                                                        onClick={() => handleDeleteReport(item.id)}
+                                                        className="text-red-500 text-[10px] font-black uppercase hover:underline flex items-center gap-1"
+                                                    >
+                                                        🗑️ Borrar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

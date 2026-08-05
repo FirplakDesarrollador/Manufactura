@@ -22,7 +22,7 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     fibra: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
-    calidad: ['ms'],
+    calidad: ['ms', 'editar', 'eliminar', 'configurar_defectos'],
     hora_a_hora: true,
     ficha_rcc: ['acceso_general', 'administrador', 'contingencias', 'asistencia'],
     opt: true,
