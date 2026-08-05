@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Calendar as CalendarIcon, Filter } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { v4 as uuidv4 } from 'uuid'
 
 interface ProducloMS {
     id: number
@@ -35,6 +36,7 @@ export default function SaldosYDestruccionesPage() {
     const [saldosType, setSaldosType] = useState<'Saldo' | 'Destrucción'>('Saldo')
     const [selectedDefect, setSelectedDefect] = useState<string>('')
     const [isUploading, setIsUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     
     // Auth
     const [user, setUser] = useState<{ id: string, email?: string, localId?: number } | null>(null)
@@ -143,11 +145,35 @@ export default function SaldosYDestruccionesPage() {
             return
         }
 
+        // Trigger file input
+        fileInputRef.current?.click()
+    }
+
+    const executeSave = async (file: File) => {
         setIsUploading(true)
+        
+        // Upload photo
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${uuidv4()}.${fileExt}`
+        const { error: uploadError } = await supabase.storage
+            .from('fichas-media')
+            .upload(fileName, file)
+
+        if (uploadError) {
+            console.error('Error uploading photo:', uploadError)
+            alert('Error al subir la foto')
+            setIsUploading(false)
+            return
+        }
+
+        const { data } = supabase.storage.from('fichas-media').getPublicUrl(fileName)
+        const photoUrl = data.publicUrl
+
         const reportData = {
             producto_id: parseInt(saldosProduct),
             create_by: user?.localId,
             defecto: [{ defecto: `${saldosType} - ${selectedDefect}` }],
+            fotoUrl: photoUrl,
             created_at: new Date().toISOString()
         }
 
@@ -419,6 +445,20 @@ export default function SaldosYDestruccionesPage() {
                             </div>
                         </div>
                     </div>
+                    {/* Hidden Photo Upload Input */}
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                                const file = e.target.files[0]
+                                void executeSave(file)
+                            }
+                        }}
+                    />
                 </div>
             )}
         </div>
