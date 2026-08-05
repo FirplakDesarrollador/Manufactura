@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings } from 'lucide-react'
+import { Camera, X, Settings, Archive } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -54,6 +54,7 @@ export default function CalidadMsReportPage() {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
+    const [hasSaldosPermission, setHasSaldosPermission] = useState(false)
     
     // New states for custom Molde prompt
     const [isMoldeModalOpen, setIsMoldeModalOpen] = useState(false)
@@ -85,6 +86,7 @@ export default function CalidadMsReportPage() {
 
         if (localUser?.permisos?.calidad) {
             setHasSettingsPermission(!!localUser.permisos.calidad.configurar_defectos)
+            setHasSaldosPermission(!!localUser.permisos.calidad.saldos_y_destrucciones)
         }
 
         const [productsRes, defectsRes, reportsRes] = await Promise.all([
@@ -364,10 +366,19 @@ export default function CalidadMsReportPage() {
                         {hasSettingsPermission && (
                             <button
                                 onClick={() => setIsSettingsOpen(true)}
-                                className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 rounded-r"
+                                className={`p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 ${hasSaldosPermission ? '' : 'rounded-r'}`}
                                 title="Configurar Defectos"
                             >
                                 <Settings className="w-5 h-5" />
+                            </button>
+                        )}
+                        {hasSaldosPermission && (
+                            <button
+                                onClick={() => router.push('/calidad/ms/saldos')}
+                                className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 rounded-r border-l-0"
+                                title="Saldos y Destrucciones"
+                            >
+                                <Archive className="w-5 h-5" />
                             </button>
                         )}
                     </div>
