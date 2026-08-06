@@ -7,6 +7,7 @@ import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { createExternalClient } from '@/lib/supabase/external';
+import AutoResizeTextarea from '@/components/opt-sistemica/AutoResizeTextarea';
 
 const questions = [
   { id: '4.1', text: "¿El líder conoce el ciclo para implementar la gestión de bajas estadísticas? (Evalué la frecuencia según los resultados de los colaboradores y/o el grupo según el tablero)" },
@@ -346,12 +347,10 @@ export default function BEPage() {
 
                 <div>
                   <label className="label">Comentario {q.id}</label>
-                  <input
-                    type="text"
-                    className="input-field"
+                  <AutoResizeTextarea
                     placeholder="Escribe un comentario opcional..."
                     value={responses[q.id].comment}
-                    onChange={(e) => handleCommentChange(q.id, e.target.value)}
+                    onChange={(val) => handleCommentChange(q.id, val)}
                   />
                 </div>
               </div>
@@ -368,12 +367,11 @@ export default function BEPage() {
 
               <div style={{ marginBottom: '32px' }}>
                 <label className="label" style={{ fontSize: '1.1rem', fontWeight: 700 }}>PLANES DE ACCIÓN GESTIÓN BAJAS ESTADÍSTICAS</label>
-                <textarea
-                  className="input-field"
+                <AutoResizeTextarea
                   style={{ minHeight: '120px', padding: '16px' }}
                   placeholder="Describe los planes de acción necesarios..."
                   value={actionPlans}
-                  onChange={(e) => setActionPlans(e.target.value)}
+                  onChange={(val) => setActionPlans(val)}
                 />
               </div>
 
