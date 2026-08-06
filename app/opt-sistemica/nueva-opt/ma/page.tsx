@@ -7,6 +7,7 @@ import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { createExternalClient } from '@/lib/supabase/external';
+import AutoResizeTextarea from '@/components/opt-sistemica/AutoResizeTextarea';
 import { Wrench, Search, Upload, Info, CheckCircle2, AlertTriangle, XCircle, Eye } from 'lucide-react';
 
 interface Machine {
@@ -624,10 +625,9 @@ export default function MantenimientoAutonomoPage() {
 
                     {/* Observaciones (obligatoria si R o M) */}
                     <div>
-                      <input 
-                        type="text" 
+                      <AutoResizeTextarea 
                         value={response.comment}
-                        onChange={(e) => handleChecklistCommentChange(item.id_detalle, e.target.value)}
+                        onChange={(val) => handleChecklistCommentChange(item.id_detalle, val)}
                         placeholder={isCommentRequired ? "⚠️ Se requiere comentario describiendo el hallazgo..." : "Observaciones adicionales..."}
                         className={`w-full bg-white border rounded-xl py-2 px-4 text-sm font-medium outline-none transition-all ${
                           isCommentRequired && !response.comment.trim() 
@@ -701,10 +701,9 @@ export default function MantenimientoAutonomoPage() {
                   })}
                 </div>
               </div>
-              <input 
-                type="text" 
+              <AutoResizeTextarea 
                 value={staticResponses['3.1'].comment}
-                onChange={(e) => handleStaticCommentChange('3.1', e.target.value)}
+                onChange={(val) => handleStaticCommentChange('3.1', val)}
                 placeholder="Comentarios sobre el tablero autónomo..."
                 className="w-full bg-white border border-slate-200 rounded-xl py-2 px-4 text-sm outline-none focus:border-slate-400"
               />
@@ -743,10 +742,9 @@ export default function MantenimientoAutonomoPage() {
                   })}
                 </div>
               </div>
-              <input 
-                type="text" 
+              <AutoResizeTextarea 
                 value={staticResponses['4.1'].comment}
-                onChange={(e) => handleStaticCommentChange('4.1', e.target.value)}
+                onChange={(val) => handleStaticCommentChange('4.1', val)}
                 placeholder="Observaciones o reporte de desvíos..."
                 className="w-full bg-white border border-slate-200 rounded-xl py-2 px-4 text-sm outline-none focus:border-slate-400"
               />
@@ -758,12 +756,12 @@ export default function MantenimientoAutonomoPage() {
               <h4 className="text-[15px] font-bold text-[#324354] leading-relaxed">
                 Verificar estado general y de limpieza de la máquina (Campo Abierto)
               </h4>
-              <textarea 
+              <AutoResizeTextarea 
                 value={staticResponses['5.1'].value}
-                onChange={(e) => handleStaticValueChange('5.1', e.target.value)}
-                rows={3}
+                onChange={(val) => handleStaticValueChange('5.1', val)}
+                style={{ minHeight: '80px' }}
                 placeholder="Escribe una descripción completa del estado general de conservación, suciedad, fugas o viruta observada en el equipo..."
-                className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm outline-none focus:border-slate-400 font-medium resize-y"
+                className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm outline-none focus:border-slate-400 font-medium"
               />
             </div>
 
@@ -800,10 +798,9 @@ export default function MantenimientoAutonomoPage() {
                   })}
                 </div>
               </div>
-              <input 
-                type="text" 
+              <AutoResizeTextarea 
                 value={staticResponses['6.1'].comment}
-                onChange={(e) => handleStaticCommentChange('6.1', e.target.value)}
+                onChange={(val) => handleStaticCommentChange('6.1', val)}
                 placeholder="Comentarios sobre la respuesta del operario..."
                 className="w-full bg-white border border-slate-200 rounded-xl py-2 px-4 text-sm outline-none focus:border-slate-400"
               />
@@ -815,12 +812,12 @@ export default function MantenimientoAutonomoPage() {
               <h4 className="text-[15px] font-bold text-[#324354] leading-relaxed">
                 ¿Cómo está recibiendo la máquina diariamente del turno anterior? (Campo Abierto)
               </h4>
-              <textarea 
+              <AutoResizeTextarea 
                 value={staticResponses['7.1'].value}
-                onChange={(e) => handleStaticValueChange('7.1', e.target.value)}
-                rows={3}
+                onChange={(val) => handleStaticValueChange('7.1', val)}
+                style={{ minHeight: '80px' }}
                 placeholder="Consigne las palabras del operario sobre la entrega y el estado en el que le entregan el equipo sus compañeros del turno anterior..."
-                className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm outline-none focus:border-slate-400 font-medium resize-y"
+                className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm outline-none focus:border-slate-400 font-medium"
               />
             </div>
 
@@ -857,10 +854,9 @@ export default function MantenimientoAutonomoPage() {
                   })}
                 </div>
               </div>
-              <input 
-                type="text" 
+              <AutoResizeTextarea 
                 value={staticResponses['8.1'].comment}
-                onChange={(e) => handleStaticCommentChange('8.1', e.target.value)}
+                onChange={(val) => handleStaticCommentChange('8.1', val)}
                 placeholder="Comentarios sobre el entrenamiento..."
                 className="w-full bg-white border border-slate-200 rounded-xl py-2 px-4 text-sm outline-none focus:border-slate-400"
               />
@@ -899,10 +895,9 @@ export default function MantenimientoAutonomoPage() {
                   })}
                 </div>
               </div>
-              <input 
-                type="text" 
+              <AutoResizeTextarea 
                 value={staticResponses['9.1'].comment}
-                onChange={(e) => handleStaticCommentChange('9.1', e.target.value)}
+                onChange={(val) => handleStaticCommentChange('9.1', val)}
                 placeholder="Observaciones de la HILU..."
                 className="w-full bg-white border border-slate-200 rounded-xl py-2 px-4 text-sm outline-none focus:border-slate-400"
               />
@@ -915,12 +910,12 @@ export default function MantenimientoAutonomoPage() {
         <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.03)] p-6 md:p-8 mb-8">
           <h2 className="text-lg font-bold text-[#324354] mb-3">📋 Planes de Acción</h2>
           <p className="text-slate-400 text-xs font-medium mb-4">Ingresa los compromisos y fechas límite acordados durante la auditoría</p>
-          <textarea
+          <AutoResizeTextarea
             value={actionPlans}
-            onChange={(e) => setActionPlans(e.target.value)}
-            rows={4}
+            onChange={(val) => setActionPlans(val)}
+            style={{ minHeight: '100px' }}
             placeholder="Escribe aquí los planes de acción detallados para las desviaciones detectadas..."
-            className="w-full bg-[#fcfbfa] border border-[#d8d3c5] rounded-2xl p-4 text-sm font-medium outline-none focus:border-[#324354] resize-y"
+            className="w-full bg-[#fcfbfa] border border-[#d8d3c5] rounded-2xl p-4 text-sm font-medium outline-none focus:border-[#324354]"
           />
         </div>
 

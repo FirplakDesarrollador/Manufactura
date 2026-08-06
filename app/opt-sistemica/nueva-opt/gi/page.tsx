@@ -8,6 +8,7 @@ import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { createExternalClient } from '@/lib/supabase/external';
+import AutoResizeTextarea from '@/components/opt-sistemica/AutoResizeTextarea';
 
 const questions = [
   { id: '1.1', text: "¿Tiene el tablero actualizado con la información del día anterior?" },
@@ -375,12 +376,10 @@ export default function GIPage() {
                 {/* Comment Input */}
                 <div>
                   <label className="label">Comentario {q.id}</label>
-                  <input
-                    type="text"
-                    className="input-field"
+                  <AutoResizeTextarea
                     placeholder="Escribe un comentario opcional..."
                     value={responses[q.id].comment}
-                    onChange={(e) => handleCommentChange(q.id, e.target.value)}
+                    onChange={(val) => handleCommentChange(q.id, val)}
                   />
                 </div>
               </div>
@@ -414,12 +413,11 @@ export default function GIPage() {
 
               <div style={{ marginBottom: '32px' }}>
                 <label className="label" style={{ fontSize: '1.1rem', fontWeight: 700 }}>PLANES ACCIÓN GESTIÓN INDICADORES</label>
-                <textarea
-                  className="input-field"
+                <AutoResizeTextarea
                   style={{ minHeight: '120px', padding: '16px' }}
                   placeholder="Describe los planes de acción necesarios..."
                   value={actionPlans}
-                  onChange={(e) => setActionPlans(e.target.value)}
+                  onChange={(val) => setActionPlans(val)}
                 />
               </div>
 
