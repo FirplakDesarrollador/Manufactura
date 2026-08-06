@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
-import semaforoData from './semaforo_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2 } from 'lucide-react'
@@ -71,12 +70,38 @@ interface SemaforoItem {
     familia: string;
     tipoOrden: string;
     cantPendiente: string;
-    cantPendItem: string;
+    cantPendItem: string | null;
     cantTotal: string;
+    disponiblePt01: string;
+    fechaCreacionOp: string;
+    estado: string;
+    fechaRecomendadaLiberacion: string;
+    fechaRealLiberacion: string;
+    consumoParaLiberar: string;
+    colorLiberacionTxt: string;
+    colorLiberacion: string;
+    cumplimientoLiberacion: string;
+    fechaEntregaLote: string;
+    fechaRecomendadaEntrega: string;
+    fechaCierreOp: string | null;
+    fechaIdealEntregaProduccion: string;
+    consumoAmortiguadorPlanta: string;
+    colorProduccionTxt: string;
+    colorProduccion: string;
+    cumplimientoPlanta: string;
+    diasRetrazoFirplak: string;
+    colorFirplakTxt: string;
+    colorFirplak: string;
+    cumplimientoFirplak: string;
+    fechaPrometidaEntregaItem: string;
+    destino: string;
+    numLote: string;
+    molde: string | null;
+    capacidadMolde: string | null;
+    fechaCargaMolde: string;
+    amortiguador: string;
+    cliente: string;
 }
-
-// Datos del Query Manager SAP: FPK - Semaforo - DJP (Proceso Produccion)
-const SEMAFORO_MOCK_DATA: SemaforoItem[] = semaforoData as SemaforoItem[];
 
 interface SapItemWarehouse {
     warehouseCode: string;
@@ -602,7 +627,7 @@ export default function ConsultaSAPPage() {
         try {
             let dataToExport = semaforoDataList;
             if (dataToExport.length === 0) {
-                const toastId = toast.loading("Consultando datos de SAP para generar Excel...");
+                const toastId = toast.loading("Consultando datos del Semáforo para generar Excel...");
                 try {
                     const res = await fetch('/api/sap/semaforo');
                     const result = await res.json();
@@ -610,17 +635,14 @@ export default function ConsultaSAPPage() {
                         dataToExport = result.data;
                         setSemaforoDataList(result.data);
                         setSemaforoHasLoaded(true);
+                        toast.dismiss(toastId);
                     } else {
-                        dataToExport = SEMAFORO_MOCK_DATA;
-                        setSemaforoDataList(SEMAFORO_MOCK_DATA);
-                        setSemaforoHasLoaded(true);
+                        toast.error(`Error al consultar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
+                        return;
                     }
-                } catch {
-                    dataToExport = SEMAFORO_MOCK_DATA;
-                    setSemaforoDataList(SEMAFORO_MOCK_DATA);
-                    setSemaforoHasLoaded(true);
-                } finally {
-                    toast.dismiss(toastId);
+                } catch (err: any) {
+                    toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+                    return;
                 }
             }
 
@@ -678,26 +700,22 @@ export default function ConsultaSAPPage() {
         }
     };
 
-    // Botón Actualizar Semáforo desde SAP (FPK - Semaforo - DJP)
+    // Botón Actualizar Semáforo (FPK - Semaforo - DJP) vía API de Sistemas
     const handleUpdateSemaforo = async () => {
         setIsExecuting(true);
-        const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP' en SAP B1...");
+        const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP'...");
         try {
             const res = await fetch('/api/sap/semaforo');
             const result = await res.json();
             if (result.success && result.data) {
                 setSemaforoDataList(result.data);
                 setSemaforoHasLoaded(true);
-                toast.success(`Semáforo actualizado correctamente desde SAP (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
+                toast.success(`Semáforo actualizado correctamente (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
             } else {
-                setSemaforoDataList(SEMAFORO_MOCK_DATA);
-                setSemaforoHasLoaded(true);
-                toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
+                toast.error(`Error al actualizar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
             }
-        } catch (err) {
-            setSemaforoDataList(SEMAFORO_MOCK_DATA);
-            setSemaforoHasLoaded(true);
-            toast.success(`Semáforo actualizado correctamente desde SAP (${SEMAFORO_MOCK_DATA.length.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
+        } catch (err: any) {
+            toast.error(`Error al actualizar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
         } finally {
             setIsExecuting(false);
         }
@@ -712,19 +730,22 @@ export default function ConsultaSAPPage() {
     const handleCopyData = async () => {
         let dataToCopy = semaforoDataList;
         if (dataToCopy.length === 0) {
-            const toastId = toast.loading("Consultando datos de SAP para copiar...");
+            const toastId = toast.loading("Consultando datos del Semáforo para copiar...");
             try {
                 const res = await fetch('/api/sap/semaforo');
                 const result = await res.json();
-                dataToCopy = (result.success && result.data) ? result.data : SEMAFORO_MOCK_DATA;
-                setSemaforoDataList(dataToCopy);
-                setSemaforoHasLoaded(true);
-            } catch {
-                dataToCopy = SEMAFORO_MOCK_DATA;
-                setSemaforoDataList(dataToCopy);
-                setSemaforoHasLoaded(true);
-            } finally {
-                toast.dismiss(toastId);
+                if (result.success && result.data) {
+                    dataToCopy = result.data;
+                    setSemaforoDataList(dataToCopy);
+                    setSemaforoHasLoaded(true);
+                    toast.dismiss(toastId);
+                } else {
+                    toast.error(`Error al consultar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
+                    return;
+                }
+            } catch (err: any) {
+                toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+                return;
             }
         }
 
