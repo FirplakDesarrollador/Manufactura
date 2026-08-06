@@ -1,108 +1,124 @@
 "use client";
 
 import React, { useState } from "react";
-import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Share2, Download, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
 
-// Datos Simulados Nivel de Servicio
-const nivelServicioDaily = [
-    { day: "1", val: 90.0 },
-    { day: "2", val: 88.72 },
-    { day: "3", val: 84.42 },
-    { day: "6", val: 79.61 },
-    { day: "7", val: 78.50 },
-    { day: "8", val: 86.03 },
-    { day: "9", val: 81.51 },
-    { day: "10", val: 86.61 },
-    { day: "14", val: 86.65 },
-    { day: "15", val: 91.01 },
-    { day: "16", val: 75.50 },
-    { day: "17", val: 84.00 },
-    { day: "21", val: 78.55 },
-    { day: "22", val: 68.40 },
-    { day: "23", val: 64.71 },
-    { day: "24", val: 80.65 },
-    { day: "27", val: 82.51 },
-    { day: "28", val: 76.42 },
-    { day: "29", val: 68.91 }
-];
+// Plant keys supported
+type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI";
 
-const nivelServicioMonthly = [
-    { month: "January", val: 67.44, active: false },
-    { month: "February", val: 73.70, active: false },
-    { month: "March", val: 82.05, active: false },
-    { month: "April", val: 76.19, active: false },
-    { month: "May", val: 77.08, active: false },
-    { month: "June", val: 72.75, active: false },
-    { month: "July", val: 80.82, active: true }
-];
+interface PlantMetrics {
+    nivelServicioMeta: number;
+    nivelServicioReal: number;
+    productividadPctMeta: number;
+    productividadPzMeta: number;
+    productividadPzReal: number;
+    hasSecondUnit: boolean;
+    secondUnitName: "KG" | "MBL";
+    secondUnitMeta: number;
+    secondUnitReal: number;
+    calidadMeta: number;
+    calidadReal: number;
+    totalPersonas: number;
+    ausentismos: number;
+    presentismoMeta: number;
+    accidentesMeta: number;
+    accidentesReal: number;
+}
 
-// Datos Simulados Productividad
-const productividadDaily = [
-    { day: "1", val: 85.0 },
-    { day: "2", val: 82.5 },
-    { day: "3", val: 88.1 },
-    { day: "6", val: 80.4 },
-    { day: "7", val: 84.2 },
-    { day: "8", val: 87.0 },
-    { day: "9", val: 81.9 },
-    { day: "10", val: 83.5 },
-    { day: "14", val: 86.0 },
-    { day: "15", val: 89.4 },
-    { day: "16", val: 78.0 },
-    { day: "17", val: 82.1 },
-    { day: "21", val: 84.5 },
-    { day: "22", val: 79.8 },
-    { day: "23", val: 75.2 },
-    { day: "24", val: 83.0 },
-    { day: "27", val: 85.2 },
-    { day: "28", val: 81.4 },
-    { day: "29", val: 82.5 }
-];
-
-const productividadMonthly = [
-    { month: "January", val: 78.20, active: false },
-    { month: "February", val: 81.00, active: false },
-    { month: "March", val: 85.40, active: false },
-    { month: "April", val: 79.10, active: false },
-    { month: "May", val: 83.60, active: false },
-    { month: "June", val: 80.20, active: false },
-    { month: "July", val: 82.50, active: true }
-];
-
-// Datos Simulados Calidad
-const calidadDaily = [
-    { day: "1", val: 88.2 },
-    { day: "2", val: 86.0 },
-    { day: "3", val: 83.4 },
-    { day: "6", val: 81.2 },
-    { day: "7", val: 85.0 },
-    { day: "8", val: 87.5 },
-    { day: "9", val: 82.1 },
-    { day: "10", val: 84.8 },
-    { day: "14", val: 88.0 },
-    { day: "15", val: 85.5 },
-    { day: "16", val: 79.2 },
-    { day: "17", val: 83.0 },
-    { day: "21", val: 80.5 },
-    { day: "22", val: 76.4 },
-    { day: "23", val: 72.1 },
-    { day: "24", val: 81.5 },
-    { day: "27", val: 83.4 },
-    { day: "28", val: 79.0 },
-    { day: "29", val: 80.9 }
-];
-
-const calidadMonthly = [
-    { month: "January", val: 75.10, active: false },
-    { month: "February", val: 79.30, active: false },
-    { month: "March", val: 84.20, active: false },
-    { month: "April", val: 81.00, active: false },
-    { month: "May", val: 82.40, active: false },
-    { month: "June", val: 78.90, active: false },
-    { month: "July", val: 80.90, active: true }
-];
+const INITIAL_PLANT_DATA: Record<PlantKey, PlantMetrics> = {
+    MS: {
+        nivelServicioMeta: 90,
+        nivelServicioReal: 80.0,
+        productividadPctMeta: 90,
+        productividadPzMeta: 550,
+        productividadPzReal: 450,
+        hasSecondUnit: true,
+        secondUnitName: "KG",
+        secondUnitMeta: 5500,
+        secondUnitReal: 4500,
+        calidadMeta: 90,
+        calidadReal: 82.0,
+        totalPersonas: 65,
+        ausentismos: 3,
+        presentismoMeta: 100,
+        accidentesMeta: 0,
+        accidentesReal: 0,
+    },
+    FV: {
+        nivelServicioMeta: 90,
+        nivelServicioReal: 80.0,
+        productividadPctMeta: 90,
+        productividadPzMeta: 30,
+        productividadPzReal: 25,
+        hasSecondUnit: false,
+        secondUnitName: "KG",
+        secondUnitMeta: 0,
+        secondUnitReal: 0,
+        calidadMeta: 35,
+        calidadReal: 25.0,
+        totalPersonas: 22,
+        ausentismos: 0,
+        presentismoMeta: 100,
+        accidentesMeta: 0,
+        accidentesReal: 0,
+    },
+    QZ: {
+        nivelServicioMeta: 90,
+        nivelServicioReal: 100.0,
+        productividadPctMeta: 90,
+        productividadPzMeta: 15,
+        productividadPzReal: 7,
+        hasSecondUnit: false,
+        secondUnitName: "KG",
+        secondUnitMeta: 0,
+        secondUnitReal: 0,
+        calidadMeta: 90,
+        calidadReal: 95.0,
+        totalPersonas: 1,
+        ausentismos: 1,
+        presentismoMeta: 100,
+        accidentesMeta: 0,
+        accidentesReal: 0,
+    },
+    MBL: {
+        nivelServicioMeta: 90,
+        nivelServicioReal: 95.0,
+        productividadPctMeta: 90,
+        productividadPzMeta: 2700,
+        productividadPzReal: 2430,
+        hasSecondUnit: true,
+        secondUnitName: "MBL",
+        secondUnitMeta: 250,
+        secondUnitReal: 200,
+        calidadMeta: 90,
+        calidadReal: 95.0,
+        totalPersonas: 13,
+        ausentismos: 1,
+        presentismoMeta: 100,
+        accidentesMeta: 0,
+        accidentesReal: 0,
+    },
+    CEFI: {
+        nivelServicioMeta: 90,
+        nivelServicioReal: 80.0,
+        productividadPctMeta: 90,
+        productividadPzMeta: 2300,
+        productividadPzReal: 2100,
+        hasSecondUnit: true,
+        secondUnitName: "MBL",
+        secondUnitMeta: 200,
+        secondUnitReal: 200,
+        calidadMeta: 90,
+        calidadReal: 95.0,
+        totalPersonas: 12,
+        ausentismos: 1,
+        presentismoMeta: 100,
+        accidentesMeta: 0,
+        accidentesReal: 0,
+    },
+};
 
 // URLs de Power BI cargadas desde variables de entorno para no exponerlas en el código fuente
 const POWERBI_URLS = {
@@ -119,41 +135,67 @@ const POWERBI_URLS = {
 };
 
 export default function IndicadoresProductividadPage() {
-    const [viewMode, setViewMode] = useState<"bi" | "manual" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("bi");
+    // Default view mode set to "manual" as requested
+    const [viewMode, setViewMode] = useState<"bi" | "manual" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("manual");
     const [calidadSubTab, setCalidadSubTab] = useState<"general" | "ms" | "fv" | "mbl" | "cefi" | "moldes">("ms");
 
-    // States for manual indicators
-    const [nivelServicio, setNivelServicio] = useState<number>(72.4);
-    const [productividadPct, setProductividadPct] = useState<number>(82.5);
-    const [productividadPz, setProductividadPz] = useState<number>(467);
-    const [productividadKg, setProductividadKg] = useState<number>(4951);
-    const [calidad, setCalidad] = useState<number>(80.9);
-    const [presentismo, setPresentismo] = useState<number>(98.6);
-    const [accidentes, setAccidentes] = useState<number>(1);
+    // Plant selector state
+    const [selectedPlant, setSelectedPlant] = useState<PlantKey>("MS");
 
-    // Editing states for custom formatting
-    const [editingCard, setEditingCard] = useState<string | null>(null);
+    // Manual date field (DD/MM/AAAA) defaulting to YESTERDAY
+    const getYesterdayFormatted = () => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const dd = String(yesterday.getDate()).padStart(2, "0");
+        const mm = String(yesterday.getMonth() + 1).padStart(2, "0");
+        const yyyy = yesterday.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    };
+    const [fechaManual, setFechaManual] = useState<string>(getYesterdayFormatted());
 
-    // Color logic thresholds matching the dashboard styling
-    const getCardColor = (type: string, value: number) => {
-        switch (type) {
-            case "nivelServicio":
-                return value >= 90 ? "bg-[#59a96a]" : value >= 80 ? "bg-[#deb841]" : "bg-[#d14747]";
-            case "productividadPct":
-                return value >= 90 ? "bg-[#59a96a]" : value >= 80 ? "bg-[#deb841]" : "bg-[#d14747]";
-            case "productividadPz":
-                return value >= 630 ? "bg-[#59a96a]" : value >= 550 ? "bg-[#deb841]" : "bg-[#d14747]";
-            case "productividadKg":
-                return value >= 6300 ? "bg-[#59a96a]" : value >= 5500 ? "bg-[#deb841]" : "bg-[#d14747]";
-            case "calidad":
-                return value >= 90 ? "bg-[#59a96a]" : value >= 85 ? "bg-[#deb841]" : "bg-[#d14747]";
-            case "presentismo":
-                return value >= 100 ? "bg-[#59a96a]" : value >= 95 ? "bg-[#deb841]" : "bg-[#d14747]";
-            case "accidentes":
-                return value === 0 ? "bg-[#59a96a]" : "bg-[#d14747]";
-            default:
-                return "bg-slate-100";
-        }
+    // State for all plant data
+    const [plantData, setPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
+
+    // Editing states for values or metas
+    const [editingKey, setEditingKey] = useState<string | null>(null);
+
+    const currentData = plantData[selectedPlant];
+
+    // Helper to update state for current plant
+    const updateCurrentPlant = (fields: Partial<PlantMetrics>) => {
+        setPlantData((prev) => ({
+            ...prev,
+            [selectedPlant]: {
+                ...prev[selectedPlant],
+                ...fields,
+            },
+        }));
+    };
+
+    // Calculate dynamic Productividad %: (piezasReal / piezasMeta) * 100
+    const calcProdPctReal = currentData.productividadPzMeta > 0
+        ? (currentData.productividadPzReal / currentData.productividadPzMeta) * 100
+        : 0;
+
+    // Calculate dynamic Presentismo %: ((totalPersonas - ausentismos) / totalPersonas) * 100
+    const calcPresentismoReal = currentData.totalPersonas > 0
+        ? ((currentData.totalPersonas - currentData.ausentismos) / currentData.totalPersonas) * 100
+        : 100;
+
+    // Color semáforo logic:
+    // Porcentaje del valor real sobre la meta:
+    // Verde: > 90% del cumplimiento sobre la meta (o >= 90%)
+    // Amarillo: >= 85% y <= 90% sobre la meta
+    // Rojo: < 85% sobre la meta
+    const getCardColor = (realVal: number, metaVal: number, isAccidentes = false, isNoApplies = false) => {
+        if (isNoApplies) return "bg-slate-200 border-slate-300 text-slate-400 opacity-80";
+        if (isAccidentes) return realVal === 0 ? "bg-[#59a96a]" : "bg-[#d14747]";
+        if (metaVal <= 0) return "bg-[#59a96a]";
+
+        const pctOfMeta = (realVal / metaVal) * 100;
+        if (pctOfMeta > 90) return "bg-[#59a96a]";
+        if (pctOfMeta >= 85) return "bg-[#deb841]";
+        return "bg-[#d14747]";
     };
 
     return (
@@ -166,80 +208,80 @@ export default function IndicadoresProductividadPage() {
                 showLogout={false}
             />
 
-            {/* Sub-Header Actions: 5 PESTAÑAS (BI, MANUAL, NIVEL DE SERVICIO, PRODUCTIVIDAD, CALIDAD) */}
-            <div className="w-full bg-white border-b border-[#e2ded5] py-3 px-4 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-2.5 sm:gap-3">
+            {/* Sub-Header Actions */}
+            <div className="w-full bg-white border-b border-[#e2ded5] py-2.5 px-4 shadow-sm">
+                <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-2 sm:gap-3">
                     <button
                         onClick={() => setViewMode("bi")}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
                             viewMode === "bi"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
-                        <LayoutGrid size={16} />
+                        <LayoutGrid size={15} />
                         <span>Tablero BI</span>
                     </button>
                     <button
                         onClick={() => setViewMode("manual")}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
                             viewMode === "manual"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
-                        <SlidersHorizontal size={16} />
+                        <SlidersHorizontal size={15} />
                         <span>Tablero Manual</span>
                     </button>
                     <button
                         onClick={() => setViewMode("nivel-servicio")}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
                             viewMode === "nivel-servicio"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
-                        <BarChart3 size={16} />
+                        <BarChart3 size={15} />
                         <span>Nivel de Servicio</span>
                     </button>
                     <button
                         onClick={() => setViewMode("productividad")}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
                             viewMode === "productividad"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
-                        <TrendingUp size={16} />
+                        <TrendingUp size={15} />
                         <span>Productividad</span>
                     </button>
                     <button
                         onClick={() => setViewMode("calidad")}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
                             viewMode === "calidad"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
-                        <ShieldCheck size={16} />
+                        <ShieldCheck size={15} />
                         <span>Calidad</span>
                     </button>
                     <button
                         onClick={() => setViewMode("ausentismo")}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
                             viewMode === "ausentismo"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
-                        <UserX size={16} />
+                        <UserX size={15} />
                         <span>Ausentismo</span>
                     </button>
                 </div>
             </div>
 
             {/* Main Area */}
-            <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 pb-20">
+            <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-4 pb-6">
                 {viewMode === "bi" ? (
                     <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
                         <iframe
@@ -371,210 +413,367 @@ export default function IndicadoresProductividadPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-8 animate-in fade-in duration-300">
-                        
-                        {/* Top Cards Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
+                    <div className="space-y-5 animate-in fade-in duration-300">
+                        {/* Header Bar with Plant Selector & Date Field DD/MM/AAAA */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-1.5 border-b border-[#e2ded5]">
+                            {/* Plant Filter Box */}
+                            <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-[#e2ded5] shadow-sm">
+                                <Filter size={16} className="text-[#324354]" />
+                                <span className="text-xs font-extrabold text-[#324354] uppercase tracking-wide">
+                                    PLANTA:
+                                </span>
+                                <div className="flex items-center gap-1.5 ml-1">
+                                    {(["MS", "FV", "QZ", "MBL", "CEFI"] as PlantKey[]).map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => {
+                                                setSelectedPlant(p);
+                                                setEditingKey(null);
+                                            }}
+                                            className={`px-3.5 py-1 rounded-lg font-black text-xs transition-all duration-200 cursor-pointer ${
+                                                selectedPlant === p
+                                                    ? "bg-[#324354] text-white shadow-sm scale-105"
+                                                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                            }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Manual Date Field (DD/MM/AAAA) in top right */}
+                            <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-xl border border-[#e2ded5] shadow-sm">
+                                <Calendar size={16} className="text-[#324354]" />
+                                <span className="text-xs font-extrabold text-[#324354] uppercase tracking-wide">
+                                    FECHA:
+                                </span>
+                                <input
+                                    type="text"
+                                    value={fechaManual}
+                                    onChange={(e) => setFechaManual(e.target.value)}
+                                    placeholder="DD/MM/AAAA"
+                                    className="w-28 text-xs font-black text-center text-[#324354] bg-slate-50 border border-slate-300 rounded-lg px-2 py-0.5 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Top Cards Grid (Ajustado la altura a 175px para cubrir perfectamente el espacio inferior) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                             {/* Card 1: Nivel de Servicio */}
                             <div className="flex flex-col space-y-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-tight text-center uppercase">
-                                    META NIVEL DE SERVICIO = 90%
-                                </span>
-                                <div className={`flex-1 min-h-[160px] flex flex-col justify-between p-6 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor("nivelServicio", nivelServicio)}`}>
+                                <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                    <span>META NIVEL DE SERVICIO = </span>
+                                    {editingKey === "meta_nivelServicio" ? (
+                                        <input
+                                            type="number"
+                                            value={currentData.nivelServicioMeta}
+                                            onChange={(e) => updateCurrentPlant({ nivelServicioMeta: parseFloat(e.target.value) || 0 })}
+                                            onBlur={() => setEditingKey(null)}
+                                            autoFocus
+                                            className="w-14 px-1 text-center bg-white border border-slate-300 rounded font-bold"
+                                        />
+                                    ) : (
+                                        <span
+                                            onClick={() => setEditingKey("meta_nivelServicio")}
+                                            className="cursor-pointer hover:underline underline-offset-2 decoration-dashed"
+                                        >
+                                            {currentData.nivelServicioMeta}%
+                                        </span>
+                                    )}
+                                </div>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.nivelServicioReal, currentData.nivelServicioMeta)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {editingCard === "nivelServicio" ? (
+                                        {editingKey === "real_nivelServicio" ? (
                                             <div className="flex items-center justify-center gap-0.5">
                                                 <input
                                                     type="number"
                                                     step="0.1"
-                                                    value={nivelServicio}
-                                                    onChange={(e) => setNivelServicio(parseFloat(e.target.value) || 0)}
-                                                    onBlur={() => setEditingCard(null)}
+                                                    value={currentData.nivelServicioReal}
+                                                    onChange={(e) => updateCurrentPlant({ nivelServicioReal: parseFloat(e.target.value) || 0 })}
+                                                    onBlur={() => setEditingKey(null)}
                                                     autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-0.5"
                                                 />
-                                                <span className="text-4xl font-extrabold text-slate-950">%</span>
+                                                <span className="text-3xl font-extrabold text-slate-950">%</span>
                                             </div>
                                         ) : (
                                             <span 
-                                                onClick={() => setEditingCard("nivelServicio")}
-                                                className="cursor-pointer hover:bg-black/5 px-4 py-2 rounded-xl text-5xl font-black text-center tracking-tight transition"
+                                                onClick={() => setEditingKey("real_nivelServicio")}
+                                                className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
                                             >
-                                                {nivelServicio.toFixed(1)} %
+                                                {currentData.nivelServicioReal.toFixed(1)} %
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-xs md:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
                                         Nivel Servicio (%)
                                     </span>
                                 </div>
                             </div>
 
-                            {/* Card 2: Productividad % */}
+                            {/* Card 2: Productividad % (Calculado: Piezas Real / Meta) */}
                             <div className="flex flex-col space-y-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-tight text-center uppercase">
-                                    META PROD. (%) = 90%
-                                </span>
-                                <div className={`flex-1 min-h-[160px] flex flex-col justify-between p-6 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor("productividadPct", productividadPct)}`}>
+                                <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                    <span>META PROD. (%) = </span>
+                                    {editingKey === "meta_productividadPct" ? (
+                                        <input
+                                            type="number"
+                                            value={currentData.productividadPctMeta}
+                                            onChange={(e) => updateCurrentPlant({ productividadPctMeta: parseFloat(e.target.value) || 0 })}
+                                            onBlur={() => setEditingKey(null)}
+                                            autoFocus
+                                            className="w-14 px-1 text-center bg-white border border-slate-300 rounded font-bold"
+                                        />
+                                    ) : (
+                                        <span
+                                            onClick={() => setEditingKey("meta_productividadPct")}
+                                            className="cursor-pointer hover:underline underline-offset-2 decoration-dashed"
+                                        >
+                                            {currentData.productividadPctMeta}%
+                                        </span>
+                                    )}
+                                </div>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(calcProdPctReal, currentData.productividadPctMeta)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {editingCard === "productividadPct" ? (
-                                            <div className="flex items-center justify-center gap-0.5">
-                                                <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    value={productividadPct}
-                                                    onChange={(e) => setProductividadPct(parseFloat(e.target.value) || 0)}
-                                                    onBlur={() => setEditingCard(null)}
-                                                    autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
-                                                />
-                                                <span className="text-4xl font-extrabold text-slate-950">%</span>
-                                            </div>
-                                        ) : (
-                                            <span 
-                                                onClick={() => setEditingCard("productividadPct")}
-                                                className="cursor-pointer hover:bg-black/5 px-4 py-2 rounded-xl text-5xl font-black text-center tracking-tight transition"
-                                            >
-                                                {productividadPct.toFixed(1)} %
-                                            </span>
-                                        )}
+                                        <span className="px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap">
+                                            {calcProdPctReal.toFixed(1)} %
+                                        </span>
                                     </div>
-                                    <span className="text-xs md:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
-                                        Productividad (%)
+                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                        Productividad (%) <span className="text-[10px] opacity-75 font-semibold lowercase block">(calculado: piezas real/meta)</span>
                                     </span>
                                 </div>
                             </div>
 
                             {/* Card 3: Productividad PZ */}
                             <div className="flex flex-col space-y-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-tight text-center uppercase">
-                                    META PROD. (PZ) = 630
-                                </span>
-                                <div className={`flex-1 min-h-[160px] flex flex-col justify-between p-6 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor("productividadPz", productividadPz)}`}>
+                                <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                    <span>META PROD. (PZ) = </span>
+                                    {editingKey === "meta_productividadPz" ? (
+                                        <input
+                                            type="number"
+                                            value={currentData.productividadPzMeta}
+                                            onChange={(e) => updateCurrentPlant({ productividadPzMeta: parseInt(e.target.value) || 0 })}
+                                            onBlur={() => setEditingKey(null)}
+                                            autoFocus
+                                            className="w-16 px-1 text-center bg-white border border-slate-300 rounded font-bold text-slate-900"
+                                        />
+                                    ) : (
+                                        <span
+                                            onClick={() => setEditingKey("meta_productividadPz")}
+                                            className="cursor-pointer hover:underline underline-offset-2 decoration-dashed text-[#324354] font-black"
+                                        >
+                                            {currentData.productividadPzMeta}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.productividadPzReal, currentData.productividadPzMeta)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {editingCard === "productividadPz" ? (
+                                        {editingKey === "real_productividadPz" ? (
                                             <input
                                                 type="number"
-                                                value={productividadPz}
-                                                onChange={(e) => setProductividadPz(parseInt(e.target.value) || 0)}
-                                                onBlur={() => setEditingCard(null)}
+                                                value={currentData.productividadPzReal}
+                                                onChange={(e) => updateCurrentPlant({ productividadPzReal: parseInt(e.target.value) || 0 })}
+                                                onBlur={() => setEditingKey(null)}
                                                 autoFocus
-                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-1"
+                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-0.5"
                                             />
                                         ) : (
                                             <span 
-                                                onClick={() => setEditingCard("productividadPz")}
-                                                className="cursor-pointer hover:bg-black/5 px-4 py-2 rounded-xl text-5xl font-black text-center tracking-tight transition"
+                                                onClick={() => setEditingKey("real_productividadPz")}
+                                                className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
                                             >
-                                                {productividadPz.toLocaleString("es-CO")}
+                                                {currentData.productividadPzReal.toLocaleString("es-CO")}
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-xs md:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
                                         Productividad (PZ)
                                     </span>
                                 </div>
                             </div>
 
-                            {/* Card 4: Productividad KG */}
+                            {/* Card 4: Productividad (KG / MBL) o NO APLICA */}
                             <div className="flex flex-col space-y-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-tight text-center uppercase">
-                                    META PROD. (KG) = 6300
-                                </span>
-                                <div className={`flex-1 min-h-[160px] flex flex-col justify-between p-6 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor("productividadKg", productividadKg)}`}>
-                                    <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {editingCard === "productividadKg" ? (
+                                {currentData.hasSecondUnit ? (
+                                    <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                        <span>META PROD. ({currentData.secondUnitName}) = </span>
+                                        {editingKey === "meta_secondUnit" ? (
                                             <input
                                                 type="number"
-                                                value={productividadKg}
-                                                onChange={(e) => setProductividadKg(parseInt(e.target.value) || 0)}
-                                                onBlur={() => setEditingCard(null)}
+                                                value={currentData.secondUnitMeta}
+                                                onChange={(e) => updateCurrentPlant({ secondUnitMeta: parseInt(e.target.value) || 0 })}
+                                                onBlur={() => setEditingKey(null)}
                                                 autoFocus
-                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-1"
+                                                className="w-16 px-1 text-center bg-white border border-slate-300 rounded font-bold text-slate-900"
                                             />
                                         ) : (
-                                            <span 
-                                                onClick={() => setEditingCard("productividadKg")}
-                                                className="cursor-pointer hover:bg-black/5 px-4 py-2 rounded-xl text-5xl font-black text-center tracking-tight transition"
+                                            <span
+                                                onClick={() => setEditingKey("meta_secondUnit")}
+                                                className="cursor-pointer hover:underline underline-offset-2 decoration-dashed text-[#324354] font-black"
                                             >
-                                                {productividadKg.toLocaleString("es-CO")}
+                                                {currentData.secondUnitMeta}
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-xs md:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
-                                        Productividad (KG)
+                                ) : (
+                                    <span className="text-xs sm:text-sm font-extrabold text-slate-400 tracking-tight text-center uppercase">
+                                        PROD. (KG / MBL) = NO APLICA
+                                    </span>
+                                )}
+                                
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitReal, currentData.secondUnitMeta, false, !currentData.hasSecondUnit)}`}>
+                                    <div className="flex-1 flex items-center justify-center text-slate-950">
+                                        {!currentData.hasSecondUnit ? (
+                                            <span className="text-2xl font-black text-slate-400 tracking-wider whitespace-nowrap">
+                                                NO APLICA
+                                            </span>
+                                        ) : editingKey === "real_secondUnit" ? (
+                                            <input
+                                                type="number"
+                                                value={currentData.secondUnitReal}
+                                                onChange={(e) => updateCurrentPlant({ secondUnitReal: parseInt(e.target.value) || 0 })}
+                                                onBlur={() => setEditingKey(null)}
+                                                autoFocus
+                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-0.5"
+                                            />
+                                        ) : (
+                                            <span 
+                                                onClick={() => setEditingKey("real_secondUnit")}
+                                                className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
+                                            >
+                                                {currentData.secondUnitReal.toLocaleString("es-CO")}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                        Productividad ({currentData.hasSecondUnit ? currentData.secondUnitName : "N/A"})
                                     </span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Bottom Cards Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-5xl mx-auto">
                             {/* Card 5: Calidad */}
                             <div className="flex flex-col space-y-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-tight text-center uppercase">
-                                    META CALIDAD = 90%
-                                </span>
-                                <div className={`flex-1 min-h-[160px] flex flex-col justify-between p-6 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor("calidad", calidad)}`}>
+                                <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                    <span>META CALIDAD = </span>
+                                    {editingKey === "meta_calidad" ? (
+                                        <input
+                                            type="number"
+                                            value={currentData.calidadMeta}
+                                            onChange={(e) => updateCurrentPlant({ calidadMeta: parseFloat(e.target.value) || 0 })}
+                                            onBlur={() => setEditingKey(null)}
+                                            autoFocus
+                                            className="w-14 px-1 text-center bg-white border border-slate-300 rounded font-bold"
+                                        />
+                                    ) : (
+                                        <span
+                                            onClick={() => setEditingKey("meta_calidad")}
+                                            className="cursor-pointer hover:underline underline-offset-2 decoration-dashed"
+                                        >
+                                            {currentData.calidadMeta}%
+                                        </span>
+                                    )}
+                                </div>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.calidadReal, currentData.calidadMeta)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {editingCard === "calidad" ? (
+                                        {editingKey === "real_calidad" ? (
                                             <div className="flex items-center justify-center gap-0.5">
                                                 <input
                                                     type="number"
                                                     step="0.1"
-                                                    value={calidad}
-                                                    onChange={(e) => setCalidad(parseFloat(e.target.value) || 0)}
-                                                    onBlur={() => setEditingCard(null)}
+                                                    value={currentData.calidadReal}
+                                                    onChange={(e) => updateCurrentPlant({ calidadReal: parseFloat(e.target.value) || 0 })}
+                                                    onBlur={() => setEditingKey(null)}
                                                     autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-0.5"
                                                 />
-                                                <span className="text-4xl font-extrabold text-slate-950">%</span>
+                                                <span className="text-3xl font-extrabold text-slate-950">%</span>
                                             </div>
                                         ) : (
                                             <span 
-                                                onClick={() => setEditingCard("calidad")}
-                                                className="cursor-pointer hover:bg-black/5 px-4 py-2 rounded-xl text-5xl font-black text-center tracking-tight transition"
+                                                onClick={() => setEditingKey("real_calidad")}
+                                                className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
                                             >
-                                                {calidad.toFixed(1)} %
+                                                {currentData.calidadReal.toFixed(1)} %
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-xs md:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
                                         Calidad
                                     </span>
                                 </div>
                             </div>
 
-                            {/* Card 6: Presentismo */}
+                            {/* Card 6: Presentismo (Calculado: (Total - Ausentismos) / Total) */}
                             <div className="flex flex-col space-y-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-tight text-center uppercase">
-                                    META PRESENTISMO = 100%
-                                </span>
-                                <div className={`flex-1 min-h-[160px] flex flex-col justify-between p-6 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor("presentismo", presentismo)}`}>
-                                    <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {editingCard === "presentismo" ? (
-                                            <div className="flex items-center justify-center gap-0.5">
-                                                <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    value={presentismo}
-                                                    onChange={(e) => setPresentismo(parseFloat(e.target.value) || 0)}
-                                                    onBlur={() => setEditingCard(null)}
-                                                    autoFocus
-                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
-                                                />
-                                                <span className="text-4xl font-extrabold text-slate-950">%</span>
+                                <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                    <span>META PRESENTISMO = </span>
+                                    {editingKey === "meta_presentismo" ? (
+                                        <input
+                                            type="number"
+                                            value={currentData.presentismoMeta}
+                                            onChange={(e) => updateCurrentPlant({ presentismoMeta: parseFloat(e.target.value) || 0 })}
+                                            onBlur={() => setEditingKey(null)}
+                                            autoFocus
+                                            className="w-14 px-1 text-center bg-white border border-slate-300 rounded font-bold"
+                                        />
+                                    ) : (
+                                        <span
+                                            onClick={() => setEditingKey("meta_presentismo")}
+                                            className="cursor-pointer hover:underline underline-offset-2 decoration-dashed"
+                                        >
+                                            {currentData.presentismoMeta}%
+                                        </span>
+                                    )}
+                                </div>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(calcPresentismoReal, currentData.presentismoMeta)}`}>
+                                    <div className="flex-1 flex flex-col items-center justify-center text-slate-950">
+                                        {editingKey === "real_ausentismos" ? (
+                                            <div className="flex flex-col items-center gap-1 bg-white/40 p-2 rounded-xl">
+                                                <div className="flex items-center gap-2 text-xs font-extrabold">
+                                                    <span>Faltas / Ausentismos:</span>
+                                                    <input
+                                                        type="number"
+                                                        value={currentData.ausentismos}
+                                                        onChange={(e) => updateCurrentPlant({ ausentismos: parseInt(e.target.value) || 0 })}
+                                                        className="w-14 p-0.5 text-center bg-white border rounded font-black text-slate-900"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs font-extrabold">
+                                                    <span>Total Personal:</span>
+                                                    <input
+                                                        type="number"
+                                                        value={currentData.totalPersonas}
+                                                        onChange={(e) => updateCurrentPlant({ totalPersonas: parseInt(e.target.value) || 1 })}
+                                                        className="w-14 p-0.5 text-center bg-white border rounded font-black text-slate-900"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={() => setEditingKey(null)}
+                                                    className="mt-0.5 px-2.5 py-0.5 bg-[#324354] text-white rounded text-xs font-bold"
+                                                >
+                                                    Guardar
+                                                </button>
                                             </div>
                                         ) : (
-                                            <span 
-                                                onClick={() => setEditingCard("presentismo")}
-                                                className="cursor-pointer hover:bg-black/5 px-4 py-2 rounded-xl text-5xl font-black text-center tracking-tight transition"
+                                            <div
+                                                onClick={() => setEditingKey("real_ausentismos")}
+                                                className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl flex flex-col items-center transition"
                                             >
-                                                {presentismo.toFixed(1)} %
-                                            </span>
+                                                <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap">
+                                                    {calcPresentismoReal.toFixed(1)} %
+                                                </span>
+                                                <span className="text-xs font-extrabold text-slate-900/80 mt-0.5 whitespace-nowrap">
+                                                    ({currentData.ausentismos} ausentismos / {currentData.totalPersonas} pers.)
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
-                                    <span className="text-xs md:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
                                         Presentismo
                                     </span>
                                 </div>
@@ -582,30 +781,47 @@ export default function IndicadoresProductividadPage() {
 
                             {/* Card 7: Seguridad (Accidentes) */}
                             <div className="flex flex-col space-y-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-tight text-center uppercase">
-                                    META SEGURIDAD = 0
-                                </span>
-                                <div className={`flex-1 min-h-[160px] flex flex-col justify-between p-6 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor("accidentes", accidentes)}`}>
+                                <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                    <span>META SEGURIDAD = </span>
+                                    {editingKey === "meta_accidentes" ? (
+                                        <input
+                                            type="number"
+                                            value={currentData.accidentesMeta}
+                                            onChange={(e) => updateCurrentPlant({ accidentesMeta: parseInt(e.target.value) || 0 })}
+                                            onBlur={() => setEditingKey(null)}
+                                            autoFocus
+                                            className="w-14 px-1 text-center bg-white border border-slate-300 rounded font-bold"
+                                        />
+                                    ) : (
+                                        <span
+                                            onClick={() => setEditingKey("meta_accidentes")}
+                                            className="cursor-pointer hover:underline underline-offset-2 decoration-dashed"
+                                        >
+                                            {currentData.accidentesMeta}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.accidentesReal, currentData.accidentesMeta, true)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {editingCard === "accidentes" ? (
+                                        {editingKey === "real_accidentes" ? (
                                             <input
                                                 type="number"
-                                                value={accidentes}
-                                                onChange={(e) => setAccidentes(parseInt(e.target.value) || 0)}
-                                                onBlur={() => setEditingCard(null)}
+                                                value={currentData.accidentesReal}
+                                                onChange={(e) => updateCurrentPlant({ accidentesReal: parseInt(e.target.value) || 0 })}
+                                                onBlur={() => setEditingKey(null)}
                                                 autoFocus
-                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-5xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-1"
+                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-32 py-0.5"
                                             />
                                         ) : (
                                             <span 
-                                                onClick={() => setEditingCard("accidentes")}
-                                                className="cursor-pointer hover:bg-black/5 px-4 py-2 rounded-xl text-5xl font-black text-center tracking-tight transition"
+                                                onClick={() => setEditingKey("real_accidentes")}
+                                                className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
                                             >
-                                                {accidentes}
+                                                {currentData.accidentesReal}
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-xs md:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
                                         Accidentes
                                     </span>
                                 </div>
@@ -614,11 +830,9 @@ export default function IndicadoresProductividadPage() {
                     </div>
                 )}
             </main>
-
-            {/* Footer */}
-            <footer className="py-6 text-center text-gray-400 text-sm border-t border-[#e2ded5] bg-white">
-                &copy; {new Date().getFullYear()} Firplak. Todos los derechos reservados.
-            </footer>
         </div>
     );
 }
+
+
+
