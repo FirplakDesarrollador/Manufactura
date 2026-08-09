@@ -1906,8 +1906,8 @@ export default function ConsultaSAPPage() {
                             <div className="bg-[#eceae6] p-2.5 border border-[#d0cdcf] rounded-none flex flex-col gap-3 shadow-inner">
                                 
                                 <div className="flex flex-wrap lg:flex-nowrap gap-x-8 gap-y-3 justify-between items-start">
-                                    {/* LEFT COLUMN FIELDS */}
-                                    <div className="space-y-1.5 shrink-0 max-w-xl w-full">
+                                    {/* LEFT COLUMN FIELDS - WIDENED TO REACH THE RIGHT AREA */}
+                                    <div className="space-y-1.5 shrink-0 max-w-4xl w-full">
                                         
                                          {/* NÚMERO DE ARTÍCULO (SEARCHABLE) */}
                                         <div className="flex items-center">
