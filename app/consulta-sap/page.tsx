@@ -1909,12 +1909,12 @@ export default function ConsultaSAPPage() {
                                     {/* LEFT COLUMN FIELDS - WIDENED TO REACH THE RIGHT AREA */}
                                     <div className="space-y-1.5 shrink-0 max-w-4xl w-full">
                                         
-                                         {/* NÚMERO DE ARTÍCULO (SEARCHABLE) */}
+                                         {/* NÚMERO DE ARTÍCULO (COMPACT SKU FIELD) */}
                                         <div className="flex items-center">
                                             <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none flex items-center">
                                                 Número de artículo <SapLinkArrow />
                                             </span>
-                                            <div className="flex items-center gap-1 flex-1">
+                                            <div className="flex items-center gap-1 w-full max-w-md">
                                                 <input
                                                     type="text"
                                                     value={itemCodeInput}
@@ -1935,7 +1935,7 @@ export default function ConsultaSAPPage() {
                                             </div>
                                         </div>
 
-                                        {/* DESCRIPCIÓN (SEARCHABLE) */}
+                                        {/* DESCRIPCIÓN (WIDE SEARCHABLE FIELD) */}
                                         <div className="flex items-center">
                                             <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none">Descripción</span>
                                             <div className="flex items-center gap-1 flex-1">
@@ -1959,19 +1959,22 @@ export default function ConsultaSAPPage() {
                                             </div>
                                         </div>
 
-                                        {/* COINCIDENCIAS DE BÚSQUEDA */}
+                                        {/* COINCIDENCIAS DE BÚSQUEDA - DESPLEGABLE ANCHO */}
                                         {itemMatches.length > 1 && (
-                                            <div className="ml-[140px] bg-white border border-amber-300 p-1.5 shadow-md max-h-36 overflow-y-auto text-[11px]">
-                                                <span className="font-bold text-amber-800 block mb-1">Coincidencias encontradas en SAP ({itemMatches.length}):</span>
-                                                <div className="space-y-0.5">
+                                            <div className="ml-[140px] w-full max-w-4xl bg-white border-2 border-amber-400 p-2 shadow-xl rounded-b-lg max-h-56 overflow-y-auto text-xs z-20">
+                                                <div className="flex items-center justify-between font-bold text-amber-900 bg-amber-50 px-2 py-1.5 rounded mb-1.5 border border-amber-200">
+                                                    <span>Coincidencias encontradas en SAP ({itemMatches.length}):</span>
+                                                    <span className="text-[10px] font-normal text-amber-700">Haz clic en un producto para seleccionarlo</span>
+                                                </div>
+                                                <div className="space-y-1">
                                                     {itemMatches.map((m, idx) => (
                                                         <div
                                                             key={idx}
                                                             onClick={() => handleItemSearch('code', m.itemCode)}
-                                                            className="hover:bg-amber-50 p-1 cursor-pointer rounded flex items-center justify-between border-b border-gray-100 font-sans"
+                                                            className="hover:bg-blue-50 hover:border-blue-300 p-2 cursor-pointer rounded border border-slate-100 flex items-center justify-between gap-4 font-sans transition-all active:scale-[0.99]"
                                                         >
-                                                            <span className="font-mono font-bold text-blue-900">{m.itemCode}</span>
-                                                            <span className="text-gray-700 truncate max-w-xs">{m.itemName}</span>
+                                                            <span className="font-mono font-bold text-blue-900 shrink-0 text-xs bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">{m.itemCode}</span>
+                                                            <span className="text-gray-800 font-medium text-xs flex-1 text-right leading-snug">{m.itemName}</span>
                                                         </div>
                                                     ))}
                                                 </div>
