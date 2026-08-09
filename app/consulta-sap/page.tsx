@@ -700,6 +700,40 @@ export default function ConsultaSAPPage() {
         }
     };
 
+    // Exportar "Prioridades Diarias Plantas" con todas las 10 pestañas procesadas
+    const handleDownloadPrioridades = async () => {
+        try {
+            let dataToExport = semaforoDataList;
+            if (dataToExport.length === 0) {
+                const toastId = toast.loading("Consultando datos del Semáforo para generar Prioridades...");
+                try {
+                    const res = await fetch('/api/sap/semaforo');
+                    const result = await res.json();
+                    if (result.success && result.data) {
+                        dataToExport = result.data;
+                        setSemaforoDataList(result.data);
+                        setSemaforoHasLoaded(true);
+                        toast.dismiss(toastId);
+                    } else {
+                        toast.error(`Error al consultar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
+                        return;
+                    }
+                } catch (err: any) {
+                    toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+                    return;
+                }
+            }
+
+            const toastId = toast.loading("Generando archivo 'Prioridades Diarias de Plantas'...");
+            const { descargarPrioridadesPlantas } = await import('@/lib/prioridadesPlantas');
+            const totalFilas = await descargarPrioridadesPlantas(dataToExport);
+            toast.success(`Archivo 'Prioridades Diarias de Plantas' generado exitosamente (${totalFilas.toLocaleString('es-CO')} registros procesados en pestañas de planta)`, { id: toastId });
+        } catch (err: any) {
+            console.error("Error al generar Prioridades Diarias:", err);
+            toast.error(`Error al generar el archivo: ${err.message || 'error desconocido'}`);
+        }
+    };
+
     // Botón Actualizar Semáforo (FPK - Semaforo - DJP) vía API de Sistemas
     const handleUpdateSemaforo = async () => {
         setIsExecuting(true);
@@ -1735,8 +1769,8 @@ export default function ConsultaSAPPage() {
                         {/* QUERY MANAGER BODY: CENTERED ACTIONS & STATUS CARD */}
                         <div className="p-8 md:p-12 bg-[#f3f0ea] flex flex-col items-center justify-center gap-8 min-h-[380px]">
                             
-                            {/* BOTONES DE ACCIÓN CENTRADOS */}
-                            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+                            {/* RENGLON 1: BOTON ACTUALIZAR SEMAFORO, SOLO Y CENTRADO */}
+                            <div className="flex items-center justify-center w-full">
                                 <button
                                     onClick={handleUpdateSemaforo}
                                     disabled={isExecuting}
@@ -1745,23 +1779,36 @@ export default function ConsultaSAPPage() {
                                     <RefreshCw size={18} className={isExecuting ? "animate-spin" : ""} />
                                     <span>Actualizar Semáforo</span>
                                 </button>
-
-                                <button
-                                    onClick={handleCopyData}
-                                    className="bg-white hover:bg-slate-100 text-[#324354] border border-[#b2b2b2] font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-2.5"
-                                >
-                                    {copiedData ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
-                                    <span>{copiedData ? "¡Copiado!" : "Copiar datos"}</span>
-                                </button>
-
-                                <button
-                                    onClick={handleExportExcel}
-                                    className="bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2.5"
-                                >
-                                    <Download size={18} />
-                                    <span>Descargar a Excel</span>
-                                </button>
                             </div>
+
+                            {/* RENGLON 2: 3 COLUMNAS, SOLO VISIBLE DESPUES DE ACTUALIZAR */}
+                            {semaforoHasLoaded && (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 w-full max-w-3xl">
+                                    <button
+                                        onClick={handleCopyData}
+                                        className="bg-white hover:bg-slate-100 text-[#324354] border border-[#b2b2b2] font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2.5"
+                                    >
+                                        {copiedData ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                                        <span>{copiedData ? "¡Copiado!" : "Copiar Datos Semáforo"}</span>
+                                    </button>
+
+                                    <button
+                                        onClick={handleExportExcel}
+                                        className="bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2.5"
+                                    >
+                                        <Download size={18} />
+                                        <span>Descargar Semáforo</span>
+                                    </button>
+
+                                    <button
+                                        onClick={handleDownloadPrioridades}
+                                        className="bg-[#324354] hover:bg-[#24313e] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2.5"
+                                    >
+                                        <Download size={18} />
+                                        <span>Descargar Prioridades diarias de Plantas</span>
+                                    </button>
+                                </div>
+                            )}
 
                             {/* MENSAJE CENTRAL CON REGISTROS ENCONTRADOS / ESTADO */}
                             <div className="w-full max-w-lg bg-white border border-[#a3a3a3] rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-3">
