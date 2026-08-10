@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings } from 'lucide-react'
+import { Camera, X, Settings, Archive, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -53,6 +53,8 @@ export default function CalidadMsReportPage() {
     const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
+    const [hasSaldosPermission, setHasSaldosPermission] = useState(false)
     
     // New states for custom Molde prompt
     const [isMoldeModalOpen, setIsMoldeModalOpen] = useState(false)
@@ -67,15 +69,25 @@ export default function CalidadMsReportPage() {
         
         const { data: localUser } = await supabase
             .from('usuarios')
-            .select('id')
+            .select('id, permisos')
             .eq('uuid', userData.user.id)
             .single()
+
+        if (!localUser?.permisos?.calidad?.ms) {
+            router.push('/home')
+            return
+        }
 
         setUser({
             id: userData.user.id,
             email: userData.user.email,
             localId: localUser?.id
         })
+
+        if (localUser?.permisos?.calidad) {
+            setHasSettingsPermission(!!localUser.permisos.calidad.configurar_defectos)
+            setHasSaldosPermission(!!localUser.permisos.calidad.saldos_y_destrucciones)
+        }
 
         const [productsRes, defectsRes, reportsRes] = await Promise.all([
             supabase.from('productos_defectos_ms').select('*').order('Referencia'),
@@ -351,12 +363,21 @@ export default function CalidadMsReportPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
                         </button>
+                        {hasSettingsPermission && (
+                            <button
+                                onClick={() => setIsSettingsOpen(true)}
+                                className={`p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 border-l-0`}
+                                title="Configurar Defectos"
+                            >
+                                <Settings className="w-5 h-5" />
+                            </button>
+                        )}
                         <button
-                            onClick={() => setIsSettingsOpen(true)}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 rounded-r"
-                            title="Configurar Defectos"
+                            onClick={() => router.push('/calidad/ms/saldos')}
+                            className="p-2.5 bg-white border border-gray-300 text-red-500 hover:bg-red-50 rounded-r border-l-0"
+                            title="Saldos y Destrucciones"
                         >
-                            <Settings className="w-5 h-5" />
+                            <Trash2 className="w-5 h-5" />
                         </button>
                     </div>
 
