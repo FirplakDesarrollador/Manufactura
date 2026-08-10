@@ -171,8 +171,17 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
         setSaving(true)
         try {
             const { type, item } = editModal
-            if (type === 'of') await updateOrdenFabricacion(item.id, item)
-            else await updateRegistroTrazabilidad(item.id, item)
+            if (type === 'of') {
+                const sumEtapas = (item.pintura || 0) + (item.desgelcada || 0) + (item.pulido || 0) + (item.reparacion || 0) + (item.saldo || 0) + (item.empaque || 0) + (item.transito || 0) + (item.vaciado || 0) + (item.estanteria || 0) + (item.acabado || 0) + (item.reparacion_larga || 0) + (item.destruccion || 0) + (item.digitado || 0) + (item.cedi || 0)
+                if (item.cantidad !== undefined && item.cantidad < sumEtapas) {
+                    alert(`No se puede actualizar: La cantidad fijada (${item.cantidad}) es inferior a las piezas ya existentes en las etapas (${sumEtapas}).`)
+                    setSaving(false)
+                    return
+                }
+                await updateOrdenFabricacion(item.id, item)
+            } else {
+                await updateRegistroTrazabilidad(item.id, item)
+            }
             alert('Actualizado correctamente')
             setEditModal(null)
             loadData()
@@ -184,6 +193,14 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     }
 
     const handleTransfer = async (registro: RegistroTrazabilidad, targetOrden: OrdenFabricacion) => {
+        const targetCantidad = Math.max(0, targetOrden.cantidad || targetOrden.cantidad_programada || 0)
+        const targetSumEtapas = (targetOrden.pintura || 0) + (targetOrden.desgelcada || 0) + (targetOrden.pulido || 0) + (targetOrden.reparacion || 0) + (targetOrden.saldo || 0) + (targetOrden.empaque || 0) + (targetOrden.transito || 0) + (targetOrden.vaciado || 0) + (targetOrden.estanteria || 0) + (targetOrden.acabado || 0) + (targetOrden.reparacion_larga || 0) + (targetOrden.destruccion || 0) + (targetOrden.digitado || 0) + (targetOrden.cedi || 0)
+
+        if (targetCantidad > 0 && targetSumEtapas >= targetCantidad) {
+            toast.error(`No se puede transferir: La orden de destino ${targetOrden.orden_fabricacion} ya cuenta con la cantidad máxima permitida (${targetCantidad} piezas).`)
+            return
+        }
+
         if (!confirm(`¿Está seguro que desea transferir esta pieza a la orden ${targetOrden.orden_fabricacion}?`)) return
 
         setSaving(true)

@@ -1,7 +1,7 @@
 import { parseDBDate } from '@/lib/utils/date';
 import React from 'react'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
-import { Box, Clipboard, Users } from 'lucide-react'
+import { Box, Clipboard, Users, AlertTriangle } from 'lucide-react'
 
 interface OrdenCardProps {
     orden: OrdenFabricacion
@@ -25,14 +25,43 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
     const enUso = relevantMoldes.filter(m => m.estado === 'En uso').length
     const enReparacion = relevantMoldes.filter(m => !['Disponible', 'En uso'].includes(m.estado)).length
 
+    const cantidadTotal = Math.max(0, orden.cantidad || orden.cantidad_programada || 0)
+
+    // Sum of all stage counts
+    const sumEtapas = (orden.pintura || 0) +
+        (orden.desgelcada || 0) +
+        (orden.pulido || 0) +
+        (orden.reparacion || 0) +
+        (orden.saldo || 0) +
+        (orden.empaque || 0) +
+        (orden.transito || 0) +
+        (orden.vaciado || 0) +
+        (orden.estanteria || 0) +
+        (orden.acabado || 0) +
+        (orden.reparacion_larga || 0) +
+        (orden.destruccion || 0) +
+        (orden.digitado || 0) +
+        (orden.cedi || 0)
+
+    const isExcedido = cantidadTotal > 0 && sumEtapas > cantidadTotal
+    const programadoCalculado = Math.max(0, cantidadTotal - sumEtapas)
+
     return (
         <button
             onClick={onClick}
-            className={`w-full text-left p-3 rounded-lg border-2 transition-all flex flex-col md:flex-row gap-3 md:gap-0 ${isActive
+            className={`w-full text-left p-3 rounded-lg border-2 transition-all flex flex-col md:flex-row gap-3 md:gap-0 relative ${isExcedido
+                ? 'bg-red-50/30 border-red-500 ring-4 ring-red-500/20 shadow-md'
+                : isActive
                 ? 'bg-cyan-100 border-cyan-500 ring-4 ring-cyan-500/20 shadow-md'
                 : 'bg-white border-gray-300 hover:bg-gray-50'
                 }`}
         >
+            {isExcedido && (
+                <div className="absolute -top-2.5 right-4 bg-red-600 text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full shadow flex items-center gap-1 z-10">
+                    <AlertTriangle size={12} />
+                    ¡Alerta: Suma en etapas ({sumEtapas}) excede cantidad ({cantidadTotal})!
+                </div>
+            )}
             {/* Left Section: Basic Info */}
             <div className="w-full md:w-1/4 md:pr-2 md:border-r border-gray-300 flex flex-col justify-between overflow-hidden">
                 <div className="overflow-hidden">
@@ -76,7 +105,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
 
             {/* Right Section: Process Grid */}
             <div className="flex-1 md:pl-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1">
-                <MiniMetric label="Cantidad" value={Math.max(0, orden.cantidad || orden.cantidad_programada || 0)} color="bg-cyan-50 border-cyan-200" />
+                <MiniMetric label="Cantidad" value={cantidadTotal} color={isExcedido ? "bg-red-100 border-red-400 text-red-700" : "bg-cyan-50 border-cyan-200"} />
                 <MiniMetric label="Pintura" value={Math.max(0, orden.pintura || 0)} />
                 <MiniMetric label="Desgelcada" value={Math.max(0, orden.desgelcada || 0)} />
                 <MiniMetric label="Pulido" value={Math.max(0, orden.pulido || 0)} />
@@ -85,7 +114,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                 <MiniMetric label="Empaque" value={Math.max(0, orden.empaque || 0)} />
                 <MiniMetric label="Transito" value={Math.max(0, orden.transito || 0)} />
 
-                <MiniMetric label="Programado" value={Math.max(0, orden.programado || 0)} color="bg-orange-50 border-orange-200" />
+                <MiniMetric label="Programado" value={programadoCalculado} color="bg-orange-50 border-orange-200" />
                 <MiniMetric label="Vaciado" value={Math.max(0, orden.vaciado || 0)} />
                 <MiniMetric label="Estanteria" value={Math.max(0, orden.estanteria || 0)} />
                 <MiniMetric label="Acabado" value={Math.max(0, orden.acabado || 0)} />

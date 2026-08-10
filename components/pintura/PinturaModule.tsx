@@ -250,8 +250,24 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             alert('Error: Debe seleccionar un Molde.')
             return
         }
-        if ((selectedOrden.programado || 0) <= 0) {
-            alert('Esta orden ya completó las piezas programadas.')
+        const sumEtapas = (selectedOrden.pintura || 0) +
+            (selectedOrden.desgelcada || 0) +
+            (selectedOrden.pulido || 0) +
+            (selectedOrden.reparacion || 0) +
+            (selectedOrden.saldo || 0) +
+            (selectedOrden.empaque || 0) +
+            (selectedOrden.transito || 0) +
+            (selectedOrden.vaciado || 0) +
+            (selectedOrden.estanteria || 0) +
+            (selectedOrden.acabado || 0) +
+            (selectedOrden.reparacion_larga || 0) +
+            (selectedOrden.destruccion || 0) +
+            (selectedOrden.digitado || 0) +
+            (selectedOrden.cedi || 0)
+        const cantidadMax = Math.max(0, selectedOrden.cantidad || selectedOrden.cantidad_programada || 0)
+
+        if (cantidadMax > 0 && sumEtapas >= cantidadMax) {
+            alert(`Acción bloqueada: La sumatoria de piezas en etapas (${sumEtapas}) de la orden ${selectedOrden.orden_fabricacion} ya alcanzó la cantidad máxima permitida (${cantidadMax}).`)
             return
         }
 
