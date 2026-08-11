@@ -102,23 +102,43 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
       <style dangerouslySetInnerHTML={{ __html: `
         .print-only { display: none; }
         @media print {
-          * { transform: none !important; transition: none !important; box-sizing: border-box !important; }
-          html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+          * { 
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
+            box-sizing: border-box !important; 
+            transform: none !important; 
+            transition: none !important; 
+          }
+          @page { 
+            size: landscape; 
+            margin: 0.5cm; 
+          }
+          html, body { 
+            width: 100% !important; 
+            height: auto !important; 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            background: #fff !important; 
+            font-family: 'Helvetica', 'Arial', sans-serif !important; 
+            overflow: visible !important; 
+          }
           .screen-only, .no-print, header, footer, nav { display: none !important; }
-          .print-only { display: block !important; width: 100% !important; margin: 0 !important; }
-          @page { size: landscape; margin: 0.5cm; }
-          .hdt-container { width: 100%; font-family: 'Helvetica', 'Arial', sans-serif; color: #000; }
-          .hdt-table { width: 100%; border-collapse: collapse; border: 1.5pt solid #000; table-layout: fixed; }
-          .hdt-table td { border: 1pt solid #000; padding: 4px 8px; vertical-align: middle; }
-          .hdt-header-title { text-align: center; font-size: 14pt; font-weight: 900; text-transform: uppercase; }
-          .hdt-label { font-size: 6.5pt; font-weight: 800; text-transform: uppercase; color: #475569; display: block; margin-bottom: 1px; }
-          .hdt-value { font-size: 9pt; font-weight: 700; color: #000; display: block; min-height: 12pt; }
-          .hdt-matrix-table { width: 100%; border-collapse: collapse; border: 1.5pt solid #000; margin-top: -1.5pt; table-layout: fixed; }
-          .hdt-matrix-table th, .hdt-matrix-table td { border: 1pt solid #000; padding: 3px 1px; text-align: center; font-size: 7pt; }
-          .hdt-matrix-table th { background-color: #F8FAFC !important; font-weight: 900; }
-          .pt-eq { font-size: 8pt; width: 12%; text-align: left !important; padding-left: 8px !important; font-weight: bold; }
-          .pt-rev { font-size: 7.5pt; width: 22%; text-align: left !important; padding-left: 8px !important; }
-          .hdt-footer { margin-top: 8px; font-size: 7pt; text-align: center; font-style: italic; }
+          .print-only { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          .hdt-container { width: 100% !important; color: #000 !important; }
+          .hdt-table { width: 100% !important; border-collapse: collapse !important; border: 1.5pt solid #000 !important; table-layout: fixed !important; }
+          .hdt-table td { border: 1pt solid #000 !important; padding: 3px 6px !important; vertical-align: middle !important; }
+          .hdt-header-title { text-align: center !important; font-size: 11pt !important; font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.3px !important; line-height: 1.2 !important; }
+          .hdt-label { font-size: 6pt !important; font-weight: 800 !important; text-transform: uppercase !important; color: #333 !important; display: block !important; margin-bottom: 1px !important; line-height: 1 !important; }
+          .hdt-value { font-size: 8.5pt !important; font-weight: 700 !important; color: #000 !important; display: block !important; line-height: 1.1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+          .hdt-matrix-table { width: 100% !important; border-collapse: collapse !important; border: 1.5pt solid #000 !important; margin-top: -1pt !important; table-layout: fixed !important; page-break-inside: auto !important; }
+          .hdt-matrix-table thead { display: table-header-group !important; }
+          .hdt-matrix-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+          .hdt-matrix-table th, .hdt-matrix-table td { border: 1pt solid #000 !important; padding: 2px 2px !important; text-align: center !important; font-size: 6.5pt !important; line-height: 1.1 !important; word-break: break-word !important; overflow-wrap: break-word !important; }
+          .hdt-matrix-table th { background-color: #F1F5F9 !important; font-weight: 800 !important; font-size: 6pt !important; }
+          .pt-eq { font-size: 6.5pt !important; width: 14% !important; text-align: left !important; padding-left: 4px !important; font-weight: 700 !important; vertical-align: top !important; text-transform: uppercase !important; }
+          .pt-rev { font-size: 6.5pt !important; width: 25% !important; text-align: left !important; padding-left: 4px !important; vertical-align: top !important; }
+          .pt-frec { font-size: 6.5pt !important; width: 4% !important; text-align: center !important; font-weight: 700 !important; vertical-align: top !important; }
+          .hdt-footer { margin-top: 6px !important; font-size: 6.5pt !important; text-align: center !important; font-style: italic !important; }
         }
       `}} />
 
@@ -183,18 +203,18 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
           <table className="hdt-table">
             <tbody>
               <tr>
-                <td style={{ width: '20%', textAlign: 'center' }} rowSpan={2}>
-                  <img src="/logo_2.png" alt="FIRPLAK" style={{ maxHeight: '40px', filter: 'brightness(0)' }} />
+                <td style={{ width: '18%', textAlign: 'center', padding: '4px' }} rowSpan={2}>
+                  <img src="/logo_2.png" alt="FIRPLAK" style={{ maxHeight: '35px', maxWidth: '100%', filter: 'brightness(0)' }} />
                 </td>
-                <td className="hdt-header-title" rowSpan={2} style={{ width: '55%' }}>
-                   Puesta a Punto de Mantenimiento Autónomo
+                <td className="hdt-header-title" rowSpan={2} style={{ width: '54%', padding: '4px 8px' }}>
+                   FORMATO DE MANTENIMIENTO AUTÓNOMO
                 </td>
-                <td style={{ width: '25%', padding: 0 }}>
+                <td style={{ width: '28%', padding: 0 }}>
                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                      <tbody>
-                       <tr style={{ borderBottom: '1pt solid #000' }}><td style={{ border: 'none', padding: '4px 8px' }}><span className="hdt-label">CÓDIGO:</span><span className="hdt-value">SMA-{id.substring(0,6).toUpperCase()}</span></td></tr>
-                       <tr style={{ borderBottom: '1pt solid #000' }}><td style={{ border: 'none', padding: '4px 8px' }}><span className="hdt-label">VERSIÓN:</span><span className="hdt-value">{clean(enc.version_formato) || '1'}</span></td></tr>
-                       <tr><td style={{ border: 'none', padding: '4px 8px' }}><span className="hdt-label">FECHA:</span><span className="hdt-value">{fecha}</span></td></tr>
+                       <tr style={{ borderBottom: '1pt solid #000' }}><td style={{ border: 'none', padding: '2px 6px' }}><span className="hdt-label">CÓDIGO:</span><span className="hdt-value">SMA-{id.substring(0,6).toUpperCase()}</span></td></tr>
+                       <tr style={{ borderBottom: '1pt solid #000' }}><td style={{ border: 'none', padding: '2px 6px' }}><span className="hdt-label">VERSIÓN:</span><span className="hdt-value">{clean(enc.version_formato) || '1'}</span></td></tr>
+                       <tr><td style={{ border: 'none', padding: '2px 6px' }}><span className="hdt-label">FECHA:</span><span className="hdt-value">{fecha}</span></td></tr>
                      </tbody>
                    </table>
                 </td>
@@ -222,20 +242,18 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
           <table className="hdt-matrix-table">
             <thead>
               <tr>
-                <th style={{ width: '11%' }}>EQUIPO / HERRAMIENTA</th>
-                <th style={{ width: '19%' }}>ACTIVIDAD A REVISAR</th>
-                <th style={{ width: '5%' }}>FREC.</th>
-                {[...Array(31)].map((_, i) => (<th key={i} style={{ width: '2.1%' }}>{i + 1}</th>))}
+                <th className="pt-eq">EQUIPO / HERRAMIENTA</th>
+                <th className="pt-rev">ACTIVIDAD A REVISAR</th>
+                <th className="pt-frec">FREC.</th>
+                {[...Array(31)].map((_, i) => (<th key={i} style={{ width: '1.83%' }}>{i + 1}</th>))}
               </tr>
             </thead>
             <tbody>
               {items.map((item, idx) => (
                 <tr key={idx}>
-                  {(rowSpans[idx] ?? 0) > 0 && (
-                    <td rowSpan={rowSpans[idx] ?? 1} className="pt-eq" style={{ verticalAlign: 'top', paddingTop: '4px' }}>{item.equipo}</td>
-                  )}
+                  <td className="pt-eq">{item.equipo}</td>
                   <td className="pt-rev">{item.revisar}</td>
-                  <td style={{ fontSize: '6.5pt' }}>{item.frecuencia.charAt(0)}</td>
+                  <td className="pt-frec">{item.frecuencia ? item.frecuencia.charAt(0) : 'D'}</td>
                   {[...Array(31)].map((_, dia) => {
                     const v = item.dias[String(dia + 1)];
                     return (<td key={dia}>{v && v !== 'N/A' ? v.charAt(0).toUpperCase() : ''}</td>);
