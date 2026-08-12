@@ -29,7 +29,6 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
 
     // Sum of all stage counts
     const sumEtapas = (orden.pintura || 0) +
-        (orden.desgelcada || 0) +
         (orden.pulido || 0) +
         (orden.reparacion || 0) +
         (orden.saldo || 0) +
@@ -39,7 +38,6 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
         (orden.estanteria || 0) +
         (orden.acabado || 0) +
         (orden.reparacion_larga || 0) +
-        (orden.destruccion || 0) +
         (orden.digitado || 0) +
         (orden.cedi || 0)
 

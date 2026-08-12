@@ -31,7 +31,9 @@ export function OrderCard({ order }: OrderCardProps) {
     ]
 
     const displayStages = [...stages, ...secondaryStages]
-    const sumEtapas = displayStages.reduce((acc, s) => acc + (s.value || 0), 0)
+    const sumEtapas = displayStages
+        .filter(s => !['DESGELCADA', 'DESTRUCCION'].includes(s.label))
+        .reduce((acc, s) => acc + (s.value || 0), 0)
     const cantidadTotal = order.cantidad || 0
     const isExcedido = cantidadTotal > 0 && sumEtapas > cantidadTotal
     const programadoCalculado = Math.max(0, cantidadTotal - sumEtapas)

@@ -251,7 +251,6 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             return
         }
         const sumEtapas = (selectedOrden.pintura || 0) +
-            (selectedOrden.desgelcada || 0) +
             (selectedOrden.pulido || 0) +
             (selectedOrden.reparacion || 0) +
             (selectedOrden.saldo || 0) +
@@ -261,7 +260,6 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             (selectedOrden.estanteria || 0) +
             (selectedOrden.acabado || 0) +
             (selectedOrden.reparacion_larga || 0) +
-            (selectedOrden.destruccion || 0) +
             (selectedOrden.digitado || 0) +
             (selectedOrden.cedi || 0)
         const cantidadMax = Math.max(0, selectedOrden.cantidad || selectedOrden.cantidad_programada || 0)
