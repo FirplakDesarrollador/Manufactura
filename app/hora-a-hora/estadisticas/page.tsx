@@ -13,6 +13,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { createExternalClient } from "@/lib/supabase/external";
+import Header from "@/components/opt-sistemica/Header";
+import SubHeader from "@/components/hora-a-hora/SubHeader";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     LineChart, Line, PieChart, Pie, Cell, Legend, RadarChart, Radar, PolarGrid,
@@ -25,6 +27,7 @@ const MONTHS = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Juli
 export default function Estadisticas() {
     const [rawData, setRawData] = useState<EvaluacionHoraHora[]>([]);
     const [nameMap, setNameMap] = useState<Record<string, string>>({});
+    const [userEmail, setUserEmail] = useState("");
 
     // Filters
     const [filterYear, setFilterYear] = useState<string>("all");
@@ -65,6 +68,13 @@ export default function Estadisticas() {
                         setNameMap(m);
                     }
                 });
+            }
+        });
+
+        // Fetch user session email
+        supabase.auth.getUser().then(({ data: authData }) => {
+            if (authData?.user) {
+                setUserEmail(authData.user.email || "");
             }
         });
     }, []);
@@ -179,15 +189,56 @@ export default function Estadisticas() {
             .slice(0, 8);
     }, [data]);
 
-    // Chart data: Top evaluadores
-    const evaluadorData = useMemo(() => {
+    // Chart data: Registros por persona (Supervisor)
+    const registrosPorPersona = useMemo(() => {
         const map: Record<string, number> = {};
         data.forEach(d => {
             const n = resolveName(d.creadoPor);
             map[n] = (map[n] || 0) + 1;
         });
-        return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6);
+        return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [data, nameMap]);
+
+    // Chart data: Registros diarios del mes seleccionado
+    const registrosDiarios = useMemo(() => {
+        const latestDate = rawData.length > 0 
+            ? new Date([...rawData].sort((a, b) => b.tiempoInicio - a.tiempoInicio)[0].tiempoInicio)
+            : new Date();
+
+        const activeYear = filterYear !== "all" ? Number(filterYear) : latestDate.getFullYear();
+        const activeMonth = filterMonth !== "all" ? Number(filterMonth) : (latestDate.getMonth() + 1);
+
+        const daysInMonth = new Date(activeYear, activeMonth, 0).getDate();
+        
+        const counts: Record<number, number> = {};
+        for (let i = 1; i <= daysInMonth; i++) {
+            counts[i] = 0;
+        }
+
+        data.forEach(d => {
+            const dt = new Date(d.tiempoInicio);
+            if (dt.getFullYear() === activeYear && (dt.getMonth() + 1) === activeMonth) {
+                counts[dt.getDate()]++;
+            }
+        });
+
+        return Array.from({ length: daysInMonth }, (_, i) => {
+            const dayNum = i + 1;
+            return {
+                day: dayNum,
+                name: dayNum.toString(),
+                value: counts[dayNum] || 0,
+            };
+        });
+    }, [data, rawData, filterYear, filterMonth]);
+
+    const activeMonthName = useMemo(() => {
+        const latestDate = rawData.length > 0 
+            ? new Date([...rawData].sort((a, b) => b.tiempoInicio - a.tiempoInicio)[0].tiempoInicio)
+            : new Date();
+        const mIndex = filterMonth !== "all" ? Number(filterMonth) : (latestDate.getMonth() + 1);
+        return MONTHS[mIndex];
+    }, [rawData, filterMonth]);
 
     // Chart data: Estado global distribution
     const estadoData = useMemo(() => {
@@ -199,18 +250,15 @@ export default function Estadisticas() {
     const estadoColors: Record<string, string> = { Verde: '#10b981', Amarillo: '#f59e0b', Rojo: '#94a3b8' };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center">
-            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/hora-a-hora"><Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white"><ArrowLeft size={20} /><span className="hidden sm:inline font-bold text-lg">Estadísticas</span></Button></Link>
-                    <div className="flex flex-col items-end">
-                        <div className="font-bold text-2xl tracking-widest leading-none">FIRPLAK</div>
-                        <div className="text-[10px] opacity-80 uppercase tracking-widest">inspiring homes</div>
-                    </div>
-                </div>
-            </header>
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center font-sans text-[#000000] w-full">
+            <Header 
+                title="Hora a Hora"
+                subtitle="Estadísticas"
+                userEmail={userEmail}
+            />
+            <SubHeader />
 
-            <main className="flex-1 w-full max-w-7xl p-4 sm:p-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <main className="flex-1 w-full max-w-[1500px] p-4 sm:p-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                 {/* Filter Bar */}
                 <div className="mb-6">
@@ -298,7 +346,54 @@ export default function Estadisticas() {
                             ))}
                         </div>
 
-                        {/* Row 1: Trend + Estado */}
+                        {/* Row 1: Registros por Persona + Registros Diarios */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <Card className="shadow-md">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Users size={18} className="text-indigo-500" /> Registros por Persona (Supervisor)
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="h-72">
+                                    {registrosPorPersona.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={registrosPorPersona} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                                <XAxis dataKey="name" fontSize={10} angle={-25} tick={{ textAnchor: 'end' }} dx={-2} dy={5} height={50} />
+                                                <YAxis fontSize={11} allowDecimals={false} />
+                                                <Tooltip formatter={(v: any) => [`${v} registros`, 'Cantidad']} />
+                                                <Bar dataKey="value" name="Registros" fill="#324354" radius={[4, 4, 0, 0]}>
+                                                    {registrosPorPersona.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : <div className="h-full flex items-center justify-center text-slate-400 text-sm">Sin registros</div>}
+                                </CardContent>
+                            </Card>
+
+                            <Card className="shadow-md">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <TrendingUp size={18} className="text-emerald-500" /> Registros Diarios del Mes ({activeMonthName})
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="h-72">
+                                    {registrosDiarios.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={registrosDiarios} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                                <XAxis dataKey="name" fontSize={11} />
+                                                <YAxis fontSize={11} allowDecimals={false} />
+                                                <Tooltip formatter={(v: any) => [`${v} registros`, 'Cantidad']} />
+                                                <Bar dataKey="value" name="Registros" fill="#7B8E90" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : <div className="h-full flex items-center justify-center text-slate-400 text-sm">Sin registros</div>}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Row 2: Trend + Estado */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <Card className="shadow-md lg:col-span-2">
                                 <CardHeader className="pb-2">
@@ -339,7 +434,7 @@ export default function Estadisticas() {
                             </Card>
                         </div>
 
-                        {/* Row 2: Desperdicios + Planta */}
+                        {/* Row 3: Desperdicios + Planta */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <Card className="shadow-md">
                                 <CardHeader className="pb-2">
@@ -384,8 +479,8 @@ export default function Estadisticas() {
                             </Card>
                         </div>
 
-                        {/* Row 3: Puesto + Evaluadores */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Row 4: Puesto */}
+                        <div className="grid grid-cols-1 gap-6">
                             <Card className="shadow-md">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-base flex items-center gap-2"><BarChart2 size={18} className="text-amber-500" /> Calidad Promedio por Puesto</CardTitle>
@@ -401,25 +496,6 @@ export default function Estadisticas() {
                                                 <Bar dataKey="calidad" name="Calidad %" fill="#f59e0b" radius={[4, 4, 0, 0]}>
                                                     {puestoData.map((d, i) => <Cell key={i} fill={d.calidad >= 90 ? '#10b981' : d.calidad >= 80 ? '#f59e0b' : '#94a3b8'} />)}
                                                 </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    ) : <div className="h-full flex items-center justify-center text-slate-400 text-sm">Sin datos</div>}
-                                </CardContent>
-                            </Card>
-
-                            <Card className="shadow-md">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base flex items-center gap-2"><Users size={18} className="text-indigo-500" /> Evaluaciones por Supervisor</CardTitle>
-                                </CardHeader>
-                                <CardContent className="h-72">
-                                    {evaluadorData.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={evaluadorData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                                                <XAxis type="number" fontSize={11} allowDecimals={false} />
-                                                <YAxis dataKey="name" type="category" fontSize={10} width={130} tick={{ fill: '#64748b' }} />
-                                                <Tooltip />
-                                                <Bar dataKey="value" name="Evaluaciones" fill="#6366f1" radius={[0, 6, 6, 0]} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     ) : <div className="h-full flex items-center justify-center text-slate-400 text-sm">Sin datos</div>}

@@ -1,0 +1,3603 @@
+'use client'
+
+import React, { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { 
+  ArrowLeft, 
+  Check, 
+  AlertTriangle, 
+  Play, 
+  Calendar, 
+  User, 
+  Clock, 
+  ChevronDown, 
+  ChevronUp, 
+  CheckSquare, 
+  Plus, 
+  FileText, 
+  History, 
+  Trash2, 
+  Eye, 
+  LayoutDashboard, 
+  ClipboardList, 
+  Activity, 
+  Info,
+  TrendingUp,
+  X,
+  Camera,
+  AlertCircle,
+  Printer,
+  Edit3,
+  Lock,
+  Key
+} from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import Header from '@/components/opt-sistemica/Header'
+
+// ----------------------------------------------------
+// 1. SEED DATA - AUTOMANTENIMIENTO ENCHAPADORA SCM (LILAC)
+// ----------------------------------------------------
+const SEED_STANDARDS = [
+  {
+    id: "est-enchapadora-scm",
+    equipo: "Enchapadora SCM Stefani",
+    planta: "MBL",
+    criticidad: "A",
+    codigo_hdt: "V1",
+    imagen_url: "/stefani_scm.png",
+    labor: "Limpieza y Ajuste de Enchapadora SCM Stefani",
+    herramientas: ["Brocha", "Pistola de aire comprimido", "Recogedor", "Trapos", "Tíner"],
+    insumos: ["Trapos", "Thinner", "Alcohol etílico al 70%"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2023-10-26",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina. No se debe utilizar silicona en la máquina.",
+    steps: [
+      {
+        id: "step-1-1",
+        orden: 1,
+        nombre_paso: "Accionar paro de emergencia de la máquina",
+        categoria_lilac: "Seguridad",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 2,
+        criterio_aceptacion: "Paro de emergencia accionado, máquina apagada y cabina desbloqueada de forma segura.",
+        sub_acciones: [{ detalle_texto: "Girar llave para desbloquear cabina.", imagen_url: "/imagenes_enchapadora_scm/paso01_paro_emergencia.png" }]
+      },
+      {
+        id: "step-1-2",
+        orden: 2,
+        nombre_paso: "Soplar toda la máquina de arriba hacia abajo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Libre de viruta y polvo en guías, calderín y zonas mecánicas visibles.",
+        sub_acciones: [
+          { detalle_texto: "Partiendo desde el calderín soplar hacia la izquierda, y del calderín hacia el tupí soplar hacia la derecha. Esto evita impurezas en la pega.", imagen_url: "/imagenes_enchapadora_scm/paso02a_soplado_general.png" },
+          { detalle_texto: "Continuación del soplado general de la máquina.", imagen_url: "/imagenes_enchapadora_scm/paso02b_soplado_general_2.png" }
+        ]
+      },
+      {
+        id: "step-1-3",
+        orden: 3,
+        nombre_paso: "Abrir las compuertas y soplar al interior",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Compuertas interiores sopladas, libre de aserrín acumulado en grupos de corte y perfilado.",
+        sub_acciones: [{ detalle_texto: "Se realiza el soplado de arriba hacia abajo quitando todas las impurezas de todos los grupos.", imagen_url: "/imagenes_enchapadora_scm/paso03_abrir_compuertas_soplar.png" }]
+      },
+      {
+        id: "step-1-4",
+        orden: 4,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración libres de obstrucciones y virutas acumuladas.",
+        sub_acciones: [{ detalle_texto: "Vaciar y barrer campanas de aspiración.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-5",
+        orden: 5,
+        nombre_paso: "Limpiar guía de canto con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Guía de canto limpia, libre de polvo y residuos que afecten la alimentación del material.",
+        sub_acciones: [{ detalle_texto: "Soplar la guía de canto.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-6",
+        orden: 6,
+        nombre_paso: "Limpiar los restos de adhesivo en el palpador y el conducto de salida del caldero, haciendo una descarga",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 10,
+        criterio_aceptacion: "Depósito de pega limpio, conducto de salida sin obstrucciones y descarga realizada.",
+        sub_acciones: [{ detalle_texto: "Limpiar residuos del caldero y palpador, vaciar residuo.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-7",
+        orden: 7,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se enchapó, con trapo y alcohol isopropílico o thinner",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 12,
+        criterio_aceptacion: "Áreas enchapadas libres de suciedad y excedentes, limpio con trapo y alcohol o thinner.",
+        sub_acciones: [{ detalle_texto: "Limpieza con trapo humedecido en alcohol isopropílico o thinner.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-8",
+        orden: 8,
+        nombre_paso: "Limpiar las superficies de contacto: guías, rodillos y cualquier parte en contacto directo con el panel",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Superficies de contacto suaves y limpias, libre de marcas de pegante.",
+        sub_acciones: [{ detalle_texto: "Limpiar guías y rodillos de arrastre con trapo y alcohol o thinner.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-9",
+        orden: 9,
+        nombre_paso: "Eliminar restos de adhesivo que puedan acumularse en los rodillos o en el palpador del caldero",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Rodillos y palpador sin acumulaciones duras de pegante.",
+        sub_acciones: [{ detalle_texto: "Limpiar con trapo y solvente antes de que se endurezcan.", imagen_url: "" }]
+      },
+      {
+        id: "step-1-10",
+        orden: 10,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Chasis exterior libre de polvo y residuos visibles.",
+        sub_acciones: [{ detalle_texto: "Pasar trapo seco o ligeramente húmedo por la superficie exterior.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-seccionadora-scm",
+    equipo: "Seccionadora SCM Sigma Prima",
+    planta: "MBL",
+    criticidad: "A",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Seccionadora SCM Sigma Prima",
+    herramientas: ["Brocha", "Pistola de aire comprimido", "Trapos", "Limpiador para discos"],
+    insumos: ["Trapos", "Limpiador de resinas", "Aceite ligero"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-02-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-2-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de material cortado de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración libres de aserrín y recortes acumulados.",
+        sub_acciones: [{ detalle_texto: "Retirar piezas grandes de material y limpiar la campana.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-2",
+        orden: 2,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se cortó, con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Zona de corte soplada y libre de viruta acumulada.",
+        sub_acciones: [{ detalle_texto: "Soplar la mesa de trabajo y carro de sierras con aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-3",
+        orden: 3,
+        nombre_paso: "Limpiar las superficies de contacto: guías y rodillos, con trapo y aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Guías limpias de polvo para asegurar un deslizamiento sin rozamiento.",
+        sub_acciones: [{ detalle_texto: "Limpiar las guías de alineación y rodillos con trapo y aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-4",
+        orden: 4,
+        nombre_paso: "Eliminar restos de madera que puedan acumularse en los discos o en el carro sierras (usar limpiador para discos y soplar con aire comprimido)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Discos limpios sin resina acumulada, carro sierras soplado.",
+        sub_acciones: [{ detalle_texto: "Aplicar limpiador para discos y soplar todas las superficies.", imagen_url: "" }]
+      },
+      {
+        id: "step-2-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Superficie exterior limpia.",
+        sub_acciones: [{ detalle_texto: "Pasar trapo por el exterior del equipo.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-taladro-cyflex-s",
+    equipo: "Taladro vertical CYFLEX S",
+    planta: "MBL",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Taladro vertical CYFLEX S",
+    herramientas: ["Trapos", "Pistola de aire comprimido", "Brocha"],
+    insumos: ["Trapos", "Alcohol isopropílico", "Lubricante de guías"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-03-10",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-3-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración al finalizar cada turno o cada vez que sea necesario",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno o cuando sea necesario",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración sin acumulaciones de viruta.",
+        sub_acciones: [{ detalle_texto: "Retirar viruta acumulada de la zona de aspiración.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-2",
+        orden: 2,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Guías limpias y lubricadas, libres de polvillo adherido.",
+        sub_acciones: [{ detalle_texto: "Soplar guías y pasar trapo para remover impurezas.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-3",
+        orden: 3,
+        nombre_paso: "Soplar con aire comprimido las pinzas de sujeción al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Pinzas de agarre limpias para evitar deslizamiento inadecuado.",
+        sub_acciones: [{ detalle_texto: "Soplar pinzas de sujeción neumáticas.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-4",
+        orden: 4,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó (mesa y cabezal de brocas)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Mesa de trabajo y cabezal de brocas sin restos de material.",
+        sub_acciones: [{ detalle_texto: "Limpiar mesa y cabezal de brocas con trapo y aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-3-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Carcasa exterior libre de polvo.",
+        sub_acciones: [{ detalle_texto: "Limpieza de chasis exterior con trapo.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-taladro-cx100",
+    equipo: "Taladro vertical CX 100",
+    planta: "MBL",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Taladro vertical CX 100",
+    herramientas: ["Trapos", "Pistola de aire comprimido", "Brocha"],
+    insumos: ["Trapos", "Alcohol isopropílico"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-03-10",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-4-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración al finalizar cada turno o cada vez que sea necesario",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno o cuando sea necesario",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas de aspiración sin virutas.",
+        sub_acciones: [{ detalle_texto: "Remover la viruta de las campanas.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-2",
+        orden: 2,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Guías limpias y deslizantes.",
+        sub_acciones: [{ detalle_texto: "Soplar y pasar trapo en las guías de los ejes.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-3",
+        orden: 3,
+        nombre_paso: "Soplar con aire comprimido las pinzas de sujeción al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Pinzas libres de polvillo para un agarre firme.",
+        sub_acciones: [{ detalle_texto: "Soplar las mordazas/pinzas de sujeción.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-4",
+        orden: 4,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó (mesa y cabezal de brocas)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Mesa limpia y cabezal libre de polvo acumulado.",
+        sub_acciones: [{ detalle_texto: "Limpiar mesa y cabezal de brocas con trapo y aire comprimido.", imagen_url: "" }]
+      },
+      {
+        id: "step-4-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Chasis exterior limpio.",
+        sub_acciones: [{ detalle_texto: "Limpiar superficies externas con trapo.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-taladro-cx200",
+    equipo: "Taladro vertical CX 200",
+    planta: "MBL",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Taladro vertical CX 200",
+    herramientas: ["Trapos", "Pistola de aire comprimido", "Brocha"],
+    insumos: ["Trapos", "Alcohol isopropílico"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2024-03-10",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-5-1",
+        orden: 1,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración al finalizar cada turno o cada vez que sea necesario",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno o cuando sea necesario",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Aspiradores libres de obstrucción.",
+        sub_acciones: [{ detalle_texto: "Limpiar acumulaciones en campanas.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-2",
+        orden: 2,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 6,
+        criterio_aceptacion: "Guías sin virutas ni suciedad.",
+        sub_acciones: [{ detalle_texto: "Limpieza general de guías.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-3",
+        orden: 3,
+        nombre_paso: "Soplar con aire comprimido las pinzas de sujeción al finalizar cada turno",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Pinzas neumáticas limpias.",
+        sub_acciones: [{ detalle_texto: "Soplar pinzas.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-4",
+        orden: 4,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó (mesa de trabajo y los dos cabezales de brocas)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Mesa de trabajo y ambos cabezales de brocas libres de polvo.",
+        sub_acciones: [{ detalle_texto: "Limpieza con trapo y aire comprimido de mesa y cabezales.", imagen_url: "" }]
+      },
+      {
+        id: "step-5-5",
+        orden: 5,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al finalizar cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Chasis limpio.",
+        sub_acciones: [{ detalle_texto: "Limpiar carcasa exterior.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-escuadradora-robland",
+    equipo: "Escuadradora Robland",
+    planta: "MBL",
+    criticidad: "C",
+    codigo_hdt: "V1",
+    labor: "Mantenimiento Autónomo de Escuadradora Robland",
+    herramientas: ["Brocha", "Pistola de aire comprimido", "Trapos"],
+    insumos: ["Trapos", "Alcohol etílico al 70%"],
+    epp: ["Gafas de seguridad", "Botas de seguridad"],
+    fecha_elaboracion: "2024-04-05",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-6-1",
+        orden: 1,
+        nombre_paso: "Al terminar el turno, soplar cuidadosamente el aserrín y el polvo, especialmente alrededor de ventiladores y motores",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Al terminar el turno",
+        tiempo_estimado_min: 7,
+        criterio_aceptacion: "Motores y ventiladores libres de polvo para prevenir sobrecalentamiento.",
+        sub_acciones: [{ detalle_texto: "Soplar suavemente el polvo de ventiladores y motores.", imagen_url: "" }]
+      },
+      {
+        id: "step-6-2",
+        orden: 2,
+        nombre_paso: "Mantener libre de polvo las guías del carro de aluminio para preservar el deslizamiento suave",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Carro de aluminio desliza suave y libre de interferencias.",
+        sub_acciones: [{ detalle_texto: "Limpiar guías del carro.", imagen_url: "" }]
+      },
+      {
+        id: "step-6-3",
+        orden: 3,
+        nombre_paso: "Limpiar el disco principal e incisor, sus bridas y tuercas, cada vez que se realice el cambio",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada vez que se realice el cambio",
+        tiempo_estimado_min: 8,
+        criterio_aceptacion: "Tuercas y bridas limpias para evitar vibraciones en el disco.",
+        sub_acciones: [{ detalle_texto: "Limpiar discos y piezas de sujeción al cambiarlos.", imagen_url: "" }]
+      },
+      {
+        id: "step-6-4",
+        orden: 4,
+        nombre_paso: "Limpieza externa del equipo con trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 4,
+        criterio_aceptacion: "Exterior del equipo libre de aserrín acumulado.",
+        sub_acciones: [{ detalle_texto: "Limpieza general de chasis con trapo.", imagen_url: "" }]
+      }
+    ]
+  },
+  {
+    id: "est-holzher-lumina",
+    equipo: "Enchapadora Holzher Lumina 1380",
+    planta: "CEFI",
+    criticidad: "A",
+    codigo_hdt: "V1",
+    imagen_url: "",
+    labor: "Inspección Pre-operacional y Mantenimiento Autónomo de Holzher Lumina 1380",
+    herramientas: ["Trapos", "Cepillo de alambre", "Rascador de boquilla"],
+    insumos: ["Alcohol isopropílico", "Lubricante"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2026-07-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-hl-1",
+        orden: 1,
+        nombre_paso: "Inspeccionar visualmente toda la máquina y las herramientas",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Sin fallas visibles ni herramientas defectuosas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-2",
+        orden: 2,
+        nombre_paso: "Verificar niveles de llenado de lubricantes",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Niveles de lubricante en rango de operación adecuado.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-3",
+        orden: 3,
+        nombre_paso: "Verificar niveles de llenado de antiadherente",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de antiadherente suficiente para el turno.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-4",
+        orden: 4,
+        nombre_paso: "Verificar niveles de llenado de agentes limpiador",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de agente limpiador en rango.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-5",
+        orden: 5,
+        nombre_paso: "Verificar sistemas de emergencia",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Paradas de emergencia y sensores de seguridad activos y funcionales.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-6",
+        orden: 6,
+        nombre_paso: "Verificar interruptor de encendido",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Interruptor y alimentación eléctrica estables.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-7",
+        orden: 7,
+        nombre_paso: "Revisar presión neumática (6 bar)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Manómetro indicando una presión estable de 6 bar.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-8",
+        orden: 8,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas sopladas y libres de viruta obstruida.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-9",
+        orden: 9,
+        nombre_paso: "Limpiar guía de canto con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Guía de canto limpia, libre de suciedad y residuos.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-10",
+        orden: 10,
+        nombre_paso: "Limpiar la barrera de luz o reflector con un trapo seco",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Reflector limpio y libre de marcas para lectura correcta.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-11",
+        orden: 11,
+        nombre_paso: "Limpiar los restos de adhesivo de la boquilla y el conducto de salida de boquilla (con cepillo de alambre y rascador de boquilla)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Boquilla y conducto libres de adhesivo acumulado.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-12",
+        orden: 12,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se enchapó, con trapo y alcohol isopropílico",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Área de enchapado libre de adhesivo y polvo.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-13",
+        orden: 13,
+        nombre_paso: "Limpiar las superficies de contacto (guías, rodillos y cualquier parte que entre en contacto directo con el panel o el material de enchapado) con trapo y alcohol isopropílico",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Superficies lisas sin residuos de pegante.",
+        sub_acciones: []
+      },
+      {
+        id: "step-hl-14",
+        orden: 14,
+        nombre_paso: "Eliminar restos de adhesivo que puedan acumularse en los rodillos o las boquillas de aplicación, para evitar que se endurezcan y afecten el proceso",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Rodillos y boquillas completamente limpios de pegante fresco.",
+        sub_acciones: []
+      }
+    ]
+  },
+  {
+    id: "est-scm-stefani-md",
+    equipo: "Enchapadora SCM Stefani MD",
+    planta: "CEFI",
+    criticidad: "A",
+    codigo_hdt: "V1",
+    imagen_url: "",
+    labor: "Inspección Pre-operacional y Mantenimiento Autónomo de SCM Stefani MD",
+    herramientas: ["Trapos", "Cepillo de alambre"],
+    insumos: ["Alcohol isopropílico", "Lubricante"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2026-07-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-sm-1",
+        orden: 1,
+        nombre_paso: "Inspeccionar visualmente toda la máquina y las herramientas",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Sin fallas visibles ni herramientas defectuosas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-2",
+        orden: 2,
+        nombre_paso: "Verificar niveles de llenado de lubricantes",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Niveles de lubricante en rango de operation adecuado.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-3",
+        orden: 3,
+        nombre_paso: "Verificar niveles de llenado de antiadherente",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de antiadherente suficiente para el turno.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-4",
+        orden: 4,
+        nombre_paso: "Verificar niveles de llenado de agentes limpiador",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de agente limpiador en rango.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-5",
+        orden: 5,
+        nombre_paso: "Verificar sistemas de emergencia",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Paradas de emergencia y sensores de seguridad activos y funcionales.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-6",
+        orden: 6,
+        nombre_paso: "Verificar interruptor de encendido",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Interruptor y alimentación eléctrica estables.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-7",
+        orden: 7,
+        nombre_paso: "Revisar presión neumática (6 bar)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Manómetro indicando una presión estable de 6 bar.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-8",
+        orden: 8,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas sopladas y libres de viruta obstruida.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-9",
+        orden: 9,
+        nombre_paso: "Limpiar guía de canto con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Guía de canto limpia, libre de suciedad y residuos.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-10",
+        orden: 10,
+        nombre_paso: "Limpiar los restos de adhesivo en el palpador y el conducto de salida del caldero, haciendo una descarga",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Caldero libre de exceso de adhesivo acumulado.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-11",
+        orden: 11,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se enchapó, con trapo y alcohol isopropílico",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Área de enchapado libre de adhesivo y polvo.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-12",
+        orden: 12,
+        nombre_paso: "Limpiar las superficies de contacto (guías, rodillos y cualquier parte que entre en contacto directo con el panel o el material de enchapado) con trapo y alcohol isopropílico",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Superficies lisas sin residuos de pegante.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sm-13",
+        orden: 13,
+        nombre_paso: "Eliminar restos de adhesivo que puedan acumularse en los rodillos o en el palpador del caldero, para evitar que se endurezcan y afecten el proceso",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Palpador y rodillos limpios y libres de acumulación dura de adhesivo.",
+        sub_acciones: []
+      }
+    ]
+  },
+  {
+    id: "est-seccionadora-6120",
+    equipo: "Seccionadora Holzher 6120 Power",
+    planta: "CEFI",
+    criticidad: "A",
+    codigo_hdt: "V1",
+    imagen_url: "",
+    labor: "Inspección Pre-operacional y Mantenimiento Autónomo de Holzher 6120 Power",
+    herramientas: ["Trapos", "Aire comprimido"],
+    insumos: ["Limpiador de discos", "Lubricante"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2026-07-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Por ningún motivo usar herramientas metálicas para la limpieza de la máquina.",
+    steps: [
+      {
+        id: "step-sp-1",
+        orden: 1,
+        nombre_paso: "Inspeccionar visualmente toda la máquina",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Sin fallas visibles en carro de corte, prensas ni mesa.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-2",
+        orden: 2,
+        nombre_paso: "Verificar que los discos estén en buenas condiciones de trabajo (limpios y sin dientes despicados)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Discos en buen estado, limpios y afilados.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-3",
+        orden: 3,
+        nombre_paso: "Verificar sistemas de emergencia",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Paradas de emergencia y sensores de seguridad activos y funcionales.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-4",
+        orden: 4,
+        nombre_paso: "Verificar interruptor de encendido",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Interruptor y alimentación eléctrica estables.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-5",
+        orden: 5,
+        nombre_paso: "Revisar presión neumática (6 bar)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Manómetro indicando una presión estable de 6 bar.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-6",
+        orden: 6,
+        nombre_paso: "Eliminar residuos de material cortado de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas sopladas y libres de viruta obstruida.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-7",
+        orden: 7,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se cortó, con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Área de corte limpia y libre de aserrín.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-8",
+        orden: 8,
+        nombre_paso: "Limpiar las superficies de contacto (guías y rodillos) con trapo y aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Superficies lisas sin residuos de pegante o polvo.",
+        sub_acciones: []
+      },
+      {
+        id: "step-sp-9",
+        orden: 9,
+        nombre_paso: "Eliminar restos de madera que puedan acumularse en los discos o en el carro sierras (usar limpiador para discos y soplar con aire comprimido todas las superficies)",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Carro de sierra limpio y sin acumulaciones de resina en los discos.",
+        sub_acciones: []
+      }
+    ]
+  },
+  {
+    id: "est-evolution-7405",
+    equipo: "Taladro vertical Holzher Evolution 7405",
+    planta: "CEFI",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    imagen_url: "",
+    labor: "Inspección Pre-operacional y Mantenimiento Autónomo de Holzher Evolution 7405",
+    herramientas: ["Trapos", "Aire comprimido"],
+    insumos: ["Alcohol isopropílico", "Lubricante"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2026-07-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Verificar siempre el sistema de vacío antes de comenzar.",
+    steps: [
+      {
+        id: "step-ev-1",
+        orden: 1,
+        nombre_paso: "Inspeccionar visualmente toda la máquina y las herramientas",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Sin fallas visibles ni herramientas defectuosas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-2",
+        orden: 2,
+        nombre_paso: "Verificar sistema de vacío",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de vacío y sujeción óptimos.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-3",
+        orden: 3,
+        nombre_paso: "Verificar sistemas de emergencia",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Paradas de emergencia y sensores de seguridad activos y funcionales.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-4",
+        orden: 4,
+        nombre_paso: "Verificar interruptor de encendido",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Interruptor y alimentación eléctrica estables.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-5",
+        orden: 5,
+        nombre_paso: "Revisar presión neumática (6 bar)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Manómetro indicando una presión estable de 6 bar.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-6",
+        orden: 6,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas sopladas y libres de viruta obstruida.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-7",
+        orden: 7,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Guías limpias, libres de suciedad y residuos.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-8",
+        orden: 8,
+        nombre_paso: "Limpiar ventosas con trapo y alcohol isopropílico",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Ventosas libres de polvo o grasa para una correcta sujeción.",
+        sub_acciones: []
+      },
+      {
+        id: "step-ev-9",
+        orden: 9,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó, con trapo y aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Área de perforado libre de aserrín y polvo.",
+        sub_acciones: []
+      }
+    ]
+  },
+  {
+    id: "est-dynestic-7505",
+    equipo: "Centro de Mecanizado Holzher Dynestic 7505",
+    planta: "CEFI",
+    criticidad: "B",
+    codigo_hdt: "V1",
+    imagen_url: "",
+    labor: "Inspección Pre-operacional y Mantenimiento Autónomo de Holzher Dynestic 7505",
+    herramientas: ["Trapos", "Aire comprimido"],
+    insumos: ["Alcohol isopropílico", "Lubricante"],
+    epp: ["Gafas de seguridad", "Botas de seguridad", "Protección auditiva"],
+    fecha_elaboracion: "2026-07-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Verificar siempre el sufridor y la mesa de vacío antes de comenzar.",
+    steps: [
+      {
+        id: "step-dy-1",
+        orden: 1,
+        nombre_paso: "Inspeccionar visualmente toda la máquina y las herramientas",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Sin fallas visibles ni herramientas defectuosas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-2",
+        orden: 2,
+        nombre_paso: "Verificar sistema de vacío",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de vacío y sujeción óptimos.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-3",
+        orden: 3,
+        nombre_paso: "Verificar sistemas de emergencia",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Paradas de emergencia y sensores de seguridad activos y funcionales.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-4",
+        orden: 4,
+        nombre_paso: "Verificar interruptor de encendido",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Interruptor y alimentación eléctrica estables.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-5",
+        orden: 5,
+        nombre_paso: "Revisar presión neumática (6 bar)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Manómetro indicando una presión estable de 6 bar.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-6",
+        orden: 6,
+        nombre_paso: "Eliminar residuos de viruta de las campanas de aspiración",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Campanas sopladas y libres de viruta obstruida.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-7",
+        orden: 7,
+        nombre_paso: "Limpiar guías con aire comprimido y trapo",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Guías limpias, libres de suciedad y residuos.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-8",
+        orden: 8,
+        nombre_paso: "Verificar y limpiar mesa de trabajo (sufridor), confirmando que no se encuentre con mecanizados profundos; de lo contrario, rectificar la mesa de ser necesario",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Sufridor en buenas condiciones, limpio y sin cortes profundos que afecten la succión.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-9",
+        orden: 9,
+        nombre_paso: "Limpiar la banda auxiliar, confirmando que no tenga residuos de material mecanizado",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Banda auxiliar limpia y libre de material obstruido.",
+        sub_acciones: []
+      },
+      {
+        id: "step-dy-10",
+        orden: 10,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se mecanizó, con trapo y aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Área de mecanizado libre de aserrín y polvo.",
+        sub_acciones: []
+      }
+    ]
+  },
+  {
+    id: "est-tarugadora-omal",
+    equipo: "Tarugadora Omal HBD 1300 OF",
+    planta: "CEFI",
+    criticidad: "C",
+    codigo_hdt: "V1",
+    imagen_url: "",
+    labor: "Inspección Pre-operacional y Mantenimiento Autónomo de Omal HBD 1300 OF",
+    herramientas: ["Trapos", "Aire comprimido"],
+    insumos: ["Agua"],
+    epp: ["Gafas de seguridad", "Botas de seguridad"],
+    fecha_elaboracion: "2026-07-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Inspeccionar siempre el sistema de líquidos (agua) y la tolva de tarugos.",
+    steps: [
+      {
+        id: "step-to-1",
+        orden: 1,
+        nombre_paso: "Inspeccionar visualmente toda la máquina y las herramientas",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Sin fallas visibles ni herramientas defectuosas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-to-2",
+        orden: 2,
+        nombre_paso: "Verificar sistema de líquidos (agua)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de agua adecuado y sin fugas neumáticas/hidráulicas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-to-3",
+        orden: 3,
+        nombre_paso: "Verificar sistemas de emergencia",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Paradas de emergencia y sensores de seguridad activos y funcionales.",
+        sub_acciones: []
+      },
+      {
+        id: "step-to-4",
+        orden: 4,
+        nombre_paso: "Verificar interruptor de encendido",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Interruptor y alimentación eléctrica estables.",
+        sub_acciones: []
+      },
+      {
+        id: "step-to-5",
+        orden: 5,
+        nombre_paso: "Revisar presión neumática (6 bar)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Manómetro indicando una presión estable de 6 bar.",
+        sub_acciones: []
+      },
+      {
+        id: "step-to-6",
+        orden: 6,
+        nombre_paso: "Verificar que la tolva de tarugos esté encendida",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Tolva activa y lista para alimentación.",
+        sub_acciones: []
+      },
+      {
+        id: "step-to-7",
+        orden: 7,
+        nombre_paso: "Limpiar la fibra óptica con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Fibra óptica soplada y libre de polvillo de madera.",
+        sub_acciones: []
+      },
+      {
+        id: "step-to-8",
+        orden: 8,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó, con trapo y aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Mesa de trabajo y tolvas limpias al 100%.",
+        sub_acciones: []
+      }
+    ]
+  },
+  {
+    id: "est-tarugadora-velox",
+    equipo: "Tarugadora Velox",
+    planta: "CEFI",
+    criticidad: "C",
+    codigo_hdt: "V1",
+    imagen_url: "",
+    labor: "Inspección Pre-operacional y Mantenimiento Autónomo de Tarugadora Velox",
+    herramientas: ["Trapos", "Aire comprimido"],
+    insumos: ["Agua"],
+    epp: ["Gafas de seguridad", "Botas de seguridad"],
+    fecha_elaboracion: "2026-07-15",
+    elaboro: "Roberto Aguilar",
+    aprobo: "Hector Chinchilla",
+    nota_general: "Nota de calidad de dato: Actividades provisionales idénticas a Omal HBD 1300 OF. Pendiente de confirmar.",
+    steps: [
+      {
+        id: "step-tv-1",
+        orden: 1,
+        nombre_paso: "Inspeccionar visualmente toda la máquina y las herramientas",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Sin fallas visibles ni herramientas defectuosas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-tv-2",
+        orden: 2,
+        nombre_paso: "Verificar sistema de líquidos (agua)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Nivel de agua adecuado y sin fugas neumáticas/hidráulicas.",
+        sub_acciones: []
+      },
+      {
+        id: "step-tv-3",
+        orden: 3,
+        nombre_paso: "Verificar sistemas de emergencia",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Paradas de emergencia y sensores de seguridad activos y funcionales.",
+        sub_acciones: []
+      },
+      {
+        id: "step-tv-4",
+        orden: 4,
+        nombre_paso: "Verificar interruptor de encendido",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Interruptor y alimentación eléctrica estables.",
+        sub_acciones: []
+      },
+      {
+        id: "step-tv-5",
+        orden: 5,
+        nombre_paso: "Revisar presión neumática (6 bar)",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Manómetro indicando una presión estable de 6 bar.",
+        sub_acciones: []
+      },
+      {
+        id: "step-tv-6",
+        orden: 6,
+        nombre_paso: "Verificar que la tolva de tarugos esté encendida",
+        categoria_lilac: "Inspección",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 3,
+        criterio_aceptacion: "Tolva activa y lista para alimentación.",
+        sub_acciones: []
+      },
+      {
+        id: "step-tv-7",
+        orden: 7,
+        nombre_paso: "Limpiar la fibra óptica con aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Fibra óptica soplada y libre de polvillo de madera.",
+        sub_acciones: []
+      },
+      {
+        id: "step-tv-8",
+        orden: 8,
+        nombre_paso: "Limpiar la máquina al final de cada turno, especialmente en las áreas donde el material se perforó, con trapo y aire comprimido",
+        categoria_lilac: "Limpieza",
+        frecuencia: "Cada turno",
+        tiempo_estimado_min: 5,
+        criterio_aceptacion: "Mesa de trabajo y tolvas limpias al 100%.",
+        sub_acciones: []
+      }
+    ]
+  }
+]
+
+const SEED_ESTANDAR = SEED_STANDARDS[0]
+
+// Default initial anomalies if localStorage is empty
+const INITIAL_ANOMALIES = [
+  {
+    id: "ANM-001",
+    registro_paso_id: "step-4",
+    equipo: "Enchapadora SCM",
+    estandar: "AUTOMANTENIMIENTO ENCHAPADORA SCM",
+    planta: "MBL",
+    paso: "Actividades de limpieza al interior de las compuertas",
+    descripcion: "Fuga leve en depósito de líquido blanco (antiadherente).",
+    prioridad: "Media",
+    responsable_escalado: "Roberto Aguilar",
+    estado: "Abierta",
+    fecha_reporte: "2026-07-05",
+    tipo: "Deterioro Forzado"
+  },
+  {
+    id: "ANM-002",
+    registro_paso_id: "step-7",
+    equipo: "Enchapadora SCM",
+    estandar: "AUTOMANTENIMIENTO ENCHAPADORA SCM",
+    planta: "MBL",
+    paso: "Verificación de rodillo de presión",
+    descripcion: "Resortes del rodillo de presión con acumulación de grasa reseca, dificulta giro suave.",
+    prioridad: "Baja",
+    responsable_escalado: "Roberto Aguilar",
+    estado: "En Proceso",
+    fecha_reporte: "2026-07-06",
+    tipo: "Falta Limpieza"
+  }
+]
+
+// Mock History logs
+const INITIAL_HISTORY = [
+  {
+    id: "RUN-101",
+    estandar_id: "est-enchapadora-scm",
+    estandar_nombre: "AUTOMANTENIMIENTO ENCHAPADORA SCM",
+    equipo: "Enchapadora SCM",
+    planta: "MBL",
+    operario: "Jorge Martínez",
+    turno: "Mañana",
+    fecha: "2026-07-04",
+    cumplimiento_pct: 100,
+    tiempo_total_est: 44,
+    tiempo_total_real: 42,
+    anomalias_detectadas: 0,
+    registros: [
+      { paso_id: "step-1", estado: "cumple", tiempo_real_seg: 110, comentario: "" },
+      { paso_id: "step-2", estado: "cumple", tiempo_real_seg: 290, comentario: "" },
+      { paso_id: "step-3", estado: "cumple", tiempo_real_seg: 450, comentario: "" },
+      { paso_id: "step-4", estado: "cumple", tiempo_real_seg: 580, comentario: "" },
+      { paso_id: "step-5", estado: "cumple", tiempo_real_seg: 220, comentario: "" },
+      { paso_id: "step-6", estado: "cumple", tiempo_real_seg: 710, comentario: "" },
+      { paso_id: "step-7", estado: "cumple", tiempo_real_seg: 160, comentario: "" }
+    ]
+  },
+  {
+    id: "RUN-102",
+    estandar_id: "est-enchapadora-scm",
+    estandar_nombre: "AUTOMANTENIMIENTO ENCHAPADORA SCM",
+    equipo: "Enchapadora SCM",
+    planta: "MBL",
+    operario: "Jorge Martínez",
+    turno: "Tarde",
+    fecha: "2026-07-05",
+    cumplimiento_pct: 85.7,
+    tiempo_total_est: 44,
+    tiempo_total_real: 51,
+    anomalias_detectadas: 1,
+    registros: [
+      { paso_id: "step-1", estado: "cumple", tiempo_real_seg: 120, comentario: "" },
+      { paso_id: "step-2", estado: "cumple", tiempo_real_seg: 320, comentario: "" },
+      { paso_id: "step-3", estado: "cumple", tiempo_real_seg: 510, comentario: "" },
+      { paso_id: "step-4", estado: "no_cumple", tiempo_real_seg: 820, comentario: "Fuga leve en depósito de líquido blanco." },
+      { paso_id: "step-5", estado: "cumple", tiempo_real_seg: 250, comentario: "" },
+      { paso_id: "step-6", estado: "cumple", tiempo_real_seg: 860, comentario: "" },
+      { paso_id: "step-7", estado: "cumple", tiempo_real_seg: 180, comentario: "" }
+    ]
+  }
+]
+
+export default function LillacModulePage() {
+  const router = useRouter()
+  const [userEmail, setUserEmail] = useState('')
+  const [activeTab, setActiveTab] = useState<'estandares' | 'historial' | 'auditoria' | 'indicadores' | 'ejecucion'>('estandares')
+  const [searchTerm, setSearchTerm] = useState('')
+  
+  // Storage states
+  const [standards, setStandards] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lilac_standards')
+      return saved ? JSON.parse(saved) : SEED_STANDARDS
+    }
+    return SEED_STANDARDS
+  })
+  const [history, setHistory] = useState<any[]>([])
+  const [anomalies, setAnomalies] = useState<any[]>([])
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [isSessionAuthorized, setIsSessionAuthorized] = useState(false)
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserEmail(user.email || '')
+        const { data: profile } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('uuid', user.id)
+          .single()
+        if (profile) {
+          setUserProfile(profile)
+        }
+      }
+    }
+    checkUser()
+
+    const savedHistory = localStorage.getItem('lilac_history')
+    const savedAnomalies = localStorage.getItem('lilac_anomalies')
+    
+    if (savedHistory) {
+      setHistory(JSON.parse(savedHistory))
+    } else {
+      setHistory(INITIAL_HISTORY)
+      localStorage.setItem('lilac_history', JSON.stringify(INITIAL_HISTORY))
+    }
+
+    if (savedAnomalies) {
+      setAnomalies(JSON.parse(savedAnomalies))
+    } else {
+      setAnomalies(INITIAL_ANOMALIES)
+      localStorage.setItem('lilac_anomalies', JSON.stringify(INITIAL_ANOMALIES))
+    }
+  }, [])
+
+  // Helper to save to local storage
+  const saveHistory = (newHistory: any[]) => {
+    setHistory(newHistory)
+    localStorage.setItem('lilac_history', JSON.stringify(newHistory))
+  }
+
+  const saveAnomalies = (newAnomalies: any[]) => {
+    setAnomalies(newAnomalies)
+    localStorage.setItem('lilac_anomalies', JSON.stringify(newAnomalies))
+  }
+
+  const saveStandards = (newStandards: any[]) => {
+    setStandards(newStandards)
+    localStorage.setItem('lilac_standards', JSON.stringify(newStandards))
+  }
+
+  // ----------------------------------------------------
+  // SUB-ACCIONES & RENDER HELPERS
+  // ----------------------------------------------------
+  const getCategoryColor = (category: string) => {
+    switch (category?.toLowerCase()) {
+      case 'limpieza':
+        return { bg: 'bg-blue-600', text: 'text-white', badge: 'bg-blue-50 text-blue-700 border-blue-200' }
+      case 'inspección':
+      case 'inspeccion':
+        return { bg: 'bg-amber-500', text: 'text-white', badge: 'bg-amber-50 text-amber-800 border-amber-200' }
+      case 'lubricación':
+      case 'lubricacion':
+        return { bg: 'bg-emerald-600', text: 'text-white', badge: 'bg-emerald-50 text-emerald-800 border-emerald-200' }
+      case 'ajuste':
+        return { bg: 'bg-orange-600', text: 'text-white', badge: 'bg-orange-50 text-orange-800 border-orange-200' }
+      case 'cambio':
+        return { bg: 'bg-violet-600', text: 'text-white', badge: 'bg-violet-50 text-violet-800 border-violet-200' }
+      default: // Seguridad / Pre-Lilac
+        return { bg: 'bg-slate-700', text: 'text-white', badge: 'bg-slate-100 text-slate-800 border-slate-200' }
+    }
+  }
+
+  // ----------------------------------------------------
+  // STATE FOR RUNNING A ROUND (EJECUCION)
+  // ----------------------------------------------------
+  const [roundSetup, setRoundSetup] = useState({
+    planta: "MBL",
+    equipo: SEED_STANDARDS[0].equipo,
+    operario: "",
+    turno: "Mañana",
+    estandarId: SEED_STANDARDS[0].id
+  })
+  const [isRoundActive, setIsRoundActive] = useState(false)
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
+  const [isSubActionsExpanded, setIsSubActionsExpanded] = useState(false)
+
+  // Results recorded in the current round
+  // Structure: { [stepId]: { estado: 'cumple' | 'no_cumple' | 'no_aplica', comentario?: string, timeSpentSec: number, anomaliaText?: string, anomaliaPriority?: string, photo?: string } }
+  const [roundAnswers, setRoundAnswers] = useState<Record<string, any>>({})
+  
+  // Track step start times for actual duration tracking
+  const [stepStartTime, setStepStartTime] = useState<number>(0)
+  const [roundStartTime, setRoundStartTime] = useState<number>(0)
+
+  // Form for anomaly report inside current step
+  const [anomalyForm, setAnomalyForm] = useState({
+    description: "",
+    priority: "Media",
+    photo: null as string | null
+  })
+  const [showAnomalyForm, setShowAnomalyForm] = useState(false)
+
+  // Selected equipment in Master list
+  const [selectedMasterEstandar, setSelectedMasterEstandar] = useState<any>(null)
+  const [isAddingStandard, setIsAddingStandard] = useState(false)
+  const [isEditingStandard, setIsEditingStandard] = useState(false)
+  const [editStandardForm, setEditStandardForm] = useState<any>(null)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [authForm, setAuthForm] = useState({ email: '', password: '' })
+  const [authError, setAuthError] = useState('')
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+
+  // ----------------------------------------------------
+  // ROUND ACTIONS
+  // ----------------------------------------------------
+  const handleStartRound = () => {
+    if (!roundSetup.operario.trim()) {
+      alert("Por favor ingrese el nombre del operario.")
+      return
+    }
+    setIsRoundActive(true)
+    setCurrentStepIndex(0)
+    setRoundAnswers({})
+    setShowAnomalyForm(false)
+    setIsSubActionsExpanded(false)
+    const now = Date.now()
+    setRoundStartTime(now)
+    setStepStartTime(now)
+  }
+
+  const activeEstandar = useMemo(() => {
+    return standards.find(s => s.id === roundSetup.estandarId) || SEED_STANDARDS[0]
+  }, [standards, roundSetup.estandarId])
+
+  const currentStep = activeEstandar.steps[currentStepIndex]
+
+  const handleStepAnswer = (status: 'cumple' | 'no_aplica') => {
+    const now = Date.now()
+    const elapsedSec = Math.max(1, Math.round((now - stepStartTime) / 1000))
+    
+    // Save answer
+    setRoundAnswers(prev => ({
+      ...prev,
+      [currentStep.id]: {
+        estado: status,
+        timeSpentSec: elapsedSec,
+        comentario: status === 'no_aplica' ? 'No aplica en este turno.' : ''
+      }
+    }))
+
+    // Proceed to next or finish
+    goToNextStep(now)
+  }
+
+  const handleSaveAnomaly = () => {
+    if (!anomalyForm.description.trim()) {
+      alert("Por favor describa la anomalía.")
+      return
+    }
+    const now = Date.now()
+    const elapsedSec = Math.max(1, Math.round((now - stepStartTime) / 1000))
+
+    // Record no_cumple answer
+    setRoundAnswers(prev => ({
+      ...prev,
+      [currentStep.id]: {
+        estado: 'no_cumple',
+        timeSpentSec: elapsedSec,
+        comentario: anomalyForm.description,
+        anomalia: {
+          descripcion: anomalyForm.description,
+          prioridad: anomalyForm.priority,
+          photo: anomalyForm.photo || "/placeholder-camera.jpg"
+        }
+      }
+    }))
+
+    // Clear form
+    setAnomalyForm({
+      description: "",
+      priority: "Media",
+      photo: null
+    })
+    setShowAnomalyForm(false)
+
+    // Go to next
+    goToNextStep(now)
+  }
+
+  const goToNextStep = (timeRef: number) => {
+    if (currentStepIndex < activeEstandar.steps.length - 1) {
+      setCurrentStepIndex(prev => prev + 1)
+      setStepStartTime(timeRef)
+      setIsSubActionsExpanded(false)
+      setShowAnomalyForm(false)
+    } else {
+      // Completed last step -> Finish round
+      setIsRoundActive(false)
+      handleCompleteRound()
+    }
+  }
+
+  const handleGoBackStep = () => {
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex(prev => prev - 1)
+      setStepStartTime(Date.now())
+      setIsSubActionsExpanded(false)
+      setShowAnomalyForm(false)
+    }
+  }
+
+  const handleCompleteRound = () => {
+    const now = Date.now()
+    const totalRealMin = Math.max(1, Math.round((now - roundStartTime) / 60000))
+    const totalEstMin = activeEstandar.steps.reduce((sum: number, s: any) => sum + (s.tiempo_estimado_min || 0), 0)
+
+    // Calculate compliance %
+    const totalSteps = activeEstandar.steps.length
+    let okCount = 0
+    let naCount = 0
+    let anomaliasCreated: any[] = []
+
+    activeEstandar.steps.forEach((s: any) => {
+      const ans = roundAnswers[s.id]
+      if (ans) {
+        if (ans.estado === 'cumple') okCount++
+        if (ans.estado === 'no_aplica') naCount++
+        if (ans.estado === 'no_cumple' && ans.anomalia) {
+          anomaliasCreated.push({
+            id: `ANM-${Math.floor(100 + Math.random() * 900)}`,
+            registro_paso_id: s.id,
+            equipo: activeEstandar.equipo,
+            estandar: activeEstandar.labor,
+            planta: activeEstandar.planta,
+            paso: s.nombre_paso,
+            descripcion: ans.anomalia.descripcion,
+            prioridad: ans.anomalia.prioridad,
+            responsable_escalado: "Roberto Aguilar", // Default escalation
+            estado: "Abierta",
+            fecha_reporte: new Date().toISOString().split('T')[0],
+            tipo: s.categoria_lilac === 'Seguridad' ? 'Seguridad' : 'Deterioro Forzado'
+          })
+        }
+      }
+    })
+
+    const applicableSteps = totalSteps - naCount
+    const compliancePct = applicableSteps > 0 
+      ? Math.round((okCount / applicableSteps) * 1000) / 10 
+      : 100
+
+    // Save round log
+    const runId = `RUN-${Math.floor(200 + Math.random() * 800)}`
+    const newLog = {
+      id: runId,
+      estandar_id: activeEstandar.id,
+      estandar_nombre: activeEstandar.labor,
+      equipo: activeEstandar.equipo,
+      planta: activeEstandar.planta,
+      operario: roundSetup.operario,
+      turno: roundSetup.turno,
+      fecha: new Date().toISOString().split('T')[0],
+      cumplimiento_pct: compliancePct,
+      tiempo_total_est: totalEstMin,
+      tiempo_total_real: totalRealMin,
+      anomalias_detectadas: anomaliasCreated.length,
+      registros: Object.entries(roundAnswers).map(([stepId, val]: [string, any]) => ({
+        paso_id: stepId,
+        estado: val.estado,
+        tiempo_real_seg: val.timeSpentSec,
+        comentario: val.comentario || ""
+      }))
+    }
+
+    const updatedHistory = [newLog, ...history]
+    saveHistory(updatedHistory)
+
+    if (anomaliasCreated.length > 0) {
+      const updatedAnomalias = [...anomaliasCreated, ...anomalies]
+      saveAnomalies(updatedAnomalias)
+    }
+
+    alert(`Ronda finalizada correctamente.\n\nCumplimiento: ${compliancePct}%\nTiempo Total: ${totalRealMin} min (Estándar: ${totalEstMin} min)\nAnomalías Reportadas: ${anomaliasCreated.length}`)
+    
+    // Switch to history tab to view logs
+    setActiveTab('historial')
+    setIsRoundActive(false)
+  }
+
+  // Simulator anomaly photo upload
+  const simulatePhotoUpload = () => {
+    const mockPhotos = [
+      "imagenes_enchapadora_scm/anomalia_calderin.png",
+      "imagenes_enchapadora_scm/anomalia_compuerta.png",
+      "imagenes_enchapadora_scm/anomalia_rodillo.png"
+    ]
+    const randomPhoto = mockPhotos[Math.floor(Math.random() * mockPhotos.length)]
+    setAnomalyForm(prev => ({
+      ...prev,
+      photo: randomPhoto
+    }))
+    alert("¡Evidencia fotográfica capturada simuladamente!")
+  }
+
+  // Clean local data
+  const handleClearLocalData = () => {
+    if (confirm("¿Estás seguro de que quieres restablecer el historial y anomalías a los datos por defecto?")) {
+      setHistory(INITIAL_HISTORY)
+      setAnomalies(INITIAL_ANOMALIES)
+      localStorage.setItem('lilac_history', JSON.stringify(INITIAL_HISTORY))
+      localStorage.setItem('lilac_anomalies', JSON.stringify(INITIAL_ANOMALIES))
+    }
+  }
+
+  const standardsByPlant = useMemo(() => {
+    const counts: Record<string, number> = {}
+    standards.forEach(s => {
+      counts[s.planta] = (counts[s.planta] || 0) + 1
+    })
+    return Object.entries(counts).map(([planta, count]) => ({
+      planta,
+      count
+    }))
+  }, [standards])
+
+  const dashboardStats = useMemo(() => {
+    if (history.length === 0) return { avgCompliance: 0, closedTickets: 0, openTickets: 0, totalRounds: 0 }
+    
+    const sumCompliance = history.reduce((sum, h) => sum + (h.cumplimiento_pct || 0), 0)
+    const avgCompliance = Math.round(sumCompliance / history.length)
+
+    const openTickets = anomalies.filter(a => a.estado === 'Abierta' || a.estado === 'En Proceso').length
+    const closedTickets = anomalies.filter(a => a.estado === 'Cerrada').length
+
+    return {
+      avgCompliance,
+      openTickets,
+      closedTickets,
+      totalRounds: history.length
+    }
+  }, [history, anomalies])
+
+  // Step calibration averages computation
+  const stepCalibrationData = useMemo(() => {
+    const calibrationMap: Record<string, { name: string, est: number, totalReal: number, count: number }> = {}
+    
+    // Initialise SCM Enchapadora steps
+    SEED_ESTANDAR.steps.forEach(s => {
+      calibrationMap[s.id] = {
+        name: `Paso ${s.orden}`,
+        est: s.tiempo_estimado_min * 60, // in seconds
+        totalReal: 0,
+        count: 0
+      }
+    })
+
+    history.forEach(round => {
+      if (round.registros) {
+        round.registros.forEach((reg: any) => {
+          if (calibrationMap[reg.paso_id]) {
+            calibrationMap[reg.paso_id].totalReal += reg.tiempo_real_seg
+            calibrationMap[reg.paso_id].count++
+          }
+        })
+      }
+    })
+
+    return Object.entries(calibrationMap).map(([id, val]) => {
+      const avgReal = val.count > 0 ? Math.round(val.totalReal / val.count) : val.est
+      return {
+        id,
+        name: val.name,
+        "Estándar (Seg)": val.est,
+        "Promedio Real (Seg)": avgReal,
+        desviacion: Math.abs(val.est - avgReal)
+      }
+    })
+  }, [history])
+
+  // Update Anomaly Status
+  const handleUpdateAnomalyStatus = (id: string, newStatus: string) => {
+    const updated = anomalies.map(a => {
+      if (a.id === id) {
+        return {
+          ...a,
+          estado: newStatus,
+          fecha_cierre: newStatus === 'Cerrada' ? new Date().toISOString().split('T')[0] : undefined
+        }
+      }
+      return a
+    })
+    saveAnomalies(updated)
+  }
+
+  // ----------------------------------------------------
+  // STANDARDS EDIT & AUTHORIZATION ACTIONS
+  // ----------------------------------------------------
+  const handleEditClick = () => {
+    const isUserAuthorized = 
+      userProfile?.rol === 'director' || 
+      userProfile?.rol === 'desarrollador' || 
+      userProfile?.rol === 'admin' || 
+      userProfile?.permisos?.mantenimiento?.editar_estandares === true || 
+      isSessionAuthorized;
+
+    if (isUserAuthorized) {
+      setEditStandardForm(JSON.parse(JSON.stringify(selectedMasterEstandar)))
+      setIsEditingStandard(true)
+    } else {
+      setAuthError('')
+      setAuthForm({ email: '', password: '' })
+      setIsAuthModalOpen(true)
+    }
+  }
+
+  const handleAuthorizeAndEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!authForm.email || !authForm.password) {
+      setAuthError("Por favor complete todos los campos.")
+      return
+    }
+
+    setIsAuthenticating(true)
+    setAuthError('')
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authForm.email,
+        password: authForm.password
+      })
+
+      if (error) {
+        setAuthError("Credenciales inválidas. Por favor intente nuevamente.")
+        setIsAuthenticating(false)
+        return
+      }
+
+      if (data.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('uuid', data.user.id)
+          .single()
+
+        if (profileError || !profile) {
+          setAuthError("No se encontró el perfil del usuario autorizador.")
+          setIsAuthenticating(false)
+          return
+        }
+
+        const hasAuthPermission = 
+          profile.rol === 'director' || 
+          profile.rol === 'desarrollador' || 
+          profile.rol === 'admin' || 
+          profile.permisos?.mantenimiento?.autorizar_editar === true;
+
+        if (hasAuthPermission) {
+          setIsSessionAuthorized(true)
+          setIsAuthModalOpen(false)
+          setEditStandardForm(JSON.parse(JSON.stringify(selectedMasterEstandar)))
+          setIsEditingStandard(true)
+          alert(`Edición autorizada con éxito por ${profile.nombre}.`)
+        } else {
+          setAuthError("El usuario ingresado no cuenta con el permiso 'Autorizar para Editar'.")
+        }
+      }
+    } catch (err) {
+      console.error("Error en autorización:", err)
+      setAuthError("Ocurrió un error inesperado durante la verificación.")
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }
+
+  const handleSaveStandardEdit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editStandardForm.equipo || !editStandardForm.labor) {
+      alert("Por favor complete los campos obligatorios.")
+      return
+    }
+
+    const updatedStandards = standards.map(s => s.id === editStandardForm.id ? editStandardForm : s)
+    saveStandards(updatedStandards)
+    setSelectedMasterEstandar(editStandardForm)
+    setIsEditingStandard(false)
+    alert("Estándar guardado correctamente.")
+  }
+
+  const handleCancelStandardEdit = () => {
+    setIsEditingStandard(false)
+    setEditStandardForm(null)
+  }
+
+  const handleAddStepToEditForm = () => {
+    const newOrder = (editStandardForm.steps?.length || 0) + 1
+    const newStep = {
+      id: `step-${editStandardForm.id}-${Date.now()}`,
+      orden: newOrder,
+      nombre_paso: "",
+      categoria_lilac: "Limpieza",
+      frecuencia: "Cada turno",
+      tiempo_estimado_min: 5,
+      criterio_aceptacion: "",
+      sub_acciones: []
+    }
+    setEditStandardForm({
+      ...editStandardForm,
+      steps: [...(editStandardForm.steps || []), newStep]
+    })
+  }
+
+  const handleRemoveStepFromEditForm = (stepId: string) => {
+    const filteredSteps = editStandardForm.steps.filter((s: any) => s.id !== stepId)
+    const reorderedSteps = filteredSteps.map((s: any, idx: number) => ({
+      ...s,
+      orden: idx + 1
+    }))
+    setEditStandardForm({
+      ...editStandardForm,
+      steps: reorderedSteps
+    })
+  }
+
+  const handleStepFieldChange = (stepId: string, field: string, value: any) => {
+    const updatedSteps = editStandardForm.steps.map((s: any) => {
+      if (s.id === stepId) {
+        return { ...s, [field]: value }
+      }
+      return s
+    })
+    setEditStandardForm({
+      ...editStandardForm,
+      steps: updatedSteps
+    })
+  }
+
+  // ----------------------------------------------------
+  // CREATE NEW MASTER STANDARD (SIMULATION)
+  // ----------------------------------------------------
+  const [newStandardForm, setNewStandardForm] = useState({
+    equipo: "",
+    planta: "MBL",
+    labor: "",
+    codigo_hdt: "",
+    elaboro: "",
+    aprobo: "",
+    herramientas: "",
+    insumos: "",
+    epp: "",
+    nota_general: ""
+  })
+
+  const handleCreateStandard = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newStandardForm.equipo || !newStandardForm.labor) {
+      alert("Por favor complete los campos obligatorios.")
+      return
+    }
+
+    const newStd = {
+      id: `est-${Math.floor(1000 + Math.random() * 9000)}`,
+      equipo: newStandardForm.equipo,
+      planta: newStandardForm.planta,
+      criticidad: "B",
+      codigo_hdt: newStandardForm.codigo_hdt || "V1",
+      labor: newStandardForm.labor,
+      herramientas: newStandardForm.herramientas.split(',').map(h => h.trim()).filter(Boolean),
+      insumos: newStandardForm.insumos.split(',').map(i => i.trim()).filter(Boolean),
+      epp: newStandardForm.epp.split(',').map(ep => ep.trim()).filter(Boolean),
+      fecha_elaboracion: new Date().toISOString().split('T')[0],
+      elaboro: newStandardForm.elaboro || "Operario",
+      aprobo: newStandardForm.aprobo || "Supervisor",
+      nota_general: newStandardForm.nota_general,
+      steps: [
+        {
+          id: `step-new-1`,
+          orden: 1,
+          nombre_paso: "Inspección visual general",
+          categoria_lilac: "Inspección",
+          frecuencia: "Cada turno",
+          tiempo_estimado_min: 5,
+          criterio_aceptacion: "Máquina limpia y sin fugas visibles.",
+          sub_acciones: [{ detalle_texto: "Revisar cableado y fugas.", imagen_url: "" }]
+        },
+        {
+          id: `step-new-2`,
+          orden: 2,
+          nombre_paso: "Limpieza exterior del chasis",
+          categoria_lilac: "Limpieza",
+          frecuencia: "Cada turno",
+          tiempo_estimado_min: 5,
+          criterio_aceptacion: "Chasis libre de polvo acumulado.",
+          sub_acciones: [{ detalle_texto: "Limpiar virutas exteriores.", imagen_url: "" }]
+        }
+      ]
+    }
+
+    saveStandards([...standards, newStd])
+    setSelectedMasterEstandar(newStd)
+    setIsAddingStandard(false)
+    setNewStandardForm({
+      equipo: "",
+      planta: "MBL",
+      labor: "",
+      codigo_hdt: "",
+      elaboro: "",
+      aprobo: "",
+      herramientas: "",
+      insumos: "",
+      epp: "",
+      nota_general: ""
+    })
+    alert("¡Estándar LILAC registrado con éxito! (Se crearon 2 pasos predeterminados de ejemplo)")
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#F6F3EE] font-sans text-[#000000]">
+      <Header
+        title="Mantenimiento"
+        subtitle="Mantenimiento Autónomo LILAC"
+        userEmail={userEmail}
+        showLogout={true}
+        onLogout={async () => {
+          await supabase.auth.signOut()
+          router.push('/login')
+        }}
+      />
+
+      {/* Tabs Menu (Only visible when round is NOT active) */}
+      {!isRoundActive && (
+        <div className="bg-white border-b border-[#e2ded5] py-2 px-4 shadow-sm relative z-30">
+          <div className="max-w-7xl mx-auto flex flex-wrap gap-2 sm:gap-4 justify-center">
+            <button
+              onClick={() => setActiveTab('estandares')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+                activeTab === 'estandares'
+                  ? 'bg-[#324354] text-white shadow-md'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <ClipboardList size={16} />
+              <span>Estándares</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('historial')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+                activeTab === 'historial'
+                  ? 'bg-[#324354] text-white shadow-md'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <History size={16} />
+              <span>Historial</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('auditoria')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+                activeTab === 'auditoria'
+                  ? 'bg-[#324354] text-white shadow-md'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Activity size={16} />
+              <span>Auditoría</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('indicadores')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+                activeTab === 'indicadores'
+                  ? 'bg-[#324354] text-white shadow-md'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <TrendingUp size={16} />
+              <span>Indicadores</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ejecucion')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+                activeTab === 'ejecucion'
+                  ? 'bg-[#324354] text-white shadow-md'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Play size={16} />
+              <span>Ejecución</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        {/* TAB 1: EJECUCION DE RONDA */}
+        {activeTab === 'ejecucion' && (
+          <div className="max-w-3xl mx-auto">
+            {!isRoundActive ? (
+              // Setup screen
+              <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-lg p-6 sm:p-10 space-y-6">
+                <div className="text-center space-y-2 border-b border-slate-100 pb-4">
+                  <h2 className="text-2xl font-bold text-[#324354]">Nueva Ronda de Mantenimiento</h2>
+                  <p className="text-slate-500 text-sm">Registre los datos básicos antes de iniciar el checklist interactivo.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Planta</label>
+                    <select
+                      value={roundSetup.planta}
+                      onChange={e => setRoundSetup({...roundSetup, planta: e.target.value})}
+                      className="w-full h-11 bg-slate-50 border-2 border-slate-200 rounded-xl px-3 outline-none focus:border-[#324354] font-medium"
+                    >
+                      <option value="MBL">Muebles (MBL)</option>
+                      <option value="MS">Mármol Sintético (MS)</option>
+                      <option value="FV">Fibra de Vidrio (FV)</option>
+                      <option value="CEFI">CEFI</option>
+                      <option value="INYECCION">Inyección</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Estándar LILAC</label>
+                    <select
+                      value={roundSetup.estandarId}
+                      onChange={e => {
+                        const std = standards.find(s => s.id === e.target.value)
+                        setRoundSetup({
+                          ...roundSetup,
+                          estandarId: e.target.value,
+                          equipo: std ? std.equipo : "Equipo"
+                        })
+                      }}
+                      className="w-full h-11 bg-slate-50 border-2 border-slate-200 rounded-xl px-3 outline-none focus:border-[#324354] font-medium"
+                    >
+                      {standards.map(s => (
+                        <option key={s.id} value={s.id}>{s.equipo} - {s.labor}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Turno</label>
+                    <select
+                      value={roundSetup.turno}
+                      onChange={e => setRoundSetup({...roundSetup, turno: e.target.value})}
+                      className="w-full h-11 bg-slate-50 border-2 border-slate-200 rounded-xl px-3 outline-none focus:border-[#324354] font-medium"
+                    >
+                      <option value="Mañana">Mañana</option>
+                      <option value="Tarde">Tarde</option>
+                      <option value="Noche">Noche</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Nombre del Operario *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Hector Chinchilla"
+                      value={roundSetup.operario}
+                      onChange={e => setRoundSetup({...roundSetup, operario: e.target.value})}
+                      className="w-full h-11 bg-slate-50 border-2 border-slate-200 rounded-xl px-3 outline-none focus:border-[#324354] font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#324354]/5 rounded-2xl p-4 border border-[#324354]/10 space-y-2">
+                  <h4 className="text-sm font-bold text-[#324354] flex items-center gap-1.5">
+                    <Info size={16} /> Información del Estándar
+                  </h4>
+                  <ul className="text-xs text-slate-600 space-y-1 list-disc pl-5">
+                    <li>Código HDT: <strong>{activeEstandar.codigo_hdt}</strong> (Versión {activeEstandar.version || '1'})</li>
+                    <li>Cantidad de Pasos LILAC: <strong>{activeEstandar.steps.length} tareas</strong></li>
+                    <li>Elaboró: <strong>{activeEstandar.elaboro}</strong> | Aprobó: <strong>{activeEstandar.aprobo}</strong></li>
+                    <li>Herramientas recomendadas: {activeEstandar.herramientas?.join(', ')}</li>
+                    <li>EPP Requerido: <strong>{activeEstandar.epp?.join(', ')}</strong></li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={handleStartRound}
+                  className="w-full py-3.5 bg-[#324354] hover:bg-[#25313e] text-white font-bold rounded-2xl transition duration-200 shadow-md flex items-center justify-center gap-2"
+                >
+                  <Play size={18} fill="white" />
+                  <span>Comenzar Ronda Interactiva</span>
+                </button>
+              </div>
+            ) : (
+              // Step-by-step Execution Ronda (Mobile-First Style)
+              <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-xl overflow-hidden flex flex-col min-h-[580px]">
+                
+                {/* Progress bar */}
+                <div className="bg-slate-100 px-4 py-3 flex items-center justify-between border-b border-slate-200">
+                  <div className="flex-1 mr-4">
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div 
+                        className="bg-[#324354] h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${((currentStepIndex + 1) / activeEstandar.steps.length) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <span className="text-xs font-extrabold text-[#324354] whitespace-nowrap">
+                    Paso {currentStepIndex + 1} de {activeEstandar.steps.length}
+                  </span>
+                </div>
+
+                {/* Big Step Card */}
+                <div className="p-4 sm:p-6 flex-1 flex flex-col space-y-4">
+                  
+                  {/* Photo area */}
+                  <div className="relative w-full aspect-video rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+                    {/* Simulator shows nice SVG or mock drawing when actual photo files aren't in system */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+                      <svg className="w-16 h-16 text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-xs font-semibold uppercase tracking-wider block text-slate-500">Ubicación Física del Punto</span>
+                      <span className="text-[10px] font-mono mt-1 text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded">{currentStep.sub_acciones?.[0]?.imagen_url}</span>
+                    </div>
+
+                    {/* LILAC Category badge overlay */}
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm border ${getCategoryColor(currentStep.categoria_lilac).badge}`}>
+                        {currentStep.categoria_lilac}
+                      </span>
+                    </div>
+
+                    {/* Frequency badge overlay */}
+                    <div className="absolute top-3 right-3 z-10">
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 bg-white text-slate-600 rounded-full shadow-sm border border-slate-200 uppercase tracking-wide">
+                        {currentStep.frecuencia}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Title & info */}
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-[#324354] leading-tight">
+                      {currentStep.orden}. {currentStep.nombre_paso}
+                    </h3>
+                    
+                    {/* Accept criteria */}
+                    <p className="text-xs font-semibold text-slate-500 mt-1">
+                      <strong className="text-slate-600">Criterio de aceptación:</strong> {currentStep.criterio_aceptacion}
+                    </p>
+                  </div>
+
+                  {/* Expanded instructions ("Ver más") */}
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50">
+                    <button
+                      onClick={() => setIsSubActionsExpanded(!isSubActionsExpanded)}
+                      className="w-full px-4 py-3 flex items-center justify-between text-left text-xs font-bold text-[#324354]"
+                    >
+                      <span>INSTRUCCIONES DETALLADAS Y SUB-ACCIONES ({currentStep.sub_acciones?.length || 0})</span>
+                      {isSubActionsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+
+                    {isSubActionsExpanded && (
+                      <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-200/60 text-xs text-slate-600">
+                        {currentStep.sub_acciones?.map((sub: any, idx: number) => (
+                          <div key={idx} className="flex gap-2 items-start border-b border-slate-200/40 pb-2 last:border-0 last:pb-0">
+                            <span className="bg-[#324354]/10 text-[#324354] w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <div className="space-y-1">
+                              <p className="leading-relaxed font-medium">{sub.detalle_texto}</p>
+                              {sub.imagen_url && (
+                                <span className="text-[9px] text-slate-400 block font-mono bg-white/50 px-1 py-0.5 rounded w-fit">Ref: {sub.imagen_url}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Eligibility check */}
+                  <div className="bg-[#7B8E90]/5 border border-[#7B8E90]/10 rounded-2xl p-3 text-xs space-y-1 text-slate-600">
+                    <span className="font-bold text-[#324354] block mb-1">Restricciones de seguridad obligatorias (Elegibilidad Operario):</span>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <CheckSquare size={13} className="text-emerald-600" />
+                        <span>Altura &lt; 1.5m</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <CheckSquare size={13} className="text-emerald-600" />
+                        <span>Sin desensamble</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <CheckSquare size={13} className="text-emerald-600" />
+                        <span>Htas Básicas</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <CheckSquare size={13} className="text-emerald-600" />
+                        <span>Sin certif. especial</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ANOMALY REPORTING DRAWER */}
+                  {showAnomalyForm && (
+                    <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 space-y-4 animate-in slide-in-from-bottom duration-300">
+                      <div className="flex items-center justify-between border-b border-red-100 pb-2">
+                        <h4 className="text-sm font-bold text-red-700 flex items-center gap-1.5">
+                          <AlertTriangle size={16} /> Reportar Anomalía del Paso
+                        </h4>
+                        <button 
+                          onClick={() => setShowAnomalyForm(false)}
+                          className="text-red-500 hover:bg-red-100 p-1 rounded-full"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-red-600 uppercase">Descripción de la anomalía *</label>
+                          <textarea
+                            placeholder="Describa brevemente qué no cumple y cuál es el estado actual..."
+                            value={anomalyForm.description}
+                            onChange={e => setAnomalyForm({...anomalyForm, description: e.target.value})}
+                            className="w-full p-2.5 bg-white border border-red-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-red-400 font-medium min-h-[60px]"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-red-600 uppercase">Prioridad de reparación</label>
+                            <select
+                              value={anomalyForm.priority}
+                              onChange={e => setAnomalyForm({...anomalyForm, priority: e.target.value})}
+                              className="w-full h-9 bg-white border border-red-300 rounded-xl px-2 text-xs font-semibold outline-none"
+                            >
+                              <option value="Baja">Baja (Preventiva)</option>
+                              <option value="Media">Media (Urgencia Media)</option>
+                              <option value="Alta">Alta (Máquina Detenida / Riesgo)</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1 flex flex-col justify-end">
+                            <button
+                              type="button"
+                              onClick={simulatePhotoUpload}
+                              className="h-9 w-full bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm"
+                            >
+                              <Camera size={14} />
+                              {anomalyForm.photo ? "Cambiar Foto" : "Subir Evidencia *"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {anomalyForm.photo && (
+                          <div className="bg-red-100/50 p-2 rounded-xl border border-red-200 flex items-center justify-between">
+                            <span className="text-[9px] font-mono text-red-800 truncate max-w-[200px]">{anomalyForm.photo}</span>
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 bg-red-600 text-white rounded">OK</span>
+                          </div>
+                        )}
+                        
+                        <button
+                          onClick={handleSaveAnomaly}
+                          className="w-full py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow"
+                        >
+                          <Check size={14} />
+                          <span>Guardar y Reportar Anomalía</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* BOTTOM ACTION BUTTONS */}
+                  {!showAnomalyForm && (
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <button
+                        onClick={() => handleStepAnswer('cumple')}
+                        className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
+                      >
+                        <Check size={18} />
+                        <span>Cumple</span>
+                      </button>
+
+                      <button
+                        onClick={() => setShowAnomalyForm(true)}
+                        className="py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
+                      >
+                        <AlertTriangle size={18} />
+                        <span>Reportar Anomalía</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Back, Next and N/A buttons */}
+                  {!showAnomalyForm && (
+                    <div className="flex justify-between items-center pt-2 text-xs border-t border-slate-100">
+                      <button
+                        onClick={handleGoBackStep}
+                        disabled={currentStepIndex === 0}
+                        className="font-bold text-slate-500 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none"
+                      >
+                        &larr; Anterior
+                      </button>
+
+                      <button
+                        onClick={() => handleStepAnswer('no_aplica')}
+                        className="font-bold text-slate-400 hover:text-slate-600 italic"
+                      >
+                        No aplica en este turno
+                      </button>
+
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Estimado: {currentStep.tiempo_estimado_min} min
+                      </span>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: ESTANDARES (CAPA A) */}
+        {activeTab === 'estandares' && (
+          <div className="space-y-6">
+            {selectedMasterEstandar === null && !isAddingStandard ? (
+              // GENERAL VIEW: Grid of Standards at full screen width
+              <>
+                {/* Top Toolbar: Search Box & New Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-sm">
+                  <div className="relative flex-1 max-w-md">
+                    <input
+                      type="text"
+                      placeholder="Buscar estándar por máquina, planta o labor..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#324354] font-medium transition-all"
+                    />
+                    <div className="absolute left-3.5 top-3.5 text-slate-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingStandard(true)}
+                    className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#324354] hover:bg-[#25313e] text-white font-bold rounded-xl transition duration-200 shadow-sm text-sm font-sans uppercase tracking-wider"
+                  >
+                    <Plus size={18} />
+                    <span>NUEVO ESTÁNDAR</span>
+                  </button>
+                </div>
+
+                {/* Grid of Miniature Cards (Full Screen Width) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                  {standards
+                    .filter(s => 
+                      s.equipo?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                      s.labor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      s.planta?.toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                    .map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setSelectedMasterEstandar(s); setIsAddingStandard(false) }}
+                        className="flex gap-4 p-4 bg-white rounded-3xl border border-[#e2ded5] hover:border-[#324354]/50 shadow-sm hover:shadow-md transition duration-200 text-left w-full group"
+                      >
+                        {/* Thumbnail image or placeholder */}
+                        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center flex-shrink-0 relative">
+                          {s.imagen_url ? (
+                            <img 
+                              src={s.imagen_url} 
+                              alt={s.equipo} 
+                              className="object-contain w-full h-full p-1.5 transition-transform duration-300 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-slate-300">
+                              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase">{s.planta}</span>
+                            </div>
+                          )}
+                          <div className="absolute top-1.5 left-1.5 flex gap-1">
+                            <span className="text-[8px] font-extrabold px-1 py-0.5 bg-[#324354] text-white rounded">
+                              {s.planta}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Text information */}
+                        <div className="flex-1 flex flex-col justify-between py-0.5 min-w-0">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                s.criticidad === 'A' ? 'bg-red-50 text-red-700 border border-red-100' : s.criticidad === 'B' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-blue-50 text-blue-700 border border-blue-100'
+                              }`}>
+                                CRITICIDAD {s.criticidad}
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-bold text-[#324354] mt-1.5 truncate">{s.equipo}</h4>
+                            <p className="text-xs text-slate-500 line-clamp-2 mt-0.5 leading-snug">{s.labor}</p>
+                          </div>
+                          
+                          <div className="text-[10px] text-slate-400 font-semibold flex items-center justify-between border-t border-slate-100/60 pt-1 mt-1">
+                            <span>Pasos: {s.steps?.length || 0}</span>
+                            <span className="text-[#7B8E90] hover:text-[#324354] transition font-bold">Ver detalles &rarr;</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  {standards.filter(s => 
+                    s.equipo?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    s.labor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    s.planta?.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).length === 0 && (
+                    <div className="col-span-full w-full text-center text-xs text-slate-400 py-12 bg-white border border-dashed border-[#e2ded5] rounded-3xl">
+                      No se encontraron estándares.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              // SELECTED DETAIL VIEW: Full screen width detail with a Back Button
+              <div className="space-y-4 w-full">
+                
+                {/* Actions row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print pb-2 border-b border-slate-100/60">
+                  {/* Back button */}
+                  <button
+                    onClick={() => { setSelectedMasterEstandar(null); setIsAddingStandard(false); setIsEditingStandard(false); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#324354] hover:bg-[#25313e] text-white font-bold rounded-xl transition shadow hover:shadow-md text-xs sm:text-sm font-sans uppercase tracking-wider cursor-pointer"
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Volver a la Lista de Estándares</span>
+                  </button>
+
+                  {!isEditingStandard && (
+                    <div className="flex items-center gap-3">
+                      {/* PRINT BUTTON */}
+                      <button
+                        onClick={() => window.print()}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition shadow-sm text-xs sm:text-sm uppercase tracking-wider cursor-pointer border border-slate-200"
+                      >
+                        <Printer size={16} />
+                        <span>Imprimir</span>
+                      </button>
+
+                      {/* EDIT BUTTON */}
+                      <button
+                        onClick={handleEditClick}
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition shadow-sm text-xs sm:text-sm uppercase tracking-wider cursor-pointer"
+                      >
+                        {userProfile?.rol === 'director' || userProfile?.rol === 'desarrollador' || userProfile?.rol === 'admin' || userProfile?.permisos?.mantenimiento?.editar_estandares || isSessionAuthorized ? (
+                          <>
+                            <Edit3 size={16} />
+                            <span>Editar Estándar</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={16} />
+                            <span>Editar (Autorizar)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full">
+                  {isAddingStandard ? (
+                    // Add standard form
+                    <form onSubmit={handleCreateStandard} className="bg-white rounded-3xl border border-[#e2ded5] shadow-sm p-6 sm:p-8 space-y-6">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-[#324354]">Registrar Nuevo Estándar LILAC (Capa A)</h3>
+                          <p className="text-xs text-slate-500">Defina el equipo, planta y encabezado de la hoja de división de trabajo.</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setIsAddingStandard(false)}
+                          className="text-slate-400 hover:text-slate-600"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Equipo *</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Bordeadora Homag"
+                            required
+                            value={newStandardForm.equipo}
+                            onChange={e => setNewStandardForm({...newStandardForm, equipo: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-[#324354]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Labor o Tarea *</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Limpieza e Inspección"
+                            required
+                            value={newStandardForm.labor}
+                            onChange={e => setNewStandardForm({...newStandardForm, labor: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-[#324354]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Planta</label>
+                          <select
+                            value={newStandardForm.planta}
+                            onChange={e => setNewStandardForm({...newStandardForm, planta: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-2 text-sm outline-none"
+                          >
+                            <option value="MBL">Muebles (MBL)</option>
+                            <option value="MS">Mármol Sintético (MS)</option>
+                            <option value="FV">Fibra de Vidrio (FV)</option>
+                            <option value="CEFI">CEFI</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Código HDT</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. HDT-BORD-01"
+                            value={newStandardForm.codigo_hdt}
+                            onChange={e => setNewStandardForm({...newStandardForm, codigo_hdt: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-[#324354]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Elaboró</label>
+                          <input
+                            type="text"
+                            placeholder="Nombre autor"
+                            value={newStandardForm.elaboro}
+                            onChange={e => setNewStandardForm({...newStandardForm, elaboro: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Aprobó</label>
+                          <input
+                            type="text"
+                            placeholder="Nombre aprobador"
+                            value={newStandardForm.aprobo}
+                            onChange={e => setNewStandardForm({...newStandardForm, aprobo: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Herramientas (separadas por coma)</label>
+                          <input
+                            type="text"
+                            placeholder="Brocha, llave fija, trapos"
+                            value={newStandardForm.herramientas}
+                            onChange={e => setNewStandardForm({...newStandardForm, herramientas: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Insumos (separadas por coma)</label>
+                          <input
+                            type="text"
+                            placeholder="Thinner, trapo, lubricante"
+                            value={newStandardForm.insumos}
+                            onChange={e => setNewStandardForm({...newStandardForm, insumos: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">EPP Requeridos (separadas por coma)</label>
+                          <input
+                            type="text"
+                            placeholder="Gafas, protección auditiva, guantes"
+                            value={newStandardForm.epp}
+                            onChange={e => setNewStandardForm({...newStandardForm, epp: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Nota de Seguridad / Nota General</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. No usar silicona en la máquina."
+                            value={newStandardForm.nota_general}
+                            onChange={e => setNewStandardForm({...newStandardForm, nota_general: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3 bg-[#324354] hover:bg-[#25313e] text-white font-bold rounded-xl transition duration-200 shadow-md"
+                      >
+                        Registrar Estandar y Crear Pasos por Defecto
+                      </button>
+                    </form>
+                  ) : isEditingStandard && editStandardForm ? (
+                    // EDIT MODE: Form to modify the selected standard details and steps list
+                    <form onSubmit={handleSaveStandardEdit} className="bg-white rounded-3xl border border-[#e2ded5] shadow-sm p-6 sm:p-8 space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+                        <div>
+                          <h3 className="text-xl font-bold text-[#324354]">Editar Estándar LILAC (Capa A)</h3>
+                          <p className="text-xs text-slate-500">Realice modificaciones generales y de pasos del estándar actual.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCancelStandardEdit}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs uppercase"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs uppercase shadow"
+                          >
+                            Guardar Cambios
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Equipo *</label>
+                          <input
+                            type="text"
+                            required
+                            value={editStandardForm.equipo}
+                            onChange={e => setEditStandardForm({...editStandardForm, equipo: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-[#324354]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Labor o Tarea *</label>
+                          <input
+                            type="text"
+                            required
+                            value={editStandardForm.labor}
+                            onChange={e => setEditStandardForm({...editStandardForm, labor: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-[#324354]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Planta</label>
+                          <select
+                            value={editStandardForm.planta}
+                            onChange={e => setEditStandardForm({...editStandardForm, planta: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-2 text-sm outline-none"
+                          >
+                            <option value="MBL">Muebles (MBL)</option>
+                            <option value="MS">Mármol Sintético (MS)</option>
+                            <option value="FV">Fibra de Vidrio (FV)</option>
+                            <option value="CEFI">CEFI</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Criticidad</label>
+                          <select
+                            value={editStandardForm.criticidad}
+                            onChange={e => setEditStandardForm({...editStandardForm, criticidad: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-2 text-sm outline-none"
+                          >
+                            <option value="A">A (Alta)</option>
+                            <option value="B">B (Media)</option>
+                            <option value="C">C (Baja)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Código HDT</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.codigo_hdt}
+                            onChange={e => setEditStandardForm({...editStandardForm, codigo_hdt: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-[#324354]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Versión</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.version || '1'}
+                            onChange={e => setEditStandardForm({...editStandardForm, version: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Elaboró</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.elaboro}
+                            onChange={e => setEditStandardForm({...editStandardForm, elaboro: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Aprobó</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.aprobo}
+                            onChange={e => setEditStandardForm({...editStandardForm, aprobo: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Herramientas (separadas por coma)</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.herramientas?.join(', ') || ''}
+                            onChange={e => setEditStandardForm({...editStandardForm, herramientas: e.target.value.split(',').map(h => h.trim()).filter(Boolean)})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Insumos (separadas por coma)</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.insumos?.join(', ') || ''}
+                            onChange={e => setEditStandardForm({...editStandardForm, insumos: e.target.value.split(',').map(i => i.trim()).filter(Boolean)})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">EPP Requeridos (separadas por coma)</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.epp?.join(', ') || ''}
+                            onChange={e => setEditStandardForm({...editStandardForm, epp: e.target.value.split(',').map(ep => ep.trim()).filter(Boolean)})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Nota de Seguridad / Nota General</label>
+                          <input
+                            type="text"
+                            value={editStandardForm.nota_general || ''}
+                            onChange={e => setEditStandardForm({...editStandardForm, nota_general: e.target.value})}
+                            className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Edit steps list */}
+                      <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-[#324354]">Tabla de Pasos del Estándar ({editStandardForm.steps?.length || 0})</h4>
+                          <button
+                            type="button"
+                            onClick={handleAddStepToEditForm}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#324354] hover:bg-[#25313e] text-white font-bold rounded-lg text-xs"
+                          >
+                            <Plus size={14} />
+                            <span>Añadir Paso</span>
+                          </button>
+                        </div>
+
+                        <div className="space-y-4">
+                          {editStandardForm.steps?.map((step: any) => (
+                            <div key={step.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3 relative">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveStepFromEditForm(step.id)}
+                                className="absolute top-4 right-4 text-slate-400 hover:text-red-600 transition"
+                                title="Eliminar Paso"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span className="text-xs font-extrabold text-slate-400">Paso {step.orden}</span>
+                                <div>
+                                  <select
+                                    value={step.categoria_lilac}
+                                    onChange={e => handleStepFieldChange(step.id, 'categoria_lilac', e.target.value)}
+                                    className="h-8 bg-white border border-slate-200 rounded-lg px-2 text-xs font-bold"
+                                  >
+                                    <option value="Limpieza">Limpieza</option>
+                                    <option value="Inspección">Inspección</option>
+                                    <option value="Lubricación">Lubricación</option>
+                                    <option value="Ajuste">Ajuste</option>
+                                    <option value="Cambio">Cambio</option>
+                                    <option value="Seguridad">Seguridad</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <input
+                                    type="text"
+                                    value={step.frecuencia}
+                                    placeholder="Frecuencia"
+                                    onChange={e => handleStepFieldChange(step.id, 'frecuencia', e.target.value)}
+                                    className="h-8 bg-white border border-slate-200 rounded-lg px-2 text-xs w-28 font-medium"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs font-medium">
+                                  <span>Tiempo:</span>
+                                  <input
+                                    type="number"
+                                    value={step.tiempo_estimado_min}
+                                    onChange={e => handleStepFieldChange(step.id, 'tiempo_estimado_min', parseInt(e.target.value) || 0)}
+                                    className="h-8 bg-white border border-slate-200 rounded-lg px-2 text-xs w-16"
+                                  />
+                                  <span>min</span>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase">Descripción del Paso *</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={step.nombre_paso}
+                                    onChange={e => handleStepFieldChange(step.id, 'nombre_paso', e.target.value)}
+                                    className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-xs"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase">Criterio de Aceptación</label>
+                                  <input
+                                    type="text"
+                                    value={step.criterio_aceptacion}
+                                    onChange={e => handleStepFieldChange(step.id, 'criterio_aceptacion', e.target.value)}
+                                    className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-xs"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </form>
+                  ) : (
+                    // NORMAL MODE: Display standard details (with print wrapping support)
+                    <div id="printable-standard" className="bg-white rounded-3xl border border-[#e2ded5] shadow-sm p-6 sm:p-8 space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold px-2 py-0.5 bg-[#324354] text-white rounded uppercase">{selectedMasterEstandar.planta}</span>
+                            <span className="text-xs font-bold px-2 py-0.5 bg-amber-500 text-white rounded">CRITICIDAD {selectedMasterEstandar.criticidad}</span>
+                          </div>
+                          <h3 className="text-xl font-bold text-[#324354] mt-1">{selectedMasterEstandar.equipo}</h3>
+                          <p className="text-xs text-slate-500 font-semibold">{selectedMasterEstandar.labor}</p>
+                        </div>
+                        
+                        <div className="text-right text-xs text-slate-400 font-medium">
+                          <p>Código HDT: <strong className="text-slate-600">{selectedMasterEstandar.codigo_hdt}</strong></p>
+                          <p>Versión: <strong className="text-slate-600">{selectedMasterEstandar.version || '1'}</strong></p>
+                          <p>Fecha: <strong className="text-slate-600">{selectedMasterEstandar.fecha_elaboracion}</strong></p>
+                        </div>
+                      </div>
+
+                      {/* Standard Header Info Card & Image */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        <div className={selectedMasterEstandar.imagen_url ? "lg:col-span-8 space-y-4" : "lg:col-span-12 space-y-4"}>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
+                              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Herramientas</span>
+                              <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.herramientas?.join(', ') || 'Ninguna'}</p>
+                            </div>
+                            <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
+                              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Insumos</span>
+                              <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.insumos?.join(', ') || 'Ninguno'}</p>
+                            </div>
+                            <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5]">
+                              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Equipo Protección (EPP)</span>
+                              <p className="text-xs font-bold text-slate-700">{selectedMasterEstandar.epp?.join(', ') || 'Ninguno'}</p>
+                            </div>
+                          </div>
+
+                          {selectedMasterEstandar.nota_general && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-1.5">
+                              <Info size={14} className="flex-shrink-0 mt-0.5" />
+                              <span><strong>Nota general de seguridad:</strong> {selectedMasterEstandar.nota_general}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {selectedMasterEstandar.imagen_url && (
+                          <div className="lg:col-span-4 bg-slate-50 border border-slate-200 rounded-2xl p-2 shadow-inner overflow-hidden flex items-center justify-center max-h-[180px] no-print">
+                            <img 
+                              src={selectedMasterEstandar.imagen_url} 
+                              alt={selectedMasterEstandar.equipo} 
+                              className="object-contain w-full h-full max-h-[160px] rounded-xl hover:scale-105 transition-transform duration-300"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Steps list */}
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-[#324354] border-b border-slate-100 pb-2">Tabla de Pasos del Estándar ({selectedMasterEstandar.steps?.length})</h4>
+                        <div className="space-y-3">
+                          {selectedMasterEstandar.steps?.map((step: any) => (
+                            <div key={step.id} className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-[#324354]/20 transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                              <div className="space-y-1.5 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs font-extrabold text-slate-400">Paso {step.orden}</span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getCategoryColor(step.categoria_lilac).badge}`}>
+                                    {step.categoria_lilac}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                    {step.frecuencia}
+                                  </span>
+                                </div>
+                                <h5 className="font-bold text-slate-800 text-sm">{step.nombre_paso}</h5>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                  <strong className="text-slate-600">Aceptación:</strong> {step.criterio_aceptacion}
+                                </p>
+                                {step.sub_acciones?.length > 0 && (
+                                  <div className="text-[10px] text-slate-400 italic no-print">
+                                    Contiene {step.sub_acciones.length} sub-acciones registradas.
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="text-right">
+                                  <span className="text-[10px] text-slate-400 font-semibold block uppercase">Tiempo Estándar</span>
+                                  <span className="text-xs font-bold text-slate-700 flex items-center justify-end gap-1">
+                                    <Clock size={12} /> {step.tiempo_estimado_min} minutos
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'historial' && (
+          <div className="space-y-6">
+            
+            {/* Top row: historical list and active anomalies summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Left Column: List of rounds */}
+              <div className="lg:col-span-8 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <h3 className="font-bold text-[#324354] text-lg">Historial de Ejecuciones</h3>
+                  <button
+                    onClick={handleClearLocalData}
+                    className="text-xs font-bold text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1.5 rounded-xl border border-red-200 transition"
+                  >
+                    Restablecer Datos
+                  </button>
+                </div>
+
+                {history.length === 0 ? (
+                  <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center text-slate-500">
+                    No se han registrado ejecuciones de rondas LILAC todavía.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {history.map((run) => (
+                      <div key={run.id} className="bg-white rounded-3xl border border-[#e2ded5] shadow-sm p-5 space-y-4 hover:border-[#324354]/20 transition">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] font-extrabold text-slate-400 block uppercase">EJECUCIÓN {run.id}</span>
+                            <h4 className="font-bold text-[#324354] text-base">{run.equipo}</h4>
+                            <p className="text-xs text-slate-500 font-semibold">{run.estandar_nombre}</p>
+                          </div>
+                          
+                          <div className="text-right">
+                            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full ${
+                              run.cumplimiento_pct >= 90 
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                                : run.cumplimiento_pct >= 80 
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200' 
+                                : 'bg-red-50 text-red-800 border border-red-200'
+                            }`}>
+                              {run.cumplimiento_pct}% Cumplimiento
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-semibold text-slate-600">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block uppercase">Operario</span>
+                            <span className="text-slate-800 flex items-center gap-1 mt-0.5"><User size={13} /> {run.operario}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block uppercase">Turno / Fecha</span>
+                            <span className="text-slate-800 flex items-center gap-1 mt-0.5"><Calendar size={13} /> {run.turno} ({run.fecha})</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block uppercase">Tiempo Real vs Est</span>
+                            <span className="text-slate-800 flex items-center gap-1 mt-0.5">
+                              <Clock size={13} /> {run.tiempo_total_real} min <span className="text-slate-400">/ {run.tiempo_total_est} min</span>
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block uppercase">Anomalías</span>
+                            <span className={`flex items-center gap-1 mt-0.5 font-bold ${
+                              run.anomalias_detectadas > 0 ? 'text-red-600' : 'text-emerald-600'
+                            }`}>
+                              {run.anomalias_detectadas > 0 ? <AlertTriangle size={13} /> : <Check size={13} />}
+                              {run.anomalias_detectadas} reportada{run.anomalias_detectadas !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* List of step details */}
+                        <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 space-y-1.5">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Estado Detallado por Paso</span>
+                          <div className="flex flex-wrap gap-2">
+                            {run.registros?.map((reg: any, idx: number) => (
+                              <span 
+                                key={idx}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 border ${
+                                  reg.estado === 'cumple'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : reg.estado === 'no_aplica'
+                                    ? 'bg-slate-100 text-slate-500 border-slate-200'
+                                    : 'bg-red-50 text-red-800 border-red-200'
+                                }`}
+                                title={reg.comentario || undefined}
+                              >
+                                <span>Paso {idx+1}</span>
+                                <span>{reg.estado === 'cumple' ? '✓' : reg.estado === 'no_aplica' ? 'N/A' : '⚠'}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Tarjetas de Anomalía (escalamientos) */}
+              <div className="lg:col-span-4 space-y-4">
+                <h3 className="font-bold text-[#324354] text-lg border-b border-slate-200 pb-2">Tarjetas de Anomalía</h3>
+                
+                {anomalies.length === 0 ? (
+                  <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-6 text-center text-slate-500 text-xs">
+                    Sin anomalías abiertas registradas.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {anomalies.map(ticket => (
+                      <div key={ticket.id} className="bg-white border border-[#e2ded5] rounded-2xl shadow-sm p-4 space-y-3 relative overflow-hidden">
+                        
+                        {/* Priority line indicator */}
+                        <div className={`absolute top-0 left-0 right-0 h-1 ${
+                          ticket.prioridad === 'Alta' 
+                            ? 'bg-red-600' 
+                            : ticket.prioridad === 'Media' 
+                            ? 'bg-amber-500' 
+                            : 'bg-blue-500'
+                        }`}></div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[9px] font-mono font-bold text-slate-400">{ticket.id}</span>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            ticket.estado === 'Cerrada'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : ticket.estado === 'En Proceso'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {ticket.estado}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-bold text-[#324354]">{ticket.equipo}</h4>
+                          <span className="text-[10px] text-slate-400 block font-semibold truncate">{ticket.paso}</span>
+                          <p className="text-xs text-slate-600 font-medium leading-relaxed bg-[#F6F3EE] p-2.5 rounded-xl border border-slate-200/50 mt-1.5">
+                            {ticket.descripcion}
+                          </p>
+                        </div>
+
+                        <div className="text-[10px] font-semibold text-slate-500 flex flex-wrap items-center justify-between gap-1">
+                          <span>Escalado a: <strong>{ticket.responsable_escalado}</strong></span>
+                          <span>Fecha: {ticket.fecha_reporte}</span>
+                        </div>
+
+                        {/* Supervisor action to change ticket status */}
+                        {ticket.estado !== 'Cerrada' && (
+                          <div className="pt-2 border-t border-slate-100 flex gap-2 justify-end">
+                            {ticket.estado === 'Abierta' && (
+                              <button
+                                onClick={() => handleUpdateAnomalyStatus(ticket.id, 'En Proceso')}
+                                className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+                              >
+                                Iniciar Atención
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleUpdateAnomalyStatus(ticket.id, 'Cerrada')}
+                              className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200"
+                            >
+                              Resolver (Cerrar)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: AUDITORIA / KPIS */}
+        {activeTab === 'auditoria' && (
+          <div className="space-y-6">
+            
+            {/* Key KPI summary cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Cumplimiento LILAC</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-[#324354]">{dashboardStats.avgCompliance}%</span>
+                  <span className="text-xs text-emerald-600 font-bold flex items-center">&uarr; 2.5%</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">Meta Organizacional: 90%</span>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Tarjetas Abiertas</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-red-600">{dashboardStats.openTickets}</span>
+                  <span className="text-xs text-slate-500 font-medium">tickets activos</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">Tiempo prom. cierre: 12h</span>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Tarjetas Cerradas</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-emerald-600">{dashboardStats.closedTickets}</span>
+                  <span className="text-xs text-slate-500 font-medium">este mes</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">Tasa de resolución: 66%</span>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Rondas Registradas</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-[#324354]">{dashboardStats.totalRounds}</span>
+                  <span className="text-xs text-slate-500 font-medium">ejecuciones</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">SCM Enchapadora V1</span>
+              </div>
+            </div>
+
+            {/* Calibration and Failures chart representation */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Calibration: real time vs standard time per step */}
+              <div className="bg-white rounded-3xl border border-[#e2ded5] p-6 shadow-sm space-y-4">
+                <div>
+                  <h4 className="text-base font-bold text-[#324354]">Calibración de Tiempos LILAC</h4>
+                  <p className="text-xs text-slate-400">Comparación del tiempo estimado (Capa A) vs tiempo real promedio (Capa B) en segundos.</p>
+                </div>
+
+                <div className="space-y-3">
+                  {stepCalibrationData.map(step => (
+                    <div key={step.id} className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-bold text-slate-700">
+                        <span>{step.name} ({SEED_ESTANDAR.steps.find(s => s.id === step.id)?.nombre_paso.substring(0, 35)}...)</span>
+                        <span>
+                          {step["Promedio Real (Seg)"]}s <span className="text-slate-400">/ {step["Estándar (Seg)"]}s</span>
+                        </span>
+                      </div>
+                      
+                      {/* Bar graph visualization */}
+                      <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden flex relative">
+                        {/* Standard background line indicator */}
+                        <div 
+                          className="bg-[#324354] h-full rounded-l-full"
+                          style={{ width: `${Math.min(100, (step["Estándar (Seg)"] / 720) * 100)}%` }}
+                        ></div>
+                        {/* Actual progress line */}
+                        <div 
+                          className={`absolute top-0 bottom-0 left-0 opacity-60 rounded-full ${
+                            step["Promedio Real (Seg)"] > step["Estándar (Seg)"] * 1.2 ? 'bg-red-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.min(100, (step["Promedio Real (Seg)"] / 720) * 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end gap-4 text-[10px] font-bold uppercase pt-2">
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-[#324354] rounded"></span> Estándar</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-emerald-500 rounded"></span> Real (Promedio)</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-red-500 rounded"></span> Desviación crítica (&gt;20%)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Zero breakdown & Failure cause distribution */}
+              <div className="bg-white rounded-3xl border border-[#e2ded5] p-6 shadow-sm space-y-6">
+                <div>
+                  <h4 className="text-base font-bold text-[#324354]">Deterioro Forzado vs Desgaste Natural</h4>
+                  <p className="text-xs text-slate-400">Distribución de averías registradas. La meta LILAC es reducir a cero las fallas por falta de limpieza/inspección.</p>
+                </div>
+
+                <div className="flex items-center justify-around py-4 gap-4">
+                  {/* Pie chart representation */}
+                  <div className="w-32 h-32 rounded-full border-8 border-slate-100 flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-conic bg-[#d14747] opacity-90" style={{ backgroundImage: 'conic-gradient(#d14747 0% 65%, #deb841 65% 90%, #59a96a 90% 100%)' }}></div>
+                    <div className="absolute w-24 h-24 bg-white rounded-full flex flex-col items-center justify-center">
+                      <span className="text-2xl font-extrabold text-red-600">65%</span>
+                      <span className="text-[8px] font-bold text-slate-400 uppercase">Deterioro</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs font-semibold">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 bg-[#d14747] rounded-full"></span>
+                      <span>Deterioro Forzado (Falta Limpieza/Lubricación) - 65%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 bg-[#deb841] rounded-full"></span>
+                      <span>Ajustes Descalibrados / Operación - 25%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 bg-[#59a96a] rounded-full"></span>
+                      <span>Desgaste Natural inevitable - 10%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs text-red-800 space-y-1">
+                  <span className="font-bold flex items-center gap-1"><AlertCircle size={14} /> Análisis de Diagnóstico:</span>
+                  <p className="font-medium text-red-700">
+                    El <strong>65%</strong> de las averías en la planta de MBL en las últimas 4 semanas corresponden a <strong>Deterioro Forzado</strong> (acumulaciones de polvillo en rodillos y guías). La implementación estricta del estándar LILAC para la Enchapadora SCM proyecta eliminar estas fallas.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: INDICADORES */}
+        {activeTab === 'indicadores' && (
+          <div className="space-y-6">
+            
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Cumplimiento Plan */}
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Cumplimiento Plan LILAC</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-[#324354]">94.0%</span>
+                  <span className="text-xs text-emerald-600 font-bold flex items-center">&uarr; 1.8%</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">Meta Sugerida: &gt;90%</span>
+              </div>
+
+              {/* MTBF */}
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">MTBF (Tiempo entre Fallas)</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-[#324354]">148 hrs</span>
+                  <span className="text-xs text-amber-600 font-bold flex items-center">&darr; 2 hrs</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">Meta Sugerida: &gt;150 hrs</span>
+              </div>
+
+              {/* MTTR */}
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">MTTR (Tiempo de Reparación)</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-[#324354]">2.2 hrs</span>
+                  <span className="text-xs text-emerald-600 font-bold flex items-center">&darr; 0.3 hrs</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">Meta Sugerida: &lt;3.0 hrs</span>
+              </div>
+
+              {/* OEE Promedio */}
+              <div className="bg-white p-5 rounded-3xl border border-[#e2ded5] shadow-sm flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">OEE Promedio LILAC</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-[#324354]">83.5%</span>
+                  <span className="text-xs text-emerald-600 font-bold flex items-center">&uarr; 0.9%</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-2 font-medium">Meta Sugerida: &gt;85%</span>
+              </div>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Graphic: Standards per Plant */}
+              <div className="lg:col-span-7 bg-white rounded-3xl border border-[#e2ded5] p-6 shadow-sm space-y-4">
+                <div>
+                  <h4 className="text-base font-bold text-[#324354]">Estándares Registrados por Planta</h4>
+                  <p className="text-xs text-slate-400">Distribución y cantidad actual de estándares de trabajo LILAC en cada sección.</p>
+                </div>
+
+                <div className="space-y-4 pt-2">
+                  {(() => {
+                    const maxVal = Math.max(...standardsByPlant.map(item => item.count), 1)
+                    return standardsByPlant.map(item => {
+                      const percentage = (item.count / maxVal) * 100
+                      return (
+                        <div key={item.planta} className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold text-slate-700">
+                            <span className="uppercase tracking-wider">{item.planta}</span>
+                            <span>{item.count} estándar{item.count !== 1 ? 'es' : ''}</span>
+                          </div>
+                          <div className="w-full h-5 bg-slate-100 rounded-full overflow-hidden flex relative">
+                            <div 
+                              className="bg-[#7B8E90] hover:bg-[#324354] h-full rounded-full transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+
+              {/* Suggestions / Analysis Info Card */}
+              <div className="lg:col-span-5 bg-white rounded-3xl border border-[#e2ded5] p-6 shadow-sm space-y-6">
+                <div>
+                  <h4 className="text-base font-bold text-[#324354]">Análisis de Mantenimiento LILAC</h4>
+                  <p className="text-xs text-slate-400">Recomendaciones para el cumplimiento de las metas sugeridas.</p>
+                </div>
+
+                <div className="bg-[#324354]/5 border border-[#324354]/10 rounded-2xl p-4 text-xs text-[#324354] space-y-2">
+                  <span className="font-bold flex items-center gap-1.5"><Info size={14} /> Recomendación MTBF:</span>
+                  <p className="font-medium text-slate-700">
+                    El MTBF actual está en <strong>148 horas</strong>, ligeramente por debajo de la meta de 150. Se observa que el 40% de las microparadas ocurren en la Enchapadora SCM Stefani por acumulación de restos de pegante. Aumentar la adherencia al estándar de limpieza en el turno de la tarde ayudará a normalizar esta métrica.
+                  </p>
+                </div>
+
+                <div className="bg-[#7B8E90]/10 border border-[#7B8E90]/20 rounded-2xl p-4 text-xs text-slate-800 space-y-2">
+                  <span className="font-bold flex items-center gap-1.5"><TrendingUp size={14} /> Oportunidad de OEE:</span>
+                  <p className="font-medium text-slate-700">
+                    El OEE promedio LILAC de <strong>83.5%</strong> refleja un aumento del 0.9% gracias al incremento de disponibilidad. Cumplir con las rutinas autónomas evita paradas mecánicas mayores durante los arranques de turno.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+      {/* MODAL: AUTORIZACION DE EDICION */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Header */}
+            <div className="bg-[#324354] p-6 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Lock className="w-5 h-5 text-amber-400" />
+                <h3 className="font-bold text-lg font-sans uppercase tracking-wider">Autorización Requerida</h3>
+              </div>
+              <button 
+                onClick={() => setIsAuthModalOpen(false)}
+                className="text-white/80 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAuthorizeAndEdit} className="p-6 space-y-4">
+              <p className="text-xs text-slate-500 font-medium">
+                No tiene permisos directos para editar este estándar. Ingrese las credenciales de un Director, Desarrollador o Supervisor autorizado.
+              </p>
+
+              {authError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold">
+                  {authError}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Correo Electrónico</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="ejemplo@firplak.com"
+                  value={authForm.email}
+                  onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                  className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3.5 text-sm outline-none focus:border-[#324354]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={authForm.password}
+                  onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                  className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3.5 text-sm outline-none focus:border-[#324354]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isAuthenticating}
+                className="w-full h-11 bg-[#324354] hover:bg-[#25313e] text-white font-bold rounded-xl transition duration-200 text-sm uppercase tracking-wider shadow flex items-center justify-center gap-2 disabled:opacity-75"
+              >
+                {isAuthenticating ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Verificando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Key size={16} className="text-amber-400" />
+                    <span>Validar y Desbloquear</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ESTILO GLOBAL PARA IMPRESION DE HOJA DE TRABAJO */}
+      <style jsx global>{`
+        @media print {
+          /* Ocultar todo */
+          body * {
+            visibility: hidden;
+            background: none !important;
+            box-shadow: none !important;
+          }
+          /* Mostrar únicamente el contenedor del estándar */
+          #printable-standard, #printable-standard * {
+            visibility: visible;
+          }
+          #printable-standard {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      </main>
+    </div>
+  )
+}

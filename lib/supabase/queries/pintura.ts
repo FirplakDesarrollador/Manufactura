@@ -159,13 +159,11 @@ export async function registrarPintura(pinturaData: {
     }
 
     // 1.1 Verificar piezas ya registradas (conteo real en trazabilidad)
-    // Se excluyen las piezas 'Desgelcada' y 'Destruccion' ya que son daños y se deben repetir.
+    // Se cuentan todas las piezas registradas en etapas para evitar que la sumatoria supere la cantidad de la orden.
     const { count, error: countError } = await supabase
         .from('query_trazabilidad_ms')
         .select('*', { count: 'exact', head: true })
         .eq('orden_fabricacion_id', pinturaData.orden_fabricacion_id)
-        .neq('estado', 'Desgelcada')
-        .neq('estado', 'Destruccion')
 
     if (countError) {
         console.error('Error al contar piezas:', countError)
@@ -175,7 +173,7 @@ export async function registrarPintura(pinturaData: {
         const piezasPermitidas = orden.cantidad || orden.cantidad_programada || 0
 
         if (piezasRegistradas >= piezasPermitidas && piezasPermitidas > 0) {
-            throw new Error(`Acción bloqueada: La orden ${orden.orden_fabricacion} ya completó sus ${piezasPermitidas} piezas (${piezasRegistradas} registradas).`)
+            throw new Error(`Acción bloqueada: La orden ${orden.orden_fabricacion} ya completó la sumatoria máxima de sus ${piezasPermitidas} piezas (${piezasRegistradas} registradas en etapas).`)
         }
     }
 

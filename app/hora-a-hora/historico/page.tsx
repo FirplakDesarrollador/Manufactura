@@ -15,6 +15,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { createExternalClient } from "@/lib/supabase/external";
+import Header from "@/components/opt-sistemica/Header";
+import SubHeader from "@/components/hora-a-hora/SubHeader";
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraHora; onClose: () => void; resolveUserName: (v: string | undefined) => string }) {
@@ -25,6 +27,20 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
     };
     const rSt = getKPIStyle(item.rendimiento);
     const qSt = getKPIStyle(item.calidad);
+
+    // Shrinks the font size as the displayed text gets longer, so long numbers never overflow their box
+    const fitFontSize = (text: string, base: "4xl" | "2xl" = "4xl") => {
+        const len = text.length;
+        if (base === "4xl") {
+            if (len <= 6) return "text-4xl";
+            if (len <= 7) return "text-3xl";
+            if (len <= 9) return "text-2xl";
+            return "text-xl";
+        }
+        if (len <= 6) return "text-2xl";
+        if (len <= 8) return "text-xl";
+        return "text-lg";
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
@@ -74,7 +90,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                                 </span>
                                 <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${rSt.labelBg}`}>{rSt.label}</span>
                             </div>
-                            <p className={`text-4xl font-black tabular-nums mt-1 ${rSt.color}`}>{item.rendimiento.toFixed(1)}%</p>
+                            <p className={`${fitFontSize(`${item.rendimiento.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${rSt.color}`}>{item.rendimiento.toFixed(1)}%</p>
                             <div className="w-full bg-slate-100 rounded-full h-2.5 mt-3 overflow-hidden">
                                 <div className={`h-full rounded-full ${rSt.bar}`} style={{ width: `${Math.min(item.rendimiento, 100)}%` }} />
                             </div>
@@ -86,7 +102,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                                 </span>
                                 <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${qSt.labelBg}`}>{qSt.label}</span>
                             </div>
-                            <p className={`text-4xl font-black tabular-nums mt-1 ${qSt.color}`}>{item.calidad.toFixed(1)}%</p>
+                            <p className={`${fitFontSize(`${item.calidad.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${qSt.color}`}>{item.calidad.toFixed(1)}%</p>
                             <div className="w-full bg-slate-100 rounded-full h-2.5 mt-3 overflow-hidden">
                                 <div className={`h-full rounded-full ${qSt.bar}`} style={{ width: `${Math.min(item.calidad, 100)}%` }} />
                             </div>
@@ -99,14 +115,14 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                             <Clock size={13} /> Tiempos de Ciclo
                         </p>
                         <div className="grid grid-cols-3 gap-3 text-center">
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Teórico</p>
-                                <p className="text-2xl font-black text-slate-700">{item.tiempoCicloTeorico}s</p>
+                                <p className={`${fitFontSize(`${item.tiempoCicloTeorico}s`, "2xl")} font-black text-slate-700 truncate`}>{item.tiempoCicloTeorico}s</p>
                             </div>
                             <div className="flex items-center justify-center text-slate-300 font-bold text-lg">VS</div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-blue-500 font-semibold uppercase tracking-wider mb-1">Prom. Real</p>
-                                <p className="text-2xl font-black text-blue-700">{item.tiempoPromedio.toFixed(1)}s</p>
+                                <p className={`${fitFontSize(`${item.tiempoPromedio.toFixed(1)}s`, "2xl")} font-black text-blue-700 truncate`}>{item.tiempoPromedio.toFixed(1)}s</p>
                             </div>
                         </div>
                         <p className="text-center text-xs text-slate-500 font-semibold mt-3 uppercase tracking-wider">
@@ -118,17 +134,17 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Detalle de Calidad</p>
                         <div className="grid grid-cols-3 gap-3 text-center">
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-slate-400 font-semibold mb-1">Inspeccionadas</p>
-                                <p className="text-2xl font-black text-slate-700">{item.piezasTotalesCalidad}</p>
+                                <p className={`${fitFontSize(`${item.piezasTotalesCalidad}`, "2xl")} font-black text-slate-700 truncate`}>{item.piezasTotalesCalidad}</p>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-emerald-500 font-semibold mb-1">Buenas</p>
-                                <p className="text-2xl font-black text-emerald-700">{item.piezasBuenas}</p>
+                                <p className={`${fitFontSize(`${item.piezasBuenas}`, "2xl")} font-black text-emerald-700 truncate`}>{item.piezasBuenas}</p>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-xs text-slate-400 font-semibold mb-1">Defectos</p>
-                                <p className="text-2xl font-black text-slate-600">{item.piezasDefectuosas}</p>
+                                <p className={`${fitFontSize(`${item.piezasDefectuosas}`, "2xl")} font-black text-slate-600 truncate`}>{item.piezasDefectuosas}</p>
                             </div>
                         </div>
                     </div>
@@ -614,23 +630,15 @@ export default function Historico() {
     const [editing, setEditing] = useState<EvaluacionHoraHora | null>(null);
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center">
-            <header className="w-full bg-[#254153] text-white shadow-md p-4 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/hora-a-hora">
-                        <Button variant="ghost" className="gap-2 hover:bg-white/10 hover:text-white">
-                            <ArrowLeft size={20} />
-                            <span className="hidden sm:inline font-bold text-lg">Histórico Hora-Hora</span>
-                        </Button>
-                    </Link>
-                    <div className="flex flex-col items-end">
-                        <div className="font-bold text-2xl tracking-widest leading-none">FIRPLAK</div>
-                        <div className="text-[10px] opacity-80 uppercase tracking-widest">inspiring homes</div>
-                    </div>
-                </div>
-            </header>
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center font-sans text-[#000000] w-full">
+            <Header 
+                title="Hora a Hora"
+                subtitle="Histórico"
+                userEmail={currentUserEmail}
+            />
+            <SubHeader />
 
-            <main className="flex-1 w-full max-w-6xl p-4 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <main className="flex-1 w-full max-w-[1500px] p-4 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                 <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between mt-6">
                     <h2 className="text-2xl font-bold text-[#254153]">Observaciones Guardadas</h2>
@@ -649,13 +657,13 @@ export default function Historico() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-none shadow-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader className="bg-[#254153] hover:bg-[#254153]">
                                 <TableRow className="hover:bg-[#254153] border-none select-none">
                                     <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider rounded-tl-lg w-16 cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider w-16 cursor-pointer hover:bg-[#3b5998] transition-colors"
                                         onClick={() => requestSort('consecutivo')}
                                     >
                                         # <SortIcon columnKey="consecutivo" />
@@ -690,7 +698,7 @@ export default function Historico() {
                                     >
                                         KPIs <SortIcon columnKey="rendimiento" />
                                     </TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider text-right rounded-tr-lg w-28">Acciones</TableHead>
+                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider text-right w-28">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

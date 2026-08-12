@@ -19,7 +19,23 @@ export default function EditHdtPage({ params }: EditHdtPageProps) {
     useEffect(() => {
         const checkAccess = async () => {
             const { data: { user } } = await supabase.auth.getUser()
-            if (isAuthorizedEditor(user?.email)) {
+            if (!user) {
+                setAuthState('unauthorized')
+                router.replace('/login')
+                return
+            }
+
+            // Fetch dynamic permissions from Supabase
+            const { data: userData } = await supabase
+                .from('usuarios')
+                .select('permisos')
+                .eq('uuid', user.id)
+                .single()
+
+            const permisos = (userData?.permisos as any) || {}
+            const isAuthorized = permisos.hdt?.editar || permisos.hdt === true || isAuthorizedEditor(user.email)
+
+            if (isAuthorized) {
                 setAuthState('authorized')
             } else {
                 setAuthState('unauthorized')

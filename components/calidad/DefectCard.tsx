@@ -8,6 +8,7 @@ interface DefectCardProps {
     count: number
     isSelected: boolean
     onToggle: (selected: boolean) => void
+    alarmColor?: 'none' | 'yellow' | 'blue' | 'red'
 }
 
 export const DefectCard: React.FC<DefectCardProps> = ({
@@ -16,49 +17,54 @@ export const DefectCard: React.FC<DefectCardProps> = ({
     count,
     isSelected,
     onToggle,
+    alarmColor = 'none'
 }) => {
+    // Determine the base styles based on alarmColor and isSelected
+    let cardClasses = 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+    let countClasses = 'bg-gray-100 text-gray-600'
+    let toggleBgClasses = 'bg-gray-200'
+
+    if (isSelected) {
+        cardClasses = 'bg-[#324354] border-[#324354] text-white shadow-md transform scale-[1.02] z-10 relative'
+        countClasses = 'bg-white/20 text-white'
+        toggleBgClasses = 'bg-[#36A284]'
+    } else {
+        if (alarmColor === 'red') {
+            cardClasses = 'bg-red-50 border-red-500 text-red-900 hover:bg-red-100 shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+            countClasses = 'bg-red-500 text-white'
+        } else if (alarmColor === 'blue') {
+            cardClasses = 'bg-blue-50 border-blue-500 text-blue-900 hover:bg-blue-100 shadow-[0_0_8px_rgba(59,130,246,0.4)]'
+            countClasses = 'bg-blue-500 text-white'
+        } else if (alarmColor === 'yellow') {
+            cardClasses = 'bg-yellow-50 border-yellow-500 text-yellow-900 hover:bg-yellow-100 shadow-[0_0_8px_rgba(234,179,8,0.4)]'
+            countClasses = 'bg-yellow-500 text-white'
+        }
+    }
+
     return (
         <button
             onClick={() => onToggle(!isSelected)}
-            className={`relative p-4 border transition-all duration-200 flex flex-col justify-between aspect-square w-full text-left group ${isSelected
-                    ? 'bg-[#254153] border-[#254153] text-white shadow-xl z-10'
-                    : 'bg-white border-gray-200 text-[#254153] hover:border-[#254153] hover:shadow-md'
-                }`}
+            className={`p-3 border transition-all duration-300 flex flex-col justify-between w-full text-left min-h-[90px] ${cardClasses}`}
         >
-            <div className="relative z-10 w-full">
-                <div className="flex justify-between items-start mb-2">
-                    <span className={`text-[10px] font-bold tracking-tighter px-1.5 py-0.5 border ${isSelected ? 'border-blue-400 text-blue-300' : 'border-gray-200 text-gray-400'
-                        }`}>
-                        {index.toString().padStart(2, '0')}
-                    </span>
-
-                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-gray-100'}`} />
-                </div>
-
-                <h3 className={`text-xs font-black leading-tight uppercase tracking-tight break-words ${isSelected ? 'text-white' : 'text-[#254153]'
-                    }`}>
+            <div className="mb-2">
+                <h3 className="text-sm font-medium leading-tight">
                     {title}
                 </h3>
             </div>
 
-            <div className="relative z-10 flex flex-col items-end w-full">
-                <span className={`text-[8px] uppercase font-bold tracking-widest mb-1 ${isSelected ? 'text-white/40' : 'text-gray-300'
-                    }`}>
-                    Count Today
-                </span>
-                <div
-                    className={`text-4xl font-black leading-none transition-all duration-300 ${isSelected
-                            ? 'text-white'
-                            : 'text-gray-200 group-hover:text-[#254153]'
-                        }`}
-                >
+            <div className="flex justify-between items-center w-full mt-auto">
+                {/* Toggle Switch */}
+                <div className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors ${toggleBgClasses}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${
+                        isSelected ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                </div>
+
+                {/* Count Pill */}
+                <div className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${countClasses}`}>
                     {count}
                 </div>
             </div>
-
-            {/* Structural Accent */}
-            <div className={`absolute bottom-0 left-0 h-1 transition-all duration-300 ${isSelected ? 'w-full bg-blue-500' : 'w-0 bg-gray-200'
-                }`} />
         </button>
     )
 }

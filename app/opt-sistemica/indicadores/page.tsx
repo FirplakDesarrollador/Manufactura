@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
+import SubHeader from '@/components/opt-sistemica/SubHeader';
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   Cell, PieChart, Pie 
@@ -137,10 +138,11 @@ export default function IndicadoresPage() {
       <Header
         title="Indicadores"
         subtitle="Métricas de Desempeño"
-        backUrl="/opt-sistemica"
+        backUrl="/sistema-produccion"
         userEmail={session?.user?.email}
         showLogout={false}
       />
+      <SubHeader />
 
       <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
         <div className="animate-fade-in">

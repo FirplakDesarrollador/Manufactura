@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import { FichaAlerta, PlantaEnum } from '@/types';
+import Header from '@/components/opt-sistemica/Header';
 import Link from 'next/link';
-import FirplakLogo from '@/components/ficha-rcc/FirplakLogo';
+import SubHeader from '@/components/ficha-rcc/SubHeader';
 
 const ADMIN_EMAILS = [
   'coordinacioncalidad@firplak.com', 
@@ -120,6 +121,25 @@ export default function HomePage() {
 
   const carpetas = Object.values(agrupacionDefectos).sort((a, b) => b.count - a.count);
 
+  // Calcular indicadores para el historial
+  const totalFichas = filteredFichas.length;
+  const enSeguimiento = filteredFichas.filter(f => f.estado === 'En Seguimiento').length;
+  const trazabilidadCompleta = filteredFichas.filter(f => f.estado === 'Trazabilidad Completa').length;
+
+  const plantaCounts = filteredFichas.reduce((acc, f) => {
+    acc[f.planta] = (acc[f.planta] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  let topPlanta = 'Ninguna';
+  let topCount = 0;
+  Object.entries(plantaCounts).forEach(([planta, count]) => {
+    if (count > topCount) {
+      topCount = count;
+      topPlanta = planta;
+    }
+  });
+
   if (loading && !user) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -131,29 +151,40 @@ export default function HomePage() {
   if (!user) return null;
 
   return (
-    <div className="home-container w-full max-w-[1200px] mx-auto px-4 sm:px-6 md:px-8 py-6">
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-6 mb-8">
-        <div className="flex items-center">
-          <div className="bg-[#254153] px-8 py-5 rounded-2xl shadow-lg transition-transform hover:scale-105">
-            <FirplakLogo height="60px" />
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
+      <Header
+        title="Respuesta Rápida Calidad"
+        subtitle="RRC"
+        userEmail={user?.email}
+        showLogout={true}
+        onLogout={handleLogout}
+      />
+      <SubHeader />
+
+      <main className="flex-1 flex justify-center p-6 md:p-10 w-full">
+        <div className="w-full max-w-[1200px]">
+
+          {/* Indicadores de Historial */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100px', borderLeft: '5px solid var(--primary)', borderRadius: '15px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Fichas</span>
+              <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>{totalFichas}</span>
+            </div>
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100px', borderLeft: '5px solid #eab308', borderRadius: '15px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>En Seguimiento</span>
+              <span style={{ fontSize: '28px', fontWeight: 800, color: '#eab308', marginTop: '4px' }}>{enSeguimiento}</span>
+            </div>
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100px', borderLeft: '5px solid #10b981', borderRadius: '15px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Trazabilidad Completa</span>
+              <span style={{ fontSize: '28px', fontWeight: 800, color: '#10b981', marginTop: '4px' }}>{trazabilidadCompleta}</span>
+            </div>
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100px', borderLeft: '5px solid var(--accent)', borderRadius: '15px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Planta Principal</span>
+              <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--accent)', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {topPlanta} ({topCount})
+              </span>
+            </div>
           </div>
-        </div>
-        <div className="flex flex-wrap justify-center gap-3 lg:gap-4 w-full lg:w-auto">
-          <Link href="/home" style={{ textDecoration: 'none' }}>
-            <button className="btn-secondary">
-               Volver al Menú
-            </button>
-          </Link>
-          <Link href="/ficha-rcc/fichas/crear" style={{ textDecoration: 'none' }}>
-            <button className="btn-primary" style={{ width: 'auto' }}>
-               + Nueva Ficha
-            </button>
-          </Link>
-          <button onClick={handleLogout} className="btn-secondary">
-            Cerrar Sesión
-          </button>
-        </div>
-      </div>
 
       {/* Carpetas de Defectos - Solo se muestran si se ha seleccionado una planta específica */}
       {filtroPlanta !== 'Todas' && (
@@ -204,7 +235,14 @@ export default function HomePage() {
 
       <div className="glass-panel mb-8 p-4 md:p-6 rounded-2xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h2 className="text-xl font-semibold m-0">Historial de Fichas</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h2 className="text-xl font-semibold m-0">Historial de Fichas</h2>
+            <Link href="/ficha-rcc/fichas/crear" style={{ textDecoration: 'none' }}>
+              <button className="btn-primary" style={{ padding: '6px 16px', fontSize: '13px', width: 'auto' }}>
+                 + Nueva Ficha
+              </button>
+            </Link>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             <input 
               type="text" 
@@ -311,7 +349,9 @@ export default function HomePage() {
             </table>
           </div>
         )}
+       </div>
       </div>
+     </main>
     </div>
   );
 }

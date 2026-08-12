@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Header from "@/components/tarjetas-excelencia/Header";
+import Header from "@/components/opt-sistemica/Header";
 import ChatBot from "@/components/tarjetas-excelencia/ChatBot";
 
 export const metadata: Metadata = {
@@ -13,9 +13,12 @@ export default function TarjetasExcelenciaLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000] w-full">
+      <Header 
+        title="Tarjetas de Excelencia"
+        subtitle="Módulo Operativo"
+      />
+      <main className="flex-1 w-full max-w-[1500px] mx-auto p-4 sm:p-6 lg:p-8">
         {children}
       </main>
       <ChatBot />

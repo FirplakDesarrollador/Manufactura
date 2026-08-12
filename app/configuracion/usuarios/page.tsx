@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Header from '@/components/opt-sistemica/Header'
 
 interface Usuario {
     id: number;
@@ -17,33 +18,47 @@ interface Usuario {
 }
 
 const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
+    hdt: ['acceso_general', 'crear', 'editar', 'estadisticas'],
     fibra: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
-    calidad: ['ms'],
+    calidad: ['ms', 'editar', 'eliminar', 'configurar_defectos', 'saldos_y_destrucciones'],
     hora_a_hora: true,
     ficha_rcc: ['acceso_general', 'administrador', 'contingencias', 'asistencia'],
     opt: true,
-    configuracion: true,
+    opt_sistemica: true,
     tarjetas_excelencia: true,
+    bitacora: true,
+    auditorias: true,
+    cinco_s: true,
+    configuracion_produccion: true,
+    configuracion: true,
     estadisticas_produccion: true,
     indicadores_productividad: true,
-    asistencia: true
+    asistencia: true,
+    mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador']
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
+    hdt: 'HDT Estandarización',
     fibra: 'Control de Piso (Fibra)',
     modulos: 'Control de Piso (Mármol)',
     muebles: 'Control de Piso (Muebles)',
     calidad: 'Calidad',
     hora_a_hora: 'Hora a Hora',
     ficha_rcc: 'Ficha RRC', // Corrección del nombre solicitada por el usuario
-    opt: 'OPT',
-    configuracion: 'Configuración',
+    opt: 'OPT Operativa',
+    opt_sistemica: 'OPT Sistémica',
     tarjetas_excelencia: 'Tarjetas Excelencia',
-    estadisticas_produccion: 'Estadísticas Sistema',
-    indicadores_productividad: 'Indicadores Productividad',
-    asistencia: 'Asistencia'
+    bitacora: 'Bitácora',
+    auditorias: 'Auditorías',
+    cinco_s: "5'S",
+    configuracion_produccion: 'Configuración (Producción)',
+    configuracion: 'Configuración General',
+    estadisticas_produccion: 'Indicadores del Sistema',
+    indicadores_productividad: 'Tablero de Control',
+    asistencia: 'Asistencia',
+    mantenimiento: 'Mantenimiento (LILAC)'
 };
 
 export default function UsuariosConfiguracionPage() {
@@ -51,6 +66,7 @@ export default function UsuariosConfiguracionPage() {
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
+    const [currentUserEmail, setCurrentUserEmail] = useState('')
     
     // Estados del Modal
     const [selectedUser, setSelectedUser] = useState<Usuario | null>(null)
@@ -78,6 +94,11 @@ export default function UsuariosConfiguracionPage() {
     }, [])
 
     useEffect(() => {
+        supabase.auth.getUser().then(({ data }) => {
+            if (data?.user) {
+                setCurrentUserEmail(data.user.email || '')
+            }
+        })
         fetchUsuarios()
     }, [fetchUsuarios])
 
@@ -178,26 +199,17 @@ export default function UsuariosConfiguracionPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
             {/* Header */}
-            <header className="bg-[#254153] sticky top-0 z-50 shadow-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <button 
-                            onClick={() => router.push('/configuracion')}
-                            className="text-white hover:text-gray-200 transition-colors"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                        </button>
-                        <h1 className="text-2xl font-bold text-white">Gestión de Usuarios</h1>
-                    </div>
-                </div>
-            </header>
+            <Header
+                title="Configuración"
+                subtitle="Gestión de Usuarios"
+                userEmail={currentUserEmail}
+                showLogout={false}
+            />
 
             {/* Main Content */}
-            <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 pt-28">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Toolbar */}
                     <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

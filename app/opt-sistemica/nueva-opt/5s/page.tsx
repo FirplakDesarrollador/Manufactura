@@ -4,6 +4,10 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { createExternalClient } from '@/lib/supabase/external';
+
+import AutoResizeTextarea from '@/components/opt-sistemica/AutoResizeTextarea';
 
 const questions = [
   { id: '6.1', text: "Elija una zona del puesto de trabajo, ¿Puede observarse que en la primera S que no hay elementos innecesarios? ¿en la segunda S todos los elementos estan ordenados?" },
@@ -21,6 +25,9 @@ export default function CincoSPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const [personas, setPersonas] = useState<string[]>([]);
+  const [personaEvaluada, setPersonaEvaluada] = useState('');
+
   const [responses, setResponses] = useState<Record<string, { value: 'SI' | 'NO' | null, comment: string }>>(
     questions.reduce((acc, q) => ({ ...acc, [q.id]: { value: null, comment: '' } }), {})
   );
@@ -37,6 +44,25 @@ export default function CincoSPage() {
       }
     });
   }, [router]);
+
+  useEffect(() => {
+    const fetchPersonas = async () => {
+      try {
+        const externalSupabase = createExternalClient();
+        const { data, error: err } = await externalSupabase
+          .from('empleados')
+          .select('nombreCompleto')
+          .eq('activo', true)
+          .order('nombreCompleto', { ascending: true });
+        if (!err && data) {
+          setPersonas(data.map((d: any) => d.nombreCompleto));
+        }
+      } catch (err) {
+        console.error('Error fetching empleados:', err);
+      }
+    };
+    fetchPersonas();
+  }, []);
 
   const percentage = useMemo(() => {
     const siCount = Object.values(responses).filter(r => r.value === 'SI').length;
@@ -58,6 +84,12 @@ export default function CincoSPage() {
   };
 
   const handleSave = async () => {
+    if (!personaEvaluada) {
+      setError('Por favor selecciona la persona a quien se le realiza la OPT.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const unanswered = Object.entries(responses).filter(([_, r]) => r.value === null);
     if (unanswered.length > 0) {
       setError(`Por favor responde todas las preguntas (${unanswered.length} por contestar).`);
@@ -75,6 +107,7 @@ export default function CincoSPage() {
           user_id: session.user.id,
           user_email: session.user.email,
           modulo_tipo: '5S',
+          persona_evaluada: personaEvaluada,
           percentage: parseFloat(percentage),
           responses: responses,
           action_plans: actionPlans
@@ -134,6 +167,18 @@ export default function CincoSPage() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <SearchableSelect
+                name="persona_evaluada"
+                label="Persona a quien se le realiza la OPT"
+                options={personas}
+                placeholder="Buscar y seleccionar persona..."
+                required={true}
+                defaultValue={personaEvaluada}
+                onValueChange={setPersonaEvaluada}
+              />
+            </div>
+
             {questions.map((q) => (
               <div key={q.id} style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                 <p style={{ fontWeight: 600, color: 'var(--accent)', marginBottom: '16px', fontSize: '1.05rem' }}>
@@ -169,12 +214,10 @@ export default function CincoSPage() {
 
                 <div>
                   <label className="label">Comentario {q.id}</label>
-                  <input
-                    type="text"
-                    className="input-field"
+                  <AutoResizeTextarea
                     placeholder="Escribe un comentario opcional..."
                     value={responses[q.id].comment}
-                    onChange={(e) => handleCommentChange(q.id, e.target.value)}
+                    onChange={(val) => handleCommentChange(q.id, val)}
                   />
                 </div>
               </div>
@@ -191,12 +234,11 @@ export default function CincoSPage() {
 
               <div style={{ marginBottom: '32px' }}>
                 <label className="label" style={{ fontSize: '1.1rem', fontWeight: 700 }}>OBSERVACIONES / PLANES DE ACCIÓN</label>
-                <textarea
-                  className="input-field"
+                <AutoResizeTextarea
                   style={{ minHeight: '120px', padding: '16px' }}
                   placeholder="Describe las observaciones o planes de acción..."
                   value={actionPlans}
-                  onChange={(e) => setActionPlans(e.target.value)}
+                  onChange={(val) => setActionPlans(val)}
                 />
               </div>
 
