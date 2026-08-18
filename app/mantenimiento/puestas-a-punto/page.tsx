@@ -42,11 +42,9 @@ export default function PuestasAPuntoPage() {
         const dbPlantas = pData ? pData.map((item: any) => item.planta).filter(Boolean) : [];
         setArrayPlantas(dbPlantas);
 
-        // 2. Consultar encabezados con fallback
-        const res1 = await supabase.from('Puestas a punto').select('*');
-        const res2 = await supabase.from('puestas_a_punto').select('*');
-        const res3 = await supabase.from('puestas_a_punto_encabezado').select('*');
-        const puestasData = res1.data?.length ? res1.data : (res2.data?.length ? res2.data : (res3.data?.length ? res3.data : []));
+        // 2. Consultar encabezados directamente de puestas_a_punto_encabezado
+        const { data: resData } = await supabase.from('puestas_a_punto_encabezado').select('*');
+        const puestasData = resData || [];
 
         // 3. Consultar detalles para obtener los equipos de cada puesta a punto
         const { data: detallesData } = await supabase

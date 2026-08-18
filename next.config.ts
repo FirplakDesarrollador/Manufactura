@@ -10,36 +10,36 @@ const nextConfig: any = {
   async rewrites() {
     return [
       {
-        source: '/mantenimiento',
-        destination: '/mtto-autonomo',
+        source: '/mtto-autonomo',
+        destination: '/mantenimiento',
       },
       {
-        source: '/mantenimiento/:path*',
-        destination: '/mtto-autonomo/:path*',
+        source: '/mtto-autonomo/:path*',
+        destination: '/mantenimiento/:path*',
       },
       {
         source: '/puestas-a-punto',
-        destination: '/mtto-autonomo/puestas-a-punto',
+        destination: '/mantenimiento/puestas-a-punto',
       },
       {
         source: '/puestas-a-punto/:path*',
-        destination: '/mtto-autonomo/puestas-a-punto/:path*',
+        destination: '/mantenimiento/puestas-a-punto/:path*',
       },
       {
         source: '/tarjetas-falla',
-        destination: '/mtto-autonomo/tarjetas-falla',
+        destination: '/mantenimiento/tarjetas-falla',
       },
       {
         source: '/tarjetas-falla/:path*',
-        destination: '/mtto-autonomo/tarjetas-falla/:path*',
+        destination: '/mantenimiento/tarjetas-falla/:path*',
       },
       {
         source: '/lilac',
-        destination: '/mtto-autonomo/lilac',
+        destination: '/mantenimiento/lilac',
       },
       {
         source: '/lilac/:path*',
-        destination: '/mtto-autonomo/lilac/:path*',
+        destination: '/mantenimiento/lilac/:path*',
       },
     ];
   },

@@ -3,10 +3,11 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-export default async function PlantaLayout({ children, params }: { children: ReactNode, params: Promise<{ planta: string }> }) {
-  const resolvedParams = await params;
-  const decodedPlanta = decodeURIComponent(resolvedParams.planta);
-  const formattedPlanta = decodedPlanta.charAt(0).toUpperCase() + decodedPlanta.slice(1);
+export default async function PlantaLayout({ children, params }: { children: ReactNode, params: Promise<{ planta: string }> | { planta: string } }) {
+  const resolvedParams = params && typeof (params as any).then === 'function' ? await params : (params as any) || {};
+  const rawPlanta = resolvedParams.planta || '';
+  const decodedPlanta = decodeURIComponent(rawPlanta);
+  const formattedPlanta = decodedPlanta ? decodedPlanta.charAt(0).toUpperCase() + decodedPlanta.slice(1) : '';
 
   return (
     <div className="home-container" style={{ backgroundColor: '#f4f7f9', minHeight: '100vh', paddingTop: '0', paddingBottom: '4rem' }}>
