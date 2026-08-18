@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
+import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -53,6 +54,7 @@ export default function CalidadMsReportPage() {
     const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [showHourlyChart, setShowHourlyChart] = useState(false)
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
     const [hasSaldosPermission, setHasSaldosPermission] = useState(false)
     
@@ -373,6 +375,13 @@ export default function CalidadMsReportPage() {
                             </button>
                         )}
                         <button
+                            onClick={() => setShowHourlyChart(prev => !prev)}
+                            className={`p-2.5 bg-white border border-gray-300 hover:bg-blue-50 border-l-0 transition-colors ${showHourlyChart ? 'text-blue-600' : 'text-gray-400'}`}
+                            title="Indicador Hora a Hora"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                        </button>
+                        <button
                             onClick={() => router.push('/calidad/ms/saldos')}
                             className="p-2.5 bg-white border border-gray-300 text-red-500 hover:bg-red-50 rounded-r border-l-0"
                             title="Saldos y Destrucciones"
@@ -426,6 +435,11 @@ export default function CalidadMsReportPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Hour-by-Hour Indicator */}
+            {showHourlyChart && (
+                <HourlyInspectionChart reports={todaysReports} />
+            )}
 
             {/* Grid */}
             <main className="flex-1 w-full bg-white p-4">
