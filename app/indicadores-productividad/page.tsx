@@ -18,6 +18,8 @@ interface PlantMetrics {
     secondUnitName: "KG" | "MBL";
     secondUnitMeta: number;
     secondUnitReal: number;
+    mesonesMeta?: number;
+    mesonesReal?: number;
     calidadMeta: number;
     calidadReal: number;
     totalPersonas: number;
@@ -38,6 +40,8 @@ const INITIAL_PLANT_DATA: Record<PlantKey, PlantMetrics> = {
         secondUnitName: "KG",
         secondUnitMeta: 5500,
         secondUnitReal: 4500,
+        mesonesMeta: 50,
+        mesonesReal: 50,
         calidadMeta: 90,
         calidadReal: 82.0,
         totalPersonas: 65,
@@ -135,8 +139,8 @@ const POWERBI_URLS = {
 };
 
 export default function IndicadoresProductividadPage() {
-    // Default view mode set to "manual" as requested
-    const [viewMode, setViewMode] = useState<"bi" | "manual" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("manual");
+    // View mode state (Default: "automatico")
+    const [viewMode, setViewMode] = useState<"automatico" | "manual" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("automatico");
     const [calidadSubTab, setCalidadSubTab] = useState<"general" | "ms" | "fv" | "mbl" | "cefi" | "moldes">("ms");
 
     // Plant selector state
@@ -153,8 +157,13 @@ export default function IndicadoresProductividadPage() {
     };
     const [fechaManual, setFechaManual] = useState<string>(getYesterdayFormatted());
 
-    // State for all plant data
-    const [plantData, setPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
+    // Separate Plant Data States for Manual and Automático dashboards
+    const [manualPlantData, setManualPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
+    const [autoPlantData, setAutoPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
+
+    // Active plant data depending on selected tab
+    const plantData = viewMode === "automatico" ? autoPlantData : manualPlantData;
+    const setPlantData = viewMode === "automatico" ? setAutoPlantData : setManualPlantData;
 
     // Editing states for values or metas
     const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -211,17 +220,20 @@ export default function IndicadoresProductividadPage() {
             {/* Sub-Header Actions */}
             <div className="w-full bg-white border-b border-[#e2ded5] py-2.5 px-4 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-2 sm:gap-3">
+                    {/* 1. Tablero Automático */}
                     <button
-                        onClick={() => setViewMode("bi")}
+                        onClick={() => setViewMode("automatico")}
                         className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "bi"
+                            viewMode === "automatico"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
-                        <LayoutGrid size={15} />
-                        <span>Tablero BI</span>
+                        <SlidersHorizontal size={15} />
+                        <span>Tablero Automático</span>
                     </button>
+
+                    {/* 2. Tablero Manual */}
                     <button
                         onClick={() => setViewMode("manual")}
                         className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
@@ -233,6 +245,21 @@ export default function IndicadoresProductividadPage() {
                         <SlidersHorizontal size={15} />
                         <span>Tablero Manual</span>
                     </button>
+
+                    {/* 3. Control de Piso MS */}
+                    <button
+                        onClick={() => setViewMode("bi")}
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                            viewMode === "bi"
+                                ? "bg-[#324354] text-white shadow-md"
+                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        }`}
+                    >
+                        <LayoutGrid size={15} />
+                        <span>Control de Piso MS</span>
+                    </button>
+
+                    {/* 4. Nivel de Servicio */}
                     <button
                         onClick={() => setViewMode("nivel-servicio")}
                         className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
@@ -244,6 +271,8 @@ export default function IndicadoresProductividadPage() {
                         <BarChart3 size={15} />
                         <span>Nivel de Servicio</span>
                     </button>
+
+                    {/* 5. Productividad */}
                     <button
                         onClick={() => setViewMode("productividad")}
                         className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
@@ -255,6 +284,8 @@ export default function IndicadoresProductividadPage() {
                         <TrendingUp size={15} />
                         <span>Productividad</span>
                     </button>
+
+                    {/* 6. Calidad */}
                     <button
                         onClick={() => setViewMode("calidad")}
                         className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
@@ -266,6 +297,8 @@ export default function IndicadoresProductividadPage() {
                         <ShieldCheck size={15} />
                         <span>Calidad</span>
                     </button>
+
+                    {/* 7. Ausentismo */}
                     <button
                         onClick={() => setViewMode("ausentismo")}
                         className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
@@ -285,7 +318,7 @@ export default function IndicadoresProductividadPage() {
                 {viewMode === "bi" ? (
                     <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
                         <iframe
-                            title="Tablero BI Productividad"
+                            title="Control de Piso MS"
                             width="100%"
                             height="100%"
                             src={POWERBI_URLS.tableroBI}
@@ -594,9 +627,120 @@ export default function IndicadoresProductividadPage() {
                                 </div>
                             </div>
 
-                            {/* Card 4: Productividad (KG / MBL) o NO APLICA */}
-                            <div className="flex flex-col space-y-2">
-                                {currentData.hasSecondUnit ? (
+                            {/* Card 4 (Top Grid): Mesones (solo en MS) o Productividad (KG / MBL / NO APLICA) */}
+                            {selectedPlant === "MS" ? (
+                                <div className="flex flex-col space-y-2">
+                                    <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                        <span>META MESONES = </span>
+                                        {editingKey === "meta_mesones" ? (
+                                            <input
+                                                type="number"
+                                                value={currentData.mesonesMeta ?? 50}
+                                                onChange={(e) => updateCurrentPlant({ mesonesMeta: parseInt(e.target.value) || 0 })}
+                                                onBlur={() => setEditingKey(null)}
+                                                autoFocus
+                                                className="w-16 px-1 text-center bg-white border border-slate-300 rounded font-bold text-slate-900"
+                                            />
+                                        ) : (
+                                            <span
+                                                onClick={() => setEditingKey("meta_mesones")}
+                                                className="cursor-pointer hover:underline underline-offset-2 decoration-dashed text-[#324354] font-black"
+                                            >
+                                                {currentData.mesonesMeta ?? 50}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.mesonesReal ?? 50, currentData.mesonesMeta ?? 50)}`}>
+                                        <div className="flex-1 flex items-center justify-center text-slate-950">
+                                            {editingKey === "real_mesones" ? (
+                                                <input
+                                                    type="number"
+                                                    value={currentData.mesonesReal ?? 50}
+                                                    onChange={(e) => updateCurrentPlant({ mesonesReal: parseInt(e.target.value) || 0 })}
+                                                    onBlur={() => setEditingKey(null)}
+                                                    autoFocus
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-0.5"
+                                                />
+                                            ) : (
+                                                <span 
+                                                    onClick={() => setEditingKey("real_mesones")}
+                                                    className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
+                                                >
+                                                    {(currentData.mesonesReal ?? 50).toLocaleString("es-CO")}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                            Mesones
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col space-y-2">
+                                    {currentData.hasSecondUnit ? (
+                                        <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
+                                            <span>META PROD. ({currentData.secondUnitName}) = </span>
+                                            {editingKey === "meta_secondUnit" ? (
+                                                <input
+                                                    type="number"
+                                                    value={currentData.secondUnitMeta}
+                                                    onChange={(e) => updateCurrentPlant({ secondUnitMeta: parseInt(e.target.value) || 0 })}
+                                                    onBlur={() => setEditingKey(null)}
+                                                    autoFocus
+                                                    className="w-16 px-1 text-center bg-white border border-slate-300 rounded font-bold text-slate-900"
+                                                />
+                                            ) : (
+                                                <span
+                                                    onClick={() => setEditingKey("meta_secondUnit")}
+                                                    className="cursor-pointer hover:underline underline-offset-2 decoration-dashed text-[#324354] font-black"
+                                                >
+                                                    {currentData.secondUnitMeta}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs sm:text-sm font-extrabold text-slate-400 tracking-tight text-center uppercase">
+                                            PROD. (KG / MBL) = NO APLICA
+                                        </span>
+                                    )}
+                                    
+                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitReal, currentData.secondUnitMeta, false, !currentData.hasSecondUnit)}`}>
+                                        <div className="flex-1 flex items-center justify-center text-slate-950">
+                                            {!currentData.hasSecondUnit ? (
+                                                <span className="text-2xl font-black text-slate-400 tracking-wider whitespace-nowrap">
+                                                    NO APLICA
+                                                </span>
+                                            ) : editingKey === "real_secondUnit" ? (
+                                                <input
+                                                    type="number"
+                                                    value={currentData.secondUnitReal}
+                                                    onChange={(e) => updateCurrentPlant({ secondUnitReal: parseInt(e.target.value) || 0 })}
+                                                    onBlur={() => setEditingKey(null)}
+                                                    autoFocus
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-0.5"
+                                                />
+                                            ) : (
+                                                <span 
+                                                    onClick={() => setEditingKey("real_secondUnit")}
+                                                    className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
+                                                >
+                                                    {currentData.secondUnitReal.toLocaleString("es-CO")}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                            Productividad ({currentData.hasSecondUnit ? currentData.secondUnitName : "N/A"})
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Bottom Cards Grid */}
+                        <div className={`grid grid-cols-1 ${selectedPlant === "MS" ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3 max-w-5xl"} gap-5 mx-auto`}>
+                            {/* Card Productividad (KG) - Reubicado en fila 2 para la planta MS */}
+                            {selectedPlant === "MS" && (
+                                <div className="flex flex-col space-y-2">
                                     <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
                                         <span>META PROD. ({currentData.secondUnitName}) = </span>
                                         {editingKey === "meta_secondUnit" ? (
@@ -617,45 +761,32 @@ export default function IndicadoresProductividadPage() {
                                             </span>
                                         )}
                                     </div>
-                                ) : (
-                                    <span className="text-xs sm:text-sm font-extrabold text-slate-400 tracking-tight text-center uppercase">
-                                        PROD. (KG / MBL) = NO APLICA
-                                    </span>
-                                )}
-                                
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitReal, currentData.secondUnitMeta, false, !currentData.hasSecondUnit)}`}>
-                                    <div className="flex-1 flex items-center justify-center text-slate-950">
-                                        {!currentData.hasSecondUnit ? (
-                                            <span className="text-2xl font-black text-slate-400 tracking-wider whitespace-nowrap">
-                                                NO APLICA
-                                            </span>
-                                        ) : editingKey === "real_secondUnit" ? (
-                                            <input
-                                                type="number"
-                                                value={currentData.secondUnitReal}
-                                                onChange={(e) => updateCurrentPlant({ secondUnitReal: parseInt(e.target.value) || 0 })}
-                                                onBlur={() => setEditingKey(null)}
-                                                autoFocus
-                                                className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-0.5"
-                                            />
-                                        ) : (
-                                            <span 
-                                                onClick={() => setEditingKey("real_secondUnit")}
-                                                className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
-                                            >
-                                                {currentData.secondUnitReal.toLocaleString("es-CO")}
-                                            </span>
-                                        )}
+                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitReal, currentData.secondUnitMeta, false, !currentData.hasSecondUnit)}`}>
+                                        <div className="flex-1 flex items-center justify-center text-slate-950">
+                                            {editingKey === "real_secondUnit" ? (
+                                                <input
+                                                    type="number"
+                                                    value={currentData.secondUnitReal}
+                                                    onChange={(e) => updateCurrentPlant({ secondUnitReal: parseInt(e.target.value) || 0 })}
+                                                    onBlur={() => setEditingKey(null)}
+                                                    autoFocus
+                                                    className="bg-white/30 border border-black/10 rounded-lg text-slate-950 text-4xl font-black text-center focus:ring-2 focus:ring-[#324354] focus:outline-none w-36 py-0.5"
+                                                />
+                                            ) : (
+                                                <span 
+                                                    onClick={() => setEditingKey("real_secondUnit")}
+                                                    className="cursor-pointer hover:bg-black/5 px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap transition"
+                                                >
+                                                    {currentData.secondUnitReal.toLocaleString("es-CO")}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
+                                            Productividad ({currentData.secondUnitName})
+                                        </span>
                                     </div>
-                                    <span className="text-xs sm:text-sm font-black text-slate-950 uppercase tracking-wider text-center mt-2">
-                                        Productividad ({currentData.hasSecondUnit ? currentData.secondUnitName : "N/A"})
-                                    </span>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Bottom Cards Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-5xl mx-auto">
+                            )}
                             {/* Card 5: Calidad */}
                             <div className="flex flex-col space-y-2">
                                 <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight text-center uppercase">
