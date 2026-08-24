@@ -201,7 +201,6 @@ export default function CalidadMsReportPage() {
             setSelectedDefects({})
             setSelectedProduct('')
             setPhotoFile(null)
-            alert('Reporte guardado exitosamente')
         }
     }
 
