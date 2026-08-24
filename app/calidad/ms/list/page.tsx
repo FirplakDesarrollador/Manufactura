@@ -224,7 +224,7 @@ export default function ReportedDefectsListPage() {
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 hour12: true,
-                                timeZone: 'UTC'
+                                timeZone: 'America/Bogota'
                             }),
                             Molde: r.Molde,
                             fotos: [],
@@ -244,13 +244,13 @@ export default function ReportedDefectsListPage() {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: true,
-                            timeZone: 'UTC'
+                            timeZone: 'America/Bogota'
                         }),
                         rawHora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('en-GB', {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: false,
-                            timeZone: 'UTC'
+                            timeZone: 'America/Bogota'
                         }).substring(0, 5),
                         usuario: usersMap[r.create_by] || 'Anónimo',
                         fotoUrl: r.fotoUrl,
@@ -277,7 +277,7 @@ export default function ReportedDefectsListPage() {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                     hour12: true,
-                                    timeZone: 'UTC'
+                                    timeZone: 'America/Bogota'
                                 }),
                                 Molde: r.Molde,
                                 fotos: [],
@@ -295,7 +295,7 @@ export default function ReportedDefectsListPage() {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: true,
-                            timeZone: 'UTC'
+                            timeZone: 'America/Bogota'
                         })
 
                         groupedMap[key].detalles.push({
@@ -307,7 +307,7 @@ export default function ReportedDefectsListPage() {
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 hour12: false,
-                                timeZone: 'UTC'
+                                timeZone: 'America/Bogota'
                             }).substring(0, 5),
                             usuario: usersMap[r.create_by] || 'Anónimo',
                             fotoUrl: r.fotoUrl,
