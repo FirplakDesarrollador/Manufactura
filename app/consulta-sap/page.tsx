@@ -8,6 +8,7 @@ import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2 } from 'lucide-react'
+import LiberacionMueblesView from '@/components/liberacion-muebles/LiberacionMueblesView'
 
 interface ComponentItem {
     id: number;
@@ -349,8 +350,8 @@ export default function ConsultaSAPPage() {
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
-    // SubHeader Tabs: Consulta Ordenes vs Query - Semáforo vs Consulta por Producto
-    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'query-semaforo' | 'consulta-producto'>('consulta-ordenes')
+    // SubHeader Tabs: Consulta Ordenes vs Query - Semáforo vs Consulta por Producto vs Liberación Muebles
+    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'query-semaforo' | 'consulta-producto' | 'liberacion-muebles'>('consulta-ordenes')
 
     // Estados Consulta por Producto (Datos maestros de artículo) - Inicialmente Vacíos
     const [itemCodeInput, setItemCodeInput] = useState("")
@@ -877,6 +878,18 @@ export default function ConsultaSAPPage() {
                     >
                         <PackageSearch size={16} />
                         <span>Consulta por Producto</span>
+                    </button>
+
+                    <button
+                        onClick={() => setSubHeaderTab('liberacion-muebles')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                            subHeaderTab === 'liberacion-muebles'
+                                ? 'bg-[#324354] text-white shadow-md'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                    >
+                        <Check size={16} />
+                        <span>Liberación Muebles</span>
                     </button>
                 </div>
             </div>
@@ -2262,6 +2275,10 @@ export default function ConsultaSAPPage() {
 
                         </div>
                     </div>
+                </main>
+            ) : subHeaderTab === 'liberacion-muebles' ? (
+                <main className="flex-1 max-w-[1700px] w-full mx-auto p-1 md:p-1.5 flex flex-col font-sans h-full min-h-0">
+                    <LiberacionMueblesView />
                 </main>
             ) : null}
         </div>

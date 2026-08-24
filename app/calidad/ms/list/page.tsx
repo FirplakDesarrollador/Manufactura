@@ -338,7 +338,7 @@ export default function ReportedDefectsListPage() {
         }
 
         if (productsRes.data) setProducts(productsRes.data)
-        if (defectsRes.data) setDefectsList(defectsRes.data)
+        if (defectosRes.data) setDefectsList(defectosRes.data)
         setLoading(false)
     }, [selectedDate])
 

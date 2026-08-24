@@ -1,5 +1,6 @@
 'use client'
 
+
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Camera, X, Settings, Archive, Trash2 } from 'lucide-react'
