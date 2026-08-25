@@ -11,6 +11,8 @@ import DesmoldeFibraModule from '@/components/fibra/desmolde/DesmoldeFibraModule
 import PulidoFibraModule from '@/components/fibra/pulido/PulidoFibraModule'
 import DigitadoFibraModule from '@/components/fibra/digitado/DigitadoFibraModule'
 import CediFibraModule from '@/components/fibra/cedi/CediFibraModule'
+import ParametrosFibraModule from '@/components/fibra/parametros/ParametrosFibraModule'
+import AdministracionFibraModule from '@/components/fibra/administracion/AdministracionFibraModule'
 
 
 
@@ -382,6 +384,10 @@ export default function FibraPage() {
                             <CediFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'dashboard' && hasPermission('dashboard') ? (
                             <DashboardFibraModule />
+                        ) : activeModule === 'parametros' && hasPermission('parametros') ? (
+                            <ParametrosFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'administracion' && hasPermission('administracion') ? (
+                            <AdministracionFibraModule userEmail={user?.email || ''} />
                         ) : (
                             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                                 <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">
