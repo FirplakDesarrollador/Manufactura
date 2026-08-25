@@ -1,0 +1,555 @@
+'use client'
+
+import React, { useState, useEffect, useMemo } from 'react'
+import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
+import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/fibra'
+import OrdenCard from '@/components/pintura/OrdenCard'
+import MoldSelector from '../pintura/MoldSelector'
+import { Search, X, Calendar, History, ClipboardList } from 'lucide-react'
+import HistorySection from '../pintura/HistorySection'
+import ModalBuscarMolde from '../pintura/ModalBuscarMolde'
+
+
+
+interface PinturaFibraModuleProps {
+    userEmail: string
+}
+
+export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProps) {
+    // State management
+    const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
+    const [trazabilidad, setTrazabilidad] = useState<RegistroTrazabilidad[]>([])
+    const [loading, setLoading] = useState(true)
+    const [searchText, setSearchText] = useState('')
+    const [selectedDate, setSelectedDate] = useState<string>('')
+    const [selectedOrden, setSelectedOrden] = useState<OrdenFabricacion | null>(null)
+    const [selectedLinea, setSelectedLinea] = useState<string>('')
+    const [allMoldes, setAllMoldes] = useState<Molde[]>([])
+    const [moldesDisponibles, setMoldesDisponibles] = useState<Molde[]>([])
+    const [debugInfo, setDebugInfo] = useState<string>('')
+    const [selectedMolde, setSelectedMolde] = useState<Molde | null>(null)
+    const [moldSearchText, setMoldSearchText] = useState('')
+    const [isMoldDropdownOpen, setIsMoldDropdownOpen] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [view, setView] = useState<'report' | 'history'>('report')
+    const [isMoldModalOpen, setIsMoldModalOpen] = useState(false)
+    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+
+
+    const loadOrdenes = React.useCallback(async () => {
+        setLoading(true)
+        try {
+            const [ordenesData, trazaData, moldesData] = await Promise.all([
+                getOrdenesFabricacion(),
+                getRegistrosTrazabilidadHoy(), // Usar hoy para métricas rápidas
+                getAllMoldes()
+            ])
+            setOrdenes(ordenesData)
+            setTrazabilidad(trazaData)
+            setAllMoldes(moldesData)
+        } catch (error) {
+            console.error('Supabase error en registrarPintura:', error)
+            throw error
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+    const loadMoldes = React.useCallback(async (moldeSku: string) => {
+        try {
+            const data = await getMoldesDisponibles(moldeSku)
+            setMoldesDisponibles(data)
+        } catch (error) {
+            console.error('Error loading moldes:', error)
+        }
+    }, [])
+
+    // Load ordenes on mount
+    useEffect(() => {
+        loadOrdenes()
+    }, [loadOrdenes])
+
+    // Auto-hide notification
+    useEffect(() => {
+        if (notification) {
+            const timer = setTimeout(() => setNotification(null), 5000)
+            return () => clearTimeout(timer)
+        }
+    }, [notification])
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isMoldDropdownOpen && !(event.target as Element).closest('.relative')) {
+                setIsMoldDropdownOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [isMoldDropdownOpen])
+
+    // Load moldes when orden is selected
+    useEffect(() => {
+        if (selectedOrden) {
+            // Priority to molde_sku as found in the working Flutter app
+            const sku = (selectedOrden.molde_sku || selectedOrden.producto_sku || selectedOrden.sku || '').trim().toLowerCase()
+            
+            // Filter locally from allMoldes
+            const available = allMoldes
+                .filter(m => 
+                    (m.molde_sku || '').trim().toLowerCase() === sku && 
+                    m.estado === 'Disponible'
+                )
+                .sort((a, b) => a.vueltas_actuales - b.vueltas_actuales)
+            
+            setMoldesDisponibles(available)
+            setSelectedMolde(null)
+            
+            if (available.length === 0) {
+                setDebugInfo(`No se encontraron moldes Disponibles para el SKU: "${sku}"`)
+            } else {
+                setDebugInfo('')
+            }
+        } else {
+            setMoldesDisponibles([])
+            setSelectedMolde(null)
+            setDebugInfo('')
+        }
+    }, [selectedOrden, allMoldes])
+
+    // Base filter for metrics (matches Administration)
+    const baseFilteredOrdenes = useMemo(() => {
+        const search = (searchText || '').toLowerCase()
+        return ordenes.filter((orden) => {
+            const matchesSearch = !search ||
+                (orden.producto_descripcion || '').toLowerCase().includes(search) ||
+                (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
+                (orden.pedido || '').toLowerCase().includes(search) ||
+                (orden.molde_descripcion || '').toLowerCase().includes(search) ||
+                (orden.producto_sku || '').toLowerCase().includes(search) ||
+                (orden.molde_sku || '').toLowerCase().includes(search) ||
+                (orden.cliente || '').toLowerCase().includes(search)
+
+            const matchesDate = !selectedDate ||
+                (orden.fecha_ideal_produccion &&
+                    orden.fecha_ideal_produccion.includes(selectedDate))
+
+            return matchesSearch && matchesDate
+        })
+    }, [ordenes, searchText, selectedDate])
+
+    // Filter and sort ordenes based on search and date (Safe from null/undefined)
+    const filteredOrdenes = useMemo(() => {
+        const filtered = baseFilteredOrdenes.filter((orden) => {
+            // En Pintura, solo mostramos lo que realmente tiene piezas pendientes por iniciar
+            const hasProgramado = (orden.programado || 0) > 0
+            return hasProgramado
+        })
+
+        return filtered.sort((a, b) => {
+            const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
+            const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
+            const valA = isNaN(dateA) ? Infinity : dateA
+            const valB = isNaN(dateB) ? Infinity : dateB
+            return valA - valB
+        })
+    }, [ordenes, searchText, selectedDate])
+
+    // Calculate metrics to match reference app (FlutterFlow)
+    const metrics = useMemo(() => {
+        const today = new Date().toISOString().split('T')[0]
+
+        // 1. Quantity & Programmed (Totals for all filtered orders)
+        const totalCantidad = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.cantidad_programada || o.cantidad || 0), 0)
+        const totalProgramado = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.programado || 0), 0)
+
+        // 2. Daily Production (From traceability)
+        // We look for everything processed today in any stage
+        const recordsToday = trazabilidad.filter(t => {
+            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
+            const pDate = (t.pintura_fecha || '').split('T')[0]
+            const aDate = (t.acabado_fecha || '').split('T')[0]
+            const dDate = (t.digitado_fecha || '').split('T')[0]
+            
+            return vDate === today || pDate === today || aDate === today || dDate === today
+        })
+
+        const vaciadoToday = trazabilidad.filter(t => {
+            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
+            return vDate === today
+        })
+
+        const pinturaToday = trazabilidad.filter(t => {
+            const pDate = (t.pintura_fecha || '').split('T')[0]
+            return pDate === today
+        })
+
+        const acabadoToday = trazabilidad.filter(t => {
+            const aDate = (t.acabado_fecha || '').split('T')[0]
+            return aDate === today
+        })
+        // Kilograms: Current Transito + Cedi Today (Matches FF logic for 3407.8kg)
+        const transitoTotal = trazabilidad.filter(t => t.estado === 'Transito')
+        const cediToday = trazabilidad.filter(t => (t.cedi_fecha || '').split('T')[0] === today)
+        
+        const totalKilos = [...transitoTotal, ...cediToday]
+            .reduce((acc, t) => acc + (Number(t.kilos_vaciados) || 0), 0)
+
+        // Derive transito from filtered orders so it respects the search filter exactly
+        const transitoFiltered = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.transito || 0), 0)
+
+        return {
+            cantidad: totalCantidad,
+            programado: totalProgramado,
+            pintura: pinturaToday.length,
+            desgelcada: 0,
+            vaciado: vaciadoToday.length,
+            acabado: acabadoToday.length,
+            saldo: baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.saldo || 0), 0),
+            digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
+            transito: transitoFiltered,
+            cedi: cediToday.length,
+            kilogramos: parseFloat(totalKilos.toFixed(1))
+        }
+    }, [baseFilteredOrdenes, trazabilidad])
+
+    const handleClearFilters = () => {
+        setSearchText('')
+        setSelectedDate('')
+    }
+
+    const checkMantenimiento = (molde: Molde) => {
+        const threshold = molde.vueltas_mto_atipicas > 0 
+            ? molde.vueltas_mto_atipicas - 1
+            : molde.vueltas_mto - 1;
+
+        if (molde.vueltas_actuales >= threshold) {
+            const isNew = molde.vueltas_mto_atipicas === 1;
+            const title = isNew ? '🆕 Molde nuevo 🆕' : '⚠️ Molde para desmanchar ⚠️';
+            const message = isNew 
+                ? `El ${molde.molde_descripcion} # ${molde.serial} Se debe encerar en el puesto`
+                : `El ${molde.molde_descripcion} # ${molde.serial} Se debe sacar para desmanchar`;
+            
+            alert(`${title}\n\n${message}`);
+            return true;
+        }
+        return false;
+    };
+
+    const handleSubmit = async () => {
+        // 1. Validaciones previas
+        if (!selectedOrden) {
+            alert('Error: Debe seleccionar una Orden de Fabricación.')
+            return
+        }
+        if (!selectedLinea) {
+            alert('Error: Debe seleccionar una Línea.')
+            return
+        }
+        if (!selectedMolde) {
+            alert('Error: Debe seleccionar un Molde.')
+            return
+        }
+        const sumEtapas = (selectedOrden.pintura || 0) +
+            (selectedOrden.pulido || 0) +
+            (selectedOrden.reparacion || 0) +
+            (selectedOrden.saldo || 0) +
+            (selectedOrden.empaque || 0) +
+            (selectedOrden.transito || 0) +
+            (selectedOrden.vaciado || 0) +
+            (selectedOrden.estanteria || 0) +
+            (selectedOrden.acabado || 0) +
+            (selectedOrden.reparacion_larga || 0) +
+            (selectedOrden.digitado || 0) +
+            (selectedOrden.cedi || 0)
+        const cantidadMax = Math.max(0, selectedOrden.cantidad || selectedOrden.cantidad_programada || 0)
+
+        if (cantidadMax > 0 && sumEtapas >= cantidadMax) {
+            alert(`Acción bloqueada: La sumatoria de piezas en etapas (${sumEtapas}) de la orden ${selectedOrden.orden_fabricacion} ya alcanzó la cantidad máxima permitida (${cantidadMax}).`)
+            return
+        }
+
+        setSubmitting(true)
+        try {
+            // 2. Proceso de registro (verificado en el backend)
+            await registrarPintura({
+                orden_fabricacion_id: selectedOrden.id,
+                molde_id: selectedMolde.id,
+                linea: selectedLinea,
+                usuario_email: userEmail
+            })
+
+            // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
+            setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
+            
+            // Actualizar localmente la orden para prevenir spam rápido
+            setSelectedOrden(prev => prev ? { ...prev, programado: (prev.programado || 0) - 1 } : null)
+            
+            // Limpia los campos del formulario (mantiene orden y línea seleccionadas para agilizar procesos)
+            setSelectedMolde(null)
+
+            // Recargar datos para actualizar métricas y caché
+            loadOrdenes()
+        } catch (error: any) {
+            console.error('Error detallado registrando pintura:', error)
+            const detail = error.message || 'Error desconocido en el servidor'
+            // Diálogo de error con el detalle específico del fallo
+            alert(`Error al registrar pintura: ${detail}`)
+            setNotification({ message: `Fallo: ${detail}`, type: 'error' })
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
+            {/* Summary Cards */}
+            <div className="p-4 bg-white border-b border-slate-200">
+                <div className="flex flex-nowrap gap-3 overflow-x-auto pb-2 no-scrollbar">
+                    <StatCard label="Cantidad" value={metrics.cantidad} color="bg-blue-50 text-blue-600" />
+                    <StatCard label="Programado" value={metrics.programado} color="bg-indigo-50 text-indigo-600" />
+                    <StatCard label="Pintura Hoy" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
+                    <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-yellow-50 text-yellow-600" />
+                    <StatCard label="Vaciado Hoy" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
+                    <StatCard label="Acabado Hoy" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
+                    <StatCard label="Saldo" value={metrics.saldo} color="bg-rose-50 text-rose-600" />
+                    <StatCard label="Digitado" value={metrics.digitado} color="bg-slate-50 text-slate-600" />
+                    <StatCard label="Transito" value={metrics.transito} color="bg-amber-50 text-amber-600" />
+                    <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-green-50 text-green-600" />
+                    <StatCard label="Kg Hoy" value={metrics.kilogramos.toFixed(1)} color="bg-blue-600 text-white" />
+                </div>
+            </div>
+
+            {/* Controls */}
+            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-4">
+                    <div className="flex-1 min-w-[300px]">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Búsqueda Global</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Producto / OF / Pedido / ..."
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="w-48">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Filtrar Fecha</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input
+                                type="date"
+                                value={selectedDate || ''}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleClearFilters}
+                        className="p-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
+                        title="Limpiar filtros"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-y-auto p-4">
+                {view === 'history' ? (
+                    <HistorySection />
+                ) : (
+                    <div className="space-y-2">
+                        <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
+                            Ordenes encontradas: {filteredOrdenes.length}
+                        </div>
+
+                        {loading ? (
+                            <div className="text-center py-8 text-gray-500">Cargando órdenes...</div>
+                        ) : filteredOrdenes.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">No se encontraron órdenes</div>
+                        ) : (
+                            filteredOrdenes.map((orden) => (
+                                <OrdenCard
+                                    key={orden.id}
+                                    orden={orden}
+                                    isActive={selectedOrden?.id === orden.id}
+                                    onClick={() => setSelectedOrden(orden)}
+                                    moldes={allMoldes}
+                                />
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Bottom Action Bar */}
+            <div className="bg-gray-50 p-4 border-t border-gray-200">
+                <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-end w-full">
+                    <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                        {/* Line Selector */}
+                        <div className="w-full sm:w-1/2">
+                            <label className="md:hidden text-xs font-bold text-cyan-600 uppercase mb-1">Línea</label>
+                            <select
+                                value={selectedLinea}
+                                onChange={(e) => setSelectedLinea(e.target.value)}
+                                className="w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none shadow-sm"
+                            >
+                                <option value="">Elija linea</option>
+                                <option value="Linea 1">Línea 1</option>
+                                <option value="Linea 2">Línea 2</option>
+                                <option value="Linea 3">Línea 3</option>
+                            </select>
+                        </div>
+
+                        {/* Mold Selector with Search */}
+                        <div className="w-full sm:w-1/2">
+                            <label className="md:hidden text-xs font-bold text-cyan-600 uppercase mb-1">Molde</label>
+                            <div className="relative">
+                                <div 
+                                    onClick={() => !(!selectedOrden || !selectedLinea) && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
+                                    className={`w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
+                                        ${!selectedOrden || !selectedLinea ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
+                                    `}
+                                >
+                                    <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
+                                        {selectedMolde 
+                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
+                                            : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
+                                    </span>
+                                    <Search size={18} className="text-gray-400" />
+                                </div>
+
+                                {isMoldDropdownOpen && (
+                                    <div className="absolute bottom-full mb-2 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+                                        <div className="p-2 border-b border-gray-100 bg-gray-50">
+                                            <input
+                                                type="text"
+                                                autoFocus
+                                                placeholder="Buscar molde..."
+                                                value={moldSearchText}
+                                                onChange={(e) => setMoldSearchText(e.target.value)}
+                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                                            />
+                                        </div>
+                                        <div className="max-h-[200px] overflow-y-auto">
+                                            {moldesDisponibles
+                                                .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
+                                                .map((molde) => (
+                                                    <div
+                                                        key={molde.id}
+                                                        onClick={() => {
+                                                            setSelectedMolde(molde)
+                                                            checkMantenimiento(molde)
+                                                            setIsMoldDropdownOpen(false)
+                                                            setMoldSearchText('')
+                                                        }}
+                                                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
+                                                    >
+                                                        <span className="text-sm font-bold">{molde.serial}</span>
+                                                        <span className="text-xs text-cyan-600 font-bold">{molde.vueltas_actuales}v</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {debugInfo && (
+                                    <div className="text-[10px] text-red-500 font-bold px-1 mt-1 animate-pulse">
+                                        {debugInfo}
+                                    </div>
+                                )}
+                                {selectedMolde && (
+                                    <div className="text-[10px] text-gray-500 px-1 mt-1 italic">
+                                        Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 flex-1 lg:flex-none">
+                        {/* Submit Button */}
+                        <button
+                            onClick={handleSubmit}
+                            disabled={!selectedOrden || !selectedLinea || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
+                            className="flex-1 lg:min-w-[150px] py-3 bg-cyan-600 text-white rounded-lg font-bold text-lg hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            {submitting ? 'Reg...' : 'Pintar'}
+                        </button>
+
+                        <div className="flex gap-2 w-full lg:w-auto">
+                            {/* Moldes Info Button */}
+                            <button
+                                onClick={() => setIsMoldModalOpen(true)}
+                                className="flex-1 lg:flex-none bg-white text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors whitespace-nowrap"
+                            >
+                                <Search size={20} className="text-cyan-500" />
+                                Moldes
+                            </button>
+
+                            {/* Registros / Volver Button */}
+                            <button
+                                onClick={() => setView(view === 'report' ? 'history' : 'report')}
+                                className={`flex-1 lg:flex-none font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 border shadow-sm transition-colors whitespace-nowrap ${view === 'history'
+                                    ? 'bg-cyan-600 text-white border-cyan-700 hover:bg-cyan-700'
+                                    : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                {view === 'history' ? (
+                                    <>
+                                        <ClipboardList size={20} />
+                                        Reportar
+                                    </>
+                                ) : (
+                                    <>
+                                        <History size={20} className="text-cyan-500" />
+                                        Registros
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Notification Snackbar */}
+            {notification && (
+                <div className={`fixed bottom-24 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300 ${
+                    notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                }`}>
+                    <div className="font-bold text-sm">
+                        {notification.message}
+                    </div>
+                    <button onClick={() => setNotification(null)} className="p-1 hover:bg-black/10 rounded">
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
+
+            {/* Modals */}
+            <ModalBuscarMolde
+                isOpen={isMoldModalOpen}
+                onClose={() => setIsMoldModalOpen(false)}
+            />
+        </div>
+    )
+}
+
+function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
+    return (
+        <div className={`shrink-0 p-3 rounded-xl border border-slate-100 shadow-sm min-w-[100px] flex flex-col items-center justify-center ${color}`}>
+            <span className="text-[9px] font-black uppercase opacity-70 mb-1">{label}</span>
+            <span className="text-sm font-black tracking-tight">{value}</span>
+        </div>
+    )
+}

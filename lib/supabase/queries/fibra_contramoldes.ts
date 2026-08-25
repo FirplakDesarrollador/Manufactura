@@ -1,0 +1,41 @@
+import { supabase } from '@/lib/supabase'
+import { RegistroTrazabilidad } from '@/types/pintura'
+import { requireUserId } from './helpers'
+
+export async function getRegistrosSinContramolde(): Promise<RegistroTrazabilidad[]> {
+    const { data, error } = await supabase
+        .from('query_trazabilidad_fv')
+        .select('*')
+        .eq('contramolde', false) // Only show if contramolde is not yet processed (matches Flutter logic)
+        .is('contramolde_fecha', null) // And not yet processed
+        .order('pintura_fecha', { ascending: true })
+
+    if (error) {
+        console.error('Error fetching registros sin contramolde:', error)
+        return []
+    }
+
+    return data || []
+}
+
+export async function registrarContramolde(registroId: number, usuarioEmail: string) {
+    // Contramolde = UPDATE trazabilidad_fv: contramolde_fecha, contramolde_user_id
+    const userId = await requireUserId(usuarioEmail)
+
+    const { data, error } = await supabase
+        .from('trazabilidad_fv')
+        .update({
+            contramolde: true,
+            contramolde_fecha: new Date().toISOString(),
+            contramolde_user_id: userId
+        })
+        .eq('id', registroId)
+        .select()
+        .single()
+
+    if (error) {
+        throw new Error(`Error al registrar contramolde: [${error.code}] ${error.message}`)
+    }
+
+    return data
+}
