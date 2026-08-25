@@ -9,8 +9,8 @@ import {
     updateRegistroTrazabilidad,
     deleteRegistroTrazabilidad
 } from '@/lib/supabase/queries/fibra_administracion'
-import { getAllMoldes } from '@/lib/supabase/queries/fibra_pintura'
-import OrdenCard from '../pintura/OrdenCard'
+import { getAllMoldes } from '@/lib/supabase/queries/fibra'
+import OrdenCard from '@/components/pintura/OrdenCard'
 import {
     RefreshCw,
     Search,
@@ -682,7 +682,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                                     <div className="text-[10px] text-slate-400 font-black uppercase truncate">{o.producto_descripcion || o.producto_sku}</div>
                                                     <div className="flex items-center gap-3 mt-1">
                                                         <span className="font-bold text-sm text-slate-800">{o.orden_fabricacion}</span>
-                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">P: {o.numero_pedido || o.pedido}</span>
+                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">P: {(o as any).numero_pedido || o.pedido}</span>
                                                     </div>
                                                 </div>
                                                 <button
@@ -871,7 +871,7 @@ function getRegistrosByOrden(registros: RegistroTrazabilidad[], ordenFabricacion
 
 function formatProcessDate(value: string) {
     let dateStr = value;
-    if (dateStr.includes('T') && !dateStr.endsWith('Z') && !/(?:\+|-)\d{2}:\d{2}$/.test(dateStr)) {
+    if (dateStr.includes('T') && !dateStr.endsWith('Z') && !/(?:(o as any).numero_pedido || o.pedido+|-)(o as any).numero_pedido || o.pedidod{2}:(o as any).numero_pedido || o.pedidod{2}$/.test(dateStr)) {
         dateStr += 'Z';
     }
     const date = new Date(dateStr)

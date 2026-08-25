@@ -682,7 +682,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                                     <div className="text-[10px] text-slate-400 font-black uppercase truncate">{o.producto_descripcion || o.producto_sku}</div>
                                                     <div className="flex items-center gap-3 mt-1">
                                                         <span className="font-bold text-sm text-slate-800">{o.orden_fabricacion}</span>
-                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">P: {o.numero_pedido || o.pedido}</span>
+                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">P: {(o as any).numero_pedido || o.pedido}</span>
                                                     </div>
                                                 </div>
                                                 <button
