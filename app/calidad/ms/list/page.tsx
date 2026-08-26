@@ -60,7 +60,6 @@ export default function ReportedDefectsListPage() {
         defecto: string | DefectItem[]
         producto_id: number
         Molde: string
-        Molde: string
         producto?: {
             Referencia: string
         }
@@ -89,7 +88,7 @@ export default function ReportedDefectsListPage() {
     const [modalStartTime, setModalStartTime] = useState('')
     const [modalEndTime, setModalEndTime] = useState('')
     const [modalProductSearch, setModalProductSearch] = useState('')
-    const [selectedDetails, setSelectedDetails] = useState<{title: string, items: { id: number, producto_id: number, referencia: string, hora: string, rawHora: string, usuario: string, fotoUrl?: string, rawDefectos: any[] }[]} | null>(null)
+    const [selectedDetails, setSelectedDetails] = useState<{title: string, items: { id: number, producto_id: number, referencia: string, hora: string, rawHora: string, usuario: string, fotoUrl?: string, molde?: string, rawDefectos: any[] }[]} | null>(null)
     const [editRecord, setEditRecord] = useState<{ id: number, referencia: string, currentFotoUrl?: string, currentMolde?: string } | null>(null)
     const [editSelectedProductId, setEditSelectedProductId] = useState<string>('')
     const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null)
@@ -224,7 +223,7 @@ export default function ReportedDefectsListPage() {
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 hour12: true,
-                                timeZone: 'UTC'
+                                timeZone: 'America/Bogota'
                             }),
                             Molde: r.Molde,
                             fotos: [],
@@ -244,13 +243,13 @@ export default function ReportedDefectsListPage() {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: true,
-                            timeZone: 'UTC'
+                            timeZone: 'America/Bogota'
                         }),
                         rawHora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('en-GB', {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: false,
-                            timeZone: 'UTC'
+                            timeZone: 'America/Bogota'
                         }).substring(0, 5),
                         usuario: usersMap[r.create_by] || 'Anónimo',
                         fotoUrl: r.fotoUrl,
@@ -277,7 +276,7 @@ export default function ReportedDefectsListPage() {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                     hour12: true,
-                                    timeZone: 'UTC'
+                                    timeZone: 'America/Bogota'
                                 }),
                                 Molde: r.Molde,
                                 fotos: [],
@@ -295,7 +294,7 @@ export default function ReportedDefectsListPage() {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: true,
-                            timeZone: 'UTC'
+                            timeZone: 'America/Bogota'
                         })
 
                         groupedMap[key].detalles.push({
@@ -307,7 +306,7 @@ export default function ReportedDefectsListPage() {
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 hour12: false,
-                                timeZone: 'UTC'
+                                timeZone: 'America/Bogota'
                             }).substring(0, 5),
                             usuario: usersMap[r.create_by] || 'Anónimo',
                             fotoUrl: r.fotoUrl,
@@ -338,7 +337,7 @@ export default function ReportedDefectsListPage() {
         }
 
         if (productsRes.data) setProducts(productsRes.data)
-        if (defectsRes.data) setDefectsList(defectsRes.data)
+        if (defectosRes.data) setDefectsList(defectosRes.data)
         setLoading(false)
     }, [selectedDate])
 
