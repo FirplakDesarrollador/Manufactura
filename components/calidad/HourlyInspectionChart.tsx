@@ -39,9 +39,9 @@ export function HourlyInspectionChart({ reports }: HourlyInspectionChartProps) {
     const [isCollapsed, setIsCollapsed] = useState(false)
 
     const hourlyData = useMemo(() => {
-        // Initialize hours 5:00 to 23:00
+        // Initialize hours 6:00 to 23:00 (Inspection shift starts at 6:00 AM)
         const hours: Record<number, { buenos: number; defectuosos: number }> = {}
-        for (let h = 5; h <= 23; h++) {
+        for (let h = 6; h <= 23; h++) {
             hours[h] = { buenos: 0, defectuosos: 0 }
         }
 
@@ -54,10 +54,11 @@ export function HourlyInspectionChart({ reports }: HourlyInspectionChartProps) {
                     ? createdAt
                     : createdAt + 'Z'
             )
-            // Use UTC since the app stores in UTC
-            const hour = date.getUTCHours()
+            // Convert to UTC-5 (Colombia time)
+            const colombiaDate = new Date(date.getTime() - 5 * 60 * 60 * 1000)
+            const hour = colombiaDate.getUTCHours()
 
-            if (hour < 5 || hour > 23) return
+            if (hour < 6 || hour > 23) return
 
             const defectos = String(report.defectos_lista || '')
             const hasDefect = defectos
@@ -72,7 +73,7 @@ export function HourlyInspectionChart({ reports }: HourlyInspectionChartProps) {
         })
 
         const data: HourlyData[] = []
-        for (let h = 5; h <= 23; h++) {
+        for (let h = 6; h <= 23; h++) {
             const total = hours[h].buenos + hours[h].defectuosos
             if (total > 0 || (h >= 6 && h <= 18)) {
                 data.push({
