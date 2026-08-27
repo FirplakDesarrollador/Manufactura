@@ -7,7 +7,7 @@ import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2 } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer } from 'lucide-react'
 import LiberacionMueblesView from '@/components/liberacion-muebles/LiberacionMueblesView'
 
 interface ComponentItem {
@@ -1106,6 +1106,19 @@ export default function ConsultaSAPPage() {
 
                                 {/* RIGHT COLUMN FIELDS */}
                                 <div className="space-y-0 shrink-0">
+                                    {/* Botón Imprimir colocado exactamente en la ubicación indicada */}
+                                    <div className="flex items-center justify-end mb-1">
+                                        <button 
+                                            type="button"
+                                            onClick={() => window.print()}
+                                            className="bg-[#324354] hover:bg-[#253342] active:scale-95 text-white px-3 py-0.5 text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs rounded-none border border-[#1c2733] cursor-pointer"
+                                            title="Imprimir Orden de Fabricación SAP"
+                                        >
+                                            <Printer size={12} />
+                                            <span>Imprimir</span>
+                                        </button>
+                                    </div>
+
                                     {/* Nº OF-Produ */}
                                     <div className="flex items-center justify-end h-5">
                                         <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Nº OF-Produ</span>
