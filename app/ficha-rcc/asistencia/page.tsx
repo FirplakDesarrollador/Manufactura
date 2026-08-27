@@ -6,7 +6,7 @@ import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import Header from '@/components/opt-sistemica/Header';
 import Link from 'next/link';
 import SubHeader from '@/components/ficha-rcc/SubHeader';
-// Importación de auth eliminada
+import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants';
 
 type AsistenciaEstado = 'Presente' | 'Ausente' | 'Permiso' | 'Incapacidad' | 'No Convocado';
 
@@ -79,19 +79,21 @@ export default function AsistenciaPage() {
     const counts: Record<string, { total: number; presente: number }> = {};
     if (data) {
       data.forEach(row => {
-        if (!counts[row.responsable]) {
-          counts[row.responsable] = { total: 0, presente: 0 };
+        if (!row.responsable) return;
+        const resolvedName = resolveNombreCompleto(row.responsable);
+        if (!counts[resolvedName]) {
+          counts[resolvedName] = { total: 0, presente: 0 };
         }
-        counts[row.responsable].total++;
+        counts[resolvedName].total++;
         if (row.estado === 'Presente') {
-          counts[row.responsable].presente++;
+          counts[resolvedName].presente++;
         }
       });
     }
 
     const percentages: Record<string, number> = {};
     Object.entries(counts).forEach(([name, c]) => {
-      percentages[name] = c.total > 0 ? Math.round((c.presente / c.total) * 100) : 100;
+      percentages[name] = c.total > 0 ? Math.round((c.presente / c.total) * 100) : 0;
     });
     setHistoricoPorcentajes(percentages);
   };
@@ -139,6 +141,8 @@ export default function AsistenciaPage() {
     // Por defecto todos ausentes (desmarcados)
     procesos.forEach(proc => {
       proc.personal.forEach((p: any) => {
+        const resolved = resolveNombreCompleto(p.nombre);
+        nuevosRegistros[resolved] = 'Ausente';
         nuevosRegistros[p.nombre] = 'Ausente';
       });
     });
@@ -146,6 +150,8 @@ export default function AsistenciaPage() {
     // Sobrescribir con los registros existentes
     if (data && data.length > 0) {
       data.forEach(reg => {
+        const resolved = resolveNombreCompleto(reg.responsable);
+        nuevosRegistros[resolved] = reg.estado as AsistenciaEstado;
         nuevosRegistros[reg.responsable] = reg.estado as AsistenciaEstado;
       });
       setIsEditing(true);
@@ -157,9 +163,11 @@ export default function AsistenciaPage() {
   };
 
   const handleEstadoChange = (responsable: string, nuevoEstado: string) => {
+    const resolved = resolveNombreCompleto(responsable);
     setRegistros(prev => ({
       ...prev,
-      [responsable]: nuevoEstado as AsistenciaEstado
+      [responsable]: nuevoEstado as AsistenciaEstado,
+      [resolved]: nuevoEstado as AsistenciaEstado
     }));
   };
 
@@ -172,8 +180,17 @@ export default function AsistenciaPage() {
         .delete()
         .eq('fecha', fecha);
 
-      // 2. Insertar los nuevos registros
-      const registrosAInsertar = Object.entries(registros).map(([resp, est]) => ({
+      // 2. Insertar los nuevos registros utilizando los nombres normalizados
+      const uniqueEntries = new Map<string, AsistenciaEstado>();
+      procesos.forEach(proc => {
+        proc.personal.forEach((p: any) => {
+          const resolved = resolveNombreCompleto(p.nombre);
+          const estado = registros[resolved] || registros[p.nombre] || 'Ausente';
+          uniqueEntries.set(resolved, estado);
+        });
+      });
+
+      const registrosAInsertar = Array.from(uniqueEntries.entries()).map(([resp, est]) => ({
         fecha: fecha,
         responsable: resp,
         estado: est
@@ -221,7 +238,10 @@ export default function AsistenciaPage() {
   // Calcular Indicadores por PROCESO
   // Un proceso asistió si al menos una persona del proceso está "Presente"
   const statsProcesos = procesos.map(proc => {
-    const personalProceso = proc.personal.map((p: any) => registros[p.nombre]);
+    const personalProceso = proc.personal.map((p: any) => {
+      const resolved = resolveNombreCompleto(p.nombre);
+      return registros[resolved] || registros[p.nombre] || 'Ausente';
+    });
     const asistio = personalProceso.some((est: any) => est === 'Presente');
     return { nombre: proc.nombre, asistio };
   });
@@ -337,14 +357,14 @@ export default function AsistenciaPage() {
                 </span>
               </div>
               {proc.personal.map((p: any, idx: number) => {
-                const isPresent = (registros[p.nombre] || 'Ausente') === 'Presente';
-                const currentEstado = registros[p.nombre] || 'Ausente';
+                const nombreCompleto = resolveNombreCompleto(p.nombre);
+                const currentEstado = registros[nombreCompleto] || registros[p.nombre] || 'Ausente';
+                const isPresent = currentEstado === 'Presente';
                 
-                // Color mapping:
-                // Verde: #59a96a
-                // Amarillo: #deb841 (for Permiso, Incapacidad)
-                // Rojo: #d14747 (for Ausente)
-                // Sage: #7B8E90 (for No Convocado)
+                const pct = historicoPorcentajes[nombreCompleto] !== undefined
+                  ? historicoPorcentajes[nombreCompleto]
+                  : (historicoPorcentajes[p.nombre] !== undefined ? historicoPorcentajes[p.nombre] : 0);
+
                 let statusColor = '#d14747'; // Default Ausente
                 if (currentEstado === 'Presente') {
                   statusColor = '#59a96a';
@@ -372,12 +392,12 @@ export default function AsistenciaPage() {
                     className="hover:bg-black/[0.02]"
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{p.nombre}</div>
+                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{nombreCompleto}</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         Asistencia histórica: <span style={{ 
                           fontWeight: 600, 
-                          color: (historicoPorcentajes[p.nombre] !== undefined ? historicoPorcentajes[p.nombre] : 100) >= 90 ? '#59a96a' : (historicoPorcentajes[p.nombre] !== undefined ? historicoPorcentajes[p.nombre] : 100) >= 80 ? '#deb841' : '#d14747'
-                        }}>{historicoPorcentajes[p.nombre] !== undefined ? `${historicoPorcentajes[p.nombre]}%` : '100%'}</span>
+                          color: pct >= 90 ? '#59a96a' : pct >= 80 ? '#deb841' : '#d14747'
+                        }}>{pct}%</span>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

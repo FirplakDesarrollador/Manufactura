@@ -6,6 +6,7 @@ import { supabase } from '@/lib/ficha-rcc/supabaseClient';
 import Link from 'next/link';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/ficha-rcc/SubHeader';
+import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell
 } from 'recharts';
@@ -300,7 +301,9 @@ export default function IndicadoresAsistenciaPage() {
       const procDict = Object.fromEntries(procData.map(p => [p.id, p.nombre]));
       respData.forEach((r: any) => {
         if (r.proceso_id && procDict[r.proceso_id]) {
+          const resolved = resolveNombreCompleto(r.nombre);
           rMap[r.nombre] = procDict[r.proceso_id];
+          rMap[resolved] = procDict[r.proceso_id];
         }
       });
     }
@@ -316,7 +319,11 @@ export default function IndicadoresAsistenciaPage() {
       console.error('Error fetching data:', error);
       setData([]);
     } else {
-      setData(records || []);
+      const normalizedRecords = (records || []).map((rec: any) => ({
+        ...rec,
+        responsable: resolveNombreCompleto(rec.responsable)
+      }));
+      setData(normalizedRecords);
     }
 
     // Fetch alert sheets data safely

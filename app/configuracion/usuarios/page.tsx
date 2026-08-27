@@ -24,7 +24,7 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
     calidad: ['ms', 'editar', 'eliminar', 'configurar_defectos', 'saldos_y_destrucciones'],
     hora_a_hora: true,
-    ficha_rcc: ['acceso_general', 'administrador', 'contingencias', 'asistencia'],
+    ficha_rcc: ['acceso_general', 'administrador', 'contingencias', 'asistencia', 'editar_fichas_administrador'],
     opt: true,
     opt_sistemica: true,
     tarjetas_excelencia: true,
@@ -59,6 +59,16 @@ const PERMISSION_LABELS: Record<string, string> = {
     indicadores_productividad: 'Tablero de Control',
     asistencia: 'Asistencia',
     mantenimiento: 'Mantenimiento (LILAC)'
+};
+
+const SUBMODULO_LABELS: Record<string, string> = {
+    editar_fichas_administrador: 'Editar Fichas Administrador',
+    acceso_general: 'Acceso General',
+    administrador: 'Administrador',
+    contingencias: 'Contingencias',
+    asistencia: 'Asistencia',
+    configurar_defectos: 'Configurar Defectos',
+    saldos_y_destrucciones: 'Saldos y Destrucciones'
 };
 
 export default function UsuariosConfiguracionPage() {
@@ -466,7 +476,7 @@ export default function UsuariosConfiguracionPage() {
                                                                         tieneAcceso ? (
                                                                             <span key={subModulo} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#254153]/5 text-[#254153] border border-[#254153]/10 capitalize">
                                                                                 <svg className="w-3.5 h-3.5 mr-1 text-[#254153]/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                                                                {subModulo.replace(/_/g, ' ')}
+                                                                                {SUBMODULO_LABELS[subModulo] || subModulo.replace(/_/g, ' ')}
                                                                             </span>
                                                                         ) : null
                                                                     )}
@@ -517,7 +527,9 @@ export default function UsuariosConfiguracionPage() {
                                                                                     />
                                                                                     <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                                                                 </div>
-                                                                                <span className="text-sm text-gray-700 capitalize group-hover:text-gray-900 transition-colors">{sub.replace(/_/g, ' ')}</span>
+                                                                                <span className="text-sm text-gray-700 capitalize group-hover:text-gray-900 transition-colors">
+                                                                                    {SUBMODULO_LABELS[sub] || sub.replace(/_/g, ' ')}
+                                                                                </span>
                                                                             </label>
                                                                         );
                                                                     })}
