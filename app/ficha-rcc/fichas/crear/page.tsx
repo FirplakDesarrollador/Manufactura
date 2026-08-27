@@ -12,6 +12,8 @@ import Combobox from '@/components/ficha-rcc/Combobox';
 import { PLANTAS_LIST, ORIGENES_LIST } from '@/lib/ficha-rcc/constants';
 import { isAuthorized } from '@/lib/ficha-rcc/auth';
 import SubHeader from '@/components/ficha-rcc/SubHeader';
+import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
+import { RESPONSABLES_LIST } from '@/lib/ficha-rcc/constants';
 
 export default function CrearFichaPage() {
   const router = useRouter();
@@ -64,11 +66,29 @@ export default function CrearFichaPage() {
   };
 
   const fetchResponsables = async () => {
-    const { data } = await supabase
-      .from('cat_responsables')
-      .select('nombre')
-      .order('nombre', { ascending: true });
-    if (data) setResponsablesCargados(data.map(r => r.nombre));
+    try {
+      const { data: empData } = await supabaseTalentoHumano
+        .from('empleados')
+        .select('nombreCompleto')
+        .eq('activo', true)
+        .order('nombreCompleto', { ascending: true });
+
+      const { data: catData } = await supabase
+        .from('cat_responsables')
+        .select('nombre')
+        .order('nombre', { ascending: true });
+
+      const empNombres = empData?.map(e => e.nombreCompleto?.trim()).filter(Boolean) || [];
+      const catNombres = catData?.map(r => r.nombre?.trim()).filter(Boolean) || [];
+
+      const unicos = Array.from(new Set([...catNombres, ...empNombres, ...RESPONSABLES_LIST])).sort((a, b) => a.localeCompare(b));
+      if (unicos.length > 0) {
+        setResponsablesCargados(unicos);
+      }
+    } catch (err) {
+      console.error('Error cargando responsables:', err);
+      setResponsablesCargados(RESPONSABLES_LIST);
+    }
   };
 
   const formatText = (str: string) => {

@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/ficha-rcc/supabaseClient';
+import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import Header from '@/components/opt-sistemica/Header';
 import Link from 'next/link';
 import SubHeader from '@/components/ficha-rcc/SubHeader';
+import Combobox from '@/components/ficha-rcc/Combobox';
+import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -22,6 +25,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'defectos' | 'personal' | 'procesos' | 'mantenimiento'>('defectos');
   const [fechaBorrar, setFechaBorrar] = useState('');
   const [responsables, setResponsables] = useState<any[]>([]);
+  const [empleadosFirplak, setEmpleadosFirplak] = useState<string[]>([]);
   const [procesos, setProcesos] = useState<any[]>([]);
   const [nuevoResponsable, setNuevoResponsable] = useState('');
   const [idProcesoNuevoResp, setIdProcesoNuevoResp] = useState('');
@@ -63,8 +67,9 @@ export default function AdminPage() {
     if (isAdmin) {
       if (activeTab === 'defectos') fetchDefectos();
       else if (activeTab === 'personal') {
-        fetchResponsables();
         fetchProcesos();
+        fetchEmpleadosFirplak();
+        fetchResponsables();
       }
       else if (activeTab === 'procesos') fetchProcesos();
     }
@@ -84,7 +89,42 @@ export default function AdminPage() {
       .from('cat_responsables')
       .select('*, cat_procesos(nombre)')
       .order('nombre', { ascending: true });
-    if (data) setResponsables(data);
+      
+    if (data) {
+      // Resolver y actualizar nombres completos en la BD si es necesario
+      const updatedList = await Promise.all(data.map(async (r) => {
+        const full = resolveNombreCompleto(r.nombre, empleadosFirplak);
+        if (full !== r.nombre) {
+          // Actualizar silenciosamente en la base de datos para corregirlo de raíz
+          await supabase.from('cat_responsables').update({ nombre: full }).eq('id', r.id);
+          return { ...r, nombre: full };
+        }
+        return r;
+      }));
+      setResponsables(updatedList);
+    }
+  };
+
+  const fetchEmpleadosFirplak = async () => {
+    try {
+      const { data, error } = await supabaseTalentoHumano
+        .from('empleados')
+        .select('nombreCompleto')
+        .eq('activo', true)
+        .order('nombreCompleto', { ascending: true });
+
+      if (error) {
+        console.error('Error cargando empleados:', error);
+      } else if (data) {
+        const nombres = data
+          .map(e => e.nombreCompleto?.trim())
+          .filter(Boolean);
+        const unicos = Array.from(new Set(nombres)).sort((a, b) => a.localeCompare(b));
+        setEmpleadosFirplak(unicos);
+      }
+    } catch (err) {
+      console.error('Error fetching empleados Firplak:', err);
+    }
   };
 
   const fetchProcesos = async () => {
@@ -108,8 +148,9 @@ export default function AdminPage() {
   const handleAddResponsable = async () => {
     if (!nuevoResponsable.trim()) return;
     setSaving(true);
+    const nombreFinal = resolveNombreCompleto(nuevoResponsable.trim(), empleadosFirplak);
     const { error } = await supabase.from('cat_responsables').insert([{ 
-      nombre: nuevoResponsable.trim(),
+      nombre: nombreFinal,
       proceso_id: idProcesoNuevoResp || null
     }]);
     if (error) alert('Error: ' + error.message);
@@ -161,8 +202,9 @@ export default function AdminPage() {
   const saveEditResponsable = async () => {
     if (!editingId || !editingNombre.trim()) return;
     setSaving(true);
+    const nombreFinal = resolveNombreCompleto(editingNombre.trim(), empleadosFirplak);
     await supabase.from('cat_responsables').update({ 
-      nombre: editingNombre.trim(),
+      nombre: nombreFinal,
       proceso_id: idProcesoNuevoResp || null
     }).eq('id', editingId);
     setEditingId(null);
@@ -339,14 +381,19 @@ export default function AdminPage() {
             <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>Lista oficial de responsables que aparecerá en los formularios.</p>
             <div style={{ background: 'var(--surface-hover)', padding: '20px', borderRadius: '15px', marginBottom: '30px', border: '1px solid var(--border)' }}>
               <h3 style={{ marginBottom: '12px', color: 'var(--primary)' }}>Añadir Responsable</h3>
-              <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
-                <input placeholder="Nombre completo" className="input-field" style={{ marginBottom: 0 }} value={nuevoResponsable} onChange={e => setNuevoResponsable(e.target.value)} />
+              <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+                <Combobox
+                  options={empleadosFirplak}
+                  value={nuevoResponsable}
+                  onChange={setNuevoResponsable}
+                  placeholder={empleadosFirplak.length === 0 ? "Cargando empleados de Firplak..." : "Seleccionar empleado de Firplak..."}
+                />
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <select className="input-field" style={{ marginBottom: 0, flex: 1 }} value={idProcesoNuevoResp} onChange={e => setIdProcesoNuevoResp(e.target.value)}>
                     <option value="">Seleccionar Proceso...</option>
                     {procesos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                   </select>
-                  <button className="btn-primary" style={{ width: 'auto' }} onClick={handleAddResponsable} disabled={saving}>Añadir</button>
+                  <button className="btn-primary" style={{ width: 'auto' }} onClick={handleAddResponsable} disabled={saving || !nuevoResponsable}>Añadir</button>
                 </div>
               </div>
             </div>
@@ -360,34 +407,42 @@ export default function AdminPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {responsables.filter(r => r.nombre.toLowerCase().includes(filtroPersonal.toLowerCase())).map(r => (
-                <div key={r.id} style={{ display: 'flex', flexDirection: 'column', padding: '12px 20px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  {editingId === r.id ? (
-                    <div style={{ display: 'flex', gap: '10px', flexDirection: 'column', width: '100%' }}>
-                      <input className="input-field" style={{ marginBottom: 0 }} value={editingNombre} onChange={e => setEditingNombre(e.target.value)} />
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <select className="input-field" style={{ marginBottom: 0, flex: 1 }} value={idProcesoNuevoResp} onChange={e => setIdProcesoNuevoResp(e.target.value)}>
-                          <option value="">Seleccionar Proceso...</option>
-                          {procesos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                        <button className="btn-primary" style={{ width: 'auto' }} onClick={saveEditResponsable}>✓</button>
-                        <button className="btn-secondary" style={{ width: 'auto' }} onClick={() => { setEditingId(null); setIdProcesoNuevoResp(''); }}>×</button>
+              {responsables.filter(r => resolveNombreCompleto(r.nombre, empleadosFirplak).toLowerCase().includes(filtroPersonal.toLowerCase())).map(r => {
+                const nombreCompleto = resolveNombreCompleto(r.nombre, empleadosFirplak);
+                return (
+                  <div key={r.id} style={{ display: 'flex', flexDirection: 'column', padding: '12px 20px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    {editingId === r.id ? (
+                      <div style={{ display: 'flex', gap: '10px', flexDirection: 'column', width: '100%' }}>
+                        <Combobox
+                          options={empleadosFirplak}
+                          value={editingNombre}
+                          onChange={setEditingNombre}
+                          placeholder="Seleccionar empleado de Firplak..."
+                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <select className="input-field" style={{ marginBottom: 0, flex: 1 }} value={idProcesoNuevoResp} onChange={e => setIdProcesoNuevoResp(e.target.value)}>
+                            <option value="">Seleccionar Proceso...</option>
+                            {procesos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                          </select>
+                          <button className="btn-primary" style={{ width: 'auto' }} onClick={saveEditResponsable}>✓</button>
+                          <button className="btn-secondary" style={{ width: 'auto' }} onClick={() => { setEditingId(null); setIdProcesoNuevoResp(''); }}>×</button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 600 }}>{r.nombre}</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Proceso: {r.cat_procesos?.nombre || 'Sin asignar'}</span>
+                    ) : (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: 600 }}>{nombreCompleto}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Proceso: {r.cat_procesos?.nombre || 'Sin asignar'}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => { setEditingId(r.id); setEditingNombre(nombreCompleto); setIdProcesoNuevoResp(r.proceso_id || ''); }} style={{ color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Editar</button>
+                          <button onClick={() => handleDeleteResponsable(r.id)} style={{ color: 'var(--text)', background: 'none', border: 'none', cursor: 'pointer' }}>Borrar</button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => { setEditingId(r.id); setEditingNombre(r.nombre); setIdProcesoNuevoResp(r.proceso_id || ''); }} style={{ color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Editar</button>
-                        <button onClick={() => handleDeleteResponsable(r.id)} style={{ color: 'var(--text)', background: 'none', border: 'none', cursor: 'pointer' }}>Borrar</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         ) : activeTab === 'procesos' ? (
@@ -440,7 +495,7 @@ export default function AdminPage() {
                     type="date" 
                     className="input-field" 
                     value={fechaBorrar} 
-                    onChange={e => setFechaBorrar(e.target.value)}
+                    onChange={e => setFechaBorrar(e.target.value)} 
                     style={{ marginBottom: 0 }}
                   />
                 </div>
