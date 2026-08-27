@@ -17,9 +17,9 @@ interface SemaforoApiResponse {
 const PLANT_ALIASES: Record<string, string[]> = {
   MS: ['MS', 'MARMOL', 'MÁRMOL SINTÉTICO', 'MARMOL SINTETICO'],
   FV: ['FV', 'FIBRA', 'FIBRA DE VIDRIO'],
-  MBL: ['MBL', 'MUEBLE', 'MUEBLES', 'MBLP'],
-  CEFI: ['CEFI', 'MBL CEFI', 'MBL-CEFI'],
-  QZ: ['QZ', 'CUARZO', 'ESPGAB', 'PFZ-CEMA']
+  MBL: ['ESPGAB', 'MBLP', 'MUEBLE', 'MBL', 'MUEBLES'],
+  CEFI: ['MBL CEFI', 'PFZ-CEMA', 'CEFI', 'MBL-CEFI'],
+  QZ: ['QUARTZSTONE', 'RTM', 'RTMM', 'CUARZO', 'QZ']
 };
 
 export async function GET(request: Request) {
