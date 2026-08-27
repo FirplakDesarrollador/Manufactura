@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users } from "lucide-react";
+import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users, RefreshCw, CheckCircle2 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
 
@@ -146,65 +146,80 @@ export default function IndicadoresProductividadPage() {
     // Plant selector state
     const [selectedPlant, setSelectedPlant] = useState<PlantKey>("MS");
 
-    // Manual date field (DD/MM/AAAA) defaulting to YESTERDAY
-    const getYesterdayFormatted = () => {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const dd = String(yesterday.getDate()).padStart(2, "0");
-        const mm = String(yesterday.getMonth() + 1).padStart(2, "0");
-        const yyyy = yesterday.getFullYear();
-        return `${dd}/${mm}/${yyyy}`;
+    // Fecha hábil anterior a hoy por defecto (en formato YYYY-MM-DD para el input type="date")
+    const getPreviousBusinessDayISO = () => {
+        const date = new Date();
+        const dayOfWeek = date.getDay(); // 0: Dom, 1: Lun, 2: Mar, ..., 6: Sáb
+
+        if (dayOfWeek === 1) {
+            // Si hoy es Lunes -> Viernes (-3 días)
+            date.setDate(date.getDate() - 3);
+        } else if (dayOfWeek === 0) {
+            // Si hoy es Domingo -> Viernes (-2 días)
+            date.setDate(date.getDate() - 2);
+        } else if (dayOfWeek === 6) {
+            // Si hoy es Sábado -> Viernes (-1 día)
+            date.setDate(date.getDate() - 1);
+        } else {
+            // Martes a Viernes -> Ayer (-1 día)
+            date.setDate(date.getDate() - 1);
+        }
+
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
     };
-    const [fechaManual, setFechaManual] = useState<string>(getYesterdayFormatted());
+
+    const [fechaISO, setFechaISO] = useState<string>(getPreviousBusinessDayISO());
+    const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+    const [loadingNS, setLoadingNS] = useState<boolean>(false);
 
     // Separate Plant Data States for Manual and Automático dashboards
     const [manualPlantData, setManualPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
     const [autoPlantData, setAutoPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
-    const [loadingNS, setLoadingNS] = useState<boolean>(false);
 
-    // Fetch live Nivel de Servicio from SAP Semáforo query
-    useEffect(() => {
-        let fechaQuery = fechaManual;
-        if (fechaManual.includes("/")) {
-            const parts = fechaManual.split("/");
-            if (parts.length === 3 && parts[2].length === 4) {
-                fechaQuery = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-            }
-        }
-
-        const fetchNivelServicio = async () => {
-            try {
-                setLoadingNS(true);
-                const res = await fetch(`/api/indicadores/nivel-servicio?fecha=${fechaQuery}`);
-                if (!res.ok) return;
-                const json = await res.json();
-                if (json.success && json.plantas) {
-                    setAutoPlantData((prev) => {
-                        const updated = { ...prev };
-                        for (const [pKey, vals] of Object.entries(json.plantas)) {
-                            const pk = pKey as PlantKey;
-                            if (updated[pk]) {
-                                const valNum = (vals as any).nivelServicio;
-                                if (typeof valNum === "number") {
-                                    updated[pk] = {
-                                        ...updated[pk],
-                                        nivelServicioReal: valNum,
-                                    };
-                                }
+    // Función para consultar Nivel de Servicio en tiempo real
+    const fetchNivelServicio = async (targetFecha: string) => {
+        try {
+            setLoadingNS(true);
+            const res = await fetch(`/api/indicadores/nivel-servicio?fecha=${targetFecha}`);
+            if (!res.ok) return;
+            const json = await res.json();
+            if (json.success && json.plantas) {
+                setAutoPlantData((prev) => {
+                    const updated = { ...prev };
+                    for (const [pKey, vals] of Object.entries(json.plantas)) {
+                        const pk = pKey as PlantKey;
+                        if (updated[pk]) {
+                            const valNum = (vals as any).nivelServicio;
+                            if (typeof valNum === "number") {
+                                updated[pk] = {
+                                    ...updated[pk],
+                                    nivelServicioReal: valNum,
+                                };
                             }
                         }
-                        return updated;
-                    });
-                }
-            } catch (err) {
-                console.error("Error fetching live Nivel de Servicio:", err);
-            } finally {
-                setLoadingNS(false);
+                    }
+                    return updated;
+                });
+                const now = new Date();
+                const horaStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setLastUpdated(horaStr);
             }
-        };
+        } catch (err) {
+            console.error("Error fetching live Nivel de Servicio:", err);
+        } finally {
+            setLoadingNS(false);
+        }
+    };
 
-        fetchNivelServicio();
-    }, [fechaManual]);
+    // Consulta inicial y ante cambio de fecha
+    useEffect(() => {
+        if (fechaISO) {
+            fetchNivelServicio(fechaISO);
+        }
+    }, [fechaISO]);
 
     // Active plant data depending on selected tab
     const plantData = viewMode === "automatico" ? autoPlantData : manualPlantData;
@@ -520,19 +535,39 @@ export default function IndicadoresProductividadPage() {
                                 </div>
                             </div>
 
-                            {/* Manual Date Field (DD/MM/AAAA) in top right */}
-                            <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-xl border border-[#e2ded5] shadow-sm">
-                                <Calendar size={16} className="text-[#324354]" />
-                                <span className="text-xs font-extrabold text-[#324354] uppercase tracking-wide">
-                                    FECHA:
-                                </span>
-                                <input
-                                    type="text"
-                                    value={fechaManual}
-                                    onChange={(e) => setFechaManual(e.target.value)}
-                                    placeholder="DD/MM/AAAA"
-                                    className="w-28 text-xs font-black text-center text-[#324354] bg-slate-50 border border-slate-300 rounded-lg px-2 py-0.5 focus:ring-2 focus:ring-[#324354] focus:outline-none"
-                                />
+                            {/* Selector de Fecha con Calendario Interactivo, Botón Buscar e Indicador de Actualización */}
+                            <div className="flex flex-wrap items-center gap-2.5 bg-white px-3.5 py-1.5 rounded-xl border border-[#e2ded5] shadow-sm">
+                                <div className="flex items-center gap-1.5">
+                                    <Calendar size={16} className="text-[#324354]" />
+                                    <span className="text-xs font-extrabold text-[#324354] uppercase tracking-wide">
+                                        FECHA:
+                                    </span>
+                                    <input
+                                        type="date"
+                                        value={fechaISO}
+                                        onChange={(e) => setFechaISO(e.target.value)}
+                                        className="text-xs font-bold text-[#324354] bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-[#324354] focus:outline-none cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* Botón Consultar / Buscar */}
+                                <button
+                                    onClick={() => fetchNivelServicio(fechaISO)}
+                                    disabled={loadingNS}
+                                    title="Consultar datos de esta fecha"
+                                    className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                                >
+                                    <RefreshCw size={13} className={loadingNS ? "animate-spin" : ""} />
+                                    <span>{loadingNS ? "Consultando..." : "Consultar"}</span>
+                                </button>
+
+                                {/* Indicador de Estado Actualizado */}
+                                {lastUpdated && !loadingNS && (
+                                    <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold px-2 py-1 rounded-lg animate-in fade-in duration-300">
+                                        <CheckCircle2 size={13} className="text-emerald-600" />
+                                        <span>Actualizado ({lastUpdated})</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
