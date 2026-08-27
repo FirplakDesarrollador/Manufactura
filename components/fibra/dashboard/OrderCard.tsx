@@ -55,11 +55,11 @@ export function OrderCard({ order }: OrderCardProps) {
 
                 </div>
                 <div className="mb-2">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-tight">Pedido: {order.numero_pedido}</p>
-                    <p className="text-[11px] text-[#254153] leading-tight mt-1">{order.producto_descripcion}</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-tight">Pedido: {order.numero_pedido || order.pedido || '-'}</p>
+                    <p className="text-[11px] font-bold text-[#254153] leading-snug mt-1" title={order.producto_descripcion}>{order.producto_descripcion || order.producto_sku || 'Sin descripción'}</p>
                 </div>
                 <div className="flex items-center gap-2 mt-3">
-                    <span className="text-[10px] text-gray-400">👤 Cliente: {order.cliente}</span>
+                    <span className="text-[10px] text-gray-400">👤 Cliente: {order.cliente || order.cliente_nombre || '-'}</span>
                 </div>
             </div>
 

@@ -124,11 +124,11 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
-                (orden.pedido || '').toLowerCase().includes(search) ||
+                (orden.pedido || orden.numero_pedido || '').toLowerCase().includes(search) ||
                 (orden.molde_descripcion || '').toLowerCase().includes(search) ||
                 (orden.producto_sku || '').toLowerCase().includes(search) ||
                 (orden.molde_sku || '').toLowerCase().includes(search) ||
-                (orden.cliente || '').toLowerCase().includes(search)
+                (orden.cliente || orden.cliente_nombre || '').toLowerCase().includes(search)
 
             const matchesDate = !selectedDate ||
                 (orden.fecha_ideal_produccion &&

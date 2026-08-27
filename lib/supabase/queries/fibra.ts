@@ -96,10 +96,10 @@ export async function getRegistrosTrazabilidadPorOrden(ordenFabricacion: string)
 
 export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
     const { data, error } = await supabase
-        .from('moldes_fv')
+        .from('query_moldes')
         .select('*')
         .eq('estado', 'Disponible')
-        .eq('tipo_molde_sku', moldeSku) // Changed molde_sku to tipo_molde_sku based on moldes_fv schema
+        .eq('molde_sku', moldeSku)
         .order('vueltas_actuales', { ascending: true })
 
     if (error) {
@@ -112,28 +112,22 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
 
 export async function getAllMoldes(): Promise<Molde[]> {
     const { data, error } = await supabase
-        .from('moldes_fv')
+        .from('query_moldes')
         .select('*')
         .neq('estado', 'Destruido')
-        // We order by serial since descripcion_molde might not exist directly in moldes_fv
-        .order('serial', { ascending: true })
+        .order('molde_descripcion', { ascending: true })
 
     if (error) {
         console.error('Error fetching all moldes:', error)
         return []
     }
 
-    // Map serial to molde_descripcion to be compatible with UI
-    return (data || []).map(m => ({
-        ...m,
-        molde_descripcion: m.observaciones || m.serial,
-        molde_sku: m.tipo_molde_sku
-    }))
+    return data || []
 }
 
 export async function updateMoldeEstado(moldeId: number, nuevoEstado: string) {
     const { data, error } = await supabase
-        .from('moldes_fv')
+        .from('moldes')
         .update({ estado: nuevoEstado })
         .eq('id', moldeId)
         .select()
@@ -182,7 +176,7 @@ export async function registrarPintura(pinturaData: {
     let masa = orden.producto_masa || 0
     if (!masa && orden.producto_sku) {
         const { data: producto } = await supabase
-            .from('productos_fv')
+            .from('productos')
             .select('masa')
             .eq('producto_sku', orden.producto_sku)
             .maybeSingle()
@@ -192,7 +186,7 @@ export async function registrarPintura(pinturaData: {
 
     // 3. Obtener información del molde
     const { data: molde, error: moldeError } = await supabase
-        .from('moldes_fv')
+        .from('query_moldes')
         .select('*')
         .eq('id', pinturaData.molde_id)
         .single()
@@ -237,7 +231,6 @@ export async function registrarPintura(pinturaData: {
     const { data: trazaReciente, error: trazaError } = await supabase
         .from('trazabilidad_fv')
         .select('estado')
-        // Assuming we relate through molde_id directly in trazabilidad_fv
         .eq('molde_id', molde.id)
         .order('pintura_fecha', { ascending: false })
         .limit(1)
@@ -250,7 +243,7 @@ export async function registrarPintura(pinturaData: {
     // 6. Actualizar molde
     const now = new Date()
     const { error: updateError } = await supabase
-        .from('moldes_fv')
+        .from('moldes')
         .update({ 
             estado: 'En uso',
             vueltas_actuales: (molde.vueltas_actuales || 0) + 1,

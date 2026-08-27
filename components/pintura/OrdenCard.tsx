@@ -68,7 +68,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                         <span className="text-xs font-bold text-gray-900 truncate">OF: {orden.orden_fabricacion}</span>
 
                     </div>
-                    <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido}</div>
+                    <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || orden.numero_pedido || 'Sin pedido'}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
                         {orden.fecha_ideal_produccion && (
                             <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
@@ -81,12 +81,14 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                             </div>
                         )}
                     </div>
-                    <div className="text-[11px] text-gray-500 mt-1 line-clamp-none leading-tight">{orden.producto_descripcion}</div>
-                    <div className="text-[9px] text-gray-400 italic mt-1 truncate">SKU: {sku || 'No definido'}</div>
+                    <div className="text-[11px] font-bold text-gray-800 mt-1 line-clamp-2 leading-tight" title={orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku}>
+                        {orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'}
+                    </div>
+                    <div className="text-[9px] text-gray-400 italic mt-0.5 truncate">SKU: {sku || 'No definido'}</div>
                 </div>
                 <div className="flex items-center gap-1 text-cyan-500 mt-2 md:mt-auto">
                     <Users size={12} className="shrink-0" />
-                    <span className="text-[11px] font-bold truncate">Cliente: {orden.cliente || orden.cliente_nombre}</span>
+                    <span className="text-[11px] font-bold truncate">Cliente: {orden.cliente || orden.cliente_nombre || 'No registrado'}</span>
                 </div>
             </div>
 

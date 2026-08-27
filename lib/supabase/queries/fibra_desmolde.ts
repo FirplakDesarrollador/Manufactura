@@ -49,7 +49,7 @@ export async function registrarDesmolde(registroId: number, usuarioEmail: string
 
     // 3. Liberar el molde -> Disponible, resetear vueltas_actuales
     const { error: moldeError } = await supabase
-        .from('moldes_fv')
+        .from('moldes')
         .update({
             estado: 'Disponible',
             modificado_por: usuarioEmail,
