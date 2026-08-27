@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
@@ -160,6 +160,51 @@ export default function IndicadoresProductividadPage() {
     // Separate Plant Data States for Manual and Automático dashboards
     const [manualPlantData, setManualPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
     const [autoPlantData, setAutoPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
+    const [loadingNS, setLoadingNS] = useState<boolean>(false);
+
+    // Fetch live Nivel de Servicio from SAP Semáforo query
+    useEffect(() => {
+        let fechaQuery = fechaManual;
+        if (fechaManual.includes("/")) {
+            const parts = fechaManual.split("/");
+            if (parts.length === 3 && parts[2].length === 4) {
+                fechaQuery = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+            }
+        }
+
+        const fetchNivelServicio = async () => {
+            try {
+                setLoadingNS(true);
+                const res = await fetch(`/api/indicadores/nivel-servicio?fecha=${fechaQuery}`);
+                if (!res.ok) return;
+                const json = await res.json();
+                if (json.success && json.plantas) {
+                    setAutoPlantData((prev) => {
+                        const updated = { ...prev };
+                        for (const [pKey, vals] of Object.entries(json.plantas)) {
+                            const pk = pKey as PlantKey;
+                            if (updated[pk]) {
+                                const valNum = (vals as any).nivelServicio;
+                                if (typeof valNum === "number") {
+                                    updated[pk] = {
+                                        ...updated[pk],
+                                        nivelServicioReal: valNum,
+                                    };
+                                }
+                            }
+                        }
+                        return updated;
+                    });
+                }
+            } catch (err) {
+                console.error("Error fetching live Nivel de Servicio:", err);
+            } finally {
+                setLoadingNS(false);
+            }
+        };
+
+        fetchNivelServicio();
+    }, [fechaManual]);
 
     // Active plant data depending on selected tab
     const plantData = viewMode === "automatico" ? autoPlantData : manualPlantData;
