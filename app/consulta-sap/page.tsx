@@ -7,7 +7,7 @@ import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2 } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer } from 'lucide-react'
 import LiberacionMueblesView from '@/components/liberacion-muebles/LiberacionMueblesView'
 
 interface ComponentItem {
@@ -350,8 +350,8 @@ export default function ConsultaSAPPage() {
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
-    // SubHeader Tabs: Consulta Ordenes vs Query - Semáforo vs Consulta por Producto vs Liberación Muebles
-    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'query-semaforo' | 'consulta-producto' | 'liberacion-muebles'>('consulta-ordenes')
+    // SubHeader Tabs: Consulta Ordenes vs Consulta por Producto vs Query - Semáforo vs Query - Ordenes Liberadas vs Query - Entregas Producción vs Liberación Muebles
+    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'consulta-producto' | 'query-semaforo' | 'query-ordenes-liberadas' | 'query-entregas-produccion' | 'liberacion-muebles'>('consulta-ordenes')
 
     // Estados Consulta por Producto (Datos maestros de artículo) - Inicialmente Vacíos
     const [itemCodeInput, setItemCodeInput] = useState("")
@@ -844,6 +844,7 @@ export default function ConsultaSAPPage() {
             {/* SUBHEADER BAR FIXED WITH TABS */}
             <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans sticky top-0">
                 <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-center overflow-x-auto scrollbar-hide py-0.5">
+                    {/* 1. Consulta Ordenes */}
                     <button
                         onClick={() => setSubHeaderTab('consulta-ordenes')}
                         className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
@@ -856,18 +857,7 @@ export default function ConsultaSAPPage() {
                         <span>Consulta Ordenes</span>
                     </button>
 
-                    <button
-                        onClick={() => setSubHeaderTab('query-semaforo')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
-                            subHeaderTab === 'query-semaforo'
-                                ? 'bg-[#324354] text-white shadow-md'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        }`}
-                    >
-                        <FileSpreadsheet size={16} />
-                        <span>Query - Semáforo</span>
-                    </button>
-
+                    {/* 2. Consulta por Producto */}
                     <button
                         onClick={() => setSubHeaderTab('consulta-producto')}
                         className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
@@ -880,6 +870,46 @@ export default function ConsultaSAPPage() {
                         <span>Consulta por Producto</span>
                     </button>
 
+                    {/* 3. Query - Semáforo */}
+                    <button
+                        onClick={() => setSubHeaderTab('query-semaforo')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                            subHeaderTab === 'query-semaforo'
+                                ? 'bg-[#324354] text-white shadow-md'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                    >
+                        <FileSpreadsheet size={16} />
+                        <span>Query - Semáforo</span>
+                    </button>
+
+                    {/* 4. Query - Ordenes Liberadas (Nuevo) */}
+                    <button
+                        onClick={() => setSubHeaderTab('query-ordenes-liberadas')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                            subHeaderTab === 'query-ordenes-liberadas'
+                                ? 'bg-[#324354] text-white shadow-md'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                    >
+                        <FileSpreadsheet size={16} />
+                        <span>Query - Ordenes Liberadas</span>
+                    </button>
+
+                    {/* 5. Query - Entregas Producción (Nuevo) */}
+                    <button
+                        onClick={() => setSubHeaderTab('query-entregas-produccion')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                            subHeaderTab === 'query-entregas-produccion'
+                                ? 'bg-[#324354] text-white shadow-md'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                    >
+                        <FileSpreadsheet size={16} />
+                        <span>Query - Entregas Producción</span>
+                    </button>
+
+                    {/* 6. Liberación Muebles */}
                     <button
                         onClick={() => setSubHeaderTab('liberacion-muebles')}
                         className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
@@ -1076,6 +1106,19 @@ export default function ConsultaSAPPage() {
 
                                 {/* RIGHT COLUMN FIELDS */}
                                 <div className="space-y-0 shrink-0">
+                                    {/* Botón Imprimir colocado exactamente en la ubicación indicada */}
+                                    <div className="flex items-center justify-end mb-1">
+                                        <button 
+                                            type="button"
+                                            onClick={() => window.print()}
+                                            className="bg-[#324354] hover:bg-[#253342] active:scale-95 text-white px-3 py-0.5 text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs rounded-none border border-[#1c2733] cursor-pointer"
+                                            title="Imprimir Orden de Fabricación SAP"
+                                        >
+                                            <Printer size={12} />
+                                            <span>Imprimir</span>
+                                        </button>
+                                    </div>
+
                                     {/* Nº OF-Produ */}
                                     <div className="flex items-center justify-end h-5">
                                         <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Nº OF-Produ</span>
@@ -2275,6 +2318,32 @@ export default function ConsultaSAPPage() {
 
                         </div>
                     </div>
+                </main>
+            ) : subHeaderTab === 'query-ordenes-liberadas' ? (
+                <main className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none py-28">
+                    <div className="w-20 h-20 bg-[#324354]/5 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                        <FileSpreadsheet className="w-10 h-10 text-[#324354]" />
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-bold text-[#324354] mb-3">Módulo en Construcción</h2>
+                    <p className="text-sm md:text-base text-gray-500 max-w-md mb-8">
+                        Estamos diseñando y construyendo la sección de <strong>Query - Órdenes Liberadas</strong> para brindarte la mejor experiencia operativa.
+                    </p>
+                    <p className="text-xs md:text-sm italic text-[#7B8E90] tracking-wide select-none">
+                        Inspirando Hogares
+                    </p>
+                </main>
+            ) : subHeaderTab === 'query-entregas-produccion' ? (
+                <main className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none py-28">
+                    <div className="w-20 h-20 bg-[#324354]/5 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                        <FileSpreadsheet className="w-10 h-10 text-[#324354]" />
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-bold text-[#324354] mb-3">Módulo en Construcción</h2>
+                    <p className="text-sm md:text-base text-gray-500 max-w-md mb-8">
+                        Estamos diseñando y construyendo la sección de <strong>Query - Entregas Producción</strong> para brindarte la mejor experiencia operativa.
+                    </p>
+                    <p className="text-xs md:text-sm italic text-[#7B8E90] tracking-wide select-none">
+                        Inspirando Hogares
+                    </p>
                 </main>
             ) : subHeaderTab === 'liberacion-muebles' ? (
                 <main className="flex-1 max-w-[1700px] w-full mx-auto p-1 md:p-1.5 flex flex-col font-sans h-full min-h-0">
