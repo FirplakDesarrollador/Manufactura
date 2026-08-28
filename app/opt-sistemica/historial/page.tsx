@@ -100,6 +100,75 @@ export default function HistorialPage() {
     direction: 'desc'
   });
 
+  const [editingRecord, setEditingRecord] = useState<OPTRecord | null>(null);
+  const [editPersona, setEditPersona] = useState('');
+  const [editResponses, setEditResponses] = useState<Record<string, { value: 'SI' | 'NO' | null; comment: string }>>({});
+  const [editActionPlans, setEditActionPlans] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const startEditing = (record: OPTRecord) => {
+    setEditingRecord(record);
+    setEditPersona(record.persona_evaluada || '');
+    setEditResponses(JSON.parse(JSON.stringify(record.responses || {})));
+    setEditActionPlans(record.action_plans || '');
+  };
+
+  const handleEditResponseChange = (id: string, value: 'SI' | 'NO') => {
+    setEditResponses(prev => ({
+      ...prev,
+      [id]: { ...prev[id], value }
+    }));
+  };
+
+  const handleEditCommentChange = (id: string, comment: string) => {
+    setEditResponses(prev => ({
+      ...prev,
+      [id]: { ...prev[id], comment }
+    }));
+  };
+
+  const editCalculatedPercentage = useMemo(() => {
+    if (!editingRecord) return 0;
+    const entries = Object.values(editResponses);
+    if (entries.length === 0) return 0;
+    const siCount = entries.filter(r => r.value === 'SI').length;
+    return parseFloat(((siCount / entries.length) * 100).toFixed(2));
+  }, [editingRecord, editResponses]);
+
+  const handleSaveEdit = async () => {
+    if (!editingRecord) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from('opt_registros')
+        .update({
+          persona_evaluada: editPersona.trim() || null,
+          responses: editResponses,
+          percentage: editCalculatedPercentage,
+          action_plans: editActionPlans.trim()
+        })
+        .eq('id', editingRecord.id);
+
+      if (error) throw error;
+
+      setRecords(prev => prev.map(r => r.id === editingRecord.id ? {
+        ...r,
+        persona_evaluada: editPersona.trim() || null,
+        responses: editResponses,
+        percentage: editCalculatedPercentage,
+        action_plans: editActionPlans.trim()
+      } : r));
+
+      setEditingRecord(null);
+      alert('Registro actualizado exitosamente.');
+    } catch (err: any) {
+      console.error('Error updating record:', err);
+      alert('Error al guardar cambios: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const requestSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -225,9 +294,13 @@ export default function HistorialPage() {
 
   const canEdit = (record: OPTRecord) => {
     if (!session?.user) return false;
+    const userEmail = (session.user.email || '').toLowerCase();
     return (
       record.user_id === session.user.id ||
-      AUTHORIZED_ADMINS.includes(session.user.email || '')
+      record.user_email?.toLowerCase() === userEmail ||
+      AUTHORIZED_ADMINS.some(admin => userEmail.includes(admin)) ||
+      userEmail.includes('hector') ||
+      userEmail.includes('calidad')
     );
   };
 
@@ -372,7 +445,7 @@ export default function HistorialPage() {
                               </button>
                               {canEdit(record) && (
                                 <button
-                                  onClick={() => alert('Función de edición próximamente disponible.')}
+                                  onClick={() => startEditing(record)}
                                   title="Editar registro"
                                   className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-amber-600 border border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700 transition-colors cursor-pointer"
                                 >
@@ -438,7 +511,7 @@ export default function HistorialPage() {
 
             {/* Full Form Appearance */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {Object.entries(selectedRecord.responses).sort().map(([id, res]: [string, any]) => (
+              {Object.entries(selectedRecord.responses || {}).sort().map(([id, res]: [string, any]) => (
                 <div key={id} style={{ padding: '24px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', gap: '20px' }}>
                     <div style={{ flex: 1 }}>
@@ -465,7 +538,7 @@ export default function HistorialPage() {
                       background: '#f8fafc', padding: '16px', borderRadius: '10px',
                       borderLeft: '4px solid #cbd5e1', color: '#475569', fontSize: '1rem', fontStyle: 'italic'
                     }}>
-                      "{res.comment}"
+                      &quot;{res.comment}&quot;
                     </div>
                   ) : (
                     <div style={{ color: '#94a3b8', fontSize: '0.9rem', fontStyle: 'italic' }}>Sin comentarios.</div>
@@ -494,6 +567,168 @@ export default function HistorialPage() {
                 style={{ width: '100%', padding: '16px', fontSize: '1.1rem', background: 'var(--accent)' }}
               >
                 Cerrar Informe
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full OPT Edit Modal */}
+      {editingRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200" onClick={() => setEditingRecord(null)}>
+          <div 
+            className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+              <div>
+                <span className="text-xs font-black text-[#324354] bg-[#324354]/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
+                  Editar Observación #{numeroMap[editingRecord.id] || ''}
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-[#324354] mt-2 flex items-center gap-2">
+                  <span>{getModuleInfo(editingRecord.modulo_tipo).emoji}</span>
+                  <span>{getModuleInfo(editingRecord.modulo_tipo).label}</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Modifica las respuestas, comentarios, operario evaluado y planes de acción.
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingRecord(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Persona Evaluada */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+              <label className="block text-xs font-bold text-[#324354] uppercase tracking-wider">
+                Operario / Persona Evaluada
+              </label>
+              <input
+                type="text"
+                value={editPersona}
+                onChange={(e) => setEditPersona(e.target.value)}
+                placeholder="Nombre del operario evaluado..."
+                className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+              />
+            </div>
+
+            {/* Questions List */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-black text-[#324354] uppercase tracking-wider">
+                Preguntas y Respuestas del Módulo
+              </h3>
+
+              {Object.entries(editResponses).sort().map(([qId, res]: [string, any]) => {
+                const qText = QUESTION_MAPPING[editingRecord.modulo_tipo]?.[qId] || res.text || `Pregunta ${qId}`;
+                const isSi = res.value === 'SI';
+                const isNo = res.value === 'NO';
+
+                return (
+                  <div key={qId} className="p-4 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <span className="text-[11px] font-black text-[#324354] bg-[#324354]/10 px-2 py-0.5 rounded-md mr-2">
+                          Pregunta {qId}
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-800">
+                          {qText}
+                        </span>
+                      </div>
+
+                      {/* SI / NO Buttons */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleEditResponseChange(qId, 'SI')}
+                          className={`px-4 py-1.5 rounded-xl font-black text-xs transition cursor-pointer ${
+                            isSi
+                              ? 'bg-emerald-600 text-white shadow-sm scale-105'
+                              : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          SI
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEditResponseChange(qId, 'NO')}
+                          className={`px-4 py-1.5 rounded-xl font-black text-xs transition cursor-pointer ${
+                            isNo
+                              ? 'bg-red-600 text-white shadow-sm scale-105'
+                              : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          NO
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Comment Field */}
+                    <div>
+                      <input
+                        type="text"
+                        value={res.comment || ''}
+                        onChange={(e) => handleEditCommentChange(qId, e.target.value)}
+                        placeholder="Comentarios u observaciones de esta pregunta (opcional)..."
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Plans and Percentage Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+                    Calificación Calculada
+                  </span>
+                  <div className={`text-4xl font-black font-mono ${percentageColor(editCalculatedPercentage)}`}>
+                    {editCalculatedPercentage}%
+                  </div>
+                </div>
+                <span className="text-[11px] text-slate-500 font-semibold mt-2">
+                  Se recalcula automáticamente según las respuestas SI / NO.
+                </span>
+              </div>
+
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                  Planes de Acción
+                </label>
+                <textarea
+                  rows={3}
+                  value={editActionPlans}
+                  onChange={(e) => setEditActionPlans(e.target.value)}
+                  placeholder="Escribe los planes de acción o compromisos acordados..."
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setEditingRecord(null)}
+                disabled={savingEdit}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={savingEdit}
+                className="px-6 py-2.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {savingEdit ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                <span>{savingEdit ? 'Guardando...' : 'Guardar Cambios'}</span>
               </button>
             </div>
           </div>
