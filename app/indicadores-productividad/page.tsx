@@ -214,12 +214,8 @@ export default function IndicadoresProductividadPage() {
         }
     };
 
-    // Consulta inicial y ante cambio de fecha
-    useEffect(() => {
-        if (fechaISO) {
-            fetchNivelServicio(fechaISO);
-        }
-    }, [fechaISO]);
+    // NO consultar automáticamente al entrar ni al cambiar la fecha por defecto
+    // Se ejecuta únicamente cuando el usuario hace clic en el botón "Actualizar"
 
     // Active plant data depending on selected tab
     const plantData = viewMode === "automatico" ? autoPlantData : manualPlantData;
@@ -550,15 +546,15 @@ export default function IndicadoresProductividadPage() {
                                     />
                                 </div>
 
-                                {/* Botón Consultar / Buscar */}
+                                {/* Botón Actualizar */}
                                 <button
                                     onClick={() => fetchNivelServicio(fechaISO)}
                                     disabled={loadingNS}
-                                    title="Consultar datos de esta fecha"
+                                    title="Actualizar datos de esta fecha"
                                     className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer disabled:opacity-50"
                                 >
                                     <RefreshCw size={13} className={loadingNS ? "animate-spin" : ""} />
-                                    <span>{loadingNS ? "Consultando..." : "Consultar"}</span>
+                                    <span>{loadingNS ? "Actualizando..." : "Actualizar"}</span>
                                 </button>
 
                                 {/* Indicador de Estado Actualizado */}
