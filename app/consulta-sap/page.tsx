@@ -7,7 +7,7 @@ import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer, Calendar } from 'lucide-react'
 import LiberacionMueblesView from '@/components/liberacion-muebles/LiberacionMueblesView'
 
 interface ComponentItem {
