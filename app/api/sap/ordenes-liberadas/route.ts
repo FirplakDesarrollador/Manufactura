@@ -35,29 +35,43 @@ export async function GET() {
         const loginData = await loginToSAP();
         const baseUrl = process.env.SAP_API_URL?.replace('/Login', '');
 
-        // Consultar órdenes de fabricación en estado Liberado
-        // Ordenadas por fecha/docNum descendente
-        const ordersUrl = `${baseUrl}/ProductionOrders?$filter=ProductionOrderStatus eq 'boposReleased'&$top=500&$orderby=DocumentNumber desc&$select=DocumentNumber,ProductionOrderType,ProductionOrderStatus,PostingDate,DueDate,ClosingDate,CustomerCode,ItemNo,ProductDescription,Warehouse,PlannedQuantity,CompletedQuantity,UserSignature,U_HBT_Tercero`;
+        // Consultar todas las órdenes de fabricación en estado Liberado
+        // Recorriendo la paginación de SAP Service Layer
+        let allOrders: any[] = [];
+        let nextUrl: string | null = `${baseUrl}/ProductionOrders?$filter=ProductionOrderStatus eq 'boposReleased'&$orderby=DocumentNumber desc&$select=DocumentNumber,ProductionOrderType,ProductionOrderStatus,PostingDate,DueDate,ClosingDate,CustomerCode,ItemNo,ProductDescription,Warehouse,PlannedQuantity,CompletedQuantity,UserSignature,U_HBT_Tercero`;
 
-        const response = await fetch(ordersUrl, {
-            method: 'GET',
-            headers: {
-                'Cookie': loginData.cookieHeader,
-                'Content-Type': 'application/json'
-            },
-            cache: 'no-store'
-        });
+        while (nextUrl) {
+            const response: Response = await fetch(nextUrl, {
+                method: 'GET',
+                headers: {
+                    'Cookie': loginData.cookieHeader,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'odata.maxpagesize=500'
+                },
+                cache: 'no-store'
+            });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            return NextResponse.json(
-                { success: false, error: `Error SAP: ${response.status} - ${errText}` },
-                { status: response.status }
-            );
+            if (!response.ok) {
+                const errText = await response.text();
+                return NextResponse.json(
+                    { success: false, error: `Error SAP: ${response.status} - ${errText}` },
+                    { status: response.status }
+                );
+            }
+
+            const data: any = await response.json();
+            const items = data.value || [];
+            allOrders.push(...items);
+
+            if (data['odata.nextLink'] || data['@odata.nextLink']) {
+                const nextRel = data['odata.nextLink'] || data['@odata.nextLink'];
+                nextUrl = nextRel.startsWith('http') ? nextRel : `${baseUrl}/${nextRel.replace(/^\//, '')}`;
+            } else {
+                nextUrl = null;
+            }
         }
 
-        const data = await response.json();
-        const rawOrders = data.value || [];
+        const rawOrders = allOrders;
 
         // Mapear cada orden con las columnas exactas del Query de SAP "FPK - Ordenes de fabricación liberadas"
         const mappedOrders = rawOrders.map((order: any, index: number) => {
