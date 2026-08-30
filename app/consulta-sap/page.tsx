@@ -123,6 +123,21 @@ interface ReleasedOrderItem {
     usuario: string;
 }
 
+interface EntregaProduccionItem {
+    id: number;
+    docNum: string;
+    itemCode: string;
+    descripcion: string;
+    cantidad: number;
+    whsCode: string;
+    familia: string;
+    ov: string;
+    numLote: string;
+    tipoOrden: string;
+    docNumOP: string;
+    bloqueado: string;
+}
+
 interface SapItemWarehouse {
     warehouseCode: string;
     warehouseName?: string;
@@ -467,6 +482,27 @@ export default function ConsultaSAPPage() {
     const [releasedOrdersLoading, setReleasedOrdersLoading] = useState<boolean>(false)
     const [releasedOrdersHasLoaded, setReleasedOrdersHasLoaded] = useState<boolean>(false)
     const [copiedReleasedData, setCopiedReleasedData] = useState<boolean>(false)
+
+    // Estados para pestaña Query - Entregas Producción (FPK - Entregas Producción Fabián Agudelo)
+    const [entregasFromDate, setEntregasFromDate] = useState<string>(() => {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const d = String(firstDay.getDate()).padStart(2, '0');
+        const m = String(firstDay.getMonth() + 1).padStart(2, '0');
+        const y = firstDay.getFullYear();
+        return `${d}/${m}/${y}`;
+    });
+    const [entregasToDate, setEntregasToDate] = useState<string>(() => {
+        const now = new Date();
+        const d = String(now.getDate()).padStart(2, '0');
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const y = now.getFullYear();
+        return `${d}/${m}/${y}`;
+    });
+    const [entregasList, setEntregasList] = useState<EntregaProduccionItem[]>([]);
+    const [entregasLoading, setEntregasLoading] = useState<boolean>(false);
+    const [entregasHasLoaded, setEntregasHasLoaded] = useState<boolean>(false);
+    const [copiedEntregasData, setCopiedEntregasData] = useState<boolean>(false);
 
     // Estado para ordenamiento de tabla Query - Semáforo
     const [semaforoSortCol, setSemaforoSortCol] = useState<keyof SemaforoItem | null>(null)
@@ -893,6 +929,79 @@ export default function ConsultaSAPPage() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Ordenes_Liberadas");
         XLSX.writeFile(workbook, `FPK_Ordenes_Fabricacion_Liberadas_${new Date().toISOString().slice(0, 10)}.xlsx`);
         toast.success("Archivo Excel de Órdenes Liberadas descargado exitosamente");
+    };
+
+    // Actualizar Query FPK - Entregas Producción (Fabián Agudelo) desde SAP
+    const handleUpdateEntregas = async () => {
+        if (!entregasFromDate.trim() || !entregasToDate.trim()) {
+            toast.error("Por favor ingresa las fechas de contabilización Desde y Hasta");
+            return;
+        }
+        setEntregasLoading(true);
+        const toastId = toast.loading(`Consultando Entregas Producción (${entregasFromDate} al ${entregasToDate}) en SAP...`);
+        try {
+            const res = await fetch(`/api/sap/entregas-produccion?fromDate=${encodeURIComponent(entregasFromDate)}&toDate=${encodeURIComponent(entregasToDate)}`);
+            const result = await res.json();
+            if (result.success && result.data) {
+                setEntregasList(result.data);
+                setEntregasHasLoaded(true);
+                toast.success(`Se encontraron ${result.data.length} entregas de producción en SAP`, { id: toastId });
+            } else {
+                toast.error(`Error al consultar SAP: ${result.error || 'Respuesta inválida'}`, { id: toastId });
+            }
+        } catch (err: any) {
+            console.error("Error al consultar entregas:", err);
+            toast.error(`Error de conexión con SAP: ${err.message || 'Error de red'}`, { id: toastId });
+        } finally {
+            setEntregasLoading(false);
+        }
+    };
+
+    // Copiar datos de Entregas Producción al portapapeles
+    const handleCopyEntregasData = () => {
+        if (entregasList.length === 0) return;
+        const headers = [
+            "Número de documento", "Número de artículo", "Descripción artículo/serv.",
+            "Cantidad", "Código de almacén", "Familia", "OV", "Num. Lote",
+            "Tipo de Orden", "Nº Documento OP", "Bloqueado"
+        ];
+        const rows = entregasList.map(item => [
+            item.docNum, item.itemCode, item.descripcion,
+            item.cantidad, item.whsCode, item.familia, item.ov, item.numLote,
+            item.tipoOrden, item.docNumOP, item.bloqueado
+        ]);
+        const tsvContent = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+        navigator.clipboard.writeText(tsvContent).then(() => {
+            setCopiedEntregasData(true);
+            toast.success(`Datos de Entregas Producción (${entregasList.length} registros) copiados al portapapeles`);
+            setTimeout(() => setCopiedEntregasData(false), 2500);
+        });
+    };
+
+    // Exportar Query FPK - Entregas Producción a Excel (.xlsx)
+    const handleExportEntregasExcel = () => {
+        if (entregasList.length === 0) {
+            toast.error("No hay datos para exportar. Presiona Actualizar primero.");
+            return;
+        }
+        const exportRows = entregasList.map(item => ({
+            "Número de documento": item.docNum,
+            "Número de artículo": item.itemCode,
+            "Descripción artículo/serv.": item.descripcion,
+            "Cantidad": item.cantidad,
+            "Código de almacén": item.whsCode,
+            "Familia": item.familia,
+            "OV": item.ov,
+            "Num. Lote": item.numLote,
+            "Tipo de Orden": item.tipoOrden,
+            "Nº Documento OP": item.docNumOP,
+            "Bloqueado": item.bloqueado
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(exportRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Entregas_Produccion");
+        XLSX.writeFile(workbook, `FPK_Entregas_Produccion_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        toast.success("Archivo Excel de Entregas Producción descargado exitosamente");
     };
 
     const renderSortIcon = (currentCol: string, activeCol: string | null, dir: 'asc' | 'desc') => {
@@ -2534,17 +2643,164 @@ export default function ConsultaSAPPage() {
                     </div>
                 </main>
             ) : subHeaderTab === 'query-entregas-produccion' ? (
-                <main className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none py-28">
-                    <div className="w-20 h-20 bg-[#324354]/5 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                        <FileSpreadsheet className="w-10 h-10 text-[#324354]" />
+                /* TAB 5: QUERY - ENTREGAS PRODUCCIÓN (FPK - Entregas Producción Fabián Agudelo) */
+                <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
+                    {/* SAP QUERY MANAGER WINDOW REPLICA CONTAINER */}
+                    <div className="bg-[#eceae6] border border-[#a3a3a3] shadow-2xl flex flex-col font-sans select-none text-xs w-full text-black overflow-hidden relative">
+                        
+                        {/* SAP WINDOW TITLE BAR */}
+                        <div className="bg-gradient-to-r from-[#eceae6] to-[#d6d3cc] px-3 py-1.5 flex items-center justify-between border-b border-[#a3a3a3]">
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 bg-amber-500 rounded-sm flex items-center justify-center text-[10px] text-white font-black select-none shadow-sm">
+                                    Q
+                                </div>
+                                <span className="font-semibold text-gray-800 text-[11px] tracking-wide">
+                                    FPK - Entregas Producción (Fabián Agudelo) — Query Manager
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* SAP GOLD SHARP ACCENT BORDER */}
+                        <div className="h-[3px] bg-[#f4b000] w-full"></div>
+
+                        {/* QUERY MANAGER BODY: CENTERED ACTIONS & STATUS CARD */}
+                        <div className="p-8 md:p-12 bg-[#f3f0ea] flex flex-col items-center justify-center gap-6 min-h-[380px]">
+                            
+                            {/* CRITERIOS DE SELECCIÓN DE FECHAS (ESTILO MODAL SAP) */}
+                            <div className="bg-white border border-[#a3a3a3] rounded-2xl p-5 sm:p-6 shadow-sm w-full max-w-xl space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                    <Calendar size={18} className="text-[#324354]" />
+                                    <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider">
+                                        Consulta: Criterios de Selección (Fecha Contabilización)
+                                    </h4>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {/* Fecha Desde */}
+                                    <div className="space-y-1.5">
+                                        <label className="block text-[11px] font-semibold text-gray-700">
+                                            Fecha de contabilización (Desde):
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={entregasFromDate}
+                                                onChange={(e) => setEntregasFromDate(e.target.value)}
+                                                placeholder="DD/MM/AAAA"
+                                                className="w-full bg-[#fefee9] border border-[#b2b2b2] px-3 py-2 text-xs font-mono font-bold text-black rounded-lg focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                                            />
+                                            <span className="absolute right-2.5 top-2.5 text-gray-400 text-[11px]">📅</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Fecha Hasta */}
+                                    <div className="space-y-1.5">
+                                        <label className="block text-[11px] font-semibold text-gray-700">
+                                            Fecha de contabilización (Hasta):
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={entregasToDate}
+                                                onChange={(e) => setEntregasToDate(e.target.value)}
+                                                placeholder="DD/MM/AAAA"
+                                                className="w-full bg-white border border-[#b2b2b2] px-3 py-2 text-xs font-mono font-bold text-black rounded-lg focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                                            />
+                                            <span className="absolute right-2.5 top-2.5 text-gray-400 text-[11px]">📅</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* RENGLON 1: BOTON ACTUALIZAR ENTREGAS PRODUCCIÓN */}
+                            <div className="flex items-center justify-center w-full">
+                                <button
+                                    onClick={handleUpdateEntregas}
+                                    disabled={entregasLoading}
+                                    className="bg-[#324354] hover:bg-[#233140] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2.5 disabled:opacity-60"
+                                >
+                                    <RefreshCw size={18} className={entregasLoading ? "animate-spin" : ""} />
+                                    <span>Actualizar Entregas Producción</span>
+                                </button>
+                            </div>
+
+                            {/* RENGLON 2: ACCIONES VISIBLES DESPUÉS DE ACTUALIZAR */}
+                            {entregasHasLoaded && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full max-w-xl">
+                                    <button
+                                        onClick={handleCopyEntregasData}
+                                        className="bg-white hover:bg-slate-100 text-[#324354] border border-[#b2b2b2] font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2.5"
+                                    >
+                                        {copiedEntregasData ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                                        <span>{copiedEntregasData ? "¡Copiado!" : "Copiar Datos Entregas"}</span>
+                                    </button>
+
+                                    <button
+                                        onClick={handleExportEntregasExcel}
+                                        className="bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2.5"
+                                    >
+                                        <Download size={18} />
+                                        <span>Descargar a Excel</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* MENSAJE CENTRAL CON REGISTROS ENCONTRADOS / ESTADO */}
+                            <div className="w-full max-w-lg bg-white border border-[#a3a3a3] rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-3">
+                                {!entregasHasLoaded ? (
+                                    <div className="space-y-2">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 text-amber-800 rounded-full mb-1">
+                                            <FileSpreadsheet size={28} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-[#324354]">Entregas de Producción SAP</h3>
+                                        <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                                            Ingresa el rango de fechas de contabilización (<strong>{entregasFromDate}</strong> al <strong>{entregasToDate}</strong>) y haz clic en <strong>"Actualizar Entregas Producción"</strong> para consultar o exportar los datos.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full mb-1">
+                                            <Check size={28} />
+                                        </div>
+                                        <h3 className="text-2xl font-extrabold text-[#324354]">
+                                            {entregasList.length.toLocaleString('es-CO')} Registros Encontrados
+                                        </h3>
+                                        <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
+                                            ✓ Consulta [FPK - Entregas Producción (Fabián Agudelo)] completada ({entregasFromDate} - {entregasToDate})
+                                        </div>
+                                        <p className="text-xs text-slate-500 pt-1">
+                                            Los datos están listos para ser descargados directamente en Excel o copiados al portapapeles.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* SAP BOTTOM FOOTER BAR */}
+                        <div className="bg-[#eceae6] border-t border-[#a3a3a3] px-4 py-2 flex items-center justify-between text-xs text-gray-700">
+                            <div className="flex items-center gap-4">
+                                <span>
+                                    {!entregasHasLoaded 
+                                        ? "(0 registros - Listo para actualización u orden de descarga)" 
+                                        : `(${entregasList.length.toLocaleString('es-CO')} registros listos para exportación)`
+                                    }
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                    <span className={`w-2 h-2 rounded-full inline-block ${entregasHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                    {entregasHasLoaded 
+                                        ? "Consulta ejecutada con éxito [200 OK]"
+                                        : "Estado: Listo para selección de fechas y consulta"
+                                    }
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-mono text-gray-500">{currentTime || '30/08/2026'}</span>
+                                <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
+                            </div>
+                        </div>
+
                     </div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-[#324354] mb-3">Módulo en Construcción</h2>
-                    <p className="text-sm md:text-base text-gray-500 max-w-md mb-8">
-                        Estamos diseñando y construyendo la sección de <strong>Query - Entregas Producción</strong> para brindarte la mejor experiencia operativa.
-                    </p>
-                    <p className="text-xs md:text-sm italic text-[#7B8E90] tracking-wide select-none">
-                        Inspirando Hogares
-                    </p>
                 </main>
             ) : subHeaderTab === 'liberacion-muebles' ? (
                 <main className="flex-1 max-w-[1700px] w-full mx-auto p-1 md:p-1.5 flex flex-col font-sans h-full min-h-0">
