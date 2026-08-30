@@ -546,19 +546,21 @@ export default function IndicadoresProductividadPage() {
                                     />
                                 </div>
 
-                                {/* Botón Actualizar */}
-                                <button
-                                    onClick={() => fetchNivelServicio(fechaISO)}
-                                    disabled={loadingNS}
-                                    title="Actualizar datos de esta fecha"
-                                    className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer disabled:opacity-50"
-                                >
-                                    <RefreshCw size={13} className={loadingNS ? "animate-spin" : ""} />
-                                    <span>{loadingNS ? "Actualizando..." : "Actualizar"}</span>
-                                </button>
+                                {/* Botón Actualizar (Solo visible en Tablero Automático) */}
+                                {viewMode === "automatico" && (
+                                    <button
+                                        onClick={() => fetchNivelServicio(fechaISO)}
+                                        disabled={loadingNS}
+                                        title="Actualizar datos de esta fecha"
+                                        className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                        <RefreshCw size={13} className={loadingNS ? "animate-spin" : ""} />
+                                        <span>{loadingNS ? "Actualizando..." : "Actualizar"}</span>
+                                    </button>
+                                )}
 
-                                {/* Indicador de Estado Actualizado */}
-                                {lastUpdated && !loadingNS && (
+                                {/* Indicador de Estado Actualizado (Solo visible en Tablero Automático) */}
+                                {viewMode === "automatico" && lastUpdated && !loadingNS && (
                                     <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold px-2 py-1 rounded-lg animate-in fade-in duration-300">
                                         <CheckCircle2 size={13} className="text-emerald-600" />
                                         <span>Actualizado ({lastUpdated})</span>
