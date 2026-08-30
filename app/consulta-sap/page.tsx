@@ -104,6 +104,25 @@ interface SemaforoItem {
     cliente: string;
 }
 
+interface ReleasedOrderItem {
+    id: number;
+    docNum: string;
+    tipo: string;
+    status: string;
+    fechaFabricacion: string;
+    fechaFinalizacion: string;
+    fechaCierre: string;
+    codigoCliente: string;
+    nombreSN: string;
+    itemCode: string;
+    itemName: string;
+    almacen: string;
+    cantPlanificada: number;
+    cantCompletada: number;
+    pendiente: number;
+    usuario: string;
+}
+
 interface SapItemWarehouse {
     warehouseCode: string;
     warehouseName?: string;
@@ -442,6 +461,12 @@ export default function ConsultaSAPPage() {
     const [copiedData, setCopiedData] = useState(false)
     const [semaforoDataList, setSemaforoDataList] = useState<SemaforoItem[]>([])
     const [semaforoHasLoaded, setSemaforoHasLoaded] = useState<boolean>(false)
+
+    // Estados para pestaña Query - Órdenes Liberadas (FPK - Ordenes de fabricación liberadas)
+    const [releasedOrdersList, setReleasedOrdersList] = useState<ReleasedOrderItem[]>([])
+    const [releasedOrdersLoading, setReleasedOrdersLoading] = useState<boolean>(false)
+    const [releasedOrdersHasLoaded, setReleasedOrdersHasLoaded] = useState<boolean>(false)
+    const [copiedReleasedData, setCopiedReleasedData] = useState<boolean>(false)
 
     // Estado para ordenamiento de tabla Query - Semáforo
     const [semaforoSortCol, setSemaforoSortCol] = useState<keyof SemaforoItem | null>(null)
@@ -793,6 +818,81 @@ export default function ConsultaSAPPage() {
         setCopiedData(true);
         toast.success(`Datos de la consulta SAP (${dataToCopy.length.toLocaleString('es-CO')} registros) copiados al portapapeles`);
         setTimeout(() => setCopiedData(false), 2000);
+    };
+
+    // Actualizar Query FPK - Ordenes de fabricación liberadas desde SAP
+    const handleUpdateReleasedOrders = async () => {
+        setReleasedOrdersLoading(true);
+        const toastId = toast.loading("Conectando con SAP para consultar Órdenes Liberadas...");
+        try {
+            const res = await fetch('/api/sap/ordenes-liberadas');
+            const result = await res.json();
+            if (result.success && result.data) {
+                setReleasedOrdersList(result.data);
+                setReleasedOrdersHasLoaded(true);
+                toast.success(`Se encontraron ${result.data.length} órdenes de fabricación liberadas en SAP`, { id: toastId });
+            } else {
+                toast.error(`Error al consultar SAP: ${result.error || 'Respuesta inválida'}`, { id: toastId });
+            }
+        } catch (err: any) {
+            console.error("Error al consultar órdenes liberadas:", err);
+            toast.error(`Error de conexión con SAP: ${err.message || 'Error de red'}`, { id: toastId });
+        } finally {
+            setReleasedOrdersLoading(false);
+        }
+    };
+
+    // Copiar datos de Órdenes Liberadas al portapapeles
+    const handleCopyReleasedData = () => {
+        if (releasedOrdersList.length === 0) return;
+        const headers = [
+            "Número de documento", "Clase orden de trabajo", "Status de pedido de fabricación",
+            "Fecha Fabricación", "Fecha Finalización", "Fecha de cierre",
+            "Código de cliente", "Nombre SN", "Nº de artículo", "Descripción del artículo",
+            "Almacén", "Cant. Planificada", "Cant. Completada", "Pendiente", "Usuario"
+        ];
+        const rows = releasedOrdersList.map(item => [
+            item.docNum, item.tipo, item.status,
+            item.fechaFabricacion, item.fechaFinalizacion, item.fechaCierre,
+            item.codigoCliente, item.nombreSN, item.itemCode, item.itemName,
+            item.almacen, item.cantPlanificada, item.cantCompletada, item.pendiente, item.usuario
+        ]);
+        const tsvContent = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+        navigator.clipboard.writeText(tsvContent).then(() => {
+            setCopiedReleasedData(true);
+            toast.success(`Datos de Órdenes Liberadas (${releasedOrdersList.length} registros) copiados al portapapeles`);
+            setTimeout(() => setCopiedReleasedData(false), 2500);
+        });
+    };
+
+    // Exportar Query FPK - Ordenes de fabricación liberadas a Excel (.xlsx)
+    const handleExportReleasedExcel = () => {
+        if (releasedOrdersList.length === 0) {
+            toast.error("No hay datos para exportar. Presiona Actualizar primero.");
+            return;
+        }
+        const exportRows = releasedOrdersList.map(item => ({
+            "Número de documento": item.docNum,
+            "Clase orden de trabajo": item.tipo,
+            "Status de pedido de fabricación": item.status,
+            "Fecha Fabricación": item.fechaFabricacion,
+            "Fecha Finalización": item.fechaFinalizacion,
+            "Fecha de cierre": item.fechaCierre,
+            "Código de cliente": item.codigoCliente,
+            "Nombre SN": item.nombreSN,
+            "Nº de artículo": item.itemCode,
+            "Descripción del artículo": item.itemName,
+            "Almacén": item.almacen,
+            "Cant. Planificada": item.cantPlanificada,
+            "Cant. Completada": item.cantCompletada,
+            "Pendiente": item.pendiente,
+            "Usuario": item.usuario
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(exportRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Ordenes_Liberadas");
+        XLSX.writeFile(workbook, `FPK_Ordenes_Fabricacion_Liberadas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        toast.success("Archivo Excel de Órdenes Liberadas descargado exitosamente");
     };
 
     const renderSortIcon = (currentCol: string, activeCol: string | null, dir: 'asc' | 'desc') => {
@@ -2320,17 +2420,118 @@ export default function ConsultaSAPPage() {
                     </div>
                 </main>
             ) : subHeaderTab === 'query-ordenes-liberadas' ? (
-                <main className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none py-28">
-                    <div className="w-20 h-20 bg-[#324354]/5 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                        <FileSpreadsheet className="w-10 h-10 text-[#324354]" />
+                /* TAB 4: QUERY - ORDENES LIBERADAS (FPK - Ordenes de fabricación liberadas) */
+                <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
+                    {/* SAP QUERY MANAGER WINDOW REPLICA CONTAINER */}
+                    <div className="bg-[#eceae6] border border-[#a3a3a3] shadow-2xl flex flex-col font-sans select-none text-xs w-full text-black overflow-hidden relative">
+                        
+                        {/* SAP WINDOW TITLE BAR */}
+                        <div className="bg-gradient-to-r from-[#eceae6] to-[#d6d3cc] px-3 py-1.5 flex items-center justify-between border-b border-[#a3a3a3]">
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 bg-amber-500 rounded-sm flex items-center justify-center text-[10px] text-white font-black select-none shadow-sm">
+                                    Q
+                                </div>
+                                <span className="font-semibold text-gray-800 text-[11px] tracking-wide">
+                                    FPK - Ordenes de fabricación liberadas — Query Manager
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* SAP GOLD SHARP ACCENT BORDER */}
+                        <div className="h-[3px] bg-[#f4b000] w-full"></div>
+
+                        {/* QUERY MANAGER BODY: CENTERED ACTIONS & STATUS CARD */}
+                        <div className="p-8 md:p-12 bg-[#f3f0ea] flex flex-col items-center justify-center gap-8 min-h-[380px]">
+                            
+                            {/* RENGLON 1: BOTON ACTUALIZAR ÓRDENES LIBERADAS */}
+                            <div className="flex items-center justify-center w-full">
+                                <button
+                                    onClick={handleUpdateReleasedOrders}
+                                    disabled={releasedOrdersLoading}
+                                    className="bg-[#324354] hover:bg-[#233140] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2.5 disabled:opacity-60"
+                                >
+                                    <RefreshCw size={18} className={releasedOrdersLoading ? "animate-spin" : ""} />
+                                    <span>Actualizar Órdenes Liberadas</span>
+                                </button>
+                            </div>
+
+                            {/* RENGLON 2: ACCIONES VISIBLES DESPUÉS DE ACTUALIZAR */}
+                            {releasedOrdersHasLoaded && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full max-w-xl">
+                                    <button
+                                        onClick={handleCopyReleasedData}
+                                        className="bg-white hover:bg-slate-100 text-[#324354] border border-[#b2b2b2] font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2.5"
+                                    >
+                                        {copiedReleasedData ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                                        <span>{copiedReleasedData ? "¡Copiado!" : "Copiar Datos Órdenes Liberadas"}</span>
+                                    </button>
+
+                                    <button
+                                        onClick={handleExportReleasedExcel}
+                                        className="bg-[#107c41] hover:bg-[#0b5c30] text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2.5"
+                                    >
+                                        <Download size={18} />
+                                        <span>Descargar a Excel</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* MENSAJE CENTRAL CON REGISTROS ENCONTRADOS / ESTADO */}
+                            <div className="w-full max-w-lg bg-white border border-[#a3a3a3] rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-3">
+                                {!releasedOrdersHasLoaded ? (
+                                    <div className="space-y-2">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 text-amber-800 rounded-full mb-1">
+                                            <FileSpreadsheet size={28} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-[#324354]">Órdenes de Fabricación Liberadas SAP</h3>
+                                        <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                                            Haz clic en <strong>"Actualizar Órdenes Liberadas"</strong> para consultar en tiempo real las órdenes activas en SAP o presiona <strong>"Descargar a Excel"</strong> para exportar el reporte oficial.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full mb-1">
+                                            <Check size={28} />
+                                        </div>
+                                        <h3 className="text-2xl font-extrabold text-[#324354]">
+                                            {releasedOrdersList.length.toLocaleString('es-CO')} Órdenes Encontradas
+                                        </h3>
+                                        <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
+                                            ✓ Consulta [FPK - Ordenes de fabricación liberadas] completada exitosamente
+                                        </div>
+                                        <p className="text-xs text-slate-500 pt-1">
+                                            Los datos están listos para ser descargados directamente en Excel o copiados al portapapeles.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* SAP BOTTOM FOOTER BAR */}
+                        <div className="bg-[#eceae6] border-t border-[#a3a3a3] px-4 py-2 flex items-center justify-between text-xs text-gray-700">
+                            <div className="flex items-center gap-4">
+                                <span>
+                                    {!releasedOrdersHasLoaded 
+                                        ? "(0 registros - Listo para actualizar o exportar)" 
+                                        : `(${releasedOrdersList.length.toLocaleString('es-CO')} registros listos para exportación)`
+                                    }
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                    <span className={`w-2 h-2 rounded-full inline-block ${releasedOrdersHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                    {releasedOrdersHasLoaded 
+                                        ? "Consulta ejecutada con éxito [200 OK]"
+                                        : "Estado: Listo para actualización u orden de descarga"
+                                    }
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-mono text-gray-500">{currentTime || '30/08/2026'}</span>
+                                <span className="font-bold text-amber-600 text-xs">SAP Business One</span>
+                            </div>
+                        </div>
+
                     </div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-[#324354] mb-3">Módulo en Construcción</h2>
-                    <p className="text-sm md:text-base text-gray-500 max-w-md mb-8">
-                        Estamos diseñando y construyendo la sección de <strong>Query - Órdenes Liberadas</strong> para brindarte la mejor experiencia operativa.
-                    </p>
-                    <p className="text-xs md:text-sm italic text-[#7B8E90] tracking-wide select-none">
-                        Inspirando Hogares
-                    </p>
                 </main>
             ) : subHeaderTab === 'query-entregas-produccion' ? (
                 <main className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none py-28">
