@@ -179,17 +179,24 @@ export default function IndicadoresProductividadPage() {
     const [manualPlantData, setManualPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
     const [autoPlantData, setAutoPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
 
-    // Función para consultar Nivel de Servicio en tiempo real
+    // Función para consultar Nivel de Servicio y Calidad en tiempo real
     const fetchNivelServicio = async (targetFecha: string) => {
         try {
             setLoadingNS(true);
-            const res = await fetch(`/api/indicadores/nivel-servicio?fecha=${targetFecha}`);
-            if (!res.ok) return;
-            const json = await res.json();
-            if (json.success && json.plantas) {
-                setAutoPlantData((prev) => {
-                    const updated = { ...prev };
-                    for (const [pKey, vals] of Object.entries(json.plantas)) {
+            const [resNS, resCalidad] = await Promise.all([
+                fetch(`/api/indicadores/nivel-servicio?fecha=${targetFecha}`),
+                fetch(`/api/indicadores/calidad?fecha=${targetFecha}`)
+            ]);
+
+            const jsonNS = resNS.ok ? await resNS.json() : null;
+            const jsonCalidad = resCalidad.ok ? await resCalidad.json() : null;
+
+            setAutoPlantData((prev) => {
+                const updated = { ...prev };
+
+                // Actualizar Nivel de Servicio
+                if (jsonNS?.success && jsonNS.plantas) {
+                    for (const [pKey, vals] of Object.entries(jsonNS.plantas)) {
                         const pk = pKey as PlantKey;
                         if (updated[pk]) {
                             const valNum = (vals as any).nivelServicio;
@@ -201,14 +208,32 @@ export default function IndicadoresProductividadPage() {
                             }
                         }
                     }
-                    return updated;
-                });
-                const now = new Date();
-                const horaStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                setLastUpdated(horaStr);
-            }
+                }
+
+                // Actualizar Calidad (%)
+                if (jsonCalidad?.success && jsonCalidad.plantas) {
+                    for (const [pKey, vals] of Object.entries(jsonCalidad.plantas)) {
+                        const pk = pKey as PlantKey;
+                        if (updated[pk]) {
+                            const calNum = (vals as any).calidad;
+                            if (typeof calNum === "number") {
+                                updated[pk] = {
+                                    ...updated[pk],
+                                    calidadReal: calNum,
+                                };
+                            }
+                        }
+                    }
+                }
+
+                return updated;
+            });
+
+            const now = new Date();
+            const horaStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setLastUpdated(horaStr);
         } catch (err) {
-            console.error("Error fetching live Nivel de Servicio:", err);
+            console.error("Error fetching live Indicadores:", err);
         } finally {
             setLoadingNS(false);
         }
