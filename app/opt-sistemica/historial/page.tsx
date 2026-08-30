@@ -7,6 +7,7 @@ import { createExternalClient } from '@/lib/supabase/external';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/opt-sistemica/SubHeader';
 import { Search, Eye, Edit2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface OPTRecord {
   id: string;
@@ -213,6 +214,24 @@ export default function HistorialPage() {
     }
   };
 
+  const [personas, setPersonas] = useState<string[]>([]);
+
+  const fetchPersonas = async () => {
+    try {
+      const ext = createExternalClient();
+      const { data, error: err } = await ext
+        .from('empleados')
+        .select('nombreCompleto')
+        .eq('activo', true)
+        .order('nombreCompleto', { ascending: true });
+      if (!err && data) {
+        setPersonas(data.map((d: any) => d.nombreCompleto));
+      }
+    } catch (err) {
+      console.error('Error fetching empleados:', err);
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -221,6 +240,7 @@ export default function HistorialPage() {
         setSession(session);
         fetchRecords();
         fetchNames();
+        fetchPersonas();
       }
     });
   }, [router]);
@@ -575,13 +595,16 @@ export default function HistorialPage() {
 
       {/* Full OPT Edit Modal */}
       {editingRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200" onClick={() => setEditingRecord(null)}>
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+          onClick={() => setEditingRecord(null)}
+        >
           <div 
-            className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[88vh] flex flex-col my-auto overflow-hidden animate-in zoom-in-95 duration-200 relative"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+            {/* Modal Header (Fixed / Non-scrolling) */}
+            <div className="px-6 sm:px-8 py-5 border-b border-slate-200 flex items-start justify-between bg-[#F8FAFC] shrink-0">
               <div>
                 <span className="text-xs font-black text-[#324354] bg-[#324354]/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
                   Editar Observación #{numeroMap[editingRecord.id] || ''}
@@ -596,128 +619,133 @@ export default function HistorialPage() {
               </div>
               <button
                 onClick={() => setEditingRecord(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition cursor-pointer"
+                className="p-2 text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-200 border border-slate-200 rounded-full transition cursor-pointer shadow-xs"
+                title="Cerrar modal"
               >
                 ✕
               </button>
             </div>
 
-            {/* Persona Evaluada */}
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
-              <label className="block text-xs font-bold text-[#324354] uppercase tracking-wider">
-                Operario / Persona Evaluada
-              </label>
-              <input
-                type="text"
-                value={editPersona}
-                onChange={(e) => setEditPersona(e.target.value)}
-                placeholder="Nombre del operario evaluado..."
-                className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-[#324354] focus:outline-none"
-              />
-            </div>
-
-            {/* Questions List */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-black text-[#324354] uppercase tracking-wider">
-                Preguntas y Respuestas del Módulo
-              </h3>
-
-              {Object.entries(editResponses).sort().map(([qId, res]: [string, any]) => {
-                const qText = QUESTION_MAPPING[editingRecord.modulo_tipo]?.[qId] || res.text || `Pregunta ${qId}`;
-                const isSi = res.value === 'SI';
-                const isNo = res.value === 'NO';
-
-                return (
-                  <div key={qId} className="p-4 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex-1">
-                        <span className="text-[11px] font-black text-[#324354] bg-[#324354]/10 px-2 py-0.5 rounded-md mr-2">
-                          Pregunta {qId}
-                        </span>
-                        <span className="text-xs sm:text-sm font-bold text-slate-800">
-                          {qText}
-                        </span>
-                      </div>
-
-                      {/* SI / NO Buttons */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleEditResponseChange(qId, 'SI')}
-                          className={`px-4 py-1.5 rounded-xl font-black text-xs transition cursor-pointer ${
-                            isSi
-                              ? 'bg-emerald-600 text-white shadow-sm scale-105'
-                              : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          SI
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEditResponseChange(qId, 'NO')}
-                          className={`px-4 py-1.5 rounded-xl font-black text-xs transition cursor-pointer ${
-                            isNo
-                              ? 'bg-red-600 text-white shadow-sm scale-105'
-                              : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          NO
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Comment Field */}
-                    <div>
-                      <input
-                        type="text"
-                        value={res.comment || ''}
-                        onChange={(e) => handleEditCommentChange(qId, e.target.value)}
-                        placeholder="Comentarios u observaciones de esta pregunta (opcional)..."
-                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-[#324354] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Action Plans and Percentage Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
-                    Calificación Calculada
-                  </span>
-                  <div className={`text-4xl font-black font-mono ${percentageColor(editCalculatedPercentage)}`}>
-                    {editCalculatedPercentage}%
-                  </div>
-                </div>
-                <span className="text-[11px] text-slate-500 font-semibold mt-2">
-                  Se recalcula automáticamente según las respuestas SI / NO.
-                </span>
-              </div>
-
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                  Planes de Acción
+            {/* Modal Body (Scrollable) */}
+            <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6">
+              {/* Persona Evaluada con SearchableSelect */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                <label className="block text-xs font-bold text-[#324354] uppercase tracking-wider">
+                  Operario / Persona Evaluada
                 </label>
-                <textarea
-                  rows={3}
-                  value={editActionPlans}
-                  onChange={(e) => setEditActionPlans(e.target.value)}
-                  placeholder="Escribe los planes de acción o compromisos acordados..."
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                <SearchableSelect
+                  name="personaEvaluada"
+                  options={personas}
+                  placeholder="Buscar y seleccionar operario..."
+                  defaultValue={editPersona}
+                  onValueChange={(val) => setEditPersona(val)}
+                  className="h-11 text-sm font-semibold rounded-xl"
                 />
               </div>
+
+              {/* Questions List */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-black text-[#324354] uppercase tracking-wider">
+                  Preguntas y Respuestas del Módulo
+                </h3>
+
+                {Object.entries(editResponses).sort().map(([qId, res]: [string, any]) => {
+                  const qText = QUESTION_MAPPING[editingRecord.modulo_tipo]?.[qId] || res.text || `Pregunta ${qId}`;
+                  const isSi = res.value === 'SI';
+                  const isNo = res.value === 'NO';
+
+                  return (
+                    <div key={qId} className="p-4 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex-1">
+                          <span className="text-[11px] font-black text-[#324354] bg-[#324354]/10 px-2 py-0.5 rounded-md mr-2">
+                            Pregunta {qId}
+                          </span>
+                          <span className="text-xs sm:text-sm font-bold text-slate-800">
+                            {qText}
+                          </span>
+                        </div>
+
+                        {/* SI / NO Buttons */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditResponseChange(qId, 'SI')}
+                            className={`px-4 py-1.5 rounded-xl font-black text-xs transition cursor-pointer ${
+                              isSi
+                                ? 'bg-emerald-600 text-white shadow-sm scale-105'
+                                : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            SI
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditResponseChange(qId, 'NO')}
+                            className={`px-4 py-1.5 rounded-xl font-black text-xs transition cursor-pointer ${
+                              isNo
+                                ? 'bg-red-600 text-white shadow-sm scale-105'
+                                : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            NO
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Comment Field */}
+                      <div>
+                        <input
+                          type="text"
+                          value={res.comment || ''}
+                          onChange={(e) => handleEditCommentChange(qId, e.target.value)}
+                          placeholder="Comentarios u observaciones de esta pregunta (opcional)..."
+                          className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Action Plans and Percentage Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+                      Calificación Calculada
+                    </span>
+                    <div className={`text-4xl font-black font-mono ${percentageColor(editCalculatedPercentage)}`}>
+                      {editCalculatedPercentage}%
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold mt-2">
+                    Se recalcula automáticamente según las respuestas SI / NO.
+                  </span>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                    Planes de Acción
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={editActionPlans}
+                    onChange={(e) => setEditActionPlans(e.target.value)}
+                    placeholder="Escribe los planes de acción o compromisos acordados..."
+                    className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            {/* Modal Footer (Fixed / Non-scrolling) */}
+            <div className="px-6 sm:px-8 py-4 border-t border-slate-200 bg-[#F8FAFC] flex items-center justify-end gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setEditingRecord(null)}
                 disabled={savingEdit}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                className="px-4 py-2.5 bg-white hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer"
               >
                 Cancelar
               </button>
