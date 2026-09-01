@@ -76,7 +76,7 @@ export default function SaldosYDestruccionesPage() {
             // Filter to only Saldos y Destrucciones
             const filteredReports = reportsRes.filter(r => {
                 const defects = Array.isArray(r.defecto) ? r.defecto : []
-                return defects.some(d => {
+                return defects.some((d: any) => {
                     const defectName = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)
                     return defectName && (defectName.startsWith('Saldo -') || defectName.startsWith('Destrucción -'))
                 })
@@ -157,9 +157,13 @@ export default function SaldosYDestruccionesPage() {
 
         if (editingReportId) {
             setIsUploading(true)
+            const foundDefect = defectOptions.find(d => d.defecto === selectedDefect)
             const reportData = {
                 producto_id: parseInt(saldosProduct),
-                defecto: [{ defecto: `${saldosType} - ${selectedDefect}` }]
+                defecto: [{ 
+                    ...(foundDefect?.id ? { id: foundDefect.id } : {}), 
+                    defecto: `${saldosType} - ${selectedDefect}` 
+                }]
             }
             const { error } = await supabase.from('ms_reporte_defectos').update(reportData).eq('id', editingReportId)
             setIsUploading(false)
@@ -201,10 +205,14 @@ export default function SaldosYDestruccionesPage() {
         const { data } = supabase.storage.from('fichas-media').getPublicUrl(fileName)
         const photoUrl = data.publicUrl
 
+        const foundDefect = defectOptions.find(d => d.defecto === selectedDefect)
         const reportData = {
             producto_id: parseInt(saldosProduct),
             create_by: user?.localId,
-            defecto: [{ defecto: `${saldosType} - ${selectedDefect}` }],
+            defecto: [{ 
+                ...(foundDefect?.id ? { id: foundDefect.id } : {}), 
+                defecto: `${saldosType} - ${selectedDefect}` 
+            }],
             fotoUrl: photoUrl,
             created_at: new Date().toISOString()
         }

@@ -411,7 +411,10 @@ export default function ReportedDefectsListPage() {
             producto_id: parseInt(editSelectedProductId),
             defecto: Object.entries(editSelectedDefects)
                 .filter(([_, isChecked]) => isChecked)
-                .map(([name]) => ({ defecto: name }))
+                .map(([name]) => {
+                    const found = defectosCatalog.find(cat => (cat.defecto || cat.Defecto || cat.nombre || cat.Nombre) === name)
+                    return found?.id ? { id: found.id, defecto: name } : { defecto: name }
+                })
         }
         if (newFotoUrl !== editRecord.currentFotoUrl) {
             updateData.fotoUrl = newFotoUrl

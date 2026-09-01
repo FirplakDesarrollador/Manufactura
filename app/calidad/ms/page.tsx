@@ -157,7 +157,10 @@ export default function CalidadMsReportPage() {
         if (!selectedProduct) return
         
         const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
-        const selectedDefectNames = selectedDefectsList.map(d => ({ defecto: d.defecto || d.Defecto || d.nombre || d.Nombre }))
+        const selectedDefectNames = selectedDefectsList.map(d => ({ 
+            id: d.id, 
+            defecto: d.defecto || d.Defecto || d.nombre || d.Nombre 
+        }))
 
         setIsUploading(true)
         let fotoUrl = null
