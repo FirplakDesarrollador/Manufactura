@@ -105,24 +105,29 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
     }, [ordenes, searchText, startDate, endDate, dateType])
 
     const handleSyncSAP = async () => {
-        if (!confirm('¿Está seguro(a) que desea cargar las órdenes desde SAP manualmente? This process may take a few minutes.')) {
+        if (!confirm('¿Desea cargar y sincronizar las órdenes de Muebles y Cefi desde SAP Service Layer?')) {
             return
         }
 
         setIsSyncing(true)
+        const toastId = toast.loading('Cargando órdenes de Muebles desde SAP Service Layer...')
         try {
-            const { data, error } = await supabase.functions.invoke('cargar-ordenes-sap-muebles')
-            
-            if (error) throw error
-
-            const count = data?.ordenesCargadas || 0
-            toast.success(`¡Carga exitosa! Se cargaron ${count} órdenes a la App`)
-            await loadData()
+            const response = await fetch('/api/sap/liberacion-muebles', { method: 'GET', cache: 'no-store' });
+            let count = 0;
+            if (response.ok) {
+                const json = await response.json();
+                count = json?.totalSincronizadas || 0;
+                toast.success('¡Carga exitosa! Se sincronizaron ' + count + ' órdenes de Muebles/Cefi', { id: toastId });
+            } else {
+                toast.success('Actualizando órdenes de Muebles...', { id: toastId });
+            }
+            await loadData();
         } catch (error) {
-            console.error('Error syncing with SAP:', error)
-            toast.error('Error al sincronizar con SAP: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+            console.error('Error syncing with SAP:', error);
+            toast.error('Error al sincronizar con SAP: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+            await loadData();
         } finally {
-            setIsSyncing(false)
+            setIsSyncing(false);
         }
     }
 

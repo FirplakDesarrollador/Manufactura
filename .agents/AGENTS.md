@@ -84,3 +84,13 @@ Este módulo cuenta con dos secciones accesibles mediante botones de alternancia
   * H3 (Apartado): Montserrat (22px, 600)
   * Cuerpo: Montserrat (18px, 400)
   * Apoyo (Etiquetas/Pie): Montserrat (13px, 500)
+
+
+---
+
+## 6. Integraciones SQL y SAP Service Layer
+
+### Habilidad (`skills/sql-sap-identifier`)
+Cualquier consulta T-SQL de SAP B1 compartida por el usuario (tablas `OWOR`, `OITM`, `ORDR`, `@FIR_FAM_SYMPH`, `@FIR_AMORTIGUADORES`, `@FIR_FECHAS_PROD`, etc.) se identifica automáticamente y se mapea con:
+- **API Backend Local (Next.js):** `app/api/sap/ordenes-liberadas/route.ts` (`http://localhost:3000/api/sap/ordenes-liberadas`).
+- **Endpoint SAP Service Layer (OData):** `https://200.7.96.194:50000/b1s/v1/SQLQueries('ordenes_marmol_sl136')/List` (Header: `Prefer: odata.maxpagesize=500`).

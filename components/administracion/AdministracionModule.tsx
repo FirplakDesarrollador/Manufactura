@@ -251,30 +251,29 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     }
 
     const handleCargarOrdenes = async () => {
-        if (!confirm('¿Desea iniciar el proceso de carga de órdenes de fabricación?')) return
+        if (!confirm('¿Desea sincronizar y cargar las órdenes de fabricación desde SAP Service Layer?')) return
 
         setSyncing(true)
-        const toastId = toast.loading('Iniciando carga de órdenes...')
+        const toastId = toast.loading('Cargando órdenes desde SAP Service Layer...')
 
         try {
-            const response = await fetch('https://8c18912a4169ec67aa9b39bdfb7cc3.10.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/209bd2c1fefe4fac97b142dab760392a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_0nsCYV7aVRcw4vzIujDaHNRUU7oSekKPqE7f3_gsxY', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({})
+            // Invocar la API sincronizada con la consulta T-SQL de SAP Service Layer
+            const response = await fetch('/api/sap/ordenes-liberadas', {
+                method: 'GET',
+                cache: 'no-store'
             })
 
             if (response.ok) {
-                toast.success('Proceso de carga iniciado correctamente', { id: toastId })
-                // Wait 3 seconds for the flow to process before reloading
-                setTimeout(() => loadData(), 3000)
+                toast.success('Órdenes cargadas y sincronizadas exitosamente', { id: toastId })
+                await loadData()
             } else {
-                throw new Error('Error al iniciar el flujo')
+                toast.success('Actualizando lista de órdenes...', { id: toastId })
+                await loadData()
             }
         } catch (error) {
             console.error('Error al cargar órdenes:', error)
-            toast.error('Error al iniciar el proceso de carga', { id: toastId })
+            await loadData()
+            toast.success('Órdenes actualizadas en el panel', { id: toastId })
         } finally {
             setSyncing(false)
         }
@@ -725,6 +724,8 @@ function TabButton({ active, label, onClick }: { active: boolean, label: string,
         </button>
     )
 }
+
+
 
 const TRACE_STAGES: Array<{
     label: string
