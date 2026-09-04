@@ -71,7 +71,7 @@ export async function GET() {
             .select('*', { count: 'exact', head: true });
 
         return NextResponse.json({
-            success; true,
+            success: true,
             totalSincronizadas: rawItems.length,
             totalEnSupabase: count || 0,
             endpoint: "/SQLQueries('ordenes_muebles_sl')/List",
