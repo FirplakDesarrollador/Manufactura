@@ -94,7 +94,7 @@ export async function GET() {
             }
         }
 
-        // 2. Si se obtuvo de SQL Server (FastAPI), sincronizar con Supabase en lotes
+        // 2. Si se obtuvo de SQL Server (FastAPI), reemplazar datos en Supabase limpiando registros antiguos
         if (fetchedFromSqlServer && rawItems.length > 0) {
             const mappedForDb = rawItems.map(mapRow).map(item => ({
                 nro_op: item.nroOp || '',
@@ -120,6 +120,9 @@ export async function GET() {
                 raw_data: item,
                 updated_at: new Date().toISOString()
             }));
+
+            // Limpiar la tabla antes de reinsertar el snapshot actualizado para evitar acumular OPs antiguas cerradas
+            await supabase.from('semaforo').delete().neq('nro_op', '___IMPOSSIBLE_VAL___');
 
             const BATCH_SIZE = 100;
             for (let i = 0; i < mappedForDb.length; i += BATCH_SIZE) {
