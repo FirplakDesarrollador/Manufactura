@@ -58,76 +58,45 @@ export async function GET() {
         let rawItems: any[] = [];
         let fetchedFromSqlServer = false;
 
-        // 1. Intentar consultar primero la API de SQL Server (FastAPI ejecutor de [Planos_Symphony].[dbo].[SEMAFORO])
-        const pyApiUrl = process.env.SEMAFORO_API_URL || 'http://127.0.0.1:7000/semaforo';
+        const candidateUrls = [
+            process.env.SEMAFORO_API_URL,
+            process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/liberacionmuebles\/?$/, 'semaforo') : null,
+            'http://127.0.0.1:7000/semaforo'
+        ].filter(Boolean) as string[];
+
         const apiKey = (process.env.SEMAFORO_API_KEY || process.env.NEXT_PUBLIC_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us').replace(/"/g, '');
 
-        try {
-            console.log("Consultando directo a SQL Server (FastAPI /semaforo)...");
-            const pyRes = await fetch(pyApiUrl, {
-                method: 'GET',
-                headers: {
-                    'api-key': apiKey,
-                    'ngrok-skip-browser-warning': 'true'
-                },
-                cache: 'no-store'
-            });
-
-            if (pyRes.ok) {
-                const pyJson = await pyRes.json();
-                const items = pyJson.response || pyJson.data || [];
-                if (Array.isArray(items) && items.length > 0) {
-                    rawItems = items;
-                    fetchedFromSqlServer = true;
-                    console.log(`SQL Server devolvió ${rawItems.length} registros del SP SEMAFORO.`);
-                }
-            } else {
-                console.warn(`FastAPI devolvió código HTTP ${pyRes.status}`);
-            }
-        } catch (pyErr) {
-            console.warn("Falló conexión directa a FastAPI /semaforo:", pyErr);
-        }
-
-        // 2. Fallback a SAP Service Layer si FastAPI no estuvo disponible
-        if (!fetchedFromSqlServer) {
-            console.log("Ejecutando fallback a SAP Service Layer...");
-            const loginData = await loginToSAP();
-            const baseUrl = process.env.SAP_API_URL?.replace('/Login', '') || 'https://200.7.96.194:50000/b1s/v1';
-
-            let url: string | null = `${baseUrl}/SQLQueries('semaforo')/List`;
-            let page = 1;
-
-            while (url) {
-                const response: Response = await fetch(url, {
+        // 1. Intentar consultar FastAPI local o ngrok
+        for (const pyApiUrl of candidateUrls) {
+            try {
+                console.log(`Intentando conectar a FastAPI /semaforo en ${pyApiUrl}...`);
+                const pyRes = await fetch(pyApiUrl, {
                     method: 'GET',
                     headers: {
-                        'Cookie': loginData.cookieHeader,
-                        'Content-Type': 'application/json',
+                        'api-key': apiKey,
+                        'ngrok-skip-browser-warning': 'true'
                     },
                     cache: 'no-store'
                 });
 
-                if (!response.ok) break;
-
-                const json: any = await response.json();
-                const items = json.value || [];
-                rawItems.push(...items);
-
-                const nextLink: string | undefined = json['@odata.nextLink'] || json['odata.nextLink'];
-                if (nextLink) {
-                    url = nextLink.startsWith('http') ? nextLink : `${baseUrl}/${nextLink.replace(/^\//, '')}`;
-                    page++;
-                } else {
-                    url = null;
+                if (pyRes.ok) {
+                    const pyJson = await pyRes.json();
+                    const items = pyJson.response || pyJson.data || [];
+                    if (Array.isArray(items) && items.length > 0) {
+                        rawItems = items;
+                        fetchedFromSqlServer = true;
+                        console.log(`FastAPI devolvió ${rawItems.length} registros.`);
+                        break;
+                    }
                 }
+            } catch (pyErr) {
+                // Continuar con la siguiente URL candidata
             }
         }
 
-        const data = rawItems.map(mapRow);
-
-        // 3. Sincronizar con Supabase en lotes de 100
-        if (data.length > 0) {
-            const mappedForDb = data.map(item => ({
+        // 2. Si se obtuvo de SQL Server (FastAPI), sincronizar con Supabase en lotes
+        if (fetchedFromSqlServer && rawItems.length > 0) {
+            const mappedForDb = rawItems.map(mapRow).map(item => ({
                 nro_op: item.nroOp || '',
                 originnum: item.originnum || '',
                 sku: item.sku || '',
@@ -155,19 +124,88 @@ export async function GET() {
             const BATCH_SIZE = 100;
             for (let i = 0; i < mappedForDb.length; i += BATCH_SIZE) {
                 const batch = mappedForDb.slice(i, i + BATCH_SIZE);
-                const { error } = await supabase
-                    .from('semaforo')
-                    .upsert(batch, { onConflict: 'nro_op' });
-                if (error) {
-                    console.error('Error upserting semaforo batch:', error);
-                }
+                await supabase.from('semaforo').upsert(batch, { onConflict: 'nro_op' });
+            }
+
+            const data = rawItems.map(mapRow);
+            return NextResponse.json({
+                success: true,
+                total: data.length,
+                source: "SQL Server (EXEC [Planos_Symphony].[dbo].[SEMAFORO])",
+                data
+            });
+        }
+
+        // 3. Fallback inteligente para Vercel: consultar Supabase DB (public.semaforo) que almacena la lista completa sincronizada
+        try {
+            console.log("Consultando registros almacenados en Supabase (public.semaforo)...");
+            const { data: dbRows, error: dbErr } = await supabase
+                .from('semaforo')
+                .select('*')
+                .order('updated_at', { ascending: false });
+
+            if (!dbErr && dbRows && dbRows.length > 0) {
+                const mappedFromDb = dbRows.map((r, index) => {
+                    const raw = r.raw_data || {};
+                    return {
+                        ...mapRow(raw, index),
+                        nroOp: r.nro_op || raw["Nro OP"] || '',
+                        sku: r.sku || raw.SKU || '',
+                        descripcion: r.descripcion || raw["Descripción Artículo"] || '',
+                        planta: r.planta || raw.Planta || '',
+                        familia: r.familia || raw.Familia || '',
+                        cantPendiente: r.cant_pendiente || '0',
+                        cantTotal: r.cant_total || '0',
+                        estado: r.estado || '',
+                        cliente: r.cliente || ''
+                    };
+                });
+
+                return NextResponse.json({
+                    success: true,
+                    total: mappedFromDb.length,
+                    source: "Supabase DB (Base de Datos Sincronizada de SQL Server)",
+                    data: mappedFromDb
+                });
+            }
+        } catch (sbErr) {
+            console.warn("Error leyendo de Supabase:", sbErr);
+        }
+
+        // 4. Último fallback: SAP Service Layer
+        const loginData = await loginToSAP();
+        const baseUrl = process.env.SAP_API_URL?.replace('/Login', '') || 'https://200.7.96.194:50000/b1s/v1';
+
+        let url: string | null = `${baseUrl}/SQLQueries('semaforo')/List`;
+        while (url) {
+            const response: Response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Cookie': loginData.cookieHeader,
+                    'Content-Type': 'application/json',
+                },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) break;
+
+            const json: any = await response.json();
+            const items = json.value || [];
+            rawItems.push(...items);
+
+            const nextLink: string | undefined = json['@odata.nextLink'] || json['odata.nextLink'];
+            if (nextLink) {
+                url = nextLink.startsWith('http') ? nextLink : `${baseUrl}/${nextLink.replace(/^\//, '')}`;
+            } else {
+                url = null;
             }
         }
 
+        const data = rawItems.map(mapRow);
         return NextResponse.json({
             success: true,
             total: data.length,
-            source: fetchedFromSqlServer ? "SQL Server (EXEC [Planos_Symphony].[dbo].[SEMAFORO])" : "SAP Service Layer",
+            source: "SAP Service Layer",
             data
         });
     } catch (err: any) {
