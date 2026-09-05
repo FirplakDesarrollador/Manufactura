@@ -1,121 +1,120 @@
 import { NextResponse } from 'next/server';
-
-interface OrdenLiberadaApiRow {
-    DocNum: number | string;
-    type?: string;
-    Status?: string;
-    "Fecha Fabricación"?: string | null;
-    "Fecha Finalización"?: string | null;
-    CloseDate?: string | null;
-    CardCode?: string | null;
-    CardName?: string | null;
-    ItemCode?: string;
-    Itemname?: string;
-    Warehouse?: string;
-    "Cant.Planificada"?: string | number;
-    "Cant.Completada"?: string | number;
-    "PENDIENTE-OJO cuando sea superior a 1"?: string | number;
-    U_name?: string | null;
-    [key: string]: any;
-}
-
-interface ApiResponse {
-    error: boolean;
-    message: string;
-    response: OrdenLiberadaApiRow[];
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-    if (!dateStr) return '';
-    try {
-        const clean = String(dateStr).trim();
-        if (clean.includes('-') && clean.length >= 10) {
-            const parts = clean.slice(0, 10).split('-');
-            if (parts.length === 3) {
-                return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            }
-        }
-        const d = new Date(clean);
-        if (isNaN(d.getTime())) return clean;
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}/${month}/${year}`;
-    } catch {
-        return String(dateStr || '');
-    }
-}
-
-function mapRow(row: OrdenLiberadaApiRow, index: number) {
-    const planned = Number(row["Cant.Planificada"]) || 0;
-    const completed = Number(row["Cant.Completada"]) || 0;
-    const rawPendiente = row["PENDIENTE-OJO cuando sea superior a 1"];
-    const pendiente = rawPendiente !== undefined && rawPendiente !== null && rawPendiente !== ''
-        ? Number(rawPendiente)
-        : (planned - completed);
-
-    return {
-        id: index + 1,
-        docNum: row.DocNum !== undefined && row.DocNum !== null ? String(row.DocNum) : '',
-        tipo: row.type || 'Estándar',
-        status: row.Status || 'Liberado',
-        fechaFabricacion: formatDate(row["Fecha Fabricación"]),
-        fechaFinalizacion: formatDate(row["Fecha Finalización"]),
-        fechaCierre: formatDate(row.CloseDate),
-        codigoCliente: row.CardCode || '',
-        nombreSN: row.CardName || 'FIRPLAK S A',
-        itemCode: row.ItemCode || '',
-        itemName: row.Itemname || '',
-        almacen: row.Warehouse || '',
-        cantPlanificada: planned,
-        cantCompletada: completed,
-        pendiente: pendiente,
-        usuario: row.U_name || 'Usuario Sistema',
-    };
-}
+import { supabase } from '@/lib/supabase';
 
 export async function GET() {
-    const apiUrl = process.env.ORDENESLIBERADAS_API_URL || 'https://rented-paralyses-wince.ngrok-free.dev/ordenesliberadasms/';
-    const apiKey = process.env.ORDENESLIBERADAS_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
-
     try {
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-                'api-key': apiKey,
-                'ngrok-skip-browser-warning': 'true',
-            },
-            cache: 'no-store',
-        });
+        const apiKey = (process.env.NEXT_PUBLIC_API_KEY || process.env.ORDENESLIBERADAS_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us').replace(/"/g, '');
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            return NextResponse.json(
-                { success: false, error: `Error consultando Órdenes Liberadas: ${response.status} - ${errorText}` },
-                { status: response.status }
-            );
+        // Candidate URLs for ordenes_fibra
+        const candidateUrls = [
+            process.env.ORDENES_FIBRA_API_URL,
+            process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/liberacionmuebles\/?$/, 'ordenes_fibra/') : null,
+            'http://127.0.0.1:7000/ordenes_fibra/'
+        ].filter(Boolean) as string[];
+
+        let rawFibraRows: any[] = [];
+        let fetchedFromFibraApi = false;
+
+        for (const url of candidateUrls) {
+            try {
+                console.log("Consultando ordenes_fibra en:", url);
+                const res = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'api-key': apiKey,
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    cache: 'no-store'
+                });
+
+                if (res.ok) {
+                    const json = await res.json();
+                    const items = json.response || json.data || json || [];
+                    if (Array.isArray(items) && items.length > 0) {
+                        rawFibraRows = items;
+                        fetchedFromFibraApi = true;
+                        console.log(`API ordenes_fibra devolvió ${rawFibraRows.length} órdenes.`);
+                        break;
+                    }
+                }
+            } catch (err) {
+                // Probar siguiente candidata
+            }
         }
 
-        const result: ApiResponse = await response.json();
+        // Sincronizar hacia ordenes_fabricacion_fibra en Supabase
+        if (fetchedFromFibraApi && rawFibraRows.length > 0) {
+            const mappedForFibraDb = rawFibraRows.map(item => ({
+                orden_fabricacion: item.orden_fabricacion ? String(item.orden_fabricacion) : '',
+                numero_pedido: item.numero_pedido || '',
+                producto_sku: item.producto_sku || '',
+                producto_descripcion: item.producto_descripcion || '',
+                cantidad: Number(item.cantidad) || 1,
+                cliente: item.cliente || 'FIRPLAK S A',
+                comentario: item.comentarios || '',
+                fecha_entrega_estimada: item.fecha_entrega_estimada || null,
+                fecha_ideal_produccion: item.fecha_ideal_produccion || null,
+                componentes: item.componentes ? (typeof item.componentes === 'string' ? JSON.parse(item.componentes) : item.componentes) : null
+            })).filter(r => r.orden_fabricacion);
 
-        if (result.error) {
-            return NextResponse.json(
-                { success: false, error: result.message || 'La API de Órdenes Liberadas reportó un error' },
-                { status: 502 }
-            );
+            const BATCH_SIZE = 100;
+            for (let i = 0; i < mappedForFibraDb.length; i += BATCH_SIZE) {
+                const batch = mappedForFibraDb.slice(i, i + BATCH_SIZE);
+                const { error } = await supabase
+                    .from('ordenes_fabricacion_fibra')
+                    .upsert(batch, { onConflict: 'orden_fabricacion' });
+                if (error) {
+                    console.error("Error upserting ordenes_fabricacion_fibra:", error);
+                }
+            }
         }
 
-        const rawRows = Array.isArray(result.response) ? result.response : [];
-        const data = rawRows.map(mapRow);
+        // También consultar API general de órdenes liberadas si existiera
+        const genUrl = process.env.ORDENESLIBERADAS_API_URL || 'http://127.0.0.1:7000/ordenesliberadasms';
+        try {
+            const response = await fetch(genUrl, {
+                method: 'GET',
+                headers: {
+                    'api-key': apiKey,
+                    'ngrok-skip-browser-warning': 'true',
+                },
+                cache: 'no-store',
+            });
+            if (response.ok) {
+                const result = await response.json();
+                const rawRows = Array.isArray(result.response) ? result.response : [];
+                if (rawRows.length > 0) {
+                    const mappedForDb = rawRows.map(item => ({
+                        orden_fabricacion: item.DocNum ? String(item.DocNum) : '',
+                        numero_pedido: item.NumLote || '',
+                        producto_sku: item.ItemCode || '',
+                        producto_descripcion: item.Itemname || '',
+                        cantidad: Number(item["Cant.Planificada"]) || 1,
+                        cliente: item.CardName || 'FIRPLAK S A',
+                        comentario: '',
+                        fecha_entrega_estimada: item["Fecha Finalización"] || null
+                    })).filter(r => r.orden_fabricacion);
+
+                    for (let i = 0; i < mappedForDb.length; i += 100) {
+                        const batch = mappedForDb.slice(i, i + 100);
+                        await supabase
+                            .from('ordenes_fabricacion')
+                            .upsert(batch, { onConflict: 'orden_fabricacion' });
+                    }
+                }
+            }
+        } catch (genErr) {
+            console.warn("Fallback ordenesliberadasms error:", genErr);
+        }
 
         return NextResponse.json({
             success: true,
-            total: data.length,
-            query: "FPK - Ordenes de fabricación liberadas",
-            data,
+            totalFibra: rawFibraRows.length,
+            message: `Sincronizadas ${rawFibraRows.length} órdenes de Fibra hacia Supabase.`,
+            data: rawFibraRows
         });
     } catch (error: any) {
-        console.error("Error en API de órdenes liberadas:", error);
+        console.error("Error en /api/sap/ordenes-liberadas:", error);
         return NextResponse.json(
             { success: false, error: error.message || 'Error al consultar órdenes liberadas' },
             { status: 500 }
