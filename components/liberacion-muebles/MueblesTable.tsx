@@ -22,6 +22,7 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [sapInventory, setSapInventory] = useState<Record<string, { mp04: number, mp01: number } | null>>({});
   const [loadingSap, setLoadingSap] = useState(false);
+  const [sapError, setSapError] = useState<string | null>(null);
 
   const toggleRow = (idx: number) => {
     if (expandedRow === idx) {
@@ -101,8 +102,8 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
         }
 
         const cantosAndTableros = parsedComponentes
-          .filter((c: any) => c.componente.toUpperCase().startsWith("CANTO") || c.componente.toUpperCase().startsWith("TABLERO"))
-          .map((c: any) => c.sku)
+          .filter((c: any) => c.componente && (c.componente.toUpperCase().includes("CANTO") || c.componente.toUpperCase().includes("TABLERO")))
+          .map((c: any) => String(c.sku).trim())
           .sort();
         if (cantosAndTableros.length > 0) {
           key = cantosAndTableros.join("|");
@@ -129,7 +130,7 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
         group.productos_agrupados.push({ sku: mueble.producto_sku, descripcion: mueble.producto_descripcion, cantidad: mueble.cantidad, orden: mueble.orden_fabricacion });
 
         parsedComponentes.forEach((newComp: any) => {
-          const existingComp = group.componentes_parsed.find((c: any) => c.sku === newComp.sku);
+          const existingComp = group.componentes_parsed.find((c: any) => String(c.sku).trim() === String(newComp.sku).trim());
           if (existingComp) {
             existingComp.cantidad += newComp.cantidad;
           } else {
@@ -164,41 +165,56 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
             comps = mueble.componentes;
           }
           comps.forEach((comp: any) => {
-            const isCantoOrTablero = comp.componente.toUpperCase().startsWith("CANTO") || comp.componente.toUpperCase().startsWith("TABLERO");
+            const compName = String(comp.componente || '').trim().toUpperCase();
+            const isCantoOrTablero = compName.includes("CANTO") || compName.includes("TABLERO");
             if (isCantoOrTablero) {
-              if (map.has(comp.sku)) {
-                map.get(comp.sku).cantidad += comp.cantidad;
+              const skuKey = String(comp.sku || '').trim();
+              if (map.has(skuKey)) {
+                map.get(skuKey).cantidad += comp.cantidad;
               } else {
-                map.set(comp.sku, { ...comp });
+                map.set(skuKey, { ...comp, sku: skuKey });
               }
             }
           });
         } catch(e) {}
       }
     });
-    return Array.from(map.values()).sort((a, b) => a.componente.localeCompare(b.componente));
+    return Array.from(map.values()).sort((a, b) => (a.componente || '').localeCompare(b.componente || ''));
   }, [muebles]);
 
-  useEffect(() => {
+  const fetchSapInventory = React.useCallback(() => {
     if (totalComponentes.length > 0) {
       setLoadingSap(true);
-      const skus = totalComponentes.map(comp => comp.sku);
+      setSapError(null);
+      const skus = totalComponentes.map(comp => String(comp.sku).trim());
       
       fetch('/api/sap/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skus, date: selectedDate })
       })
-      .then(res => res.json())
-      .then(data => {
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || `Error SAP (${res.status})`);
+        }
         if (data.inventory) {
           setSapInventory(data.inventory);
+        } else {
+          throw new Error("No se recibio respuesta valida de inventario SAP");
         }
       })
-      .catch(err => console.error("Error fetching SAP inventory:", err))
+      .catch(err => {
+        console.error("Error fetching SAP inventory:", err);
+        setSapError(err.message || "Error de conexión con SAP");
+      })
       .finally(() => setLoadingSap(false));
     }
   }, [totalComponentes, selectedDate]);
+
+  useEffect(() => {
+    fetchSapInventory();
+  }, [fetchSapInventory]);
 
   return (
     <div className="space-y-8">
@@ -258,11 +274,37 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
 
       {totalComponentes.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
-          <div className="px-6 py-6 border-b border-blue-100 bg-blue-50/50">
-            <h3 className="text-lg font-bold text-blue-900">
-              Resumen Total de Consumo (Cantos y Tableros)
-            </h3>
-            <p className="text-sm text-blue-700">Sumatoria total requerida para toda la programación mostrada</p>
+          <div className="px-6 py-6 border-b border-blue-100 bg-blue-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-blue-900">
+                Resumen Total de Consumo (Cantos y Tableros)
+              </h3>
+              <p className="text-sm text-blue-700">Sumatoria total requerida para toda la programación mostrada</p>
+            </div>
+
+            {sapError ? (
+              <div className="flex items-center gap-3 bg-red-50 text-red-700 px-3 py-2 rounded-lg border border-red-200 text-xs font-medium">
+                <span>⚠️ {sapError}</span>
+                <button
+                  onClick={fetchSapInventory}
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-2 py-1 rounded transition-colors text-xs"
+                >
+                  Reintentar
+                </button>
+              </div>
+            ) : loadingSap ? (
+              <div className="text-xs text-blue-600 font-semibold flex items-center gap-2">
+                <span className="animate-spin inline-block w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></span>
+                Consultando stock en SAP...
+              </div>
+            ) : (
+              <button
+                onClick={fetchSapInventory}
+                className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+              >
+                Actualizar SAP
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-blue-100 text-sm">
@@ -277,18 +319,25 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
               </thead>
               <tbody className="divide-y divide-blue-50">
                 {totalComponentes.map((comp: any, idx: number) => {
-                  const disp = sapInventory[comp.sku];
-                  const isLoading = loadingSap && typeof disp === 'undefined';
+                  const compSkuClean = String(comp.sku || '').trim();
+                  const matchingKey = Object.keys(sapInventory).find(
+                    k => k.trim().toUpperCase() === compSkuClean.toUpperCase()
+                  );
+                  const disp = matchingKey ? sapInventory[matchingKey] : undefined;
                   
-                  let statusColor = "text-gray-500 italic"; // Default loading/not found style
+                  let statusColor = "text-gray-500 italic";
                   let dispText = "No encontrado";
                   let materialDisponibleText = "-";
                   let observacionText = "-";
                   let observacionColor = "text-gray-500";
 
-                  if (isLoading) {
+                  if (loadingSap && disp === undefined) {
                     dispText = "Consultando...";
-                  } else if (disp && typeof disp === 'object') {
+                    statusColor = "text-blue-500 italic animate-pulse";
+                  } else if (sapError && disp === undefined) {
+                    dispText = "Error SAP";
+                    statusColor = "text-red-500 italic font-medium";
+                  } else if (disp !== undefined && disp !== null && typeof disp === 'object') {
                     dispText = disp.mp04.toFixed(2);
                     statusColor = "text-blue-900 font-bold";
                     
@@ -336,3 +385,4 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
     </div>
   );
 }
+
