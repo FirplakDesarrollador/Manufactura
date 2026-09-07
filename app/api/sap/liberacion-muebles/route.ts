@@ -16,9 +16,12 @@ function parseDate(dateStr: string | null | undefined): string | null {
 
 export async function GET() {
     try {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         const loginData = await loginToSAP();
         const baseUrl = process.env.SAP_API_URL?.replace('/Login', '') || 'https://200.7.96.194:50000/b1s/v1';
-        const queryUrl = `${baseUrl}/SQLQueries('ordenes_muebles_sl')/List`;
+        
+        // Consultar órdenes de Muebles liberadas junto con sus componentes (WOR1 + OITM) desde SAP Service Layer
+        const queryUrl = `${baseUrl}/SQLQueries('ordenes_muebles_comp_v3')/List`;
 
         const response = await fetch(queryUrl, {
             method: 'GET',
@@ -30,40 +33,54 @@ export async function GET() {
             cache: 'no-store'
         });
 
-        let rawItems: any[] = [];
+        let rawRows: any[] = [];
         if (response.ok) {
             const json = await response.json();
-            rawItems = json.value || [];
+            rawRows = json.value || [];
         }
 
-        if (rawItems.length > 0) {
-            const mappedRecords = rawItems.map((item: any) => {
-                let componentesJson = [];
-                if (item.componentes) {
-                    try {
-                        componentesJson = typeof item.componentes === 'string' ? JSON.parse(item.componentes) : item.componentes;
-                    } catch {
-                        componentesJson = [];
-                    }
-                }
-                return {
-                    orden_fabricacion: item.orden_fabricacion ? String(item.orden_fabricacion) : '',
-                    numero_pedido: item.numero_pedido || '',
-                    producto_sku: item.producto_sku || '',
-                    producto_descripcion: item.producto_descripcion || '',
-                    cantidad: Number(item.cantidad) || 1,
-                    cliente: item.cliente || '',
-                    fecha_entrega_estimada: parseDate(item.fecha_entrega_estimada),
-                    componentes: componentesJson,
-                    planta: item.planta || 'Muebles',
-                    modificado_por: 'SAP Service Layer Sync',
-                    created_at: parseDate(item.fecha_liberacion) || new Date().toISOString()
-                };
-            });
+        // Agrupar filas devueltas por orden de fabricación
+        const orderMap = new Map<string, any>();
+        rawRows.forEach((row: any) => {
+            const docNum = String(row.orden_fabricacion || '');
+            if (!docNum) return;
 
+            if (!orderMap.has(docNum)) {
+                orderMap.set(docNum, {
+                    orden_fabricacion: docNum,
+                    numero_pedido: row.numero_pedido || docNum,
+                    producto_sku: row.producto_sku || '',
+                    producto_descripcion: row.producto_descripcion || '',
+                    cantidad: Number(row.cantidad) || 1,
+                    cliente: row.cliente || 'FIRPLAK S A',
+                    fecha_entrega_estimada: parseDate(row.fecha_entrega_estimada),
+                    planta: row.planta || 'Muebles',
+                    modificado_por: 'SAP Service Layer Sync',
+                    created_at: parseDate(row.fecha_liberacion) || new Date().toISOString(),
+                    componentes: []
+                });
+            }
+
+            const order = orderMap.get(docNum);
+            if (row.componente_sku && row.componente_nombre) {
+                const planned = Number(row.comp_planned) || 0;
+                const issued = Number(row.comp_issued) || 0;
+                const compQty = Math.round((planned - issued) * 100) / 100;
+                
+                order.componentes.push({
+                    sku: row.componente_sku,
+                    componente: row.componente_nombre,
+                    cantidad: compQty
+                });
+            }
+        });
+
+        const groupedOrders = Array.from(orderMap.values());
+
+        if (groupedOrders.length > 0) {
             await supabase
                 .from('ordenes_fabricacion_muebles')
-                .upsert(mappedRecords, { onConflict: 'orden_fabricacion' });
+                .upsert(groupedOrders, { onConflict: 'orden_fabricacion' });
         }
 
         const { count } = await supabase
@@ -72,10 +89,10 @@ export async function GET() {
 
         return NextResponse.json({
             success: true,
-            totalSincronizadas: rawItems.length,
+            totalSincronizadas: groupedOrders.length,
             totalEnSupabase: count || 0,
-            endpoint: "/SQLQueries('ordenes_muebles_sl')/List",
-            data: rawItems
+            endpoint: "/SQLQueries('ordenes_muebles_comp_v3')/List",
+            data: groupedOrders
         });
     } catch (error: any) {
         console.error("Error en API /api/sap/liberacion-muebles: ", error);

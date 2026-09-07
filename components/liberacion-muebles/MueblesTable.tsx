@@ -2,6 +2,22 @@
 
 import React, { useState, useEffect } from "react";
 
+function formatDate(dateStr: any): string {
+  if (!dateStr) return '-';
+  const str = String(dateStr).trim();
+  if (str.length === 8 && /^\d{8}$/.test(str)) {
+    const year = str.substring(0, 4);
+    const month = str.substring(4, 6);
+    const day = str.substring(6, 8);
+    return `${day}/${month}/${year}`;
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  }
+  return str;
+}
+
 export default function MueblesTable({ muebles, selectedDate }: { muebles: any[], selectedDate?: string }) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [sapInventory, setSapInventory] = useState<Record<string, { mp04: number, mp01: number } | null>>({});
@@ -217,7 +233,7 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
                 <td className="px-4 py-3 text-blue-700">{mueble.cantidad}</td>
                 <td className="px-4 py-3 text-blue-700">{mueble.cliente}</td>
                 <td className="px-4 py-3 text-blue-700">
-                  {new Date(mueble.fecha_entrega_estimada).toLocaleDateString()}
+                  {formatDate(mueble.fecha_entrega_estimada)}
                 </td>
               </tr>
               {expandedRow === idx && (
