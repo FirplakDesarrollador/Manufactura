@@ -137,12 +137,15 @@ export default function GestionMantenimientoPage() {
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [advanceSearch, setAdvanceSearch] = useState('');
 
-  // Preventivo (PMP) View State & Filters
+  // Preventivo (PMP) View State & Filters (Base Maestra Fija)
   const [preventivoSearch, setPreventivoSearch] = useState('');
   const [preventivoPlanta, setPreventivoPlanta] = useState('Todas');
   const [preventivoFrecuencia, setPreventivoFrecuencia] = useState('Todas');
-  const [preventivoEstado, setPreventivoEstado] = useState('Todos');
-  const [preventivoTecnico, setPreventivoTecnico] = useState('Todos');
+  const [preventivoTurno, setPreventivoTurno] = useState('Todos');
+
+  // Edit Task (Preventivo Base) State
+  const [editingTask, setEditingTask] = useState<MaintenanceTask | null>(null);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
 
   // Historial View State & Filters
   const [historySearch, setHistorySearch] = useState('');
@@ -980,6 +983,40 @@ export default function GestionMantenimientoPage() {
     });
   };
 
+  // Preventivo Task Edit & Delete Handlers
+  const handleOpenEditTask = (task: MaintenanceTask) => {
+    setEditingTask({ ...task });
+    setShowEditTaskModal(true);
+  };
+
+  const handleSaveTaskEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask) return;
+
+    const durHours = (editingTask.durationMinutes || 60) / 60;
+    const isDue = editingTask.adelantada || (editingTask.refFrecuencia >= editingTask.frecuencia);
+
+    const updatedTask: MaintenanceTask = {
+      ...editingTask,
+      durationHours: durHours,
+      isDue: isDue
+    };
+
+    const updatedTasks = tasks.map(t => (t.id === editingTask.id ? updatedTask : t));
+    persistState(updatedTasks, technicians);
+    setShowEditTaskModal(false);
+    setEditingTask(null);
+  };
+
+  const handleDeleteTask = (taskId: number) => {
+    const taskToDelete = tasks.find(t => t.id === taskId);
+    if (!taskToDelete) return;
+    if (confirm(`¿Estás seguro de eliminar el mantenimiento "${taskToDelete.title}" de la base maestra de programación?`)) {
+      const updatedTasks = tasks.filter(t => t.id !== taskId);
+      persistState(updatedTasks, technicians);
+    }
+  };
+
   // Corrective Add Handler
   const handleAddCorrectivoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1134,7 +1171,8 @@ export default function GestionMantenimientoPage() {
           normalize(task.code).includes(q) ||
           normalize(task.csvId).includes(q) ||
           normalize(task.maquina).includes(q) ||
-          normalize(task.detalle).includes(q);
+          normalize(task.detalle).includes(q) ||
+          normalize(task.planta).includes(q);
         if (!matches) return false;
       }
 
@@ -1147,19 +1185,15 @@ export default function GestionMantenimientoPage() {
         if (task.frecuencia !== freqNum) return false;
       }
 
-      if (preventivoEstado !== 'Todos') {
-        if (preventivoEstado === 'En Espera' && task.idtecs !== 9999) return false;
-        if (preventivoEstado !== 'En Espera' && (task.status || 'Pendiente') !== preventivoEstado) return false;
-      }
-
-      if (preventivoTecnico !== 'Todos') {
-        const techIdNum = parseInt(preventivoTecnico);
-        if (task.idtecs !== techIdNum) return false;
+      if (preventivoTurno !== 'Todos') {
+        const tInter = normalize(task.tipoIntervencion || '');
+        const pTurno = normalize(preventivoTurno);
+        if (!tInter.includes(pTurno) && !pTurno.includes(tInter)) return false;
       }
 
       return true;
     });
-  }, [tasks, preventivoSearch, preventivoPlanta, preventivoFrecuencia, preventivoEstado, preventivoTecnico]);
+  }, [tasks, preventivoSearch, preventivoPlanta, preventivoFrecuencia, preventivoTurno]);
 
   // Historial Memoized Filtered Records
   const filteredHistoryRows = useMemo(() => {
@@ -2114,28 +2148,38 @@ export default function GestionMantenimientoPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* VIEW 3: PREVENTIVO (PMP) */}
+        {/* VIEW 3: PREVENTIVO (PMP) - BASE MAESTRA DE PROGRAMACIÓN FIJA */}
         {/* ========================================================================= */}
         {activeTab === 'preventivo' && (
           <div className="flex flex-col gap-6 animate-in fade-in duration-300">
             
-            {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-[#324354]">{tasks.length}</div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">Total Mantenimientos en Plan</div>
+            {/* Master Header Card */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#e2ded5] shadow-xs">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-[#324354]/5 flex items-center justify-center text-[#324354]">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-[#324354]">Base Maestra de Programación (Preventivo PMP)</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Catálogo fijo de estándares preventivos, frecuencias de mantenimiento, máquinas asignadas y turnos operativos.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-emerald-600">{tasks.filter(t => t.isDue).length}</div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">Al Día / Programadas Hoy</div>
-              </div>
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-purple-700">{tasks.filter(t => t.adelantada).length}</div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">Validaciones Adelantadas</div>
-              </div>
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-amber-600">{tasks.filter(t => t.idtecs === 9999).length}</div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">En Espera / Super Técnico</div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold px-3.5 py-2 bg-[#F6F3EE] border border-gray-200 rounded-xl text-[#324354] whitespace-nowrap">
+                  Total Registros Base: <strong>{tasks.length}</strong>
+                </span>
+                <button
+                  onClick={() => setShowTaskModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#324354] text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-[#324354]/90 transition-all shadow-xs cursor-pointer whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nuevo Mantenimiento</span>
+                </button>
               </div>
             </div>
 
@@ -2144,7 +2188,7 @@ export default function GestionMantenimientoPage() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="font-bold text-[#324354] text-sm sm:text-base flex items-center gap-2">
                   <Filter className="w-4 h-4 text-[#7B8E90]" />
-                  <span>Filtros del Plan Preventivo ({filteredPreventivoTasks.length} registros)</span>
+                  <span>Filtros de Catálogo ({filteredPreventivoTasks.length} de {tasks.length} estándares)</span>
                 </h3>
 
                 <div className="flex items-center gap-2">
@@ -2168,8 +2212,7 @@ export default function GestionMantenimientoPage() {
                       setPreventivoSearch('');
                       setPreventivoPlanta('Todas');
                       setPreventivoFrecuencia('Todas');
-                      setPreventivoEstado('Todos');
-                      setPreventivoTecnico('Todos');
+                      setPreventivoTurno('Todos');
                     }}
                     className="text-xs text-[#7B8E90] hover:text-[#324354] font-semibold underline cursor-pointer ml-1"
                   >
@@ -2178,7 +2221,7 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Search */}
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -2186,7 +2229,7 @@ export default function GestionMantenimientoPage() {
                     type="text"
                     value={preventivoSearch}
                     onChange={(e) => setPreventivoSearch(e.target.value)}
-                    placeholder="Buscar por título, código..."
+                    placeholder="Buscar por título, código, máquina..."
                     className="w-full pl-9 pr-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs focus:outline-none focus:border-[#324354]"
                   />
                 </div>
@@ -2217,121 +2260,123 @@ export default function GestionMantenimientoPage() {
                   </select>
                 </div>
 
-                {/* Estado */}
+                {/* Turno Requerido */}
                 <div>
                   <select
-                    value={preventivoEstado}
-                    onChange={(e) => setPreventivoEstado(e.target.value)}
+                    value={preventivoTurno}
+                    onChange={(e) => setPreventivoTurno(e.target.value)}
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
                   >
-                    <option value="Todos">Estado: Todos</option>
-                    <option value="Pendiente">⏳ Pendiente</option>
-                    <option value="Incompleto">⚠️ Incompleto</option>
-                    <option value="Completado">✅ Completado</option>
-                    <option value="En Espera">📥 En Espera / Pool</option>
-                  </select>
-                </div>
-
-                {/* Técnico */}
-                <div>
-                  <select
-                    value={preventivoTecnico}
-                    onChange={(e) => setPreventivoTecnico(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
-                  >
-                    <option value="Todos">Técnico: Todos</option>
-                    {technicians.map(t => (
-                      <option key={t.id} value={t.id.toString()}>{t.name}</option>
-                    ))}
+                    <option value="Todos">Turno: Todos</option>
+                    <option value="PR">Producción (PR)</option>
+                    <option value="NP">Paro de Planta (NP)</option>
+                    <option value="PRNP">Producción y Paro (PRNP)</option>
                   </select>
                 </div>
               </div>
             </div>
 
-            {/* Preventivo Table */}
+            {/* Preventivo Master Table */}
             <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-xs overflow-hidden">
-              <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
+              <div className="overflow-x-auto max-h-[680px] overflow-y-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20">
                     <tr>
-                      <th className="py-3 px-4 font-bold">Código</th>
-                      <th className="py-3 px-4 font-bold min-w-[220px]">Título Mantenimiento</th>
-                      <th className="py-3 px-3 font-bold">Planta</th>
-                      <th className="py-3 px-3 font-bold">Máquina</th>
-                      <th className="py-3 px-3 font-bold text-center">Frecuencia</th>
-                      <th className="py-3 px-3 font-bold text-center">Ref. Días</th>
-                      <th className="py-3 px-3 font-bold text-center">Duración</th>
-                      <th className="py-3 px-3 font-bold">Turno</th>
-                      <th className="py-3 px-4 font-bold">Técnico Asignado</th>
-                      <th className="py-3 px-3 font-bold text-center">Estado</th>
-                      <th className="py-3 px-3 font-bold text-center">Acciones</th>
+                      <th className="py-3.5 px-4 font-bold text-center w-12">#</th>
+                      <th className="py-3.5 px-4 font-bold">Código</th>
+                      <th className="py-3.5 px-4 font-bold min-w-[260px]">Título del Mantenimiento / Detalle</th>
+                      <th className="py-3.5 px-3 font-bold">Planta</th>
+                      <th className="py-3.5 px-3 font-bold">Máquina / Equipo</th>
+                      <th className="py-3.5 px-3 font-bold text-center">Frecuencia Base</th>
+                      <th className="py-3.5 px-3 font-bold text-center">Duración Estándar</th>
+                      <th className="py-3.5 px-3 font-bold text-center">Turno</th>
+                      <th className="py-3.5 px-4 font-bold min-w-[180px]">Técnicos Habilitados</th>
+                      <th className="py-3.5 px-4 font-bold text-center w-28">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredPreventivoTasks.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="py-12 text-center text-gray-400">
-                          No se encontraron mantenimientos con los filtros seleccionados.
+                        <td colSpan={10} className="py-12 text-center text-gray-400">
+                          No se encontraron mantenimientos en la base con los filtros seleccionados.
                         </td>
                       </tr>
                     ) : (
-                      filteredPreventivoTasks.map(task => {
-                        const tech = technicians.find(t => t.id === task.idtecs);
-                        const isOverdue = task.refFrecuencia >= task.frecuencia;
+                      filteredPreventivoTasks.map((task, idx) => {
+                        const candidateTechs = technicians.filter(t =>
+                          t.id !== 9999 && (
+                            (task.idtecsCandidates && task.idtecsCandidates.includes(t.id)) ||
+                            (t.authorizedTitles && t.authorizedTitles.includes(normalize(task.title)))
+                          )
+                        );
 
                         return (
-                          <tr key={task.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-3 px-4 font-bold text-[#324354]">
-                              <span className="px-2 py-0.5 bg-slate-100 rounded text-[11px]">
+                          <tr key={task.id || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-3 px-4 text-center font-bold text-gray-400">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-[#324354] whitespace-nowrap">
+                              <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[11px]">
                                 #{task.csvId || task.code}
                               </span>
                             </td>
-                            <td className="py-3 px-4 font-semibold text-[#324354]">
-                              <div>{task.title}</div>
-                              {task.detalle && (
-                                <div className="text-[10px] text-gray-400 line-clamp-1 mt-0.5">{task.detalle}</div>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{task.planta}</td>
-                            <td className="py-3 px-3 text-gray-600 font-medium">{task.maquina}</td>
-                            <td className="py-3 px-3 text-center font-bold text-[#324354]">{task.frecuencia}d</td>
-                            <td className="py-3 px-3 text-center font-bold">
-                              <span className={`px-2 py-0.5 rounded ${isOverdue ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                {task.refFrecuencia}d
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-center font-medium text-gray-600">
-                              {task.durationMinutes}m ({task.durationHours.toFixed(1)}h)
-                            </td>
-                            <td className="py-3 px-3 font-medium text-gray-600">{task.tipoIntervencion || 'General'}</td>
-                            <td className="py-3 px-4 font-bold text-[#324354]">
-                              {tech ? (
-                                <span>{tech.name}</span>
+                            <td className="py-3 px-4 text-[#324354]">
+                              <div className="font-bold text-xs sm:text-sm">{task.title}</div>
+                              {task.detalle ? (
+                                <div className="text-[11px] text-gray-500 line-clamp-2 mt-0.5">{task.detalle}</div>
                               ) : (
-                                <span className="text-purple-700">Super Técnico (Pool)</span>
+                                <div className="text-[10px] text-gray-400 italic mt-0.5">Sin observaciones técnicas</div>
                               )}
                             </td>
-                            <td className="py-3 px-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                task.status === 'Completado' ? 'bg-emerald-100 text-emerald-800' :
-                                task.status === 'Incompleto' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                              }`}>
-                                {task.status || 'Pendiente'}
+                            <td className="py-3 px-3 text-gray-700 font-semibold whitespace-nowrap">
+                              <span className="px-2 py-0.5 bg-[#F6F3EE] rounded-md border text-[11px]">
+                                {task.planta}
                               </span>
                             </td>
-                            <td className="py-3 px-3 text-center">
-                              <select
-                                defaultValue=""
-                                onChange={(e) => {
-                                  if (e.target.value) handleAssignTask(task.id, parseInt(e.target.value), true);
-                                }}
-                                className="px-2 py-1 bg-white border border-[#324354]/30 rounded-lg text-[10px] font-bold text-[#324354] focus:outline-none cursor-pointer"
-                              >
-                                <option value="" disabled>Asignar...</option>
-                                {technicians.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                              </select>
+                            <td className="py-3 px-3 text-gray-700 font-medium whitespace-nowrap">{task.maquina}</td>
+                            <td className="py-3 px-3 text-center font-bold text-[#324354] whitespace-nowrap">
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-100 rounded-md font-bold">
+                                {task.frecuencia}d
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-center font-medium text-gray-700 whitespace-nowrap">
+                              <strong>{task.durationMinutes}m</strong> ({task.durationHours.toFixed(1)}h)
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <span className="px-2 py-0.5 bg-slate-100 font-bold text-[#324354] rounded text-[11px]">
+                                {task.tipoIntervencion || 'General'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              {candidateTechs.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {candidateTechs.map(ct => (
+                                    <span key={ct.id} className="px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-medium rounded">
+                                      {ct.name.split(' ')[0]} {ct.name.split(' ')[1] ? ct.name.split(' ')[1][0] + '.' : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic text-[11px]">Todos los técnicos del turno</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditTask(task)}
+                                  className="p-1.5 text-[#324354] hover:bg-white hover:text-blue-600 hover:border-gray-300 rounded-xl transition-all cursor-pointer border border-transparent"
+                                  title="Editar mantenimiento base"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTask(task.id)}
+                                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-white hover:border-gray-300 rounded-xl transition-all cursor-pointer border border-transparent"
+                                  title="Eliminar de la base"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -3325,10 +3370,19 @@ export default function GestionMantenimientoPage() {
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#324354]/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-[#324354] mb-4">Crear Mantenimiento Manual</h3>
+            <div className="flex items-center justify-between border-b border-[#e2ded5] pb-3 mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-[#324354] flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-[#7B8E90]" />
+                  <span>Nuevo Mantenimiento Base (PMP)</span>
+                </h3>
+                <p className="text-xs text-gray-500">Registra un nuevo estándar preventivo fijo en el catálogo maestro.</p>
+              </div>
+            </div>
+
             <form onSubmit={handleAddTaskSubmit} className="flex flex-col gap-3.5">
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Título de la Tarea</label>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Título del Mantenimiento</label>
                 <input
                   type="text"
                   value={newTaskForm.title}
@@ -3339,11 +3393,11 @@ export default function GestionMantenimientoPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Detalle / Descripción</label>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Detalle / Procedimiento Técnico</label>
                 <textarea
                   value={newTaskForm.detalle}
                   onChange={(e) => setNewTaskForm(prev => ({ ...prev, detalle: e.target.value }))}
-                  placeholder="Descripción detallada del trabajo..."
+                  placeholder="Descripción detallada de la rutina de mantenimiento..."
                   className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:border-[#324354] min-h-[50px]"
                 />
               </div>
@@ -3354,11 +3408,12 @@ export default function GestionMantenimientoPage() {
                     type="text"
                     value={newTaskForm.planta}
                     onChange={(e) => setNewTaskForm(prev => ({ ...prev, planta: e.target.value }))}
+                    placeholder="Ej. RTM / Mármol"
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquina</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquina / Equipo</label>
                   <input
                     type="text"
                     value={newTaskForm.maquina}
@@ -3370,7 +3425,7 @@ export default function GestionMantenimientoPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Duración (minutos)</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Duración Estándar (Minutos)</label>
                   <input
                     type="number"
                     value={newTaskForm.durationMinutes}
@@ -3378,7 +3433,7 @@ export default function GestionMantenimientoPage() {
                     min="10"
                     step="5"
                     required
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm"
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold"
                   />
                 </div>
                 <div>
@@ -3394,29 +3449,17 @@ export default function GestionMantenimientoPage() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Frecuencia (días)</label>
-                  <input
-                    type="number"
-                    value={newTaskForm.frecuencia}
-                    onChange={(e) => setNewTaskForm(prev => ({ ...prev, frecuencia: parseFloat(e.target.value) || 0 }))}
-                    min="1"
-                    required
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Ref Frecuencia (actual)</label>
-                  <input
-                    type="number"
-                    value={newTaskForm.refFrecuencia}
-                    onChange={(e) => setNewTaskForm(prev => ({ ...prev, refFrecuencia: parseFloat(e.target.value) || 0 }))}
-                    min="0"
-                    required
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Frecuencia Estándar (Días)</label>
+                <input
+                  type="number"
+                  value={newTaskForm.frecuencia}
+                  onChange={(e) => setNewTaskForm(prev => ({ ...prev, frecuencia: parseFloat(e.target.value) || 0, refFrecuencia: parseFloat(e.target.value) || 0 }))}
+                  min="1"
+                  required
+                  placeholder="Ej. 30"
+                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold"
+                />
               </div>
               <div className="flex gap-3 pt-3">
                 <button
@@ -3430,7 +3473,154 @@ export default function GestionMantenimientoPage() {
                   type="submit"
                   className="flex-1 py-2.5 bg-[#324354] text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-[#324354]/90 cursor-pointer"
                 >
-                  Guardar Mantenimiento
+                  Guardar en Catálogo Base
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Maintenance Task (Preventivo Base) */}
+      {showEditTaskModal && editingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#324354]/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#e2ded5] pb-3 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-[#324354] flex items-center gap-2">
+                  <Pencil className="w-5 h-5 text-[#7B8E90]" />
+                  <span>Modificar Mantenimiento Base</span>
+                </h3>
+                <p className="text-xs text-gray-500">Actualiza la ficha técnica y parámetros del estándar preventivo.</p>
+              </div>
+              <span className="text-xs px-2.5 py-1 bg-slate-100 font-mono font-bold text-gray-700 rounded-lg">
+                #{editingTask.csvId || editingTask.code}
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveTaskEdit} className="flex flex-col gap-3.5">
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Título del Mantenimiento</label>
+                <input
+                  type="text"
+                  value={editingTask.title}
+                  onChange={(e) => setEditingTask(prev => prev ? { ...prev, title: e.target.value } : null)}
+                  required
+                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:border-[#324354]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Detalle / Procedimiento Técnico</label>
+                <textarea
+                  value={editingTask.detalle || ''}
+                  onChange={(e) => setEditingTask(prev => prev ? { ...prev, detalle: e.target.value } : null)}
+                  placeholder="Detalle o instrucciones del mantenimiento..."
+                  className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:border-[#324354] min-h-[55px]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Planta</label>
+                  <input
+                    type="text"
+                    value={editingTask.planta || ''}
+                    onChange={(e) => setEditingTask(prev => prev ? { ...prev, planta: e.target.value } : null)}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquina / Equipo</label>
+                  <input
+                    type="text"
+                    value={editingTask.maquina || ''}
+                    onChange={(e) => setEditingTask(prev => prev ? { ...prev, maquina: e.target.value } : null)}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Duración (Minutos)</label>
+                  <input
+                    type="number"
+                    step="5"
+                    min="5"
+                    value={editingTask.durationMinutes}
+                    onChange={(e) => setEditingTask(prev => prev ? { ...prev, durationMinutes: parseFloat(e.target.value) || 0 } : null)}
+                    required
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Turno Requerido</label>
+                  <select
+                    value={editingTask.tipoIntervencion || 'PR'}
+                    onChange={(e) => setEditingTask(prev => prev ? { ...prev, tipoIntervencion: e.target.value } : null)}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354]"
+                  >
+                    <option value="PR">Producción (PR)</option>
+                    <option value="NP">Paro de Planta (NP)</option>
+                    <option value="PRNP">Producción y Paro (PRNP)</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Frecuencia Base (Días)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editingTask.frecuencia}
+                  onChange={(e) => setEditingTask(prev => prev ? { ...prev, frecuencia: parseFloat(e.target.value) || 0 } : null)}
+                  required
+                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Técnicos Autorizados / Candidatos</label>
+                <div className="max-h-32 overflow-y-auto p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 flex flex-col gap-1.5 text-xs">
+                  {technicians.filter(t => t.id !== 9999).map(tech => {
+                    const isSelected = editingTask.idtecsCandidates?.includes(tech.id);
+                    return (
+                      <label key={tech.id} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded-lg transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={!!isSelected}
+                          onChange={(e) => {
+                            const current = editingTask.idtecsCandidates || [];
+                            const updated = e.target.checked
+                              ? [...current, tech.id]
+                              : current.filter(id => id !== tech.id);
+                            setEditingTask(prev => prev ? { ...prev, idtecsCandidates: updated } : null);
+                          }}
+                          className="rounded accent-[#324354]"
+                        />
+                        <span className="font-semibold text-[#324354]">{tech.name}</span>
+                        <span className="text-[10px] text-gray-500">({getTurnoLabel(tech.turno)})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditTaskModal(false); setEditingTask(null); }}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs sm:text-sm hover:bg-gray-200 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-[#324354] text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-[#324354]/90 cursor-pointer"
+                >
+                  Guardar Cambios
                 </button>
               </div>
             </form>
