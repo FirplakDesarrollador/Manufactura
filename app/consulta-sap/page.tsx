@@ -476,6 +476,7 @@ export default function ConsultaSAPPage() {
     const [copiedData, setCopiedData] = useState(false)
     const [semaforoDataList, setSemaforoDataList] = useState<SemaforoItem[]>([])
     const [semaforoHasLoaded, setSemaforoHasLoaded] = useState<boolean>(false)
+    const [semaforoDataSource, setSemaforoDataSource] = useState<string>('')
 
     // Estados para pestaña Query - Órdenes Liberadas (FPK - Ordenes de fabricación liberadas)
     const [releasedOrdersList, setReleasedOrdersList] = useState<ReleasedOrderItem[]>([])
@@ -805,6 +806,7 @@ export default function ConsultaSAPPage() {
             const result = await res.json();
             if (result.success && result.data) {
                 setSemaforoDataList(result.data);
+                setSemaforoDataSource(result.source || 'Desconocido');
                 setSemaforoHasLoaded(true);
                 toast.success(`Semáforo actualizado correctamente (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
             } else {
@@ -2096,7 +2098,7 @@ export default function ConsultaSAPPage() {
                                             {semaforoDataList.length.toLocaleString('es-CO')} Registros Encontrados
                                         </h3>
                                         <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
-                                            ✓ Consulta EXEC [Planos_Symphony].[dbo].[SEMAFORO] completada exitosamente
+                                            ✓ Consulta completada exitosamente desde: <strong>{semaforoDataSource}</strong>
                                         </div>
                                         <p className="text-xs text-slate-500 pt-1">
                                             Los datos están listos para ser descargados directamente en Excel o copiados al portapapeles.

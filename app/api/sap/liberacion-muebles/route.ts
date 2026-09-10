@@ -28,7 +28,7 @@ export async function GET() {
             headers: {
                 'Cookie': loginData.cookieHeader || loginData,
                 'Content-Type': 'application/json',
-                'Prefer': 'odata.maxpagesize=500'
+                'Prefer': 'odata.maxpagesize=5000'
             },
             cache: 'no-store'
         });

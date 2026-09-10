@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { loginToSAP } from '@/lib/sap';
 import { supabase } from '@/lib/supabase';
 
 function mapRow(item: any, index: number) {
@@ -53,57 +52,67 @@ function mapRow(item: any, index: number) {
     };
 }
 
-export async function GET() {
+export async function POST(req: Request) {
     try {
-        console.log("Consultando registros almacenados en Supabase (Sincronizados desde SQL Server)...");
-        const { data: dbRows, error: dbErr } = await supabase
-            .from('semaforo')
-            .select('*')
-            .order('updated_at', { ascending: false });
-
-        if (dbErr) {
-            throw new Error(`Error de Supabase: ${dbErr.message}`);
+        const body = await req.json();
+        
+        // Verificamos un token básico de seguridad
+        const authHeader = req.headers.get('authorization');
+        if (authHeader !== 'Bearer firplak_sync_2026') {
+            return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
         }
 
-        if (dbRows && dbRows.length > 0) {
-            const mappedFromDb = dbRows.map((r, index) => {
-                const raw = r.raw_data || {};
-                return {
-                    ...mapRow(raw, index),
-                    nroOp: r.nro_op || raw["Nro OP"] || '',
-                    sku: r.sku || raw.SKU || '',
-                    descripcion: r.descripcion || raw["Descripción Artículo"] || '',
-                    planta: r.planta || raw.Planta || '',
-                    familia: r.familia || raw.Familia || '',
-                    cantPendiente: r.cant_pendiente || '0',
-                    cantTotal: r.cant_total || '0',
-                    estado: r.estado || '',
-                    cliente: r.cliente || ''
-                };
-            });
+        if (!Array.isArray(body) || body.length === 0) {
+            return NextResponse.json({ success: false, error: 'Payload vacío o no es un array' }, { status: 400 });
+        }
 
-            return NextResponse.json({
-                success: true,
-                total: mappedFromDb.length,
-                source: "Supabase DB (Sincronización Automática Webhook)",
-                data: mappedFromDb
-            });
+        const rawItems = body;
+
+        const mappedForDb = rawItems.map(mapRow).map((item: any) => ({
+            nro_op: item.nroOp || '',
+            originnum: item.originnum || '',
+            sku: item.sku || '',
+            descripcion: item.descripcion || '',
+            planta: item.planta || '',
+            familia: item.familia || '',
+            tipo_orden: item.tipoOrden || '',
+            cant_pendiente: item.cantPendiente || '0',
+            cant_total: item.cantTotal || '0',
+            estado: item.estado || '',
+            fecha_creacion_op: item.fechaCreacionOp || '',
+            fecha_real_liberacion: item.fechaRealLiberacion || '',
+            color_liberacion: item.colorLiberacion || '',
+            color_produccion: item.colorProduccion || '',
+            color_firplak: item.colorFirplak || '',
+            cumplimiento_planta: item.cumplimientoPlanta || '',
+            cumplimiento_firplak: item.cumplimientoFirplak || '',
+            dias_retrazo_firplak: item.diasRetrazoFirplak || '0',
+            cliente: item.cliente || '',
+            num_lote: item.numLote || '',
+            raw_data: item,
+            updated_at: new Date().toISOString()
+        }));
+
+        // Primero borramos los datos actuales para tener una copia limpia
+        await supabase.from('semaforo').delete().neq('nro_op', '___IMPOSSIBLE_VAL___');
+
+        // Luego insertamos en bloques de 100
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < mappedForDb.length; i += BATCH_SIZE) {
+            const batch = mappedForDb.slice(i, i + BATCH_SIZE);
+            await supabase.from('semaforo').upsert(batch, { onConflict: 'nro_op' });
         }
 
         return NextResponse.json({
             success: true,
-            total: 0,
-            source: "Supabase DB (Vacío)",
-            data: []
+            message: `Sincronizados ${rawItems.length} registros exitosamente.`
         });
 
     } catch (err: any) {
-        console.error("Error en /api/sap/semaforo:", err);
+        console.error("Error en /api/sap/semaforo/sync:", err);
         return NextResponse.json({
             success: false,
-            error: String(err),
-            total: 0,
-            data: []
+            error: String(err)
         }, { status: 500 });
     }
 }
