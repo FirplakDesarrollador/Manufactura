@@ -1,109 +1,117 @@
 import { NextResponse } from 'next/server';
-import { loginToSAP } from '@/lib/sap';
-import { supabase } from '@/lib/supabase';
 
-function mapRow(item: any, index: number) {
-    const descKey = Object.keys(item).find(k => k.toLowerCase().includes('descripc')) || 'Descripción Artículo';
-    const cantPendKey = Object.keys(item).find(k => k.toLowerCase().includes('pendiente') && !k.toLowerCase().includes('item')) || 'Cant. Pendiente';
-    const cantPendItemKey = Object.keys(item).find(k => k.toLowerCase().includes('pend') && k.toLowerCase().includes('item')) || 'Cant. Pend. Item';
-    const cantTotKey = Object.keys(item).find(k => k.toLowerCase().includes('total')) || 'Cantidad total';
-    const tipoOrdKey = Object.keys(item).find(k => k.toLowerCase().includes('tipo')) || 'Tipo Orden';
-
-    return {
-        id: index + 1,
-        originnum: item.Originnum ? String(item.Originnum) : '',
-        nroOp: item["Nro OP"] ? String(item["Nro OP"]) : (item.orden_fabricacion ? String(item.orden_fabricacion) : ''),
-        sku: item.SKU || item.producto_sku || '',
-        descripcion: item[descKey] || item.producto_descripcion || '',
-        planta: item.Planta || item.linea || 'MS',
-        familia: item.Familia || 'PA',
-        tipoOrden: item[tipoOrdKey] || 'STANDARD',
-        cantPendiente: String(item[cantPendKey] ?? item.cantidad ?? '0'),
-        cantPendItem: String(item[cantPendItemKey] ?? '0'),
-        cantTotal: String(item[cantTotKey] ?? item.cantidad ?? '0'),
-        disponiblePt01: String(item["Disponible PT01"] ?? '0'),
-        fechaCreacionOp: item["Fecha Creación OP"] || item.fecha_liberacion || '',
-        estado: item.Estado || 'Liberado',
-        fechaRecomendadaLiberacion: item["Fecha Recomendada Liberación"] || item.fecha_liberacion || '',
-        fechaRealLiberacion: item["Fecha Real Liberación"] || item.fecha_liberacion || '',
-        consumoParaLiberar: String(item["Consumo Para Liberar"] ?? '0'),
-        colorLiberacionTxt: item["Color Liberación Txt"] || 'Verde',
-        colorLiberacion: String(item["Color Liberación"] ?? 'VERDE'),
-        cumplimientoLiberacion: item["Cumplimiento Liberación"] || '100%',
-        fechaEntregaLote: item["Fecha Entrega Lote"] || item.fecha_entrega_estimada || '',
-        fechaRecomendadaDeEntrega: item["Fecha Recomendada de Entrega"] || item.fecha_entrega_estimada || '',
-        fechaCierreOp: item["Fecha Cierre OP"] || null,
-        fechaIdealEntregaProduccion: item["Fecha Ideal Entrega Producción"] || item.fecha_ideal_produccion || '',
-        consumoAmortiguadorPlanta: String(item["Consumo Amortiguador Planta"] ?? '0'),
-        colorProduccionTxt: item["Color Producción Txt"] || 'Verde',
-        colorProduccion: String(item["Color Producción"] ?? 'VERDE'),
-        cumplimientoPlanta: item["Cumplimiento Planta"] || '100%',
-        diasRetrazoFirplak: String(item["Dias Retrazo Firplak"] ?? '0'),
-        colorFirplakTxt: item["Color Firplak Txt"] || 'Verde',
-        colorFirplak: String(item["Color Firplak"] ?? 'VERDE'),
-        cumplimientoFirplak: item["Cumplimiento Firplak"] || '100%',
-        fechaPrometidaEntregaItem: item["Fecha Prometida Entrega Item"] || item.fecha_entrega_estimada || '',
-        destino: item.Destino || 'CEDI',
-        numLote: item.NumLote || item.numero_pedido || '',
-        molde: item.Molde || item.molde_descripcion || null,
-        capacidadMolde: item["Capacidad Molde"] ? String(item["Capacidad Molde"]) : null,
-        fechaCargaMolde: item["Fecha Carga Molde"] || '',
-        amortiguador: String(item.Amortiguador ?? '0'),
-        cliente: item.Cliente || item.cliente || 'FIRPLAK S A',
-    };
-}
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET() {
     try {
-        console.log("Consultando registros almacenados en Supabase (Sincronizados desde SQL Server)...");
-        const { data: dbRows, error: dbErr } = await supabase
-            .from('semaforo')
-            .select('*')
-            .order('updated_at', { ascending: false });
+        console.log("Iniciando solicitud a SAP Service Layer para semaforo_v3...");
+        const sapUrl = process.env.SAP_API_URL;
+        
+        const loginRes = await fetch(sapUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                CompanyDB: process.env.SAP_COMPANY_DB,
+                Password: process.env.SAP_PASSWORD,
+                UserName: process.env.SAP_USERNAME
+            }),
+            cache: 'no-store'
+        });
 
-        if (dbErr) {
-            throw new Error(`Error de Supabase: ${dbErr.message}`);
+        if (!loginRes.ok) {
+            throw new Error(`Error en Login SAP: ${loginRes.status}`);
         }
 
-        if (dbRows && dbRows.length > 0) {
-            const mappedFromDb = dbRows.map((r, index) => {
-                const raw = r.raw_data || {};
-                return {
-                    ...mapRow(raw, index),
-                    nroOp: r.nro_op || raw["Nro OP"] || '',
-                    sku: r.sku || raw.SKU || '',
-                    descripcion: r.descripcion || raw["Descripción Artículo"] || '',
-                    planta: r.planta || raw.Planta || '',
-                    familia: r.familia || raw.Familia || '',
-                    cantPendiente: r.cant_pendiente || '0',
-                    cantTotal: r.cant_total || '0',
-                    estado: r.estado || '',
-                    cliente: r.cliente || ''
-                };
+        const loginData = await loginRes.json();
+        const routeIdMatch = (loginRes.headers.get("set-cookie") || "").match(/ROUTEID=([^;]+)/);
+        const cookieHeader = `B1SESSION=${loginData.SessionId}; ROUTEID=${routeIdMatch ? routeIdMatch[1] : ""}`;
+        const baseUrl = sapUrl.replace('/Login', '');
+
+        // Obtener todos los registros paginados (max 10000)
+        let allRecords = [];
+        let nextUrl = `${baseUrl}/U_F_SEMAFORO?$inlinecount=allpages`;
+        
+        while (nextUrl) {
+            const listRes = await fetch(nextUrl, {
+                headers: {
+                    'Cookie': cookieHeader,
+                    'Prefer': 'odata.maxpagesize=5000'
+                },
+                cache: 'no-store'
             });
 
-            return NextResponse.json({
-                success: true,
-                total: mappedFromDb.length,
-                source: "Supabase DB (Sincronización Automática Webhook)",
-                data: mappedFromDb
-            });
+            if (!listRes.ok) {
+                const errText = await listRes.text();
+                throw new Error(`Error al consultar semaforo_v3: ${listRes.status} - ${errText}`);
+            }
+
+            const data = await listRes.json();
+            allRecords = allRecords.concat(data.value || []);
+            
+            if (data['odata.nextLink']) {
+                nextUrl = `${baseUrl}/${data['odata.nextLink']}`;
+            } else {
+                nextUrl = null;
+            }
         }
+
+        console.log(`Consulta completada. Total registros obtenidos de SAP: ${allRecords.length}`);
+
+        // Mapear de U_... a los nombres originales esperados por el frontend
+        const mappedRecords = allRecords.map(r => ({
+            "Originnum": r.U_Originnum,
+            "Nro OP": r.U_NroOP,
+            "SKU": r.U_SKU,
+            "Descripción Artículo": r.U_DescArticulo,
+            "Planta": r.U_Planta,
+            "Familia": r.U_Familia,
+            "Tipo Orden": r.U_TipoOrden,
+            "Cant. Pendiente": r.U_CantPendiente,
+            "Cant. Pend. Item": r.U_CantPendItem,
+            "Cantidad total": r.U_CantidadTotal,
+            "Disponible PT01": r.U_DisponiblePT01,
+            "Fecha Creación OP": r.U_FechaCreacionOP,
+            "Estado": r.U_Estado,
+            "Fecha Recomendada Liberación": r.U_FechaRecoLib,
+            "Fecha Real Liberación": r.U_FechaRealLib,
+            "Consumo Para Liberar": r.U_ConsumoParaLib,
+            "Color Liberación Txt": r.U_ColorLibTxt,
+            "Color Liberación": r.U_ColorLib,
+            "Cumplimiento Liberación": r.U_CumpLib,
+            "Fecha Entrega Lote": r.U_FechaEntLote,
+            "Fecha Recomendada de Entrega": r.U_FechaRecoEnt,
+            "Fecha Cierre OP": r.U_FechaCierreOP,
+            "Fecha Ideal Entrega Producción": r.U_FechaIdealEnt,
+            "Consumo Amortiguador Planta": r.U_ConsumoAmort,
+            "Color Producción Txt": r.U_ColorProdTxt,
+            "Color Producción": r.U_ColorProd,
+            "Cumplimiento Planta": r.U_CumpPlanta,
+            "Dias Retrazo Firplak": r.U_DiasRetrazo,
+            "Color Firplak Txt": r.U_ColorFirplakTxt,
+            "Color Firplak": r.U_ColorFirplak,
+            "Cumplimiento Firplak": r.U_CumpFirplak,
+            "Fecha Prometida Entrega Item": r.U_FechaPromEnt,
+            "Destino": r.U_Destino,
+            "NumLote": r.U_NumLote,
+            "Molde": r.U_Molde,
+            "Capacidad Molde": r.U_CapacidadMolde,
+            "Fecha Carga Molde": r.U_FechaCargaMolde,
+            "Amortiguador": r.U_Amortiguador,
+            "Cliente": r.U_Cliente
+        }));
 
         return NextResponse.json({
             success: true,
-            total: 0,
-            source: "Supabase DB (Vacío)",
-            data: []
+            source: 'SAP Service Layer (@F_SEMAFORO UDT)',
+            data: mappedRecords
         });
 
-    } catch (err: any) {
-        console.error("Error en /api/sap/semaforo:", err);
-        return NextResponse.json({
-            success: false,
-            error: String(err),
-            total: 0,
-            data: []
-        }, { status: 500 });
+    } catch (error) {
+        console.error("Error en API semáforo (Service Layer UDT):", error);
+        return NextResponse.json(
+            { success: false, error: 'Failed to fetch from SAP Service Layer', details: error.message },
+            { status: 500 }
+        );
     }
 }
