@@ -104,7 +104,8 @@ export async function GET() {
         return NextResponse.json({
             success: true,
             source: 'SAP Service Layer (@F_SEMAFORO UDT)',
-            data: mappedRecords
+            data: mappedRecords,
+            total: mappedRecords.length
         });
 
     } catch (error) {
