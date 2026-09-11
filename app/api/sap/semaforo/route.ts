@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+export const maxDuration = 60; // Permitir hasta 60 segundos (útil para Vercel si la API tarda >10s)
 
 export async function GET() {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -24,11 +25,12 @@ export async function GET() {
 
         const data = await listRes.json();
         
-        if (data.error) {
+        if (data && data.error) {
             throw new Error(`Error retornado por la API Python: ${data.message}`);
         }
 
-        const allRecords = data.response || [];
+        // Si data es un arreglo directo, lo usamos. Si viene envuelto en response, usamos data.response
+        const allRecords = Array.isArray(data) ? data : (data.response || []);
 
         console.log(`Consulta completada. Total registros obtenidos: ${allRecords.length}`);
 
