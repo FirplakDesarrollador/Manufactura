@@ -243,7 +243,7 @@ export default function Header({
               subItems: [
                 { label: 'Indicadores Mantenimiento', path: '/mantenimiento' },
                 { label: 'Tarjetas de Anomalías', path: '/mantenimiento/tarjetas-falla' },
-                { label: 'Gestión de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
+                { label: 'Gestor de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
                 { label: 'Almacén', path: '/mantenimiento/almacen' },
                 { label: 'Máquinas', path: '/mantenimiento/maquinas' },
                 { label: 'Mantenimiento Autónomo LILAC', path: '/mantenimiento/lilac' },

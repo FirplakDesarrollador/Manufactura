@@ -3,11 +3,12 @@
 import NextImage from 'next/image'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Home, Save, Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Search, X, User, LayoutGrid, Printer, History, Clock, Check, GripVertical } from 'lucide-react'
+import { ArrowLeft, Home, Save, Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Search, X, User, LayoutGrid, Printer, History, Clock, Check, GripVertical, ShieldAlert, RotateCcw, CheckCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano'
 import { Database } from '@/lib/hdt/database.types'
 import { isAuthorizedEditor } from '@/lib/hdt/authorized-editors'
+import { moveToTrash } from '@/lib/hdt/papelera'
 
 import {
     DndContext,
@@ -123,6 +124,20 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
     const [versionHistory, setVersionHistory] = useState<HdtRow[]>([])
     const [creatingVersion, setCreatingVersion] = useState(false)
     const [canDelete, setCanDelete] = useState(false)
+
+    // Estados de confirmación de eliminación y papelera
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [deleteStep, setDeleteStep] = useState<1 | 2>(1)
+    const [deleteScope, setDeleteScope] = useState<'version' | 'all'>('version')
+    const [deletingToTrash, setDeletingToTrash] = useState(false)
+    const [currentUserEmail, setCurrentUserEmail] = useState<string>('Usuario')
+
+    // Estados de autoguardado inteligente
+    const [lastAutoSave, setLastAutoSave] = useState<string | null>(null)
+    const [isAutoSaving, setIsAutoSaving] = useState(false)
+    const isFirstLoadRef = useRef(true)
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
     // Form State
     const [formData, setFormData] = useState<Partial<HdtRow>>({
         planta: 'CEFI',
@@ -206,6 +221,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
         const checkUserPerms = async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (user && user.email) {
+                setCurrentUserEmail(user.email)
                 const authorized = isAuthorizedEditor(user.email)
                 setCanDelete(authorized)
                 // Si llegó al modo edit sin autorización, forzar vista solo lectura
@@ -712,31 +728,96 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
         }
     }
 
-    const handleDeleteAllVersions = async () => {
-        if (!hdtId || !formData.codigo) return
-        const confirmDelete = window.confirm("¿Estás seguro de que deseas eliminar TODAS las versiones de esta HDT? Esta acción no se puede deshacer.")
-        if (!confirmDelete) return
-        
-        setSaving(true)
+    // Autoguardado automático en segundo plano para modo editor
+    const performAutoSave = async () => {
+        if (!hdtId || currentMode !== 'edit' || saving || isAutoSaving || creatingVersion) return
+        setIsAutoSaving(true)
+        try {
+            // 1. Guardar copia local de seguridad en el navegador (Local Draft Backup)
+            const draftKey = `firplak_hdt_draft_${hdtId}`
+            localStorage.setItem(draftKey, JSON.stringify({
+                hdt: formData,
+                steps,
+                savedAt: new Date().toISOString()
+            }))
+
+            // 2. Sincronizar cabecera en Supabase si es versión vigente
+            if (formData.is_current) {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { id: _, updated_at: __, ...cleanFormData } = formData
+                await (supabase.from('hdts') as any).update(cleanFormData).eq('id', hdtId)
+
+                // 3. Sincronizar pasos en Supabase
+                await (supabase.from('hdt_steps') as any).delete().eq('hdt_id', hdtId)
+                const stepsToInsert = steps.map(step => ({
+                    hdt_id: hdtId,
+                    acciones_importantes: step.acciones_importantes || '',
+                    paso_importante: step.paso_importante || '',
+                    punto_clave: step.punto_clave || '',
+                    razon_punto_clave: step.razon_punto_clave || '',
+                    step_no: step.step_no
+                }))
+                await (supabase.from('hdt_steps') as any).insert(stepsToInsert)
+            }
+
+            const now = new Date()
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            setLastAutoSave(timeStr)
+        } catch (err) {
+            console.warn('Auto-save background sync notice:', err)
+        } finally {
+            setIsAutoSaving(false)
+        }
+    }
+
+    // Disparador de autoguardado con debounce tras modificaciones
+    useEffect(() => {
+        if (loading || currentMode !== 'edit' || !hdtId) return
+
+        if (isFirstLoadRef.current) {
+            isFirstLoadRef.current = false
+            return
+        }
+
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current)
+        }
+
+        autoSaveTimerRef.current = setTimeout(() => {
+            performAutoSave()
+        }, 3500)
+
+        return () => {
+            if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+        }
+    }, [formData, steps, loading, currentMode, hdtId])
+
+    const openDeleteModal = () => {
+        setDeleteStep(1)
+        setDeleteScope('version')
+        setShowDeleteModal(true)
+    }
+
+    const handleConfirmMoveToTrash = async () => {
+        if (!hdtId) return
+        setDeletingToTrash(true)
         setError(null)
         try {
-            // Eliminar todos los pasos de todas las versiones con este código
-            const { data: versions } = await supabase.from('hdts').select('id').eq('codigo', formData.codigo)
-            if (versions && versions.length > 0) {
-                const versionIds = versions.map((v: { id: string }) => v.id)
-                await supabase.from('hdt_steps').delete().in('hdt_id', versionIds)
+            const res = await moveToTrash(
+                formData as HdtRow,
+                steps as StepRow[],
+                deleteScope,
+                currentUserEmail
+            )
+            if (!res.success) {
+                throw new Error(res.error || 'Error al mover a la papelera de reciclaje.')
             }
-            
-            // Eliminar las HDTs
-            const { error: delError } = await supabase.from('hdts').delete().eq('codigo', formData.codigo)
-            if (delError) throw delError
-            
-            router.push('/hdt')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setShowDeleteModal(false)
+            router.push('/hdt/plants')
         } catch (err: any) {
-            console.error('Error al eliminar:', err)
+            console.error('Error al mover a papelera:', err)
             setError(err.message || 'Error al eliminar la HDT.')
-            setSaving(false)
+            setDeletingToTrash(false)
         }
     }
 
@@ -1445,13 +1526,30 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                             </button>
                         )}
                         
+                        {/* Indicador de Autoguardado en tiempo real */}
+                        {lastAutoSave && !isAutoSaving && (
+                            <div className="hidden xl:flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-3.5 py-2 rounded-xl shadow-xs shrink-0">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span>Autoguardado: {lastAutoSave}</span>
+                            </div>
+                        )}
+                        {isAutoSaving && (
+                            <div className="hidden xl:flex items-center gap-2 text-xs font-semibold text-brand-primary bg-brand-primary/10 border border-brand-primary/20 px-3.5 py-2 rounded-xl animate-pulse shrink-0">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Guardando cambios...</span>
+                            </div>
+                        )}
+
                         {canDelete && currentMode !== 'create' && (
                             <button
                                 type="button"
-                                onClick={handleDeleteAllVersions}
-                                disabled={saving}
-                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-red-100 text-red-600 border-2 border-red-200 rounded-xl md:rounded-2xl font-bold hover:bg-red-600 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0"
-                                title="Eliminar HDT completa"
+                                onClick={openDeleteModal}
+                                disabled={saving || deletingToTrash}
+                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-red-50 text-red-600 border-2 border-red-200 rounded-xl md:rounded-2xl font-bold hover:bg-red-600 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0 shadow-xs"
+                                title="Eliminar HDT o versión"
                             >
                                 <Trash2 className="h-4 w-4 md:h-5 md:w-5 hidden sm:block shrink-0" />
                                 <span className="whitespace-nowrap">Eliminar</span>
@@ -1460,6 +1558,163 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                     </div>
                 </div>
             </form>
+
+            {/* Modal de Doble Confirmación de Eliminación con Respaldo en Papelera */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 md:p-8 border border-zinc-100 relative text-left">
+                        {deleteStep === 1 ? (
+                            <div>
+                                <div className="flex items-center gap-4 mb-5">
+                                    <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                                        <Trash2 className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-zinc-900 leading-tight">
+                                            ¿Deseas eliminar esta HDT?
+                                        </h3>
+                                        <p className="text-xs md:text-sm text-zinc-500 mt-0.5">
+                                            Paso 1 de 2: Selecciona el alcance de la eliminación
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 my-6">
+                                    <label
+                                        onClick={() => setDeleteScope('version')}
+                                        className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                                            deleteScope === 'version'
+                                                ? 'border-red-500 bg-red-50/50'
+                                                : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="deleteScope"
+                                            checked={deleteScope === 'version'}
+                                            onChange={() => setDeleteScope('version')}
+                                            className="mt-1 text-red-600 focus:ring-red-500"
+                                        />
+                                        <div className="flex-1">
+                                            <p className="font-bold text-zinc-800 text-sm">
+                                                Eliminar solo esta versión (v{formData.version || 1})
+                                            </p>
+                                            <p className="text-xs text-zinc-500 mt-1">
+                                                Se retirará únicamente esta versión de la planta y se guardará una copia de respaldo en la Papelera de Reciclaje.
+                                            </p>
+                                        </div>
+                                    </label>
+
+                                    <label
+                                        onClick={() => setDeleteScope('all')}
+                                        className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                                            deleteScope === 'all'
+                                                ? 'border-red-500 bg-red-50/50'
+                                                : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="deleteScope"
+                                            checked={deleteScope === 'all'}
+                                            onChange={() => setDeleteScope('all')}
+                                            className="mt-1 text-red-600 focus:ring-red-500"
+                                        />
+                                        <div className="flex-1">
+                                            <p className="font-bold text-zinc-800 text-sm">
+                                                Eliminar la HDT completa (Todas las versiones)
+                                            </p>
+                                            <p className="text-xs text-zinc-500 mt-1">
+                                                Se retirarán todas las versiones registradas para el código <span className="font-semibold text-zinc-700">{formData.codigo || 'HDT'}</span> y se respaldará la serie completa en la Papelera.
+                                            </p>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDeleteModal(false)}
+                                        className="px-5 py-2.5 rounded-xl font-bold text-zinc-600 hover:bg-zinc-100 transition-colors text-sm"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeleteStep(2)}
+                                        className="px-6 py-2.5 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-colors text-sm shadow-md"
+                                    >
+                                        Siguiente paso →
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                        <ShieldAlert className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-zinc-900 leading-tight">
+                                            Confirmación de Respaldo y Eliminación
+                                        </h3>
+                                        <p className="text-xs md:text-sm text-zinc-500 mt-0.5">
+                                            Paso 2 de 2: Confirmación de seguridad
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 my-5 space-y-2">
+                                    <p className="text-sm font-semibold text-amber-900">
+                                        Vas a eliminar {deleteScope === 'version' ? `la versión v${formData.version || 1}` : 'TODAS las versiones'} de la HDT:
+                                    </p>
+                                    <div className="bg-white p-3 rounded-xl border border-amber-200/60">
+                                        <p className="font-bold text-zinc-800 text-sm">{formData.labor || 'Sin título'}</p>
+                                        <p className="text-xs text-zinc-500 mt-0.5">
+                                            Código: {formData.codigo || 'HDT'} • Planta: {formData.planta || 'CEFI'}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-start gap-2 pt-2 text-xs text-emerald-800 font-medium">
+                                        <CheckCheck className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                                        <span>
+                                            <strong>Respaldo asegurado:</strong> Los datos se guardarán en la <strong>Papelera de Reciclaje</strong> para que puedas consultarlos o restaurarlos en cualquier momento.
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeleteStep(1)}
+                                        disabled={deletingToTrash}
+                                        className="px-5 py-2.5 rounded-xl font-bold text-zinc-600 hover:bg-zinc-100 transition-colors text-sm"
+                                    >
+                                        ← Volver
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleConfirmMoveToTrash}
+                                        disabled={deletingToTrash}
+                                        className="px-6 py-2.5 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-colors text-sm shadow-md flex items-center gap-2"
+                                    >
+                                        {deletingToTrash ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span>Moviendo a papelera...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Trash2 className="h-4 w-4" />
+                                                <span>Sí, mover a Papelera</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </main>
     )
 }

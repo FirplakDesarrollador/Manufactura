@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, Edit, Plus, BarChart3 } from 'lucide-react';
+import { Eye, Edit, Plus, BarChart3, Trash2 } from 'lucide-react';
 import { Suspense } from 'react';
 
 function SubHeaderContent() {
@@ -34,6 +34,12 @@ function SubHeaderContent() {
       href: '/hdt/statistics',
       isActive: pathname.includes('/hdt/statistics'),
       icon: <BarChart3 size={16} />
+    },
+    {
+      label: 'Papelera',
+      href: '/hdt/papelera',
+      isActive: pathname.includes('/hdt/papelera'),
+      icon: <Trash2 size={16} />
     }
   ];
 
