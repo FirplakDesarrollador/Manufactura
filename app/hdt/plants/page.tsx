@@ -99,16 +99,6 @@ function PlantsContent() {
 
             <main className="flex-1 max-w-5xl mx-auto w-full p-6 sm:p-12">
                 <div className="space-y-8">
-                    <div className="flex items-center gap-3 pb-6 border-b border-[#e2ded5]">
-                        <div className="p-3 rounded-2xl bg-[#324354]/10">
-                            <Factory className="h-8 w-8 text-[#324354]" />
-                        </div>
-                        <div>
-                            <h2 className="text-3xl font-bold text-[#324354]">Plantas disponibles</h2>
-                            <p className="font-medium text-slate-500">Selecciona una planta para ver su listado de HDTs</p>
-                        </div>
-                    </div>
-
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 space-y-4">
                             <Loader2 className="h-12 w-12 animate-spin text-[#324354]" />
@@ -146,7 +136,7 @@ function PlantsContent() {
                                 <button
                                     key={planta}
                                     onClick={() => router.push(`/hdt/list?planta=${encodeURIComponent(planta)}&action=${action}`)}
-                                    className="group bg-white p-8 rounded-3xl flex items-center justify-between transition-all duration-300 text-left border border-[#e2ded5] hover:border-[#324354] hover:bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)]"
+                                    className="group bg-white p-8 rounded-3xl flex items-center justify-between transition-all duration-300 text-left border border-[#e2ded5] hover:border-[#324354] hover:bg-slate-50 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_-15px_rgba(50,67,84,0.12)] cursor-pointer"
                                 >
                                     <div className="flex items-center gap-5">
                                         <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-slate-50 transition-colors duration-300 group-hover:bg-[#324354]/10">
@@ -163,12 +153,6 @@ function PlantsContent() {
                     )}
                 </div>
             </main>
-
-            <footer className="p-8 text-center border-t border-[#e2ded5]">
-                <p className="text-xs font-bold tracking-[0.2em] uppercase text-slate-400">
-                    Firplak S.A. | Planta de Producción
-                </p>
-            </footer>
         </div>
     )
 }

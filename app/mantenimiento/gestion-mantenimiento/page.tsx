@@ -1402,8 +1402,8 @@ export default function GestionMantenimientoPage() {
 
       {/* Main Top Header */}
       <Header
-        title="Mantenimiento"
-        subtitle="Gestión de Mantenimiento y Asignación de Técnicos"
+        title="Gestor de Mantenimiento"
+        subtitle="Planificación y Asignación de Técnicos"
         userEmail={userEmail}
         showLogout={true}
         onLogout={async () => {
