@@ -103,14 +103,17 @@ export async function getAllMoldes(): Promise<Molde[]> {
         .from('query_moldes')
         .select('*')
         .neq('estado', 'Destruido')
-        .order('molde_descripcion', { ascending: true })
 
     if (error) {
         console.error('Error fetching all moldes:', error)
         return []
     }
 
-    return data || []
+    return (data || []).map((m: any) => ({
+        ...m,
+        molde_sku: m.molde_sku || m.tipo_molde_sku || '',
+        molde_descripcion: m.molde_descripcion || m.nombre_articulo || ''
+    }))
 }
 
 export async function updateMoldeEstado(moldeId: number, nuevoEstado: string) {

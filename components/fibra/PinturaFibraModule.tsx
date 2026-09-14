@@ -91,22 +91,52 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
     // Load moldes when orden is selected
     useEffect(() => {
         if (selectedOrden) {
-            // Priority to molde_sku as found in the working Flutter app
             const sku = (selectedOrden.molde_sku || selectedOrden.producto_sku || selectedOrden.sku || '').trim().toLowerCase()
-            
+            const targetDesc = (selectedOrden.molde_descripcion || selectedOrden.producto_descripcion || '').trim().toLowerCase()
+
+            // Extract numeric code from PMOL02-0087-000-0000 -> "87"
+            const codeMatch = sku.match(/PMOL\d*-(\d+)/i)
+            const targetCode = codeMatch ? codeMatch[1].replace(/^0+/, '') : ''
+
             // Filter locally from allMoldes
             const available = allMoldes
-                .filter(m => 
-                    (m.molde_sku || '').trim().toLowerCase() === sku && 
-                    m.estado === 'Disponible'
-                )
+                .filter(m => {
+                    if (m.estado !== 'Disponible') return false
+
+                    const mSku = (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase()
+                    const mSerial = (m.serial || '').trim().toLowerCase()
+                    const mDesc = (m.molde_descripcion || (m as any).nombre_articulo || '').trim().toLowerCase()
+
+                    // 1. Exact SKU / Serial match
+                    if (sku && (mSku === sku || mSerial === sku)) return true
+
+                    // 2. Serial code prefix match (e.g. "0087-10" matches targetCode "87" or "0087")
+                    if (targetCode) {
+                        const serialPrefix = mSerial.split('-')[0].replace(/^0+/, '')
+                        if (serialPrefix === targetCode) return true
+                    }
+
+                    // 3. Description keyword match (e.g. both contain "aqua 80x60" or "lavarropas aqua")
+                    if (targetDesc && mDesc) {
+                        const keywords = targetDesc
+                            .replace(/molde|blanco|brillante|mate|con|flauta/gi, '')
+                            .split(/\s+/)
+                            .filter(w => w.length > 2)
+
+                        if (keywords.length > 0 && keywords.every(kw => mDesc.includes(kw))) {
+                            return true
+                        }
+                    }
+
+                    return false
+                })
                 .sort((a, b) => a.vueltas_actuales - b.vueltas_actuales)
-            
+
             setMoldesDisponibles(available)
             setSelectedMolde(null)
-            
+
             if (available.length === 0) {
-                setDebugInfo(`No se encontraron moldes Disponibles para el SKU: "${sku}"`)
+                setDebugInfo(`No se encontraron moldes Disponibles para la orden: "${sku}" (${selectedOrden.molde_descripcion || selectedOrden.producto_descripcion})`)
             } else {
                 setDebugInfo('')
             }
