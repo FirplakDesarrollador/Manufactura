@@ -42,7 +42,10 @@ export async function updateOrdenFabricacion(id: number, data: Partial<OrdenFabr
 export async function deleteOrdenFabricacion(id: number) {
     const { error } = await supabase
         .from('ordenes_fabricacion')
-        .delete()
+        .update({
+            pendiente: false,
+            modificado_por: 'Eliminado/Cancelado por Usuario App'
+        })
         .eq('id', id)
 
     if (error) {

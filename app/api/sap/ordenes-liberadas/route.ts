@@ -163,9 +163,20 @@ export async function GET() {
 
         // Upsert a la tabla ordenes_fabricacion (Mármol Sintético)
         if (msUpsertBatch.length > 0) {
+            // Consultar órdenes ya cerradas o canceladas (pendiente = false) en Supabase para NO reactivarlas
+            const { data: nonPendingRows } = await supabase
+                .from('ordenes_fabricacion')
+                .select('orden_fabricacion')
+                .eq('pendiente', false);
+
+            const nonPendingSet = new Set((nonPendingRows || []).map(r => String(r.orden_fabricacion)));
+
+            // Filtrar batch excluyendo las órdenes marcadas como no pendientes / canceladas / eliminadas
+            const cleanBatch = msUpsertBatch.filter(item => !nonPendingSet.has(String(item.orden_fabricacion)));
+
             const BATCH_SIZE = 50;
-            for (let i = 0; i < msUpsertBatch.length; i += BATCH_SIZE) {
-                const batch = msUpsertBatch.slice(i, i + BATCH_SIZE);
+            for (let i = 0; i < cleanBatch.length; i += BATCH_SIZE) {
+                const batch = cleanBatch.slice(i, i + BATCH_SIZE);
                 const { error } = await supabase
                     .from('ordenes_fabricacion')
                     .upsert(batch, { onConflict: 'orden_fabricacion' });
@@ -173,7 +184,7 @@ export async function GET() {
                     console.error('Error upserting ordenes_fabricacion (MS):', error);
                 }
             }
-            console.log(`Upserted ${msUpsertBatch.length} Mármol Sintético orders to ordenes_fabricacion.`);
+            console.log(`Upserted ${cleanBatch.length} Mármol Sintético orders to ordenes_fabricacion (excluidas ${msUpsertBatch.length - cleanBatch.length} canceladas/cerradas).`);
         }
 
         return NextResponse.json({

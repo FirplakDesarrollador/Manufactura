@@ -5,6 +5,7 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
     const { data, error } = await supabase
         .from('query_ordenes_fabricacion')
         .select('*')
+        .eq('pendiente', true)
         .order('fecha_ideal_produccion', { ascending: true })
 
     if (error) {
@@ -12,7 +13,12 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
         return []
     }
 
-    return data || []
+    return (data || []).filter((ord: any) => {
+        const cantReq = Number(ord.cantidad) || 1
+        const cediCount = Number(ord.cedi) || 0
+        // Desaparecer automáticamente de la programación las OFs entregadas en su totalidad a CEDI
+        return cediCount < cantReq
+    })
 }
 
 export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]> {
