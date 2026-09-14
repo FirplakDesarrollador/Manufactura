@@ -9,7 +9,7 @@ export async function GET() {
     try {
         console.log("Iniciando solicitud a la nueva API Python (Cloudflare) para semaforo...");
         
-        const apiUrl = "https://salaries-bite-bachelor-adding.trycloudflare.com/semaforo/";
+        const apiUrl = "https://bibliographic-transmitted-eleven-tale.trycloudflare.com/semaforo/";
         
         const listRes = await fetch(apiUrl, {
             headers: {
