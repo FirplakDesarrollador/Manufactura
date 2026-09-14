@@ -75,7 +75,7 @@ export default function MttoHomePage() {
     },
     { 
       title: "Máquinas", 
-      path: "/mantenimiento/maquinas", 
+      path: "/mantenimiento/gestion-mantenimiento?tab=maquinas", 
       icon: <Cpu size={32} />
     },
     { 

@@ -94,6 +94,20 @@ export default function ConfiguracionPage() {
                         <span className="text-2xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300">Usuarios</span>
                         <span className="text-xs text-gray-400 mt-2 font-medium">Roles y Permisos de Acceso</span>
                     </button>
+
+                    {/* Nomenclatura Plantas Button */}
+                    <button
+                        onClick={() => router.push('/configuracion/nomenclatura-plantas')}
+                        className="w-full sm:w-80 flex flex-col items-center justify-center p-10 bg-white rounded-3xl shadow-xl border-2 border-gray-100 hover:border-[#324354] hover:shadow-2xl transition-all duration-300 group cursor-pointer"
+                    >
+                        <div className="w-24 h-24 bg-[#7B8E90]/15 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#324354] transition-all duration-300">
+                            <svg className="w-12 h-12 text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                        <span className="text-2xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center">Nomenclatura Plantas</span>
+                        <span className="text-xs text-gray-400 mt-2 font-medium text-center">Estandarización y Alias de Plantas</span>
+                    </button>
                 </div>
             </main>
         </div>

@@ -80,9 +80,45 @@ export default function MaquinasPage() {
   
   // Data State
   const [maquinas, setMaquinas] = useState<MaquinaEquipo[]>([]);
+  const [planesPreventivos, setPlanesPreventivos] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMaquina, setSelectedMaquina] = useState<MaquinaEquipo | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+
+  const normalizeText = (str: string): string => {
+    return (str || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const getPmpForMachine = (m: MaquinaEquipo | null) => {
+    if (!m || !planesPreventivos || planesPreventivos.length === 0) return [];
+    const code = (m.codigo_equipo || "").trim().toUpperCase();
+    const name = normalizeText(m.nombre_equipo || "");
+    const alt = normalizeText(m.nombre_alterno || "");
+
+    return planesPreventivos.filter(p => {
+      const pTitle = normalizeText(p.titulo || "");
+      const pCode = (p.codigo || "").toUpperCase();
+      const pMaq = normalizeText(p.maquina || "");
+
+      if (code && code !== "-" && code !== "N/A" && code !== "0") {
+        const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
+        if (regex.test(p.titulo || "") || regex.test(pCode) || regex.test(p.maquina || "")) {
+          return true;
+        }
+      }
+
+      if (pMaq && (pMaq === name || (alt && pMaq === alt))) return true;
+      if (name.length >= 5 && (pMaq.includes(name) || name.includes(pMaq))) return true;
+      return false;
+    });
+  };
   
   // Sorting State
   const [sortColumn, setSortColumn] = useState<keyof MaquinaEquipo | "">("nombre_equipo");
@@ -142,20 +178,176 @@ export default function MaquinasPage() {
     proveedor_email: ""
   });
 
+  // Deduplication State
+  const [duplicateCount, setDuplicateCount] = useState<number>(0);
+  const [duplicateIdsToDelete, setDuplicateIdsToDelete] = useState<number[]>([]);
+  const [cleaningDuplicates, setCleaningDuplicates] = useState<boolean>(false);
+  const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
+
+  // Helper to score record completeness
+  const getRecordCompletenessScore = (m: MaquinaEquipo): number => {
+    let score = 0;
+    if (m.fotos) score += 5;
+    if (m.planos) score += 3;
+    if (m.manuales) score += 3;
+    if (m.estandares) score += 3;
+    if (m.codigo_equipo) score += 2;
+    if (m.activo_fijo) score += 2;
+    if (m.marca) score += 1;
+    if (m.modelo) score += 1;
+    if (m.caracteristicas) score += 2;
+    if (m.fecha_compra) score += 1;
+    if (m.fecha_instalacion) score += 1;
+    if (m.valor_compra || m.valor_nuevo) score += 1;
+    if (m.proceso) score += 1;
+    if (m.proveedor_nombre) score += 1;
+    if (m.notas) score += 1;
+    return score;
+  };
+
+  // Helper to generate a unique key for grouping duplicate machines
+  const getMachineDeduplicationKey = (m: MaquinaEquipo): string => {
+    const code = (m.codigo_equipo || "").trim().toUpperCase();
+    const name = (m.nombre_equipo || "").trim().toUpperCase().replace(/\s+/g, " ");
+    const plant = (m.planta || "").trim().toUpperCase();
+    const brand = (m.marca || "").trim().toUpperCase();
+    const model = (m.modelo || "").trim().toUpperCase();
+
+    if (code && code !== "-" && code !== "N/A" && code !== "0") {
+      return `CODE:${code}__PLANT:${plant}`;
+    }
+
+    return `NAME:${name}__BRAND:${brand}__MODEL:${model}__PLANT:${plant}`;
+  };
+
   const fetchMachines = async () => {
     try {
-      const { data, error } = await supabase
-        .from("maquinas_equipos")
-        .select("*")
-        .order("nombre_equipo", { ascending: true });
+      // Pagination to fetch all rows from Supabase
+      let allRaw: MaquinaEquipo[] = [];
+      let from = 0;
+      const step = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("maquinas_equipos")
+          .select("*")
+          .range(from, from + step - 1)
+          .order("id", { ascending: true });
 
-      if (data) {
-        setMaquinas(data as MaquinaEquipo[]);
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allRaw = allRaw.concat(data as MaquinaEquipo[]);
+          if (data.length < step) {
+            hasMore = false;
+          } else {
+            from += step;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Group by unique key and deduplicate
+      const groups: { [key: string]: MaquinaEquipo[] } = {};
+      allRaw.forEach(m => {
+        const key = getMachineDeduplicationKey(m);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(m);
+      });
+
+      const uniqueMachines: MaquinaEquipo[] = [];
+      const toDeleteIds: number[] = [];
+
+      for (const [, list] of Object.entries(groups)) {
+        if (list.length === 1) {
+          uniqueMachines.push(list[0]);
+        } else {
+          // Sort list by score descending, then by lowest id
+          list.sort((a, b) => {
+            const scoreA = getRecordCompletenessScore(a);
+            const scoreB = getRecordCompletenessScore(b);
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            return a.id - b.id;
+          });
+
+          const master = { ...list[0] };
+          const duplicates = list.slice(1);
+
+          // Merge any non-empty field from duplicates
+          for (const dup of duplicates) {
+            toDeleteIds.push(dup.id);
+            for (const field of Object.keys(dup) as (keyof MaquinaEquipo)[]) {
+              if ((master[field] === null || master[field] === undefined || master[field] === "") && dup[field]) {
+                (master as any)[field] = dup[field];
+              }
+            }
+          }
+
+          uniqueMachines.push(master);
+        }
+      }
+
+      setDuplicateCount(toDeleteIds.length);
+      setDuplicateIdsToDelete(toDeleteIds);
+      setMaquinas(uniqueMachines);
+
+      // Fetch linked preventive plans (PMP)
+      try {
+        const { data: pmpData } = await supabase
+          .from("mantenimiento_planes_preventivos")
+          .select("*")
+          .eq("activo", true);
+        if (pmpData) {
+          setPlanesPreventivos(pmpData);
+        }
+      } catch (pmpErr) {
+        console.warn("Error fetching PMP plans in machines catalog:", pmpErr);
       }
     } catch (err) {
       console.error("Error fetching machines:", err);
+    }
+  };
+
+  const handleDeduplicateDatabase = async () => {
+    if (duplicateIdsToDelete.length === 0) {
+      alert("No se detectaron registros duplicados para depurar en la base de datos.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `Se detectaron ${duplicateIdsToDelete.length} registros duplicados en Supabase.\n\n¿Deseas eliminarlos de la base de datos permanentemente y conservar únicamente las fichas maestras unificadas?`
+    );
+    if (!confirmed) return;
+
+    setCleaningDuplicates(true);
+    try {
+      const batchSize = 200;
+      let totalDeleted = 0;
+
+      for (let i = 0; i < duplicateIdsToDelete.length; i += batchSize) {
+        const batch = duplicateIdsToDelete.slice(i, i + batchSize);
+        const { error } = await supabase
+          .from("maquinas_equipos")
+          .delete()
+          .in("id", batch);
+
+        if (error) {
+          console.error("Error deleting duplicate batch:", error);
+        } else {
+          totalDeleted += batch.length;
+        }
+      }
+
+      setCleanFeedback(`¡Se eliminaron ${totalDeleted} registros duplicados de Supabase con éxito!`);
+      setTimeout(() => setCleanFeedback(null), 6000);
+      await fetchMachines();
+    } catch (err) {
+      console.error("Error al depurar duplicados:", err);
+      alert("Hubo un error al depurar los duplicados en Supabase.");
+    } finally {
+      setCleaningDuplicates(false);
     }
   };
 
@@ -164,6 +356,10 @@ export default function MaquinasPage() {
     const clean = url.trim();
     return clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("/") || clean.startsWith("data:");
   };
+
+  useEffect(() => {
+    router.replace('/mantenimiento/gestion-mantenimiento?tab=maquinas');
+  }, [router]);
 
   useEffect(() => {
     const checkUserAndFetch = async () => {
@@ -627,38 +823,22 @@ export default function MaquinasPage() {
       />
 
       {/* Navigation SubHeader */}
-      <div className="bg-white border-b border-[#e2ded5] py-2.5 px-4 shadow-sm relative z-30 w-full font-sans">
-        <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-3 justify-center overflow-x-auto scrollbar-hide py-0.5">
+      <div className="bg-white border-b border-[#e2ded5] py-2 px-3 shadow-xs relative z-30 w-full font-sans">
+        <div className="max-w-[1700px] mx-auto flex flex-row flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
+          <button
+            onClick={() => router.push("/mantenimiento/gestion-mantenimiento")}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap flex-shrink-0"
+          >
+            <ArrowLeft size={16} />
+            <span>Gestor de Mantenimiento</span>
+          </button>
           <button
             onClick={() => setActiveTab("inventario")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all text-xs cursor-pointer border-none whitespace-nowrap flex-shrink-0 ${
-              activeTab === "inventario"
-                ? "bg-[#324354] text-white shadow-md"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-            }`}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold transition-all text-xs bg-[#324354] text-white shadow-md whitespace-nowrap flex-shrink-0 cursor-default"
           >
-            <FolderOpen className="w-4 h-4" />
+            <FolderOpen size={16} />
             <span>Inventario de Equipos</span>
           </button>
-          
-          {/* Only render Administrador tab if user has access */}
-          {hasAdminAccess && (
-            <button
-              onClick={() => {
-                setActiveTab("admin");
-                resetForm();
-                setSelectedEditMachineId(null);
-              }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all text-xs cursor-pointer border-none whitespace-nowrap flex-shrink-0 ${
-                activeTab === "admin"
-                  ? "bg-[#324354] text-white shadow-md"
-                  : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>Administrador</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -670,11 +850,11 @@ export default function MaquinasPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>
               <button
-                onClick={() => router.push("/mantenimiento")}
-                className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-[#324354] uppercase tracking-wider transition-colors duration-200"
+                onClick={() => router.push("/mantenimiento/gestion-mantenimiento")}
+                className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-[#324354] uppercase tracking-wider transition-colors duration-200 cursor-pointer"
               >
                 <ArrowLeft size={14} />
-                <span>Volver a Mantenimiento</span>
+                <span>Volver a Gestor de Mantenimiento</span>
               </button>
               <h1 className="text-3xl font-black text-[#324354] mt-1 tracking-tight font-sans">
                 Hoja de Vida de Máquinas
@@ -709,6 +889,41 @@ export default function MaquinasPage() {
               </div>
             </div>
           </div>
+
+          {/* Duplicate Cleanup Notification Banner */}
+          {duplicateCount > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-3xl p-4 sm:p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in shadow-xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-800 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-bold text-amber-950">
+                    Se detectaron {duplicateCount} registros duplicados en la base de datos de Supabase
+                  </p>
+                  <p className="text-xs text-amber-800 mt-0.5">
+                    La visualización actual ya unificó y corrigió las fichas en <strong>{maquinas.length} máquinas únicas</strong>. Puedes limpiar y depurar la base de datos de Supabase de forma permanente con un clic.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDeduplicateDatabase}
+                disabled={cleaningDuplicates}
+                className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold rounded-2xl text-xs flex items-center gap-2 transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{cleaningDuplicates ? "Depurando Supabase..." : `Depurar ${duplicateCount} Duplicados en BD`}</span>
+              </button>
+            </div>
+          )}
+
+          {cleanFeedback && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-3xl p-4 mb-6 text-xs sm:text-sm font-bold flex items-center gap-2.5 animate-in fade-in shadow-xs">
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{cleanFeedback}</span>
+            </div>
+          )}
 
           {/* Filter Toolbar */}
           <div className="bg-white border border-[#e2ded5] rounded-3xl p-5 shadow-[0_4px_25px_rgba(50,67,84,0.03)] mb-6 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
@@ -792,7 +1007,7 @@ export default function MaquinasPage() {
                       onClick={() => handleSort("nombre_equipo")} 
                       className="py-4 px-6 font-bold cursor-pointer select-none hover:bg-slate-700/50 transition-colors"
                     >
-                      Nombre Equipo {renderSortIndicator("nombre_equipo")}
+                      Máquinas y Equipos {renderSortIndicator("nombre_equipo")}
                     </th>
                     <th 
                       onClick={() => handleSort("marca")} 
@@ -835,7 +1050,9 @@ export default function MaquinasPage() {
                       </td>
                     </tr>
                   ) : (
-                    processedMaquinas.map((m) => (
+                    processedMaquinas.map((m) => {
+                      const linkedPmps = getPmpForMachine(m);
+                      return (
                       <tr
                         key={m.id}
                         onClick={() => setSelectedMaquina(m)}
@@ -845,7 +1062,14 @@ export default function MaquinasPage() {
                           {m.codigo_equipo || <span className="text-gray-400 font-normal">S/C</span>}
                         </td>
                         <td className="py-4 px-6">
-                          <div className="font-bold text-gray-800 text-sm">{m.nombre_equipo}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-gray-800 text-sm">{m.nombre_equipo}</span>
+                            {linkedPmps.length > 0 && (
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-[10px] font-bold shrink-0">
+                                {linkedPmps.length} {linkedPmps.length === 1 ? 'PMP' : 'PMPs'}
+                              </span>
+                            )}
+                          </div>
                           {m.nombre_alterno && (
                             <div className="text-xs text-gray-400 font-medium italic mt-0.5">{m.nombre_alterno}</div>
                           )}
@@ -881,7 +1105,8 @@ export default function MaquinasPage() {
                           </button>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1830,6 +2055,56 @@ export default function MaquinasPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Linked Preventive Plans (PMP) */}
+              {(() => {
+                const linkedPmps = getPmpForMachine(selectedMaquina);
+                return (
+                  <div className="bg-white border border-[#e2ded5] rounded-2xl p-5 space-y-3 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="block text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-[#7B8E90]" />
+                        <span>Planes Preventivos Vinculados (PMP)</span>
+                      </span>
+                      <span className="text-xs px-2.5 py-0.5 bg-blue-50 text-blue-800 border border-blue-100 rounded-full font-bold">
+                        {linkedPmps.length} {linkedPmps.length === 1 ? 'Plan Asociado' : 'Planes Asociados'}
+                      </span>
+                    </div>
+
+                    {linkedPmps.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic py-2">
+                        No hay planes preventivos maestros (PMP) vinculados directamente con este equipo.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                        {linkedPmps.map((p) => (
+                          <div key={p.id} className="py-2.5 flex items-start justify-between gap-3 text-xs">
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="px-1.5 py-0.5 bg-slate-100 font-mono font-bold text-slate-700 rounded text-[10px]">
+                                  {p.codigo || `MP-${p.id}`}
+                                </span>
+                                <span className="font-bold text-[#324354]">{p.titulo}</span>
+                              </div>
+                              {p.detalle_instrucciones && (
+                                <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">{p.detalle_instrucciones}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded font-bold text-[10px]">
+                                {p.frecuencia_dias || 15}d
+                              </span>
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded font-medium text-[10px]">
+                                {p.duracion_minutos || 60} min
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Vendor & Provider Section */}
               <div className="bg-white border border-[#e2ded5] rounded-2xl p-5 space-y-4 shadow-sm">
