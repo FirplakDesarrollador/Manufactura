@@ -179,14 +179,16 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                             <div className="space-y-2">
                                 <h3 className="text-2xl font-bold text-gray-900">Proceso en marcha</h3>
                                 <p className="text-gray-500 text-sm max-w-[260px] mx-auto">
-                                    {taskOrders.length > 1 ? 'Corta las piezas de cada orden seleccionada antes de registrar.' : taskOrders[0].producto_descripcion || 'Corta las piezas indicadas en la hoja de ruta antes de registrar.'}
+                                    {taskOrders.length > 1 
+                                        ? `${tarea.proceso === 'Enchape' ? 'Enchapa' : tarea.proceso === 'Corte' ? 'Corta' : 'Procesa'} las piezas de cada orden seleccionada antes de registrar.` 
+                                        : taskOrders[0].producto_descripcion || `Procesa las piezas indicadas en la hoja de ruta antes de registrar.`}
                                 </p>
                             </div>
                             <button
                                 onClick={() => setIsFinishing(true)}
                                 className="group relative w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 overflow-hidden"
                             >
-                                <span>FINALIZAR CORTE</span>
+                                <span>FINALIZAR {(tarea.proceso || 'PROCESO').toUpperCase()}</span>
                                 <CheckCircle2 size={24} />
                             </button>
                         </>

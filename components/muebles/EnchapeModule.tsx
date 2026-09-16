@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
-import { Search, X, Calendar, RefreshCw, Filter, Layers } from 'lucide-react'
+import { Search, X, Calendar, RefreshCw, Filter, Layers, CheckSquare, Play } from 'lucide-react'
 
 interface EnchapeModuleProps {
     userEmail: string
@@ -25,8 +25,9 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
-    const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
+    const [selectedOrdenes, setSelectedOrdenes] = useState<OrdenMueble[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
     const loadData = useCallback(async (soft = false) => {
@@ -87,6 +88,19 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
     const handleClearFilters = () => {
         setSearchText('')
         setSelectedDate('')
+    }
+
+    const toggleOrden = (orden: OrdenMueble) => {
+        setSelectedOrdenes((current) => {
+            const exists = current.some((item) => item.id === orden.id)
+            if (exists) return current.filter((item) => item.id !== orden.id)
+            return [...current, orden]
+        })
+    }
+
+    const clearSelection = () => {
+        setSelectedOrdenes([])
+        setIsModalOpen(false)
     }
 
     const filteredOrdenes = useMemo(() => {
@@ -189,6 +203,37 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
                         )}
                     </div>
 
+                    {selectedOrdenes.length > 0 && (
+                        <div className="sticky top-2 z-20 mb-4 bg-white border border-indigo-100 rounded-xl shadow-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                    <CheckSquare size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-black text-gray-900">{selectedOrdenes.length} orden{selectedOrdenes.length === 1 ? '' : 'es'} seleccionada{selectedOrdenes.length === 1 ? '' : 's'}</p>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">
+                                        Total disponible: {selectedOrdenes.reduce((sum, item) => sum + (item.corte || 0) + (item.reponer_enchape || 0), 0)} piezas
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={clearSelection}
+                                    className="px-3 py-2 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold text-xs uppercase"
+                                >
+                                    Limpiar
+                                </button>
+                                <button
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-bold text-xs uppercase flex items-center gap-2 shadow-lg shadow-indigo-100"
+                                >
+                                    <Play size={16} />
+                                    Iniciar enchape
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
                             <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -207,11 +252,8 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
                                 <OrderCard
                                     key={orden.id}
                                     orden={orden}
-                                    isActive={selectedOrden?.id === orden.id}
-                                    onClick={() => {
-                                        setSelectedOrden(orden)
-                                        setIsModalOpen(true)
-                                    }}
+                                    isActive={selectedOrdenes.some((item) => item.id === orden.id)}
+                                    onClick={() => toggleOrden(orden)}
                                     proceso="Enchape"
                                 />
                             ))}
@@ -221,25 +263,39 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
             </div>
 
             {/* Trazabilidad Modal */}
-            {selectedOrden && (
+            {selectedOrdenes.length > 0 && (
                 <TrazabilidadModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    orden={selectedOrden}
+                    orden={selectedOrdenes[0]}
+                    ordenes={selectedOrdenes}
                     proceso="Enchape"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
                     userEmail={userEmail}
                     onStartTask={(tarea) => {
-                        setIsModalOpen(false)
+                        clearSelection()
                         onStartTask?.(tarea)
                     }}
                     onSuccess={() => {
-                        setIsModalOpen(false)
+                        clearSelection()
                         loadData()
                     }}
                 />
             )}
+
+            {/* Notification Snackbar */}
+            {notification && (
+                <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-8 duration-300 ${
+                    notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+                } text-white`}>
+                    <div className="font-bold">{notification.message}</div>
+                    <button onClick={() => setNotification(null)} className="p-1 hover:bg-black/10 rounded-lg">
+                        <X size={18} />
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
+

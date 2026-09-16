@@ -45,7 +45,7 @@ export default function TrazabilidadModal({
     const [isSearching, setIsSearching] = useState(false)
     const [startTime, setStartTime] = useState<string>('')
     const ordenesSeleccionadas = React.useMemo(
-        () => proceso === 'Corte' && ordenes?.length ? ordenes : [orden],
+        () => (proceso === 'Corte' || proceso === 'Enchape') && ordenes?.length ? ordenes : [orden],
         [orden, ordenes, proceso]
     )
 
@@ -69,7 +69,7 @@ export default function TrazabilidadModal({
                 avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.por_cortar || 0), 0)
                 break
             case 'Enchape':
-                avail = (orden.corte || 0) + (orden.reponer_enchape || 0)
+                avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.corte || 0) + (item.reponer_enchape || 0), 0)
                 break
             case 'Inspeccion':
                 avail = (orden.enchape || 0) + (orden.reponer_inspeccion || 0)
@@ -190,14 +190,16 @@ export default function TrazabilidadModal({
     const handleSubmit = async () => {
         if (validationError || !identificacion) return
 
-        // Si es Corte, iniciamos la tarea en lugar de registrar inmediatamente
-        if (proceso === 'Corte') {
+        // Si es Corte o Enchape, iniciamos la tarea en lugar de registrar inmediatamente
+        if (proceso === 'Corte' || proceso === 'Enchape') {
             setLoading(true)
             try {
                 const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
                     of: item.orden_fabricacion,
                     producto_descripcion: item.producto_descripcion,
-                    available: item.por_cortar || 0
+                    available: proceso === 'Corte'
+                        ? (item.por_cortar || 0)
+                        : ((item.corte || 0) + (item.reponer_enchape || 0))
                 }))
 
                 const nuevaTarea = {
@@ -206,13 +208,13 @@ export default function TrazabilidadModal({
                     inicio: startTime,
                     operario_nombre: empleado?.nombreCompleto || 'Desconocido',
                     operario_cedula: identificacion,
-                    producto_descripcion: tareasOrdenes.length === 1 ? tareasOrdenes[0].producto_descripcion : 'Corte de varias ordenes',
+                    producto_descripcion: tareasOrdenes.length === 1 ? tareasOrdenes[0].producto_descripcion : `${proceso} de varias ordenes`,
                     available: available,
                     ordenes: tareasOrdenes
                 }
                 
                 await setTareaActiva(userEmail, nuevaTarea)
-                toast.success('¡Proceso de corte iniciado!')
+                toast.success(`¡Proceso de ${proceso.toLowerCase()} iniciado!`)
                 
                 if (onStartTask) onStartTask(nuevaTarea)
                 onClose()
@@ -377,13 +379,15 @@ export default function TrazabilidadModal({
                                 </div>
                             )}
 
-                            {proceso === 'Corte' && ordenesSeleccionadas.length > 1 ? (
+                            {(proceso === 'Corte' || proceso === 'Enchape') && ordenesSeleccionadas.length > 1 ? (
                                 <div className="w-full max-h-36 overflow-y-auto rounded-2xl border border-gray-100 divide-y divide-gray-100">
                                     {ordenesSeleccionadas.map((item) => (
                                         <div key={item.id} className="p-3 text-left">
                                             <div className="flex items-center justify-between gap-3">
                                                 <span className="text-blue-600 font-black text-xs">OF #{item.orden_fabricacion}</span>
-                                                <span className="text-gray-400 font-bold text-[10px]">{item.por_cortar || 0} disp.</span>
+                                                <span className="text-gray-400 font-bold text-[10px]">
+                                                    {proceso === 'Corte' ? (item.por_cortar || 0) : ((item.corte || 0) + (item.reponer_enchape || 0))} disp.
+                                                </span>
                                             </div>
                                             <p className="text-gray-500 font-bold text-[10px] uppercase leading-tight mt-1 line-clamp-2">
                                                 {item.producto_descripcion}
@@ -406,7 +410,9 @@ export default function TrazabilidadModal({
                                     <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Disponible</span>
                                     <span className="text-gray-800 font-bold text-sm">{available}</span>
                                 </div>
-                            </div>                             {proceso !== 'Corte' && (
+                            </div>
+                            
+                            {proceso !== 'Corte' && proceso !== 'Enchape' && (
                                 <div className="flex items-center gap-4">
                                     <button 
                                         onClick={handleDecrement} 
@@ -436,8 +442,7 @@ export default function TrazabilidadModal({
                                         <PlusSquare size={48} fill="currentColor" stroke="white" />
                                     </button>
                                 </div>
-                             )}
-
+                            )}
 
                             <div className="w-full">
                                 {validationError ? (
@@ -454,7 +459,7 @@ export default function TrazabilidadModal({
                                         }`}
                                     >
                                         {loading ? <Loader2 className="animate-spin" size={24} /> : (
-                                            proceso === 'Corte' ? (
+                                            proceso === 'Corte' || proceso === 'Enchape' ? (
                                                 <><Play size={20} /><span>INICIAR PROCESO</span></>
                                             ) : (
                                                 <><Send size={20} /><span>REGISTRAR</span></>
