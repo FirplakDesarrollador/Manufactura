@@ -44,9 +44,11 @@ export default function TrazabilidadModal({
     const [empleado, setEmpleado] = useState<{ nombreCompleto: string, foto: string } | null>(null)
     const [isSearching, setIsSearching] = useState(false)
     const [startTime, setStartTime] = useState<string>('')
+    const isTaskBasedProcess = proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección'
+
     const ordenesSeleccionadas = React.useMemo(
-        () => (proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección') && ordenes?.length ? ordenes : [orden],
-        [orden, ordenes, proceso]
+        () => isTaskBasedProcess && ordenes?.length ? ordenes : [orden],
+        [orden, ordenes, isTaskBasedProcess]
     )
 
     const validateQuantity = React.useCallback((val: number) => {
@@ -191,8 +193,8 @@ export default function TrazabilidadModal({
     const handleSubmit = async () => {
         if (validationError || !identificacion) return
 
-        // Si es Corte, Enchape o Inspeccion, iniciamos la tarea en lugar de registrar inmediatamente
-        if (proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección') {
+        // Si es un proceso basado en tareas (Corte, Enchape, Inspección), iniciamos la tarea en lugar de registrar inmediatamente
+        if (isTaskBasedProcess) {
             setLoading(true)
             try {
                 const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
@@ -383,14 +385,18 @@ export default function TrazabilidadModal({
                                 </div>
                             )}
 
-                            {(proceso === 'Corte' || proceso === 'Enchape') && ordenesSeleccionadas.length > 1 ? (
+                            {isTaskBasedProcess && ordenesSeleccionadas.length > 1 ? (
                                 <div className="w-full max-h-36 overflow-y-auto rounded-2xl border border-gray-100 divide-y divide-gray-100">
                                     {ordenesSeleccionadas.map((item) => (
                                         <div key={item.id} className="p-3 text-left">
                                             <div className="flex items-center justify-between gap-3">
                                                 <span className="text-blue-600 font-black text-xs">OF #{item.orden_fabricacion}</span>
                                                 <span className="text-gray-400 font-bold text-[10px]">
-                                                    {proceso === 'Corte' ? (item.por_cortar || 0) : ((item.corte || 0) + (item.reponer_enchape || 0))} disp.
+                                                    {proceso === 'Corte'
+                                                        ? (item.por_cortar || 0)
+                                                        : proceso === 'Enchape'
+                                                        ? ((item.corte || 0) + (item.reponer_enchape || 0))
+                                                        : ((item.enchape || 0) + (item.reponer_inspeccion || 0))} disp.
                                                 </span>
                                             </div>
                                             <p className="text-gray-500 font-bold text-[10px] uppercase leading-tight mt-1 line-clamp-2">
@@ -416,7 +422,7 @@ export default function TrazabilidadModal({
                                 </div>
                             </div>
                             
-                            {proceso !== 'Corte' && proceso !== 'Enchape' && (
+                            {!isTaskBasedProcess && (
                                 <div className="flex items-center gap-4">
                                     <button 
                                         onClick={handleDecrement} 
@@ -463,7 +469,7 @@ export default function TrazabilidadModal({
                                         }`}
                                     >
                                         {loading ? <Loader2 className="animate-spin" size={24} /> : (
-                                            proceso === 'Corte' || proceso === 'Enchape' ? (
+                                            isTaskBasedProcess ? (
                                                 <><Play size={20} /><span>INICIAR PROCESO</span></>
                                             ) : (
                                                 <><Send size={20} /><span>REGISTRAR</span></>
