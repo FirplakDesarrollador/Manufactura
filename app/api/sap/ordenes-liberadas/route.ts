@@ -72,8 +72,12 @@ export async function GET() {
             console.error('Error al conectar con SAP Service Layer:', sapErr);
         }
 
-        // Helper para distinguir SKUs que NO pertenecen a Mármol Sintético
-        const isNonMarmolSku = (sku: string) => /^(VHPT|VTIN|VHEM|VEXH|VMUB|MUEB)/i.test(sku);
+        // Helper para distinguir SKUs que NO pertenecen a Mármol Sintético / Fibra / Vaciado (Muebles, Empaque, Cajas, Insumos)
+        const isNonMarmolSku = (sku: string, desc?: string) => {
+            if (/^(VHPT|VTIN|VHEM|VEXH|VMUB|MUEB|PEMP|CEMP|PZCO|CMPD)/i.test(sku)) return true;
+            if (desc && /^CAJA\s/i.test(desc.trim())) return true;
+            return false;
+        };
 
         // 2. Mapear datos para el frontend (page.tsx), Power Automate y Supabase
         const mappedRows = rawRows.map(item => {
@@ -127,7 +131,7 @@ export async function GET() {
             if (ofNum) marmolMap.set(ofNum, item);
         });
 
-        const msFilteredMappedRows = mappedRows.filter(r => !isNonMarmolSku(r.producto_sku));
+        const msFilteredMappedRows = mappedRows.filter(r => !isNonMarmolSku(r.producto_sku, r.producto_descripcion));
         const msUpsertMap = new Map<string, any>();
 
         msFilteredMappedRows.forEach(r => {
