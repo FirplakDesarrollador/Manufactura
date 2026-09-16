@@ -53,6 +53,7 @@ export interface TareaMuebleActiva {
     producto_descripcion?: string;
     available?: number;
     ordenes?: TareaMuebleActivaOrden[];
+    taladro?: string;
 }
 
 export interface MetricasMuebles {

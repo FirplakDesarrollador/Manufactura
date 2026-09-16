@@ -1,40 +1,49 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
 import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
+import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
-import { Search, X, Calendar, RefreshCw, Filter, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react'
+import { Search, X, Calendar, RefreshCw, Filter, CheckCircle, AlertCircle, ChevronDown, CheckSquare, Play } from 'lucide-react'
 
 interface InspeccionModuleProps {
     userEmail: string
     turno: string
     usuarioNombre: string
     plantaMuebles: string // Added to handle taladro options
+    onStartTask?: (tarea: any) => void
 }
 
-export default function InspeccionModule({ userEmail, turno, usuarioNombre, plantaMuebles }: InspeccionModuleProps) {
+export default function InspeccionModule({ userEmail, turno, usuarioNombre, plantaMuebles, onStartTask }: InspeccionModuleProps) {
     const [ordenes, setOrdenes] = useState<OrdenMueble[]>([])
     const [metricas, setMetricas] = useState<MetricasMuebles | null>(null)
     const [loading, setLoading] = useState(true)
+    const [syncing, setSyncing] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
-    const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
+    const [selectedOrdenes, setSelectedOrdenes] = useState<OrdenMueble[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [taladro, setTaladro] = useState<string>('')
+    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+    const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
     const taladroOptions = plantaMuebles === 'Muebles' 
         ? ['CYFLEX S', 'CX200', 'HUAHUA', 'HUA HUA 2']
         : ['Taladro Cefi', 'CX100']
 
-    const loadData = React.useCallback(async () => {
-        setLoading(true)
+    const loadData = useCallback(async (soft = false) => {
+        if (soft) {
+            setSyncing(true)
+        } else {
+            setLoading(true)
+        }
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(),
+                getOrdenesMuebles(plantaMuebles),
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)
@@ -45,16 +54,58 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
             console.error('Error loading Inspeccion data:', error)
         } finally {
             setLoading(false)
+            setSyncing(false)
         }
-    }, [turno])
+    }, [turno, plantaMuebles])
 
     useEffect(() => {
         loadData()
     }, [loadData])
 
+    // Realtime subscription — auto-refresh when records are inserted/updated
+    useEffect(() => {
+        const channel = supabase
+            .channel('inspeccion-realtime')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'trazabilidad_muebles'
+            }, () => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'ordenes_fabricacion_muebles'
+            }, () => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                debounceRef.current = setTimeout(() => loadData(true), 800)
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+            if (debounceRef.current) clearTimeout(debounceRef.current)
+        }
+    }, [loadData])
+
     const handleClearFilters = () => {
         setSearchText('')
         setSelectedDate('')
+    }
+
+    const toggleOrden = (orden: OrdenMueble) => {
+        setSelectedOrdenes((current) => {
+            const exists = current.some((item) => item.id === orden.id)
+            if (exists) return current.filter((item) => item.id !== orden.id)
+            return [...current, orden]
+        })
+    }
+
+    const clearSelection = () => {
+        setSelectedOrdenes([])
+        setIsModalOpen(false)
     }
 
     const filteredOrdenes = useMemo(() => {
@@ -98,6 +149,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                 <button 
                                     onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
                                     className={`p-2 rounded-lg text-white transition-colors duration-200 flex items-center gap-1 ${dateType === 'entrega' ? 'bg-emerald-600' : 'bg-purple-600'}`}
+                                    title={dateType === 'entrega' ? 'Filtrando por Fecha Entrega' : 'Filtrando por Fecha Creación'}
                                 >
                                     <Calendar size={20} />
                                     <span className="text-[10px] font-bold hidden sm:inline uppercase">{dateType}</span>
@@ -138,8 +190,9 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                             </button>
                             
                             <button
-                                onClick={loadData}
+                                onClick={() => loadData()}
                                 className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+                                title="Actualizar datos"
                             >
                                 <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                             </button>
@@ -173,7 +226,44 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                     <CheckCircle size={14} />
                                     ORDENES EN INSPECCIÓN: {filteredOrdenes.length}
                                 </div>
+                                {syncing && (
+                                    <div className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold uppercase tracking-widest animate-in fade-in duration-300">
+                                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping inline-block" />
+                                        Actualizando...
+                                    </div>
+                                )}
                             </div>
+
+                            {selectedOrdenes.length > 0 && (
+                                <div className="sticky top-2 z-20 mb-4 bg-white border border-emerald-100 rounded-xl shadow-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                            <CheckSquare size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-black text-gray-900">{selectedOrdenes.length} orden{selectedOrdenes.length === 1 ? '' : 'es'} seleccionada{selectedOrdenes.length === 1 ? '' : 's'}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase">
+                                                Total disponible: {selectedOrdenes.reduce((sum, item) => sum + (item.enchape || 0) + (item.reponer_inspeccion || 0), 0)} piezas
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={clearSelection}
+                                            className="px-3 py-2 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold text-xs uppercase"
+                                        >
+                                            Limpiar
+                                        </button>
+                                        <button
+                                            onClick={() => setIsModalOpen(true)}
+                                            className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-bold text-xs uppercase flex items-center gap-2 shadow-lg shadow-emerald-100"
+                                        >
+                                            <Play size={16} />
+                                            Iniciar inspección
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -193,11 +283,8 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                         <OrderCard
                                             key={orden.id}
                                             orden={orden}
-                                            isActive={selectedOrden?.id === orden.id}
-                                            onClick={() => {
-                                                setSelectedOrden(orden)
-                                                setIsModalOpen(true)
-                                            }}
+                                            isActive={selectedOrdenes.some((item) => item.id === orden.id)}
+                                            onClick={() => toggleOrden(orden)}
                                             proceso="Inspeccion"
                                         />
                                     ))}
@@ -209,21 +296,38 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
             </div>
 
             {/* Trazabilidad Modal */}
-            {selectedOrden && (
+            {selectedOrdenes.length > 0 && (
                 <TrazabilidadModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    orden={selectedOrden}
+                    orden={selectedOrdenes[0]}
+                    ordenes={selectedOrdenes}
                     proceso="Inspeccion"
                     usuarioNombre={usuarioNombre || 'Usuario'}
                     turno={turno}
                     userEmail={userEmail}
                     taladro={taladro}
+                    onStartTask={(tarea) => {
+                        clearSelection()
+                        onStartTask?.(tarea)
+                    }}
                     onSuccess={() => {
-                        setIsModalOpen(false)
+                        clearSelection()
                         loadData()
                     }}
                 />
+            )}
+
+            {/* Notification Snackbar */}
+            {notification && (
+                <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-8 duration-300 ${
+                    notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+                } text-white`}>
+                    <div className="font-bold">{notification.message}</div>
+                    <button onClick={() => setNotification(null)} className="p-1 hover:bg-black/10 rounded-lg">
+                        <X size={18} />
+                    </button>
+                </div>
             )}
         </div>
     )

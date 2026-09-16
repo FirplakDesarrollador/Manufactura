@@ -92,7 +92,8 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                         proceso: tarea.proceso,
                         cedula_operario: tarea.operario_cedula,
                         nombre_operario: tarea.operario_nombre,
-                        fecha_inicio: tarea.inicio
+                        fecha_inicio: tarea.inicio,
+                        taladro: tarea.taladro
                     })
                 ))
                 toast.success('Proceso finalizado con exito')

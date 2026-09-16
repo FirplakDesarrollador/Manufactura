@@ -324,6 +324,7 @@ export default function MueblesPage() {
                                 turno="1" 
                                 usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
                                 plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                onStartTask={setActiveTask}
                             />
                         ) : activeModule === 'empaque' ? (
                             <EmpaqueModule 

@@ -45,7 +45,7 @@ export default function TrazabilidadModal({
     const [isSearching, setIsSearching] = useState(false)
     const [startTime, setStartTime] = useState<string>('')
     const ordenesSeleccionadas = React.useMemo(
-        () => (proceso === 'Corte' || proceso === 'Enchape') && ordenes?.length ? ordenes : [orden],
+        () => (proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección') && ordenes?.length ? ordenes : [orden],
         [orden, ordenes, proceso]
     )
 
@@ -72,7 +72,8 @@ export default function TrazabilidadModal({
                 avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.corte || 0) + (item.reponer_enchape || 0), 0)
                 break
             case 'Inspeccion':
-                avail = (orden.enchape || 0) + (orden.reponer_inspeccion || 0)
+            case 'Inspección':
+                avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.enchape || 0) + (item.reponer_inspeccion || 0), 0)
                 break
             case 'Empaque':
                 avail = orden.inspeccion || 0
@@ -190,8 +191,8 @@ export default function TrazabilidadModal({
     const handleSubmit = async () => {
         if (validationError || !identificacion) return
 
-        // Si es Corte o Enchape, iniciamos la tarea en lugar de registrar inmediatamente
-        if (proceso === 'Corte' || proceso === 'Enchape') {
+        // Si es Corte, Enchape o Inspeccion, iniciamos la tarea en lugar de registrar inmediatamente
+        if (proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección') {
             setLoading(true)
             try {
                 const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
@@ -199,7 +200,9 @@ export default function TrazabilidadModal({
                     producto_descripcion: item.producto_descripcion,
                     available: proceso === 'Corte'
                         ? (item.por_cortar || 0)
-                        : ((item.corte || 0) + (item.reponer_enchape || 0))
+                        : proceso === 'Enchape'
+                        ? ((item.corte || 0) + (item.reponer_enchape || 0))
+                        : ((item.enchape || 0) + (item.reponer_inspeccion || 0))
                 }))
 
                 const nuevaTarea = {
@@ -210,7 +213,8 @@ export default function TrazabilidadModal({
                     operario_cedula: identificacion,
                     producto_descripcion: tareasOrdenes.length === 1 ? tareasOrdenes[0].producto_descripcion : `${proceso} de varias ordenes`,
                     available: available,
-                    ordenes: tareasOrdenes
+                    ordenes: tareasOrdenes,
+                    taladro: taladro
                 }
                 
                 await setTareaActiva(userEmail, nuevaTarea)
