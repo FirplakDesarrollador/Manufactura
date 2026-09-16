@@ -124,51 +124,17 @@ export async function GET() {
             };
         });
 
-        // 3. Preparar los registros de Mármol Sintético / Vaciado / Fibra / Pintura para la tabla 'ordenes_fabricacion'
-        const marmolMap = new Map<string, any>();
-        marmolRawRows.forEach(item => {
-            const ofNum = String(item.orden_fabricacion || item.DocNum || '');
-            if (ofNum) marmolMap.set(ofNum, item);
-        });
+        // 3. Preparar los registros EXCLUSIVOS de Mármol Sintético para la tabla 'ordenes_fabricacion'
+        let msUpsertBatch: any[] = [];
 
-        const msFilteredMappedRows = mappedRows.filter(r => !isNonMarmolSku(r.producto_sku, r.producto_descripcion));
-        const msUpsertMap = new Map<string, any>();
-
-        msFilteredMappedRows.forEach(r => {
-            const ofNum = String(r.orden_fabricacion);
-            const marmolItem = marmolMap.get(ofNum);
-
-            const rawDesc = (marmolItem?.producto_descripcion || marmolItem?.ItemName || r.producto_descripcion || r.itemName || '').trim();
-            const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
-
-            msUpsertMap.set(ofNum, {
-                orden_fabricacion: ofNum,
-                numero_pedido: r.numero_pedido,
-                producto_sku: r.producto_sku,
-                producto_descripcion: cleanDesc,
-                cantidad: r.cantidad,
-                cliente: r.cliente,
-                comentario: r.comentario,
-                fecha_entrega_estimada: r.fecha_entrega_estimada,
-                fecha_ideal_produccion: r.fecha_ideal_produccion,
-                tamano: marmolItem?.tamano || r.tamano || '',
-                linea: marmolItem?.linea || r.linea || 'F02',
-                molde_sku: marmolItem?.molde_sku || r.molde_sku || '',
-                molde_descripcion: marmolItem?.molde_descripcion || r.molde_descripcion || '',
-                kilos_gelcoat: marmolItem?.kilos_gelcoat !== undefined ? Number(marmolItem.kilos_gelcoat) : r.kilos_gelcoat,
-                modificado_por: 'Sistema SAP'
-            });
-        });
-
-        marmolRawRows.forEach(item => {
-            const ofNum = String(item.orden_fabricacion || item.DocNum || '');
-            if (ofNum && !msUpsertMap.has(ofNum)) {
+        if (marmolRawRows.length > 0) {
+            msUpsertBatch = marmolRawRows.map(item => {
                 const rawDesc = (item.producto_descripcion || item.ItemName || '').trim();
                 const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
 
-                msUpsertMap.set(ofNum, {
-                    orden_fabricacion: ofNum,
-                    numero_pedido: item.numero_pedido || ofNum,
+                return {
+                    orden_fabricacion: String(item.orden_fabricacion || item.DocNum),
+                    numero_pedido: item.numero_pedido || String(item.orden_fabricacion || item.DocNum),
                     producto_sku: item.producto_sku || item.ItemCode || '',
                     producto_descripcion: cleanDesc,
                     cantidad: Number(item.cantidad || item.PlannedQty) || 1,
@@ -182,11 +148,33 @@ export async function GET() {
                     molde_descripcion: item.molde_descripcion || '',
                     kilos_gelcoat: item.kilos_gelcoat !== undefined && item.kilos_gelcoat !== null ? Number(item.kilos_gelcoat) : null,
                     modificado_por: 'Sistema SAP'
+                };
+            });
+        } else {
+            msUpsertBatch = mappedRows
+                .filter(r => !isNonMarmolSku(r.producto_sku, r.producto_descripcion))
+                .map(r => {
+                    const rawDesc = (r.producto_descripcion || r.itemName || '').trim();
+                    const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
+                    return {
+                        orden_fabricacion: r.orden_fabricacion,
+                        numero_pedido: r.numero_pedido,
+                        producto_sku: r.producto_sku,
+                        producto_descripcion: cleanDesc,
+                        cantidad: r.cantidad,
+                        cliente: r.cliente,
+                        comentario: r.comentario,
+                        fecha_entrega_estimada: r.fecha_entrega_estimada,
+                        fecha_ideal_produccion: r.fecha_ideal_produccion,
+                        tamano: r.tamano,
+                        linea: r.linea,
+                        molde_sku: r.molde_sku,
+                        molde_descripcion: r.molde_descripcion,
+                        kilos_gelcoat: r.kilos_gelcoat,
+                        modificado_por: 'Sistema SAP'
+                    };
                 });
-            }
-        });
-
-        const msUpsertBatch = Array.from(msUpsertMap.values());
+        }
 
         // Sincronizar catálogo de productos en 'productos' para asegurar que el join en query_ordenes_fabricacion siempre funcione
         const productosMap = new Map<string, { producto_sku: string; producto_descripcion: string }>();
@@ -227,6 +215,30 @@ export async function GET() {
                 }
             }
             console.log(`Upserted ${cleanBatch.length} Mármol Sintético orders to ordenes_fabricacion (excluidas ${msUpsertBatch.length - cleanBatch.length} canceladas/cerradas).`);
+
+            if (marmolRawRows.length > 0) {
+                const validMarmolSet = new Set(msUpsertBatch.map(b => String(b.orden_fabricacion)));
+                const { data: allPending } = await supabase
+                    .from('ordenes_fabricacion')
+                    .select('orden_fabricacion')
+                    .eq('pendiente', true);
+
+                const ofsToDeactivate = (allPending || [])
+                    .map(r => String(r.orden_fabricacion))
+                    .filter(ofNum => !validMarmolSet.has(ofNum));
+
+                if (ofsToDeactivate.length > 0) {
+                    const BATCH_SIZE = 50;
+                    for (let i = 0; i < ofsToDeactivate.length; i += BATCH_SIZE) {
+                        const batch = ofsToDeactivate.slice(i, i + BATCH_SIZE);
+                        await supabase
+                            .from('ordenes_fabricacion')
+                            .update({ pendiente: false })
+                            .in('orden_fabricacion', batch);
+                    }
+                    console.log(`Deactivated ${ofsToDeactivate.length} non-Mármol pending orders from ordenes_fabricacion.`);
+                }
+            }
         }
 
         return NextResponse.json({
