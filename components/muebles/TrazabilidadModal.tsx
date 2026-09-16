@@ -44,7 +44,7 @@ export default function TrazabilidadModal({
     const [empleado, setEmpleado] = useState<{ nombreCompleto: string, foto: string } | null>(null)
     const [isSearching, setIsSearching] = useState(false)
     const [startTime, setStartTime] = useState<string>('')
-    const isTaskBasedProcess = proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección'
+    const isTaskBasedProcess = proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección' || proceso === 'Empaque'
 
     const ordenesSeleccionadas = React.useMemo(
         () => isTaskBasedProcess && ordenes?.length ? ordenes : [orden],
@@ -78,7 +78,7 @@ export default function TrazabilidadModal({
                 avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.enchape || 0) + (item.reponer_inspeccion || 0), 0)
                 break
             case 'Empaque':
-                avail = orden.inspeccion || 0
+                avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.inspeccion || 0), 0)
                 break
             case 'Digitado':
                 avail = orden.empaque || 0
@@ -204,6 +204,8 @@ export default function TrazabilidadModal({
                         ? (item.por_cortar || 0)
                         : proceso === 'Enchape'
                         ? ((item.corte || 0) + (item.reponer_enchape || 0))
+                        : proceso === 'Empaque'
+                        ? (item.inspeccion || 0)
                         : ((item.enchape || 0) + (item.reponer_inspeccion || 0))
                 }))
 
@@ -396,6 +398,8 @@ export default function TrazabilidadModal({
                                                         ? (item.por_cortar || 0)
                                                         : proceso === 'Enchape'
                                                         ? ((item.corte || 0) + (item.reponer_enchape || 0))
+                                                        : proceso === 'Empaque'
+                                                        ? (item.inspeccion || 0)
                                                         : ((item.enchape || 0) + (item.reponer_inspeccion || 0))} disp.
                                                 </span>
                                             </div>
