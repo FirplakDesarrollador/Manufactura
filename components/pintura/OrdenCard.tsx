@@ -81,9 +81,15 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                             </div>
                         )}
                     </div>
-                    <div className="text-[11px] font-bold text-gray-800 mt-1 line-clamp-2 leading-tight" title={orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku}>
-                        {orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'}
-                    </div>
+                    {(() => {
+                        const rawDesc = orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'
+                        const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim()
+                        return (
+                            <div className="text-[11px] font-bold text-gray-800 mt-1 line-clamp-2 leading-tight" title={cleanDesc}>
+                                {cleanDesc}
+                            </div>
+                        )
+                    })()}
                     <div className="text-[9px] text-gray-400 italic mt-0.5 truncate">SKU: {sku || 'No definido'}</div>
                 </div>
                 <div className="flex items-center gap-1 text-cyan-500 mt-2 md:mt-auto">

@@ -138,11 +138,14 @@ export async function GET() {
             const ofNum = String(r.orden_fabricacion);
             const marmolItem = marmolMap.get(ofNum);
 
+            const rawDesc = (marmolItem?.producto_descripcion || marmolItem?.ItemName || r.producto_descripcion || r.itemName || '').trim();
+            const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
+
             msUpsertMap.set(ofNum, {
                 orden_fabricacion: ofNum,
                 numero_pedido: r.numero_pedido,
                 producto_sku: r.producto_sku,
-                producto_descripcion: (marmolItem?.producto_descripcion || marmolItem?.ItemName || r.producto_descripcion || r.itemName || '').trim(),
+                producto_descripcion: cleanDesc,
                 cantidad: r.cantidad,
                 cliente: r.cliente,
                 comentario: r.comentario,
@@ -160,11 +163,14 @@ export async function GET() {
         marmolRawRows.forEach(item => {
             const ofNum = String(item.orden_fabricacion || item.DocNum || '');
             if (ofNum && !msUpsertMap.has(ofNum)) {
+                const rawDesc = (item.producto_descripcion || item.ItemName || '').trim();
+                const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
+
                 msUpsertMap.set(ofNum, {
                     orden_fabricacion: ofNum,
                     numero_pedido: item.numero_pedido || ofNum,
                     producto_sku: item.producto_sku || item.ItemCode || '',
-                    producto_descripcion: (item.producto_descripcion || item.ItemName || '').trim(),
+                    producto_descripcion: cleanDesc,
                     cantidad: Number(item.cantidad || item.PlannedQty) || 1,
                     cliente: item.cliente || item.CardName || 'FIRPLAK S A',
                     comentario: item.comentarios || item.comentario || '',
