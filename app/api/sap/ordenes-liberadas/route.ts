@@ -120,48 +120,80 @@ export async function GET() {
             };
         });
 
-        // 3. Preparar los registros EXCLUSIVOS de Mármol Sintético para la tabla 'ordenes_fabricacion'
-        let msUpsertBatch: any[] = [];
+        // 3. Preparar los registros de Mármol Sintético / Vaciado / Fibra / Pintura para la tabla 'ordenes_fabricacion'
+        const marmolMap = new Map<string, any>();
+        marmolRawRows.forEach(item => {
+            const ofNum = String(item.orden_fabricacion || item.DocNum || '');
+            if (ofNum) marmolMap.set(ofNum, item);
+        });
 
-        if (marmolRawRows.length > 0) {
-            msUpsertBatch = marmolRawRows.map(item => ({
-                orden_fabricacion: String(item.orden_fabricacion || item.DocNum),
-                numero_pedido: item.numero_pedido || String(item.orden_fabricacion || item.DocNum),
-                producto_sku: item.producto_sku || item.ItemCode || '',
-                cantidad: Number(item.cantidad || item.PlannedQty) || 1,
-                cliente: item.cliente || item.CardName || 'FIRPLAK S A',
-                comentario: item.comentarios || item.comentario || '',
-                fecha_entrega_estimada: item.fecha_entrega_estimada || item.DueDate || null,
-                fecha_ideal_produccion: item.fecha_liberacion || item.fecha_ideal_produccion || item.RlsDate || null,
-                tamano: item.tamano || '',
-                linea: item.linea || 'F02',
-                molde_sku: item.molde_sku || '',
-                molde_descripcion: item.molde_descripcion || '',
-                kilos_gelcoat: item.kilos_gelcoat !== undefined && item.kilos_gelcoat !== null ? Number(item.kilos_gelcoat) : null,
+        const msFilteredMappedRows = mappedRows.filter(r => !isNonMarmolSku(r.producto_sku));
+        const msUpsertMap = new Map<string, any>();
+
+        msFilteredMappedRows.forEach(r => {
+            const ofNum = String(r.orden_fabricacion);
+            const marmolItem = marmolMap.get(ofNum);
+
+            msUpsertMap.set(ofNum, {
+                orden_fabricacion: ofNum,
+                numero_pedido: r.numero_pedido,
+                producto_sku: r.producto_sku,
+                producto_descripcion: (marmolItem?.producto_descripcion || marmolItem?.ItemName || r.producto_descripcion || r.itemName || '').trim(),
+                cantidad: r.cantidad,
+                cliente: r.cliente,
+                comentario: r.comentario,
+                fecha_entrega_estimada: r.fecha_entrega_estimada,
+                fecha_ideal_produccion: r.fecha_ideal_produccion,
+                tamano: marmolItem?.tamano || r.tamano || '',
+                linea: marmolItem?.linea || r.linea || 'F02',
+                molde_sku: marmolItem?.molde_sku || r.molde_sku || '',
+                molde_descripcion: marmolItem?.molde_descripcion || r.molde_descripcion || '',
+                kilos_gelcoat: marmolItem?.kilos_gelcoat !== undefined ? Number(marmolItem.kilos_gelcoat) : r.kilos_gelcoat,
                 modificado_por: 'Sistema SAP'
-            }));
-        } else {
-            msUpsertBatch = mappedRows
-                .filter(r => !isNonMarmolSku(r.producto_sku))
-                .map(r => ({
-                    orden_fabricacion: r.orden_fabricacion,
-                    numero_pedido: r.numero_pedido,
-                    producto_sku: r.producto_sku,
-                    cantidad: r.cantidad,
-                    cliente: r.cliente,
-                    comentario: r.comentario,
-                    fecha_entrega_estimada: r.fecha_entrega_estimada,
-                    fecha_ideal_produccion: r.fecha_ideal_produccion,
-                    tamano: r.tamano,
-                    linea: r.linea,
-                    molde_sku: r.molde_sku,
-                    molde_descripcion: r.molde_descripcion,
-                    kilos_gelcoat: r.kilos_gelcoat,
+            });
+        });
+
+        marmolRawRows.forEach(item => {
+            const ofNum = String(item.orden_fabricacion || item.DocNum || '');
+            if (ofNum && !msUpsertMap.has(ofNum)) {
+                msUpsertMap.set(ofNum, {
+                    orden_fabricacion: ofNum,
+                    numero_pedido: item.numero_pedido || ofNum,
+                    producto_sku: item.producto_sku || item.ItemCode || '',
+                    producto_descripcion: (item.producto_descripcion || item.ItemName || '').trim(),
+                    cantidad: Number(item.cantidad || item.PlannedQty) || 1,
+                    cliente: item.cliente || item.CardName || 'FIRPLAK S A',
+                    comentario: item.comentarios || item.comentario || '',
+                    fecha_entrega_estimada: item.fecha_entrega_estimada || item.DueDate || null,
+                    fecha_ideal_produccion: item.fecha_liberacion || item.fecha_ideal_produccion || item.RlsDate || null,
+                    tamano: item.tamano || '',
+                    linea: item.linea || 'F02',
+                    molde_sku: item.molde_sku || '',
+                    molde_descripcion: item.molde_descripcion || '',
+                    kilos_gelcoat: item.kilos_gelcoat !== undefined && item.kilos_gelcoat !== null ? Number(item.kilos_gelcoat) : null,
                     modificado_por: 'Sistema SAP'
-                }));
+                });
+            }
+        });
+
+        const msUpsertBatch = Array.from(msUpsertMap.values());
+
+        // Sincronizar catálogo de productos en 'productos' para asegurar que el join en query_ordenes_fabricacion siempre funcione
+        const productosMap = new Map<string, { producto_sku: string; producto_descripcion: string }>();
+        msUpsertBatch.forEach(item => {
+            if (item.producto_sku && item.producto_descripcion) {
+                productosMap.set(item.producto_sku, {
+                    producto_sku: item.producto_sku,
+                    producto_descripcion: item.producto_descripcion
+                });
+            }
+        });
+        const productosBatch = Array.from(productosMap.values());
+        if (productosBatch.length > 0) {
+            await supabase.from('productos').upsert(productosBatch, { onConflict: 'producto_sku' });
         }
 
-        // Upsert a la tabla ordenes_fabricacion (Mármol Sintético)
+        // Upsert a la tabla ordenes_fabricacion (Mármol Sintético / Vaciado / Fibra / Pintura)
         if (msUpsertBatch.length > 0) {
             // Consultar órdenes ya cerradas o canceladas (pendiente = false) en Supabase para NO reactivarlas
             const { data: nonPendingRows } = await supabase
