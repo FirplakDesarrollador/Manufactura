@@ -92,9 +92,11 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
 
                 {/* Column 2: Producto & Entrega */}
                 <div className="w-full sm:w-[275px] space-y-2">
-                    <div className="h-10">
+                    <div className="h-10 flex items-center justify-center">
                         <p className="text-xs font-bold text-gray-800 line-clamp-2 leading-tight text-center">
-                            {orden.producto_descripcion}
+                            {orden.producto_descripcion && orden.producto_descripcion.trim() !== '' && orden.producto_descripcion.toLowerCase() !== 'sin descripcion' && orden.producto_descripcion.toLowerCase() !== 'sin descripción'
+                                ? orden.producto_descripcion
+                                : (orden.producto_sku ? `PRODUCTO (${orden.producto_sku})` : `ORDEN DE FABRICACIÓN #${orden.orden_fabricacion}`)}
                         </p>
                     </div>
                     <div className="flex items-center justify-between text-xs mt-1">
