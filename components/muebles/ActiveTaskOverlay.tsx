@@ -181,8 +181,8 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                 <h3 className="text-2xl font-bold text-gray-900">Proceso en marcha</h3>
                                 <p className="text-gray-500 text-sm max-w-[260px] mx-auto">
                                     {taskOrders.length > 1 
-                                        ? `${tarea.proceso === 'Enchape' ? 'Enchapa' : tarea.proceso === 'Corte' ? 'Corta' : 'Procesa'} las piezas de cada orden seleccionada antes de registrar.` 
-                                        : taskOrders[0].producto_descripcion || `Procesa las piezas indicadas en la hoja de ruta antes de registrar.`}
+                                        ? `${tarea.proceso === 'Enchape' ? 'Enchapa' : tarea.proceso === 'Corte' ? 'Corta' : tarea.proceso === 'Empaque' ? 'Empaca' : 'Procesa'} las piezas de cada orden seleccionada antes de registrar.` 
+                                        : (taskOrders[0].producto_descripcion && taskOrders[0].producto_descripcion !== 'Sin descripcion' ? taskOrders[0].producto_descripcion : `ORDEN DE FABRICACIÓN #${taskOrders[0].of}`)}
                                 </p>
                             </div>
                             <button
@@ -203,13 +203,16 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                             <div className="w-full max-h-[300px] overflow-y-auto pr-1 space-y-3">
                                 {taskOrders.map((item) => {
                                     const cantidad = cantidades[item.of] || 0
+                                    const descriptionText = item.producto_descripcion && item.producto_descripcion !== 'Sin descripcion'
+                                        ? item.producto_descripcion
+                                        : `ORDEN DE FABRICACIÓN #${item.of}`
                                     return (
                                         <div key={item.of} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-3">
                                             <div className="flex items-start justify-between gap-3 mb-3 text-left">
                                                 <div className="min-w-0">
                                                     <div className="text-blue-600 text-xs font-black">OF #{item.of}</div>
                                                     <p className="text-[10px] text-gray-500 font-bold uppercase leading-tight line-clamp-2">
-                                                        {item.producto_descripcion || 'Sin descripcion'}
+                                                        {descriptionText}
                                                     </p>
                                                 </div>
                                                 <span className="shrink-0 text-[10px] text-gray-400 font-black uppercase">{item.available || 0} disp.</span>

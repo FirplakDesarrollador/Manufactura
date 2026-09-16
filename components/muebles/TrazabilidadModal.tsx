@@ -404,14 +404,14 @@ export default function TrazabilidadModal({
                                                 </span>
                                             </div>
                                             <p className="text-gray-500 font-bold text-[10px] uppercase leading-tight mt-1 line-clamp-2">
-                                                {item.producto_descripcion}
+                                                {item.producto_descripcion || (item.producto_sku ? `PRODUCTO (${item.producto_sku})` : `OF #${item.orden_fabricacion}`)}
                                             </p>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
                                 <p className="text-center text-gray-400 font-bold text-[10px] leading-relaxed max-w-[280px] uppercase tracking-wider">
-                                    {orden.producto_descripcion}
+                                    {orden.producto_descripcion || (orden.producto_sku ? `PRODUCTO (${orden.producto_sku})` : `OF #${orden.orden_fabricacion}`)}
                                 </p>
                             )}
 
