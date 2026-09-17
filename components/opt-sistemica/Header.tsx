@@ -33,19 +33,28 @@ export default function Header({
     if (userEmail) {
       setInternalEmail(userEmail);
     } else {
-      supabase.auth.getSession().then(({ data }) => {
-        if (data?.session?.user?.email) {
-          setInternalEmail(data.session.user.email);
-        }
-      });
+      supabase.auth.getSession()
+        .then(({ data }) => {
+          if (data?.session?.user?.email) {
+            setInternalEmail(data.session.user.email);
+          }
+        })
+        .catch(err => {
+          console.warn('Header getSession error:', err);
+        });
     }
   }, [userEmail]);
 
   const handleSignOut = async () => {
-    if (onLogout) {
-      onLogout();
-    } else {
-      await supabase.auth.signOut();
+    try {
+      if (onLogout) {
+        onLogout();
+      } else {
+        await supabase.auth.signOut();
+        router.push('/login');
+      }
+    } catch (err) {
+      console.warn('Sign out error:', err);
       router.push('/login');
     }
   };
@@ -196,6 +205,15 @@ export default function Header({
               )
             },
             { 
+              label: 'Tarjetas de Anomalías TPM', 
+              path: '/mantenimiento/tarjetas-falla', 
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              )
+            },
+            { 
               label: 'Calidad', 
               path: '/calidad', 
               icon: (
@@ -242,7 +260,6 @@ export default function Header({
               ),
               subItems: [
                 { label: 'Indicadores Mantenimiento', path: '/mantenimiento' },
-                { label: 'Tarjetas de Anomalías', path: '/mantenimiento/tarjetas-falla' },
                 { label: 'Gestor de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
                 { label: 'Almacén', path: '/mantenimiento/almacen' },
                 { label: 'Máquinas', path: '/mantenimiento/maquinas' },
