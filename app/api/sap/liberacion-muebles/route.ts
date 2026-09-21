@@ -38,7 +38,7 @@ export async function GET() {
             throw new Error(`Error al consultar SAP Service Layer (${response.status}): ${errText.slice(0, 200)}`);
         }
         const json = await response.json();
-        rawRows = json.value || [];
+        const rawRows: any[] = json.value || [];
 
         // Agrupar filas devueltas por orden de fabricación
         const orderMap = new Map<string, any>();
