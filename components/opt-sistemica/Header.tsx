@@ -259,8 +259,8 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'Indicadores Mantenimiento', path: '/mantenimiento' },
                 { label: 'Gestor de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
+                { label: 'Indicadores Mantenimiento', path: '/mantenimiento' },
                 { label: 'Almacén', path: '/mantenimiento/almacen' },
                 { label: 'Máquinas', path: '/mantenimiento/maquinas' },
                 { label: 'Mantenimiento Autónomo LILAC', path: '/mantenimiento/lilac' },

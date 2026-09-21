@@ -57,6 +57,9 @@ import {
   Activity,
   ShieldAlert,
   ExternalLink,
+  Lock,
+  Edit3,
+  Image as ImageIcon,
   X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -65,6 +68,7 @@ import Header from '@/components/opt-sistemica/Header';
 import TarjetasTpmTab from '@/components/mantenimiento/TarjetasTpmTab';
 import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSemanalPlanner';
 import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosColumnas';
+import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import * as XLSX from 'xlsx';
 import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT } from '@/lib/nomenclaturaPlantas';
 
@@ -172,9 +176,10 @@ interface CorrectiveRecord {
   fecha_cierre?: string | null;
   accion_tomada?: string;
   fotos?: string[];
+  fotos_solucion?: string[];
 }
 
-type TabType = 'planificador' | 'tecnico' | 'preventivo' | 'correctivo' | 'tarjetas' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas';
+type TabType = 'planificador' | 'tecnico' | 'preventivo' | 'correctivo' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas';
 
 const DAILY_CAPACITY_LIMIT = 7.2;
 
@@ -256,9 +261,25 @@ export default function GestionMantenimientoPage() {
     fecha_limite: string;
     accion_tomada: string;
     prioridad: 'Alta' | 'Media' | 'Baja';
+    fotos_solucion: string[];
   } | null>(null);
+  const [annotatingSolutionImage, setAnnotatingSolutionImage] = useState<{ src: string; index?: number } | null>(null);
+  const solutionCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const solutionFileInputRef = useRef<HTMLInputElement | null>(null);
   const [savingCorrectivoModal, setSavingCorrectivoModal] = useState(false);
   const [correctivoModalFeedback, setCorrectivoModalFeedback] = useState<string | null>(null);
+
+  // Preventivo Execution Modal State (Portal Técnicos / Planificador)
+  const [executingPreventivo, setExecutingPreventivo] = useState<MaintenanceTask | null>(null);
+  const [executingPreventivoForm, setExecutingPreventivoForm] = useState<{
+    status: 'Pendiente' | 'Incompleto' | 'Completado';
+    observations: string;
+    fechaApertura: string;
+    fechaCierre: string;
+  } | null>(null);
+  const [savingPreventivoModal, setSavingPreventivoModal] = useState(false);
+  const [preventivoModalFeedback, setPreventivoModalFeedback] = useState<string | null>(null);
+
   const [portalFilterType, setPortalFilterType] = useState<'todos' | 'correctivos' | 'preventivos'>('todos');
   const [portalSearchQuery, setPortalSearchQuery] = useState('');
   const [portalViewMode, setPortalViewMode] = useState<'board' | 'list' | 'charts'>('board');
@@ -694,6 +715,13 @@ export default function GestionMantenimientoPage() {
     fetchEmpleados();
   }, []);
 
+  // Auto-fetch correctivos when switching to 'correctivo' or 'planificador'
+  useEffect(() => {
+    if (activeTab === 'correctivo' || activeTab === 'planificador') {
+      fetchCorrectivoRecords();
+    }
+  }, [activeTab]);
+
   // Fetch Supabase History Records from mantenimiento_ordenes
   const fetchHistoryRecords = async () => {
     setHistoryLoading(true);
@@ -742,22 +770,37 @@ export default function GestionMantenimientoPage() {
   const fetchCorrectivoRecords = async () => {
     try {
       // 1. Query Correctivos and TPM Cards from mantenimiento_ordenes
-      const { data: ordenesData } = await supabase
+      const { data: ordenesData, error: ordErr } = await supabase
         .from('mantenimiento_ordenes')
         .select('*')
-        .or('tipo_orden.eq.CORRECTIVO,origen.eq.TARJETA_TPM,id_tarjeta_falla.not.is.null')
         .order('created_at', { ascending: false });
 
+      if (ordErr) {
+        console.warn('Aviso consultando mantenimiento_ordenes:', ordErr);
+      }
+
       // 2. Query tarjetas_falla_anomalia
-      const { data: tarjetasData } = await supabase
+      const { data: tarjetasData, error: tarjErr } = await supabase
         .from('tarjetas_falla_anomalia')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (tarjErr) {
+        console.warn('Aviso consultando tarjetas_falla_anomalia:', tarjErr);
+      }
+
       const recordsMap = new Map<string, CorrectiveRecord>();
 
       if (ordenesData && ordenesData.length > 0) {
-        ordenesData.forEach((d: any, index: number) => {
+        const correctivos = ordenesData.filter((d: any) => {
+          const tOrd = (d.tipo_orden || d.tipo || d.tipo_mantenimiento || '').toUpperCase();
+          const orig = (d.origen || '').toUpperCase();
+          const cod = (d.codigo || '').toUpperCase();
+          const tit = (d.titulo || '').toUpperCase();
+          return tOrd.includes('CORRECTIVO') || orig.includes('TARJETA') || orig.includes('TPM') || orig.includes('CORRECTIVO') || cod.startsWith('TPM-') || cod.startsWith('CORR-') || tit.includes('TARJETA') || tit.includes('CORRECTIVO') || d.id_tarjeta_falla != null || d.id_correctivo != null;
+        });
+
+        correctivos.forEach((d: any, index: number) => {
           let fotosArr: string[] = [];
           if (Array.isArray(d.fotos_antes)) fotosArr = d.fotos_antes;
           else if (Array.isArray(d.fotos)) fotosArr = d.fotos;
@@ -784,6 +827,15 @@ export default function GestionMantenimientoPage() {
             }
           }
 
+          let fotosSolucionArr: string[] = [];
+          if (Array.isArray(d.fotos_despues)) fotosSolucionArr = d.fotos_despues;
+          else if (Array.isArray(d.fotos_solucion)) fotosSolucionArr = d.fotos_solucion;
+          else if (typeof d.fotos_despues === 'string' && d.fotos_despues.trim().startsWith('[')) {
+            try { fotosSolucionArr = JSON.parse(d.fotos_despues); } catch {}
+          } else if (typeof d.fotos_solucion === 'string' && d.fotos_solucion.trim().startsWith('[')) {
+            try { fotosSolucionArr = JSON.parse(d.fotos_solucion); } catch {}
+          }
+
           recordsMap.set(codigo, {
             id: d.id || index + 1,
             codigo: codigo,
@@ -798,7 +850,8 @@ export default function GestionMantenimientoPage() {
             fecha_limite: d.fecha_limite || d.fecha_programada || d.fecha_plazo || d.fecha_compromiso || null,
             fecha_cierre: d.fecha_cierre || null,
             accion_tomada: d.accion_realizada || d.comentarios_ejecucion || '',
-            fotos: fotosArr
+            fotos: fotosArr,
+            fotos_solucion: fotosSolucionArr
           });
         });
       }
@@ -806,21 +859,27 @@ export default function GestionMantenimientoPage() {
       if (tarjetasData && tarjetasData.length > 0) {
         tarjetasData.forEach((d: any, index: number) => {
           const cod = d.codigo || d.codigo_tarjeta || `TPM-${d.id || index + 1}`;
-          if (!recordsMap.has(cod)) {
-            let fotosArr: string[] = [];
-            if (Array.isArray(d.fotos)) fotosArr = d.fotos;
-            else if (typeof d.fotos === 'string' && d.fotos.trim().startsWith('[')) {
-              try { fotosArr = JSON.parse(d.fotos); } catch {}
-            } else if (typeof d.fotos === 'string' && d.fotos.trim().length > 0) {
-              fotosArr = [d.fotos];
-            } else if (d.foto_url) fotosArr = [d.foto_url];
-            else if (d.foto) fotosArr = [d.foto];
+          const existing = recordsMap.get(cod);
 
-            const rawEstado = (d.estado || '').toLowerCase();
-            const estado: 'Abierta' | 'En Proceso' | 'Resuelta' = 
-              rawEstado === 'resuelta' || rawEstado === 'cerrada' || rawEstado === 'completado' ? 'Resuelta' :
-              rawEstado === 'en proceso' || rawEstado === 'en_proceso' ? 'En Proceso' : 'Abierta';
+          let fotosArr: string[] = [];
+          if (Array.isArray(d.fotos)) fotosArr = d.fotos;
+          else if (typeof d.fotos === 'string' && d.fotos.trim().startsWith('[')) {
+            try { fotosArr = JSON.parse(d.fotos); } catch {}
+          } else if (typeof d.fotos === 'string' && d.fotos.trim().length > 0) {
+            fotosArr = [d.fotos];
+          } else if (d.foto_url) fotosArr = [d.foto_url];
+          else if (d.foto) fotosArr = [d.foto];
 
+          let fotosSolucionArr: string[] = [];
+          if (Array.isArray(d.fotos_despues)) fotosSolucionArr = d.fotos_despues;
+          else if (Array.isArray(d.fotos_solucion)) fotosSolucionArr = d.fotos_solucion;
+
+          const rawEstado = (d.estado || '').toLowerCase();
+          const estado: 'Abierta' | 'En Proceso' | 'Resuelta' = 
+            rawEstado === 'resuelta' || rawEstado === 'cerrada' || rawEstado === 'completado' ? 'Resuelta' :
+            rawEstado === 'en proceso' || rawEstado === 'en_proceso' ? 'En Proceso' : 'Abierta';
+
+          if (!existing) {
             recordsMap.set(cod, {
               id: d.id || index + 1000,
               codigo: cod,
@@ -829,16 +888,95 @@ export default function GestionMantenimientoPage() {
               origen: 'Tarjeta TPM',
               sintoma: d.descripcion_que || d.descripcion_anomalia || d.sintoma || d.falla || 'Anomalía reportada',
               prioridad: (d.prioridad as any) || 'Alta',
-              tecnico_asignado: d.tecnico_asignado || 'Sin asignar',
+              tecnico_asignado: d.tecnico_asignado || d.responsable_tecnico || 'Sin asignar',
               estado,
-              fecha_reporte: d.created_at ? d.created_at.slice(0, 16).replace('T', ' ') : getLocalDatetimeString().replace('T', ' '),
+              fecha_reporte: d.fecha_apertura || (d.created_at ? d.created_at.slice(0, 16).replace('T', ' ') : getLocalDatetimeString().replace('T', ' ')),
               fecha_limite: d.fecha_limite || d.fecha_plazo || d.fecha_compromiso || d.fecha_cierre || null,
               fecha_cierre: d.fecha_cierre || null,
               accion_tomada: d.accion_inmediata || d.accion_correctiva || '',
-              fotos: fotosArr
+              fotos: fotosArr,
+              fotos_solucion: fotosSolucionArr
             });
+          } else {
+            const techInDb = d.tecnico_asignado || d.responsable_tecnico;
+            if (techInDb && techInDb !== 'Sin asignar' && (!existing.tecnico_asignado || existing.tecnico_asignado === 'Sin asignar')) {
+              existing.tecnico_asignado = techInDb;
+            }
+            if (fotosSolucionArr.length > 0 && (!existing.fotos_solucion || existing.fotos_solucion.length === 0)) {
+              existing.fotos_solucion = fotosSolucionArr;
+            }
           }
         });
+      }
+
+      // 3. Read LocalStorage TPM & Correctivo records to guarantee zero data loss
+      if (typeof window !== 'undefined') {
+        const localSaved = localStorage.getItem('firplak_tarjetas_tpm_records');
+        if (localSaved) {
+          try {
+            const parsed = JSON.parse(localSaved);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((t: any) => {
+                if (t && t.codigo) {
+                  if (!recordsMap.has(t.codigo)) {
+                    recordsMap.set(t.codigo, {
+                      id: t.id || Date.now(),
+                      codigo: t.codigo,
+                      maquina: t.maquina || 'Equipo General',
+                      planta: t.planta || 'Mármol Sintético',
+                      origen: 'Tarjeta TPM',
+                      sintoma: t.descripcion_que || 'Anomalía reportada',
+                      prioridad: t.prioridad || 'Alta',
+                      tecnico_asignado: t.tecnico_asignado || t.responsable_tecnico || 'Sin asignar',
+                      estado: t.estado === 'cerrada' ? 'Resuelta' : t.estado === 'en_proceso' ? 'En Proceso' : 'Abierta',
+                      fecha_reporte: t.fecha_apertura || getLocalDatetimeString().replace('T', ' '),
+                      fecha_limite: t.fecha_cierre || null,
+                      fecha_cierre: t.fecha_cierre || null,
+                      accion_tomada: t.accion_inmediata || '',
+                      fotos: t.fotos || [],
+                      fotos_solucion: t.fotos_solucion || t.fotos_despues || []
+                    });
+                  } else {
+                    const current = recordsMap.get(t.codigo)!;
+                    const techInLocal = t.tecnico_asignado || t.responsable_tecnico;
+                    if (techInLocal && techInLocal !== 'Sin asignar' && (!current.tecnico_asignado || current.tecnico_asignado === 'Sin asignar')) {
+                      current.tecnico_asignado = techInLocal;
+                    }
+                    if ((t.fotos_solucion || t.fotos_despues) && (!current.fotos_solucion || current.fotos_solucion.length === 0)) {
+                      current.fotos_solucion = t.fotos_solucion || t.fotos_despues || [];
+                    }
+                  }
+                }
+              });
+            }
+          } catch (e) {}
+        }
+
+        // Also merge any assigned technical data from firplak_correctivos_records
+        const corrSaved = localStorage.getItem('firplak_correctivos_records');
+        if (corrSaved) {
+          try {
+            const parsedCorr = JSON.parse(corrSaved);
+            if (Array.isArray(parsedCorr)) {
+              parsedCorr.forEach((c: any) => {
+                if (c && c.codigo && recordsMap.has(c.codigo)) {
+                  const current = recordsMap.get(c.codigo)!;
+                  recordsMap.set(c.codigo, {
+                    ...current,
+                    tecnico_asignado: c.tecnico_asignado || current.tecnico_asignado,
+                    estado: c.estado || current.estado,
+                    prioridad: c.prioridad || current.prioridad,
+                    fecha_limite: c.fecha_limite !== undefined ? c.fecha_limite : current.fecha_limite,
+                    accion_tomada: c.accion_tomada || current.accion_tomada,
+                    fotos_solucion: c.fotos_solucion || current.fotos_solucion || []
+                  });
+                } else if (c && c.codigo) {
+                  recordsMap.set(c.codigo, c);
+                }
+              });
+            }
+          } catch (e) {}
+        }
       }
 
       const initialMocks: CorrectiveRecord[] = [
@@ -903,7 +1041,7 @@ export default function GestionMantenimientoPage() {
           fotos: []
         },
         {
-          id: 'mock_1',
+          id: 'mock_corr_1',
           codigo: 'CORR-0101',
           maquina: 'Prensa Hidráulica 02',
           planta: 'Mármol Sintético',
@@ -918,7 +1056,7 @@ export default function GestionMantenimientoPage() {
           fotos: []
         },
         {
-          id: 'mock_2',
+          id: 'mock_corr_2',
           codigo: 'CORR-0102',
           maquina: 'Cabina de Pintura C-0154',
           planta: 'Mármol Sintético',
@@ -933,7 +1071,7 @@ export default function GestionMantenimientoPage() {
           fotos: []
         },
         {
-          id: 'mock_3',
+          id: 'mock_corr_3',
           codigo: 'CORR-0103',
           maquina: 'Sierra Escuadradora 01',
           planta: 'Muebles',
@@ -955,6 +1093,13 @@ export default function GestionMantenimientoPage() {
         if (!recordsMap.has(m.codigo)) {
           combined.push(m);
         }
+      });
+
+      // Sort combined descending by date (newest first)
+      combined.sort((a, b) => {
+        const tA = new Date(a.fecha_reporte).getTime() || 0;
+        const tB = new Date(b.fecha_reporte).getTime() || 0;
+        return tB - tA;
       });
 
       setCorrectiveRecords(combined);
@@ -1161,10 +1306,8 @@ export default function GestionMantenimientoPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const rawParam = (params.get('tab') || '').toLowerCase();
-      const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'tarjetas', 'historial', 'configuracion', 'indicadores', 'maquinas'];
-      if (rawParam === 'tarjetas-tpm' || rawParam === 'tarjetas-falla' || rawParam === 'tpm' || rawParam === 'tarjetas') {
-        setActiveTab('tarjetas');
-      } else if (rawParam && validTabs.includes(rawParam as TabType)) {
+      const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas'];
+      if (rawParam && validTabs.includes(rawParam as TabType)) {
         setActiveTab(rawParam as TabType);
       }
     }
@@ -2160,6 +2303,36 @@ export default function GestionMantenimientoPage() {
     }
   };
 
+  // Helper: Open file for solution annotation (Camera / Upload)
+  const handleSolutionFileForAnnotation = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAnnotatingSolutionImage({ src: reader.result });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Helper: Save annotated solution photo
+  const handleSaveAnnotatedSolutionPhoto = (annotatedDataUrl: string) => {
+    if (annotatingSolutionImage?.index !== undefined) {
+      setEditingCorrectivoForm(prev => prev ? ({
+        ...prev,
+        fotos_solucion: (prev.fotos_solucion || []).map((f, i) => i === annotatingSolutionImage.index ? annotatedDataUrl : f)
+      }) : null);
+    } else {
+      setEditingCorrectivoForm(prev => prev ? ({
+        ...prev,
+        fotos_solucion: [...(prev.fotos_solucion || []), annotatedDataUrl].slice(0, 3)
+      }) : null);
+    }
+    setAnnotatingSolutionImage(null);
+  };
+
   // Handler to open the Correctivo Detail Pop-up / Modal
   const handleOpenCorrectivoDetail = (item: CorrectiveRecord) => {
     setViewingCorrectivo(item);
@@ -2168,7 +2341,8 @@ export default function GestionMantenimientoPage() {
       estado: item.estado,
       fecha_limite: item.fecha_limite ? item.fecha_limite.slice(0, 10) : '',
       accion_tomada: item.accion_tomada || '',
-      prioridad: item.prioridad
+      prioridad: item.prioridad,
+      fotos_solucion: item.fotos_solucion || []
     });
     setCorrectivoModalFeedback(null);
   };
@@ -2191,67 +2365,216 @@ export default function GestionMantenimientoPage() {
       estado: form.estado,
       fecha_limite: form.fecha_limite.trim() ? form.fecha_limite.trim() : null,
       prioridad: form.prioridad,
-      accion_tomada: form.accion_tomada.trim()
+      accion_tomada: form.accion_tomada.trim(),
+      fotos_solucion: form.fotos_solucion || []
     };
 
     const updatedList = correctiveRecords.map(c => c.id === viewingCorrectivo.id ? updatedRecord : c);
     setCorrectiveRecords(updatedList);
     setViewingCorrectivo(updatedRecord);
 
-    try {
-      const dbTpmStatus = form.estado === 'Resuelta' ? 'cerrada' : form.estado === 'En Proceso' ? 'en_proceso' : 'abierta';
-      const fechaCierreVal = form.estado === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null;
+    const dbTpmStatus = form.estado === 'Resuelta' ? 'cerrada' : form.estado === 'En Proceso' ? 'en_proceso' : 'abierta';
+    const fechaCierreVal = form.estado === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null;
 
-      // 1. Update mantenimiento_ordenes
-      await supabase
+    // 1. Persist directly to LocalStorage (firplak_correctivos_records & firplak_tarjetas_tpm_records)
+    if (typeof window !== 'undefined') {
+      try {
+        const corrSaved = localStorage.getItem('firplak_correctivos_records');
+        let corrList: any[] = corrSaved ? JSON.parse(corrSaved) : [];
+        if (!Array.isArray(corrList)) corrList = [];
+        const existingCorrIdx = corrList.findIndex((c: any) => c && (c.codigo === viewingCorrectivo.codigo || c.id === viewingCorrectivo.id));
+        if (existingCorrIdx >= 0) {
+          corrList[existingCorrIdx] = updatedRecord;
+        } else {
+          corrList.push(updatedRecord);
+        }
+        localStorage.setItem('firplak_correctivos_records', JSON.stringify(corrList));
+
+        const tpmSaved = localStorage.getItem('firplak_tarjetas_tpm_records');
+        if (tpmSaved) {
+          let tpmList = JSON.parse(tpmSaved);
+          if (Array.isArray(tpmList)) {
+            tpmList = tpmList.map((t: any) => {
+              if (t && (t.codigo === viewingCorrectivo.codigo || t.id === viewingCorrectivo.id)) {
+                return {
+                  ...t,
+                  tecnico_asignado: finalTechName,
+                  responsable_tecnico: finalTechName,
+                  estado: dbTpmStatus,
+                  prioridad: form.prioridad,
+                  accion_inmediata: form.accion_tomada.trim() || t.accion_inmediata,
+                  accion_correctiva: form.accion_tomada.trim() || t.accion_correctiva,
+                  fecha_cierre: fechaCierreVal,
+                  fecha_limite: form.fecha_limite.trim() || t.fecha_limite,
+                  fotos_despues: form.fotos_solucion || t.fotos_despues || [],
+                  fotos_solucion: form.fotos_solucion || t.fotos_solucion || []
+                };
+              }
+              return t;
+            });
+            localStorage.setItem('firplak_tarjetas_tpm_records', JSON.stringify(tpmList));
+          }
+        }
+      } catch (lsErr) {
+        console.warn('Error guardando en localStorage:', lsErr);
+      }
+    }
+
+    try {
+      // 2. Update or Insert in mantenimiento_ordenes
+      const { data: existingOrd } = await supabase
         .from('mantenimiento_ordenes')
-        .update({
+        .select('id')
+        .eq('codigo', viewingCorrectivo.codigo)
+        .maybeSingle();
+
+      if (existingOrd) {
+        await supabase
+          .from('mantenimiento_ordenes')
+          .update({
+            id_tecnico: techIdToSave,
+            tecnico_nombre: isUnassigned ? null : finalTechName,
+            estado: form.estado,
+            prioridad: form.prioridad,
+            accion_realizada: form.accion_tomada.trim() || null,
+            fecha_programada: form.fecha_limite.trim() || null,
+            fecha_cierre: fechaCierreVal,
+            fotos_despues: form.fotos_solucion || []
+          })
+          .eq('codigo', viewingCorrectivo.codigo);
+      } else {
+        await supabase.from('mantenimiento_ordenes').insert([{
+          codigo: viewingCorrectivo.codigo,
+          origen: viewingCorrectivo.origen === 'Tarjeta TPM' ? 'TARJETA_TPM' : 'CORRECTIVO_DIRECTO',
+          tipo_orden: 'CORRECTIVO',
+          titulo: `[Correctivo] ${viewingCorrectivo.sintoma}`,
+          maquina: viewingCorrectivo.maquina,
+          planta: viewingCorrectivo.planta,
           id_tecnico: techIdToSave,
           tecnico_nombre: isUnassigned ? null : finalTechName,
-          estado: form.estado,
+          turno: 'General',
           prioridad: form.prioridad,
+          estado: form.estado,
+          fecha_programada: form.fecha_limite.trim() || new Date().toISOString().slice(0, 10),
+          duracion_estimada_min: 60,
+          sintoma_falla: viewingCorrectivo.sintoma,
           accion_realizada: form.accion_tomada.trim() || null,
-          fecha_programada: form.fecha_limite.trim() || null,
-          fecha_cierre: fechaCierreVal
-        })
-        .eq('codigo', viewingCorrectivo.codigo);
+          fecha_cierre: fechaCierreVal,
+          fotos_antes: viewingCorrectivo.fotos || [],
+          fotos_despues: form.fotos_solucion || []
+        }]);
+      }
 
-      // 2. Update tarjetas_falla_anomalia
+      // 3. Update tarjetas_falla_anomalia by all possible identifiers
       const tpmUpdatePayload = {
         tecnico_asignado: isUnassigned ? null : finalTechName,
-        responsable: isUnassigned ? null : finalTechName,
+        responsable_tecnico: isUnassigned ? null : finalTechName,
         estado: dbTpmStatus,
         prioridad: form.prioridad,
         accion_correctiva: form.accion_tomada.trim() || null,
-        fecha_cierre: fechaCierreVal
+        fecha_cierre: fechaCierreVal,
+        fotos_despues: form.fotos_solucion || []
       };
 
-      if (typeof viewingCorrectivo.id === 'number' && viewingCorrectivo.id < 1000000000) {
-        await supabase
-          .from('tarjetas_falla_anomalia')
-          .update(tpmUpdatePayload)
-          .eq('id', viewingCorrectivo.id);
-      } else {
-        await supabase
-          .from('tarjetas_falla_anomalia')
-          .update(tpmUpdatePayload)
-          .eq('codigo_tarjeta', viewingCorrectivo.codigo);
-      }
+      await Promise.allSettled([
+        supabase.from('tarjetas_falla_anomalia').update(tpmUpdatePayload).eq('codigo', viewingCorrectivo.codigo),
+        supabase.from('tarjetas_falla_anomalia').update(tpmUpdatePayload).eq('codigo_tarjeta', viewingCorrectivo.codigo),
+        typeof viewingCorrectivo.id === 'number' && viewingCorrectivo.id < 1000000000
+          ? supabase.from('tarjetas_falla_anomalia').update(tpmUpdatePayload).eq('id', viewingCorrectivo.id)
+          : Promise.resolve()
+      ]);
 
       setCorrectivoModalFeedback('¡Mantenimiento correctivo guardado exitosamente!');
+    } catch (err) {
+      console.warn('Error guardando en Supabase:', err);
+      setCorrectivoModalFeedback('Guardado localmente. Se sincronizará con la nube.');
+    } finally {
+      setSavingCorrectivoModal(false);
       setTimeout(() => {
         setCorrectivoModalFeedback(null);
         setViewingCorrectivo(null);
         setEditingCorrectivoForm(null);
       }, 1200);
-    } catch (err) {
-      console.warn('Error guardando cambios del correctivo:', err);
-      setCorrectivoModalFeedback('Guardado localmente. (Error al sincronizar con Supabase)');
+    }
+  };
+
+  // Handler to open the Preventivo Execution Modal (Portal Técnicos / Planificador)
+  const handleOpenPreventivoExecution = (task: MaintenanceTask) => {
+    setExecutingPreventivo(task);
+    setExecutingPreventivoForm({
+      status: (task.status as any) || 'Pendiente',
+      observations: task.observations || '',
+      fechaApertura: task.fechaApertura ? task.fechaApertura.slice(0, 16) : getLocalDatetimeString().slice(0, 16),
+      fechaCierre: task.fechaCierre ? task.fechaCierre.slice(0, 16) : (task.status === 'Completado' ? getLocalDatetimeString().slice(0, 16) : '')
+    });
+    setPreventivoModalFeedback(null);
+  };
+
+  // Handler to save Preventivo Execution from the Modal
+  const handleSavePreventivoExecution = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!executingPreventivo || !executingPreventivoForm) return;
+
+    setSavingPreventivoModal(true);
+    const form = executingPreventivoForm;
+    const isCompleted = form.status === 'Completado';
+    const nowStr = getLocalDatetimeString();
+    const finalFechaCierre = isCompleted ? (form.fechaCierre ? form.fechaCierre : nowStr) : null;
+    const finalFechaApertura = form.fechaApertura ? form.fechaApertura : nowStr;
+
+    const updatedTask: MaintenanceTask = {
+      ...executingPreventivo,
+      status: form.status,
+      observations: form.observations.trim(),
+      fechaApertura: finalFechaApertura,
+      fechaCierre: finalFechaCierre,
+      refFrecuencia: isCompleted ? 0 : executingPreventivo.refFrecuencia,
+      isDue: isCompleted ? false : executingPreventivo.isDue
+    };
+
+    const updatedTasks = tasks.map(t => t.id === executingPreventivo.id ? updatedTask : t);
+    setTasks(updatedTasks);
+    persistState(updatedTasks, technicians);
+    setExecutingPreventivo(updatedTask);
+
+    try {
+      const tech = technicians.find(t => t.id === updatedTask.idtecs);
+      const techName = tech ? tech.name : 'Super técnico';
+
+      // Insert/update into mantenimiento_ordenes
+      await supabase.from('mantenimiento_ordenes').insert({
+        id_plan_preventivo: updatedTask.id,
+        codigo: updatedTask.code,
+        titulo: updatedTask.title,
+        maquina: updatedTask.maquina,
+        planta: updatedTask.planta,
+        id_tecnico: tech?.id !== 9999 ? tech?.id : null,
+        tecnico_nombre: techName,
+        turno: tech?.turno || 'General',
+        fecha_programada: new Date().toISOString().slice(0, 10),
+        duracion_estimada_min: updatedTask.durationMinutes,
+        estado: form.status,
+        fecha_apertura: formatDateForSupabase(finalFechaApertura),
+        fecha_cierre: formatDateForSupabase(finalFechaCierre),
+        comentarios_ejecucion: form.observations.trim(),
+        adelantada: !!updatedTask.adelantada
+      });
+
+      fetchHistoryRecords();
+      setPreventivoModalFeedback('¡Ejecución de mantenimiento preventivo guardada exitosamente!');
       setTimeout(() => {
-        setCorrectivoModalFeedback(null);
+        setPreventivoModalFeedback(null);
+        setExecutingPreventivo(null);
+        setExecutingPreventivoForm(null);
+      }, 1200);
+    } catch (err) {
+      console.warn('Error guardando ejecución en Supabase:', err);
+      setPreventivoModalFeedback('Guardado localmente. (Error sincronizando con Supabase)');
+      setTimeout(() => {
+        setPreventivoModalFeedback(null);
       }, 2500);
     } finally {
-      setSavingCorrectivoModal(false);
+      setSavingPreventivoModal(false);
     }
   };
 
@@ -2267,40 +2590,65 @@ export default function GestionMantenimientoPage() {
 
     const found = updated.find(c => c.id === correctivoId);
     if (found) {
+      const dbStatus = newStatus === 'Resuelta' ? 'cerrada' : newStatus === 'En Proceso' ? 'en_proceso' : 'abierta';
+      const fechaCierreVal = newStatus === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null;
+
+      // Update LocalStorage
+      if (typeof window !== 'undefined') {
+        try {
+          const corrSaved = localStorage.getItem('firplak_correctivos_records');
+          let corrList: any[] = corrSaved ? JSON.parse(corrSaved) : [];
+          if (!Array.isArray(corrList)) corrList = [];
+          const idx = corrList.findIndex((c: any) => c && (c.codigo === found.codigo || c.id === found.id));
+          if (idx >= 0) {
+            corrList[idx] = { ...corrList[idx], estado: newStatus, fecha_cierre: fechaCierreVal };
+          } else {
+            corrList.push({ ...found, estado: newStatus, fecha_cierre: fechaCierreVal });
+          }
+          localStorage.setItem('firplak_correctivos_records', JSON.stringify(corrList));
+
+          const tpmSaved = localStorage.getItem('firplak_tarjetas_tpm_records');
+          if (tpmSaved) {
+            let tpmList = JSON.parse(tpmSaved);
+            if (Array.isArray(tpmList)) {
+              tpmList = tpmList.map((t: any) => {
+                if (t && (t.codigo === found.codigo || t.id === found.id)) {
+                  return { ...t, estado: dbStatus, fecha_cierre: fechaCierreVal };
+                }
+                return t;
+              });
+              localStorage.setItem('firplak_tarjetas_tpm_records', JSON.stringify(tpmList));
+            }
+          }
+        } catch (lsErr) {}
+      }
+
       setSaveFeedback(prev => ({ ...prev, [`corr_${correctivoId}`]: true }));
       try {
-        const dbStatus = newStatus === 'Resuelta' ? 'cerrada' : newStatus === 'En Proceso' ? 'en_proceso' : 'abierta';
-        
         // Update mantenimiento_ordenes
         await supabase
           .from('mantenimiento_ordenes')
           .update({ 
             estado: newStatus,
             accion_realizada: found.accion_tomada,
-            fecha_cierre: newStatus === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null
+            fecha_cierre: fechaCierreVal
           })
           .eq('codigo', found.codigo);
 
         // Update tarjetas_falla_anomalia
-        if (typeof correctivoId === 'number' && correctivoId < 1000000000) {
-          await supabase
-            .from('tarjetas_falla_anomalia')
-            .update({ 
-              estado: dbStatus,
-              accion_correctiva: found.accion_tomada,
-              fecha_cierre: newStatus === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null
-            })
-            .eq('id', correctivoId);
-        } else {
-          await supabase
-            .from('tarjetas_falla_anomalia')
-            .update({ 
-              estado: dbStatus,
-              accion_correctiva: found.accion_tomada,
-              fecha_cierre: newStatus === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null
-            })
-            .eq('codigo_tarjeta', found.codigo);
-        }
+        const tpmUpdate = { 
+          estado: dbStatus,
+          accion_correctiva: found.accion_tomada,
+          fecha_cierre: fechaCierreVal
+        };
+
+        await Promise.allSettled([
+          supabase.from('tarjetas_falla_anomalia').update(tpmUpdate).eq('codigo', found.codigo),
+          supabase.from('tarjetas_falla_anomalia').update(tpmUpdate).eq('codigo_tarjeta', found.codigo),
+          typeof correctivoId === 'number' && correctivoId < 1000000000
+            ? supabase.from('tarjetas_falla_anomalia').update(tpmUpdate).eq('id', correctivoId)
+            : Promise.resolve()
+        ]);
       } catch (err) {
         console.warn('Error actualizando estado de correctivo en Supabase:', err);
       } finally {
@@ -2326,37 +2674,93 @@ export default function GestionMantenimientoPage() {
 
     const found = updated.find(c => c.id === correctivoId);
     if (found) {
+      // 1. Update localStorage immediately
+      if (typeof window !== 'undefined') {
+        try {
+          const corrSaved = localStorage.getItem('firplak_correctivos_records');
+          let corrList: any[] = corrSaved ? JSON.parse(corrSaved) : [];
+          if (!Array.isArray(corrList)) corrList = [];
+          const idx = corrList.findIndex((c: any) => c && (c.codigo === found.codigo || c.id === found.id));
+          if (idx >= 0) {
+            corrList[idx] = { ...corrList[idx], ...found, tecnico_asignado: finalTechName };
+          } else {
+            corrList.push({ ...found, tecnico_asignado: finalTechName });
+          }
+          localStorage.setItem('firplak_correctivos_records', JSON.stringify(corrList));
+
+          const tpmSaved = localStorage.getItem('firplak_tarjetas_tpm_records');
+          if (tpmSaved) {
+            let tpmList = JSON.parse(tpmSaved);
+            if (Array.isArray(tpmList)) {
+              tpmList = tpmList.map((t: any) => {
+                if (t && (t.codigo === found.codigo || t.id === found.id)) {
+                  return {
+                    ...t,
+                    tecnico_asignado: finalTechName,
+                    responsable_tecnico: finalTechName
+                  };
+                }
+                return t;
+              });
+              localStorage.setItem('firplak_tarjetas_tpm_records', JSON.stringify(tpmList));
+            }
+          }
+        } catch (lsErr) {}
+      }
+
       setSaveFeedback(prev => ({ ...prev, [`corr_tech_${correctivoId}`]: true }));
       try {
         const techIdToSave = !isUnassigned && newTechId !== undefined && newTechId !== null ? newTechId : null;
 
-        // 1. Update mantenimiento_ordenes
-        await supabase
+        // 1. Update or Insert in mantenimiento_ordenes
+        const { data: existingOrd } = await supabase
           .from('mantenimiento_ordenes')
-          .update({
-            id_tecnico: techIdToSave,
-            tecnico_nombre: isUnassigned ? null : finalTechName
-          })
-          .eq('codigo', found.codigo);
+          .select('id')
+          .eq('codigo', found.codigo)
+          .maybeSingle();
 
-        // 2. Update tarjetas_falla_anomalia
-        if (typeof correctivoId === 'number' && correctivoId < 1000000000) {
+        if (existingOrd) {
           await supabase
-            .from('tarjetas_falla_anomalia')
+            .from('mantenimiento_ordenes')
             .update({
-              tecnico_asignado: isUnassigned ? null : finalTechName,
-              responsable: isUnassigned ? null : finalTechName
+              id_tecnico: techIdToSave,
+              tecnico_nombre: isUnassigned ? null : finalTechName
             })
-            .eq('id', correctivoId);
+            .eq('codigo', found.codigo);
         } else {
-          await supabase
-            .from('tarjetas_falla_anomalia')
-            .update({
-              tecnico_asignado: isUnassigned ? null : finalTechName,
-              responsable: isUnassigned ? null : finalTechName
-            })
-            .eq('codigo_tarjeta', found.codigo);
+          await supabase.from('mantenimiento_ordenes').insert([{
+            codigo: found.codigo,
+            origen: found.origen === 'Tarjeta TPM' ? 'TARJETA_TPM' : 'CORRECTIVO_DIRECTO',
+            tipo_orden: 'CORRECTIVO',
+            titulo: `[Correctivo] ${found.sintoma}`,
+            maquina: found.maquina,
+            planta: found.planta,
+            id_tecnico: techIdToSave,
+            tecnico_nombre: isUnassigned ? null : finalTechName,
+            turno: 'General',
+            prioridad: found.prioridad,
+            estado: found.estado,
+            fecha_programada: found.fecha_limite || new Date().toISOString().slice(0, 10),
+            duracion_estimada_min: 60,
+            sintoma_falla: found.sintoma,
+            accion_realizada: found.accion_tomada || null,
+            fotos_antes: found.fotos || []
+          }]);
         }
+
+        // 2. Update tarjetas_falla_anomalia by all possible identifiers
+        const tpmUpdatePayload = {
+          tecnico_asignado: isUnassigned ? null : finalTechName,
+          responsable_tecnico: isUnassigned ? null : finalTechName
+        };
+
+        await Promise.allSettled([
+          supabase.from('tarjetas_falla_anomalia').update(tpmUpdatePayload).eq('codigo', found.codigo),
+          supabase.from('tarjetas_falla_anomalia').update(tpmUpdatePayload).eq('codigo_tarjeta', found.codigo),
+          typeof correctivoId === 'number' && correctivoId < 1000000000
+            ? supabase.from('tarjetas_falla_anomalia').update(tpmUpdatePayload).eq('id', correctivoId)
+            : Promise.resolve()
+        ]);
       } catch (err) {
         console.warn('Error reasignando técnico en Supabase:', err);
       } finally {
@@ -2379,19 +2783,35 @@ export default function GestionMantenimientoPage() {
 
     const found = updated.find(c => c.id === correctivoId);
     if (found) {
+      if (typeof window !== 'undefined') {
+        try {
+          const corrSaved = localStorage.getItem('firplak_correctivos_records');
+          let corrList: any[] = corrSaved ? JSON.parse(corrSaved) : [];
+          if (!Array.isArray(corrList)) corrList = [];
+          const idx = corrList.findIndex((c: any) => c && (c.codigo === found.codigo || c.id === found.id));
+          if (idx >= 0) {
+            corrList[idx] = { ...corrList[idx], accion_tomada: newAction };
+          } else {
+            corrList.push({ ...found, accion_tomada: newAction });
+          }
+          localStorage.setItem('firplak_correctivos_records', JSON.stringify(corrList));
+        } catch (lsErr) {}
+      }
+
       setSaveFeedback(prev => ({ ...prev, [`corr_${correctivoId}`]: true }));
       try {
-        if (typeof correctivoId === 'number' && correctivoId < 1000000000) {
-          await supabase
-            .from('tarjetas_falla_anomalia')
-            .update({ accion_correctiva: newAction })
-            .eq('id', correctivoId);
-        } else {
-          await supabase
-            .from('tarjetas_falla_anomalia')
-            .update({ accion_correctiva: newAction })
-            .eq('codigo', found.codigo);
-        }
+        await supabase
+          .from('mantenimiento_ordenes')
+          .update({ accion_realizada: newAction })
+          .eq('codigo', found.codigo);
+
+        await Promise.allSettled([
+          supabase.from('tarjetas_falla_anomalia').update({ accion_correctiva: newAction }).eq('codigo', found.codigo),
+          supabase.from('tarjetas_falla_anomalia').update({ accion_correctiva: newAction }).eq('codigo_tarjeta', found.codigo),
+          typeof correctivoId === 'number' && correctivoId < 1000000000
+            ? supabase.from('tarjetas_falla_anomalia').update({ accion_correctiva: newAction }).eq('id', correctivoId)
+            : Promise.resolve()
+        ]);
       } catch (err) {
         console.warn('Error actualizando acción correctiva en Supabase:', err);
       } finally {
@@ -3344,27 +3764,57 @@ export default function GestionMantenimientoPage() {
     );
   }, [portalTechTasks, portalSearchQuery]);
 
+  // Helper: Parse date string in local timezone without UTC offset shift
+  const parseLocalDateWithoutTimezoneShift = (dateStr: string | null | undefined): Date | null => {
+    if (!dateStr) return null;
+    const cleanStr = String(dateStr).trim();
+    
+    // Match YYYY-MM-DD
+    const ymdMatch = cleanStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10) - 1;
+      const day = parseInt(ymdMatch[3], 10);
+      return new Date(year, month, day, 0, 0, 0, 0);
+    }
+
+    // Match DD-MM-YYYY or DD/MM/YYYY
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10) - 1;
+      const year = parseInt(dmyMatch[3], 10);
+      return new Date(year, month, day, 0, 0, 0, 0);
+    }
+
+    const d = new Date(cleanStr);
+    if (isNaN(d.getTime())) return null;
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   // Helper: Categorize portal task with rawTimestamp
   const categorizePortalTask = (task: MaintenanceTask): { category: 'atrasadas' | 'hoy' | 'proximas'; dateLabel: string; dateStatus: 'overdue' | 'today' | 'upcoming'; rawTimestamp: number } => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (task.fechaApertura) {
-      const taskDate = new Date(task.fechaApertura);
-      taskDate.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      const dayNum = taskDate.getDate();
-      const monthStr = taskDate.toLocaleDateString('es-ES', { month: 'short' });
-      const formattedDate = `${dayNum} ${monthStr}`;
+      const taskDate = parseLocalDateWithoutTimezoneShift(task.fechaApertura);
+      if (taskDate) {
+        const diffDays = Math.round((taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        const dayNum = taskDate.getDate();
+        const monthStr = taskDate.toLocaleDateString('es-ES', { month: 'short' });
+        const formattedDate = `${dayNum} ${monthStr}`;
 
-      if (diffDays < 0) {
-        return { category: 'atrasadas', dateLabel: formattedDate, dateStatus: 'overdue', rawTimestamp: taskDate.getTime() };
+        if (diffDays < 0) {
+          return { category: 'atrasadas', dateLabel: formattedDate, dateStatus: 'overdue', rawTimestamp: taskDate.getTime() };
+        }
+        if (diffDays === 0) {
+          return { category: 'hoy', dateLabel: 'Hoy', dateStatus: 'today', rawTimestamp: taskDate.getTime() };
+        }
+        return { category: 'proximas', dateLabel: formattedDate, dateStatus: 'upcoming', rawTimestamp: taskDate.getTime() };
       }
-      if (diffDays === 0) {
-        return { category: 'hoy', dateLabel: 'Hoy', dateStatus: 'today', rawTimestamp: taskDate.getTime() };
-      }
-      return { category: 'proximas', dateLabel: formattedDate, dateStatus: 'upcoming', rawTimestamp: taskDate.getTime() };
     }
 
     const ref = task.refFrecuencia || 0;
@@ -3412,21 +3862,22 @@ export default function GestionMantenimientoPage() {
 
     const refDateStr = corr.fecha_limite || corr.fecha_reporte;
     if (refDateStr) {
-      const corrDate = new Date(refDateStr);
-      corrDate.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((corrDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      const dayNum = corrDate.getDate();
-      const monthStr = corrDate.toLocaleDateString('es-ES', { month: 'short' });
-      const formattedDate = `${dayNum} ${monthStr}`;
+      const corrDate = parseLocalDateWithoutTimezoneShift(refDateStr);
+      if (corrDate) {
+        const diffDays = Math.round((corrDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        const dayNum = corrDate.getDate();
+        const monthStr = corrDate.toLocaleDateString('es-ES', { month: 'short' });
+        const formattedDate = `${dayNum} ${monthStr}`;
 
-      if (diffDays < 0) {
-        return { category: 'atrasadas', dateLabel: formattedDate, dateStatus: 'overdue', rawTimestamp: corrDate.getTime() };
+        if (diffDays < 0) {
+          return { category: 'atrasadas', dateLabel: formattedDate, dateStatus: 'overdue', rawTimestamp: corrDate.getTime() };
+        }
+        if (diffDays === 0) {
+          return { category: 'hoy', dateLabel: 'Hoy', dateStatus: 'today', rawTimestamp: corrDate.getTime() };
+        }
+        return { category: 'proximas', dateLabel: formattedDate, dateStatus: 'upcoming', rawTimestamp: corrDate.getTime() };
       }
-      if (diffDays === 0) {
-        return { category: 'hoy', dateLabel: 'Hoy', dateStatus: 'today', rawTimestamp: corrDate.getTime() };
-      }
-      return { category: 'proximas', dateLabel: formattedDate, dateStatus: 'upcoming', rawTimestamp: corrDate.getTime() };
     }
 
     return { category: 'hoy', dateLabel: 'Hoy', dateStatus: 'today', rawTimestamp: today.getTime() };
@@ -3596,7 +4047,6 @@ export default function GestionMantenimientoPage() {
     { id: 'tecnico', label: 'Portal Técnicos', icon: <User size={14} /> },
     { id: 'preventivo', label: 'Preventivo (PMP)', icon: <FileSpreadsheet size={14} /> },
     { id: 'correctivo', label: 'Correctivo', icon: <AlertTriangle size={14} /> },
-    { id: 'tarjetas', label: 'Tarjetas TPM', icon: <ShieldAlert size={14} /> },
     { id: 'historial', label: 'Historial OT', icon: <History size={14} /> },
     { id: 'indicadores', label: 'Indicadores', icon: <BarChart3 size={14} /> },
     { id: 'maquinas', label: 'Máquinas y Equipos', icon: <Cpu size={14} /> },
@@ -3873,7 +4323,15 @@ export default function GestionMantenimientoPage() {
                         plannerColumns.atrasadas.map(item => (
                           <div
                             key={item.id}
-                            className="bg-white rounded-xl p-2 border border-[#e2ded5] shadow-2xs hover:shadow-xs transition-all flex flex-col gap-1 group relative"
+                            onClick={() => {
+                              if (item.type === 'correctivo') {
+                                handleOpenCorrectivoDetail(item.data as CorrectiveRecord);
+                              } else {
+                                handleOpenPreventivoExecution(item.data as MaintenanceTask);
+                              }
+                            }}
+                            className="bg-white rounded-xl p-2.5 border border-[#e2ded5] shadow-2xs hover:shadow-md hover:border-rose-300 transition-all flex flex-col gap-1.5 group relative cursor-pointer select-none"
+                            title="Haz clic para abrir el detalle, modificar información o cerrar la orden"
                           >
                             {/* Top Line: Tag Badge, Date/Deadline & Duration */}
                             <div className="flex items-center justify-between gap-1">
@@ -3904,18 +4362,14 @@ export default function GestionMantenimientoPage() {
                             </div>
 
                             {/* Title / Description */}
-                            <div
-                              onClick={() => setExpandedCards(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                              className="cursor-pointer group-hover:text-blue-900 transition-colors"
-                              title="Clic para reportar ejecución / ver detalle"
-                            >
-                              <h4 className="font-bold text-[10.5px] text-[#324354] leading-tight line-clamp-2">
+                            <div>
+                              <h4 className="font-bold text-[10.5px] text-[#324354] leading-tight line-clamp-2 group-hover:text-blue-900 transition-colors">
                                 {item.title}
                               </h4>
                             </div>
 
-                            {/* Footer Line: Machine & Plant + Status Selector */}
-                            <div className="flex items-center justify-between gap-1.5 pt-0.5 border-t border-gray-100 mt-0.5">
+                            {/* Footer Line: Machine & Plant + Status Badge */}
+                            <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-gray-100 mt-0.5">
                               <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium min-w-0 flex-1 truncate">
                                 <span className="shrink-0">🏭</span>
                                 <span className="font-semibold text-gray-700 shrink-0">{item.planta || 'FIRPLAK'}</span>
@@ -3927,97 +4381,13 @@ export default function GestionMantenimientoPage() {
                                 )}
                               </div>
 
-                              <div className="relative inline-flex items-center shrink-0">
-                                <select
-                                  value={item.status}
-                                  onChange={(e) => {
-                                    if (item.type === 'correctivo') {
-                                      handleUpdateCorrectivoStatus(item.data.id, e.target.value as any);
-                                    } else {
-                                      handleUpdateStatus(Number(item.data.id), e.target.value);
-                                    }
-                                  }}
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer shadow-2xs bg-rose-50 text-rose-800 border-rose-200"
-                                >
-                                  {item.type === 'correctivo' ? (
-                                    <>
-                                      <option value="Abierta">🔴 Abierta</option>
-                                      <option value="En Proceso">🟡 En Proceso</option>
-                                      <option value="Resuelta">🟢 Resuelta</option>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <option value="Pendiente">⏳ Pendiente</option>
-                                      <option value="Incompleto">⚠️ Incompleto</option>
-                                      <option value="Completado">✅ Completado</option>
-                                    </>
-                                  )}
-                                </select>
+                              <div className="shrink-0 flex items-center gap-1">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all bg-rose-50 text-rose-800 border-rose-200">
+                                  🔴 {item.status}
+                                </span>
+                                <Eye className="w-3 h-3 text-gray-400 group-hover:text-[#324354] transition-colors" />
                               </div>
                             </div>
-
-                            {/* Expanded Execution Area */}
-                            {expandedCards[item.id] && (
-                              <div className="pt-1.5 border-t border-gray-100 flex flex-col gap-1.5 text-[9.5px] animate-in fade-in">
-                                <div className="bg-[#F6F3EE] p-1.5 rounded-lg text-gray-600">
-                                  <strong className="block text-[#324354] mb-0.5">Detalle / Instrucción:</strong>
-                                  <p className="line-clamp-3">{item.type === 'correctivo' ? (item.data as CorrectiveRecord).sintoma : ((item.data as MaintenanceTask).detalle || 'Mantenimiento estándar')}</p>
-                                </div>
-
-                                {item.type === 'preventivo' ? (
-                                  <>
-                                    <div className="grid grid-cols-2 gap-1 text-[9px]">
-                                      <div>
-                                        <label className="font-bold text-gray-500 block mb-0.5">Apertura:</label>
-                                        <input
-                                          type="datetime-local"
-                                          value={(item.data as MaintenanceTask).fechaApertura || ''}
-                                          onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, (item.data as MaintenanceTask).observations || '', e.target.value, (item.data as MaintenanceTask).fechaCierre || null)}
-                                          className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9px]"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="font-bold text-gray-500 block mb-0.5">Cierre:</label>
-                                        <input
-                                          type="datetime-local"
-                                          value={(item.data as MaintenanceTask).fechaCierre || ''}
-                                          onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, (item.data as MaintenanceTask).observations || '', (item.data as MaintenanceTask).fechaApertura || null, e.target.value)}
-                                          className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9px]"
-                                        />
-                                      </div>
-                                    </div>
-                                    <textarea
-                                      value={(item.data as MaintenanceTask).observations || ''}
-                                      onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, e.target.value, (item.data as MaintenanceTask).fechaApertura || null, (item.data as MaintenanceTask).fechaCierre || null)}
-                                      placeholder="Observaciones de ejecución..."
-                                      className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9.5px] min-h-[34px] focus:outline-none"
-                                    />
-                                    {saveFeedback[Number((item.data as MaintenanceTask).id)] && (
-                                      <div className="text-[8.5px] text-emerald-600 font-bold flex items-center gap-1">
-                                        <Check className="w-2.5 h-2.5" />
-                                        <span>Guardado en Supabase</span>
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <textarea
-                                      value={(item.data as CorrectiveRecord).accion_tomada || ''}
-                                      onChange={(e) => handleUpdateCorrectivoAction((item.data as CorrectiveRecord).id, e.target.value)}
-                                      placeholder="Acción correctiva realizada..."
-                                      className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9.5px] min-h-[34px] focus:outline-none"
-                                    />
-                                    {saveFeedback[`corr_${(item.data as CorrectiveRecord).id}`] && (
-                                      <div className="text-[8.5px] text-emerald-600 font-bold flex items-center gap-1">
-                                        <Check className="w-2.5 h-2.5" />
-                                        <span>Guardado en Supabase</span>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
-
                           </div>
                         ))
                       )}
@@ -4031,7 +4401,6 @@ export default function GestionMantenimientoPage() {
                         <span className="w-2 h-2 rounded-full bg-[#324354] shrink-0"></span>
                         <h3 className="font-bold text-xs text-[#324354] shrink-0">Hoy</h3>
 
-                        {/* Carga solo de hoy como en la primera imagen */}
                         <div className="flex items-center gap-1 ml-1 truncate">
                           <span className="text-[9.5px] font-bold text-gray-600 hidden xl:inline">Carga del Día:</span>
                           <span className={`px-1.5 py-0.2 rounded text-[9px] font-black shadow-2xs ${plannerStats.todaySemaforoClass}`}>
@@ -4053,7 +4422,15 @@ export default function GestionMantenimientoPage() {
                         plannerColumns.hoy.map(item => (
                           <div
                             key={item.id}
-                            className="bg-white rounded-xl p-2 border border-[#e2ded5] shadow-2xs hover:shadow-xs transition-all flex flex-col gap-1 group relative"
+                            onClick={() => {
+                              if (item.type === 'correctivo') {
+                                handleOpenCorrectivoDetail(item.data as CorrectiveRecord);
+                              } else {
+                                handleOpenPreventivoExecution(item.data as MaintenanceTask);
+                              }
+                            }}
+                            className="bg-white rounded-xl p-2.5 border border-[#e2ded5] shadow-2xs hover:shadow-md hover:border-[#324354]/40 transition-all flex flex-col gap-1.5 group relative cursor-pointer select-none"
+                            title="Haz clic para abrir el detalle, modificar información o cerrar la orden"
                           >
                             {/* Top Line: Tag Badge, Date/Deadline & Duration */}
                             <div className="flex items-center justify-between gap-1">
@@ -4084,18 +4461,14 @@ export default function GestionMantenimientoPage() {
                             </div>
 
                             {/* Title / Description */}
-                            <div
-                              onClick={() => setExpandedCards(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                              className="cursor-pointer group-hover:text-blue-900 transition-colors"
-                              title="Clic para reportar ejecución / ver detalle"
-                            >
-                              <h4 className="font-bold text-[10.5px] text-[#324354] leading-tight line-clamp-2">
+                            <div>
+                              <h4 className="font-bold text-[10.5px] text-[#324354] leading-tight line-clamp-2 group-hover:text-blue-900 transition-colors">
                                 {item.title}
                               </h4>
                             </div>
 
-                            {/* Footer Line: Machine & Plant + Status Selector */}
-                            <div className="flex items-center justify-between gap-1.5 pt-0.5 border-t border-gray-100 mt-0.5">
+                            {/* Footer Line: Machine & Plant + Status Badge */}
+                            <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-gray-100 mt-0.5">
                               <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium min-w-0 flex-1 truncate">
                                 <span className="shrink-0">🏭</span>
                                 <span className="font-semibold text-gray-700 shrink-0">{item.planta || 'FIRPLAK'}</span>
@@ -4107,97 +4480,21 @@ export default function GestionMantenimientoPage() {
                                 )}
                               </div>
 
-                              <div className="relative inline-flex items-center shrink-0">
-                                <select
-                                  value={item.status}
-                                  onChange={(e) => {
-                                    if (item.type === 'correctivo') {
-                                      handleUpdateCorrectivoStatus(item.data.id, e.target.value as any);
-                                    } else {
-                                      handleUpdateStatus(item.data.id, e.target.value);
-                                    }
-                                  }}
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer shadow-2xs bg-[#F6F3EE] text-[#324354] border-[#e2ded5]"
-                                >
-                                  {item.type === 'correctivo' ? (
-                                    <>
-                                      <option value="Abierta">🔴 Abierta</option>
-                                      <option value="En Proceso">🟡 En Proceso</option>
-                                      <option value="Resuelta">🟢 Resuelta</option>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <option value="Pendiente">⏳ Pendiente</option>
-                                      <option value="Incompleto">⚠️ Incompleto</option>
-                                      <option value="Completado">✅ Completado</option>
-                                    </>
-                                  )}
-                                </select>
+                              <div className="shrink-0 flex items-center gap-1">
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                  item.status === 'Resuelta' || item.status === 'Completado'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : item.status === 'En Proceso'
+                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                    : 'bg-[#F6F3EE] text-[#324354] border-[#e2ded5]'
+                                }`}>
+                                  {item.status === 'Resuelta' || item.status === 'Completado' ? '🟢 ' + item.status :
+                                   item.status === 'En Proceso' ? '🟡 ' + item.status :
+                                   '🔴 ' + item.status}
+                                </span>
+                                <Eye className="w-3 h-3 text-gray-400 group-hover:text-[#324354] transition-colors" />
                               </div>
                             </div>
-
-                            {/* Expanded Execution Area */}
-                            {expandedCards[item.id] && (
-                              <div className="pt-1.5 border-t border-gray-100 flex flex-col gap-1.5 text-[9.5px] animate-in fade-in">
-                                <div className="bg-[#F6F3EE] p-1.5 rounded-lg text-gray-600">
-                                  <strong className="block text-[#324354] mb-0.5">Detalle / Instrucción:</strong>
-                                  <p className="line-clamp-3">{item.type === 'correctivo' ? (item.data as CorrectiveRecord).sintoma : ((item.data as MaintenanceTask).detalle || 'Mantenimiento estándar')}</p>
-                                </div>
-
-                                {item.type === 'preventivo' ? (
-                                  <>
-                                    <div className="grid grid-cols-2 gap-1 text-[9px]">
-                                      <div>
-                                        <label className="font-bold text-gray-500 block mb-0.5">Apertura:</label>
-                                        <input
-                                          type="datetime-local"
-                                          value={(item.data as MaintenanceTask).fechaApertura || ''}
-                                          onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, (item.data as MaintenanceTask).observations || '', e.target.value, (item.data as MaintenanceTask).fechaCierre || null)}
-                                          className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9px]"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="font-bold text-gray-500 block mb-0.5">Cierre:</label>
-                                        <input
-                                          type="datetime-local"
-                                          value={(item.data as MaintenanceTask).fechaCierre || ''}
-                                          onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, (item.data as MaintenanceTask).observations || '', (item.data as MaintenanceTask).fechaApertura || null, e.target.value)}
-                                          className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9px]"
-                                        />
-                                      </div>
-                                    </div>
-                                    <textarea
-                                      value={(item.data as MaintenanceTask).observations || ''}
-                                      onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, e.target.value, (item.data as MaintenanceTask).fechaApertura || null, (item.data as MaintenanceTask).fechaCierre || null)}
-                                      placeholder="Observaciones de ejecución..."
-                                      className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9.5px] min-h-[34px] focus:outline-none"
-                                    />
-                                    {saveFeedback[(item.data as MaintenanceTask).id] && (
-                                      <div className="text-[8.5px] text-emerald-600 font-bold flex items-center gap-1">
-                                        <Check className="w-2.5 h-2.5" />
-                                        <span>Guardado en Supabase</span>
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <textarea
-                                      value={(item.data as CorrectiveRecord).accion_tomada || ''}
-                                      onChange={(e) => handleUpdateCorrectivoAction((item.data as CorrectiveRecord).id, e.target.value)}
-                                      placeholder="Acción correctiva realizada..."
-                                      className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9.5px] min-h-[34px] focus:outline-none"
-                                    />
-                                    {saveFeedback[`corr_${(item.data as CorrectiveRecord).id}`] && (
-                                      <div className="text-[8.5px] text-emerald-600 font-bold flex items-center gap-1">
-                                        <Check className="w-2.5 h-2.5" />
-                                        <span>Guardado en Supabase</span>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
-
                           </div>
                         ))
                       )}
@@ -4224,7 +4521,15 @@ export default function GestionMantenimientoPage() {
                         plannerColumns.proximas.map(item => (
                           <div
                             key={item.id}
-                            className="bg-white rounded-xl p-2 border border-[#e2ded5] shadow-2xs hover:shadow-xs transition-all flex flex-col gap-1 group relative"
+                            onClick={() => {
+                              if (item.type === 'correctivo') {
+                                handleOpenCorrectivoDetail(item.data as CorrectiveRecord);
+                              } else {
+                                handleOpenPreventivoExecution(item.data as MaintenanceTask);
+                              }
+                            }}
+                            className="bg-white rounded-xl p-2.5 border border-[#e2ded5] shadow-2xs hover:shadow-md hover:border-sky-300 transition-all flex flex-col gap-1.5 group relative cursor-pointer select-none"
+                            title="Haz clic para abrir el detalle, modificar información o cerrar la orden"
                           >
                             {/* Top Line: Tag Badge, Date/Deadline & Duration */}
                             <div className="flex items-center justify-between gap-1">
@@ -4255,18 +4560,14 @@ export default function GestionMantenimientoPage() {
                             </div>
 
                             {/* Title / Description */}
-                            <div
-                              onClick={() => setExpandedCards(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                              className="cursor-pointer group-hover:text-blue-900 transition-colors"
-                              title="Clic para reportar ejecución / ver detalle"
-                            >
-                              <h4 className="font-bold text-[10.5px] text-[#324354] leading-tight line-clamp-2">
+                            <div>
+                              <h4 className="font-bold text-[10.5px] text-[#324354] leading-tight line-clamp-2 group-hover:text-blue-900 transition-colors">
                                 {item.title}
                               </h4>
                             </div>
 
-                            {/* Footer Line: Machine & Plant + Status Selector */}
-                            <div className="flex items-center justify-between gap-1.5 pt-0.5 border-t border-gray-100 mt-0.5">
+                            {/* Footer Line: Machine & Plant + Status Badge */}
+                            <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-gray-100 mt-0.5">
                               <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium min-w-0 flex-1 truncate">
                                 <span className="shrink-0">🏭</span>
                                 <span className="font-semibold text-gray-700 shrink-0">{item.planta || 'FIRPLAK'}</span>
@@ -4278,97 +4579,21 @@ export default function GestionMantenimientoPage() {
                                 )}
                               </div>
 
-                              <div className="relative inline-flex items-center shrink-0">
-                                <select
-                                  value={item.status}
-                                  onChange={(e) => {
-                                    if (item.type === 'correctivo') {
-                                      handleUpdateCorrectivoStatus(item.data.id, e.target.value as any);
-                                    } else {
-                                      handleUpdateStatus(item.data.id, e.target.value);
-                                    }
-                                  }}
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer shadow-2xs bg-[#F6F3EE] text-[#324354] border-[#e2ded5]"
-                                >
-                                  {item.type === 'correctivo' ? (
-                                    <>
-                                      <option value="Abierta">🔴 Abierta</option>
-                                      <option value="En Proceso">🟡 En Proceso</option>
-                                      <option value="Resuelta">🟢 Resuelta</option>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <option value="Pendiente">⏳ Pendiente</option>
-                                      <option value="Incompleto">⚠️ Incompleto</option>
-                                      <option value="Completado">✅ Completado</option>
-                                    </>
-                                  )}
-                                </select>
+                              <div className="shrink-0 flex items-center gap-1">
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                  item.status === 'Resuelta' || item.status === 'Completado'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : item.status === 'En Proceso'
+                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                    : 'bg-[#F6F3EE] text-[#324354] border-[#e2ded5]'
+                                }`}>
+                                  {item.status === 'Resuelta' || item.status === 'Completado' ? '🟢 ' + item.status :
+                                   item.status === 'En Proceso' ? '🟡 ' + item.status :
+                                   '🔴 ' + item.status}
+                                </span>
+                                <Eye className="w-3 h-3 text-gray-400 group-hover:text-[#324354] transition-colors" />
                               </div>
                             </div>
-
-                            {/* Expanded Execution Area */}
-                            {expandedCards[item.id] && (
-                              <div className="pt-1.5 border-t border-gray-100 flex flex-col gap-1.5 text-[9.5px] animate-in fade-in">
-                                <div className="bg-[#F6F3EE] p-1.5 rounded-lg text-gray-600">
-                                  <strong className="block text-[#324354] mb-0.5">Detalle / Instrucción:</strong>
-                                  <p className="line-clamp-3">{item.type === 'correctivo' ? (item.data as CorrectiveRecord).sintoma : ((item.data as MaintenanceTask).detalle || 'Mantenimiento estándar')}</p>
-                                </div>
-
-                                {item.type === 'preventivo' ? (
-                                  <>
-                                    <div className="grid grid-cols-2 gap-1 text-[9px]">
-                                      <div>
-                                        <label className="font-bold text-gray-500 block mb-0.5">Apertura:</label>
-                                        <input
-                                          type="datetime-local"
-                                          value={(item.data as MaintenanceTask).fechaApertura || ''}
-                                          onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, (item.data as MaintenanceTask).observations || '', e.target.value, (item.data as MaintenanceTask).fechaCierre || null)}
-                                          className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9px]"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="font-bold text-gray-500 block mb-0.5">Cierre:</label>
-                                        <input
-                                          type="datetime-local"
-                                          value={(item.data as MaintenanceTask).fechaCierre || ''}
-                                          onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, (item.data as MaintenanceTask).observations || '', (item.data as MaintenanceTask).fechaApertura || null, e.target.value)}
-                                          className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9px]"
-                                        />
-                                      </div>
-                                    </div>
-                                    <textarea
-                                      value={(item.data as MaintenanceTask).observations || ''}
-                                      onChange={(e) => handleUpdateDetails((item.data as MaintenanceTask).id, e.target.value, (item.data as MaintenanceTask).fechaApertura || null, (item.data as MaintenanceTask).fechaCierre || null)}
-                                      placeholder="Observaciones de ejecución..."
-                                      className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9.5px] min-h-[34px] focus:outline-none"
-                                    />
-                                    {saveFeedback[(item.data as MaintenanceTask).id] && (
-                                      <div className="text-[8.5px] text-emerald-600 font-bold flex items-center gap-1">
-                                        <Check className="w-2.5 h-2.5" />
-                                        <span>Guardado en Supabase</span>
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <textarea
-                                      value={(item.data as CorrectiveRecord).accion_tomada || ''}
-                                      onChange={(e) => handleUpdateCorrectivoAction((item.data as CorrectiveRecord).id, e.target.value)}
-                                      placeholder="Acción correctiva realizada..."
-                                      className="w-full p-1 bg-[#F6F3EE] border border-gray-300 rounded text-[9.5px] min-h-[34px] focus:outline-none"
-                                    />
-                                    {saveFeedback[`corr_${(item.data as CorrectiveRecord).id}`] && (
-                                      <div className="text-[8.5px] text-emerald-600 font-bold flex items-center gap-1">
-                                        <Check className="w-2.5 h-2.5" />
-                                        <span>Guardado en Supabase</span>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
-
                           </div>
                         ))
                       )}
@@ -4395,7 +4620,15 @@ export default function GestionMantenimientoPage() {
                         plannerColumns.completadas.map(item => (
                           <div
                             key={item.id}
-                            className="bg-white/90 rounded-xl p-2 border border-emerald-200/80 shadow-2xs flex flex-col gap-1 group relative opacity-90 hover:opacity-100 transition-opacity"
+                            onClick={() => {
+                              if (item.type === 'correctivo') {
+                                handleOpenCorrectivoDetail(item.data as CorrectiveRecord);
+                              } else {
+                                handleOpenPreventivoExecution(item.data as MaintenanceTask);
+                              }
+                            }}
+                            className="bg-white/90 rounded-xl p-2.5 border border-emerald-200/80 shadow-2xs hover:shadow-md hover:border-emerald-400 flex flex-col gap-1.5 group relative cursor-pointer select-none opacity-90 hover:opacity-100 transition-all"
+                            title="Haz clic para abrir el detalle y revisar o reabrir la orden"
                           >
                             {/* Top Line: Tag Badge, Date/Deadline & Duration */}
                             <div className="flex items-center justify-between gap-1">
@@ -4424,8 +4657,8 @@ export default function GestionMantenimientoPage() {
                               </h4>
                             </div>
 
-                            {/* Footer Line: Machine & Plant + Status Selector */}
-                            <div className="flex items-center justify-between gap-1.5 pt-0.5 border-t border-gray-100 mt-0.5">
+                            {/* Footer Line: Machine & Plant + Status Badge */}
+                            <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-gray-100 mt-0.5">
                               <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium min-w-0 flex-1 truncate">
                                 <span className="shrink-0">🏭</span>
                                 <span className="font-semibold text-gray-700 shrink-0">{item.planta || 'FIRPLAK'}</span>
@@ -4437,35 +4670,13 @@ export default function GestionMantenimientoPage() {
                                 )}
                               </div>
 
-                              <div className="relative inline-flex items-center shrink-0">
-                                <select
-                                  value={item.status}
-                                  onChange={(e) => {
-                                    if (item.type === 'correctivo') {
-                                      handleUpdateCorrectivoStatus(item.data.id, e.target.value as any);
-                                    } else {
-                                      handleUpdateStatus(item.data.id, e.target.value);
-                                    }
-                                  }}
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all cursor-pointer shadow-2xs bg-emerald-50 text-emerald-800 border-emerald-300"
-                                >
-                                  {item.type === 'correctivo' ? (
-                                    <>
-                                      <option value="Resuelta">🟢 Resuelta</option>
-                                      <option value="En Proceso">🟡 En Proceso</option>
-                                      <option value="Abierta">🔴 Reabrir</option>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <option value="Completado">✅ Completado</option>
-                                      <option value="Pendiente">⏳ Pendiente</option>
-                                      <option value="Incompleto">⚠️ Incompleto</option>
-                                    </>
-                                  )}
-                                </select>
+                              <div className="shrink-0 flex items-center gap-1">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all bg-emerald-50 text-emerald-800 border-emerald-300">
+                                  🟢 {item.status}
+                                </span>
+                                <Eye className="w-3 h-3 text-gray-400 group-hover:text-[#324354] transition-colors" />
                               </div>
                             </div>
-
                           </div>
                         ))
                       )}
@@ -4962,32 +5173,6 @@ export default function GestionMantenimientoPage() {
         {activeTab === 'correctivo' && (
           <div className="flex flex-col gap-6 animate-in fade-in duration-300">
             
-            {/* Quick Metrics Bar for Correctivo */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-[#324354]">{correctiveRecords.length}</div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">Total Correctivos Reportados</div>
-              </div>
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-rose-600">
-                  {correctiveRecords.filter(c => c.prioridad === 'Alta').length}
-                </div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">Prioridad Alta / Críticos 🚨</div>
-              </div>
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-amber-600">
-                  {correctiveRecords.filter(c => c.estado === 'Abierta' || c.estado === 'En Proceso').length}
-                </div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">En Atención / Pendientes ⏳</div>
-              </div>
-              <div className="bg-white rounded-2xl p-4 border border-[#e2ded5] shadow-xs">
-                <div className="text-2xl font-bold text-emerald-600">
-                  {correctiveRecords.filter(c => c.estado === 'Resuelta').length}
-                </div>
-                <div className="text-xs text-gray-500 font-semibold uppercase">Resueltos / Cerrados ✅</div>
-              </div>
-            </div>
-
             {/* Filter Bar for Correctivo */}
             <div className="bg-white rounded-3xl p-5 border border-[#e2ded5] shadow-xs flex flex-col gap-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -4997,14 +5182,6 @@ export default function GestionMantenimientoPage() {
                 </h3>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => fetchCorrectivoRecords()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#e2ded5] text-[#324354] font-bold rounded-xl text-xs hover:bg-gray-100 transition-all shadow-xs cursor-pointer"
-                    title="Actualizar listado de correctivos"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-[#7B8E90]" />
-                    <span>Actualizar</span>
-                  </button>
                   <button
                     onClick={() => setShowCorrectivoModal(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#324354] text-white font-bold rounded-xl text-xs hover:bg-[#324354]/90 transition-all shadow-xs cursor-pointer"
@@ -5072,38 +5249,24 @@ export default function GestionMantenimientoPage() {
               </div>
             </div>
 
-            {/* Correctivo Table */}
-            <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-xs overflow-hidden">
-              <div className="w-full overflow-x-hidden max-h-[650px] overflow-y-auto">
-                <table className="w-full table-fixed text-left text-[11px] border-collapse">
-                  <colgroup>
-                    <col className="w-[5%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[20%]" />
-                    <col className="w-[6%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[5%]" />
-                  </colgroup>
+            {/* Correctivo Table - Fully Responsive & Multi-Line Text Wrapping */}
+            <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-xs overflow-hidden w-full">
+              <div className="w-full overflow-x-auto max-h-[calc(100vh-230px)] overflow-y-auto scrollbar-thin">
+                <table className="w-full text-left text-xs border-collapse min-w-[1240px] table-auto">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
-                      <th className="py-2.5 px-1 font-bold text-center">Foto</th>
-                      <th className="py-2.5 px-1.5 font-bold truncate">Código</th>
-                      <th className="py-2.5 px-1.5 font-bold truncate">Máquinas / Equipos</th>
-                      <th className="py-2.5 px-1 font-bold text-center">Planta</th>
-                      <th className="py-2.5 px-1 font-bold text-center">Origen</th>
-                      <th className="py-2.5 px-2 font-bold truncate">Síntoma / Falla</th>
-                      <th className="py-2.5 px-0.5 font-bold text-center">Prioridad</th>
-                      <th className="py-2.5 px-1 font-bold text-center">Plazo</th>
-                      <th className="py-2.5 px-1.5 font-bold truncate">Técnico Asignado</th>
-                      <th className="py-2.5 px-1 font-bold text-center">Estado</th>
-                      <th className="py-2.5 px-1.5 font-bold truncate">Acción Correctiva</th>
-                      <th className="py-2.5 px-1 font-bold text-center">Detalle</th>
+                      <th className="py-3 px-2 font-bold text-center w-[54px] min-w-[54px]">Foto</th>
+                      <th className="py-3 px-2 font-bold text-center w-[110px] min-w-[100px]">Código</th>
+                      <th className="py-3 px-3 font-bold w-[180px] min-w-[150px]">Máquinas / Equipos</th>
+                      <th className="py-3 px-2 font-bold text-center w-[75px] min-w-[65px]">Planta</th>
+                      <th className="py-3 px-2 font-bold text-center w-[85px] min-w-[75px]">Origen</th>
+                      <th className="py-3 px-3 font-bold min-w-[220px] max-w-[320px]">Síntoma / Falla</th>
+                      <th className="py-3 px-2 font-bold text-center w-[75px] min-w-[70px]">Prioridad</th>
+                      <th className="py-3 px-2 font-bold text-center w-[110px] min-w-[100px]">Plazo</th>
+                      <th className="py-3 px-3 font-bold min-w-[170px] max-w-[240px]">Técnico Asignado</th>
+                      <th className="py-3 px-2 font-bold text-center w-[110px] min-w-[100px]">Estado</th>
+                      <th className="py-3 px-3 font-bold min-w-[150px] max-w-[240px]">Acción Correctiva</th>
+                      <th className="py-3 px-2 font-bold text-center w-[70px] min-w-[60px]">Detalle</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -5119,12 +5282,13 @@ export default function GestionMantenimientoPage() {
 
                         return (
                           <tr 
-                            key={item.id} 
+                            key={item.codigo || `corr_${item.id}`} 
                             onClick={() => handleOpenCorrectivoDetail(item)}
-                            className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                            className="hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                            title="Haz clic para ver o editar el detalle del correctivo"
                           >
                             {/* Evidencia Foto */}
-                            <td className="py-2 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
                               {item.fotos && item.fotos.length > 0 ? (
                                 <div className="relative inline-block group">
                                   <img
@@ -5152,12 +5316,14 @@ export default function GestionMantenimientoPage() {
                                 </div>
                               ) : (
                                 <div className="w-9 h-9 mx-auto rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
-                                  <Camera className="w-3.5 h-3.5" />
+                                  <Camera className="w-4 h-4" />
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-2 font-bold text-[#324354]">
-                              <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] border block truncate max-w-[100px] ${
+
+                            {/* Código */}
+                            <td className="py-2.5 px-2 font-bold text-[#324354] text-center">
+                              <span className={`px-2 py-1 rounded-lg font-mono text-[10.5px] border block whitespace-normal break-words leading-tight shadow-2xs ${
                                 isTpm 
                                   ? 'bg-purple-50 text-purple-800 border-purple-200' 
                                   : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -5165,76 +5331,90 @@ export default function GestionMantenimientoPage() {
                                 {item.codigo}
                               </span>
                             </td>
-                            <td className="py-2 px-2 font-bold text-[#324354]">
-                              <span className="truncate block max-w-[160px]" title={item.maquina}>{item.maquina}</span>
+
+                            {/* Máquinas / Equipos */}
+                            <td className="py-2.5 px-3 font-bold text-[#324354]">
+                              <div className="whitespace-normal break-words leading-snug text-[11.5px]" title={item.maquina}>
+                                {item.maquina}
+                              </div>
                             </td>
-                            <td className="py-2 px-1.5 text-center text-gray-600 font-semibold whitespace-nowrap">
-                              <span className="px-1.5 py-0.5 bg-[#F6F3EE] rounded border border-[#e2ded5] text-[10px] font-bold text-[#324354]">
+
+                            {/* Planta */}
+                            <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                              <span className="px-2 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-[10.5px] font-bold text-[#324354] inline-block shadow-2xs">
                                 {obtenerCodigoPlanta(item.planta, plantasNomenclatura)}
                               </span>
                             </td>
                             
                             {/* Origen / Categoría Badge */}
-                            <td className="py-2 px-1.5 whitespace-nowrap">
+                            <td className="py-2.5 px-2 text-center whitespace-nowrap">
                               {isTpm ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
                                   <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
                                   TPM
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                   Directo
                                 </span>
                               )}
                             </td>
 
-                            <td className="py-2 px-2.5 text-[#324354] font-medium">
-                              <div className="line-clamp-2 leading-tight" title={item.sintoma}>{item.sintoma}</div>
-                              <div className="text-[9px] text-gray-400 mt-0.5">{item.fecha_reporte}</div>
+                            {/* Síntoma / Falla */}
+                            <td className="py-2.5 px-3 text-[#324354]">
+                              <div className="whitespace-normal break-words font-medium leading-snug text-[11px]" title={item.sintoma}>
+                                {item.sintoma}
+                              </div>
+                              <div className="text-[9.5px] text-gray-400 mt-1 font-medium flex items-center gap-1">
+                                <span>📅</span>
+                                <span>{item.fecha_reporte}</span>
+                              </div>
                             </td>
-                            <td className="py-2 px-1 text-center font-bold whitespace-nowrap">
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] ${
-                                item.prioridad === 'Alta' ? 'bg-rose-100 text-rose-700' :
-                                item.prioridad === 'Media' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-700'
+
+                            {/* Prioridad */}
+                            <td className="py-2.5 px-2 text-center font-bold whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded text-[10px] inline-block shadow-2xs ${
+                                item.prioridad === 'Alta' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                                item.prioridad === 'Media' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
                               }`}>
                                 {item.prioridad}
                               </span>
                             </td>
 
                             {/* Plazo / Fecha de Cierre */}
-                            <td className="py-2 px-1.5 text-center whitespace-nowrap">
+                            <td className="py-2.5 px-2 text-center whitespace-nowrap">
                               {item.fecha_limite ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] shadow-2xs">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] shadow-2xs">
                                   <Calendar className="w-3 h-3 text-[#7B8E90] shrink-0" />
                                   <span>{item.fecha_limite.slice(0, 10)}</span>
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] text-gray-400 italic bg-gray-50 border border-gray-200 shadow-2xs">
-                                  <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
-                                  Sin asignar
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-gray-400 italic bg-gray-50 border border-gray-200 shadow-2xs">
+                                  <Clock className="w-3 h-3 text-gray-400 shrink-0" />
+                                  Sin plazo
                                 </span>
                               )}
                             </td>
 
-                            {/* Técnico Asignado (Badge) */}
-                            <td className="py-2 px-2 font-semibold text-[#324354]">
+                            {/* Técnico Asignado (Multi-Line Badge) */}
+                            <td className="py-2.5 px-3 font-semibold text-[#324354]">
                               {item.tecnico_asignado && item.tecnico_asignado !== 'Sin asignar' && item.tecnico_asignado !== 'Por asignar' ? (
-                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-bold bg-blue-50 text-[#324354] border border-blue-200 shadow-2xs max-w-[160px] truncate" title={item.tecnico_asignado}>
-                                  <User className="w-3 h-3 text-blue-600 shrink-0" />
-                                  <span className="truncate">{item.tecnico_asignado}</span>
+                                <div className="flex items-start gap-1.5 p-1.5 rounded-xl text-[10.5px] font-bold bg-blue-50 text-[#324354] border border-blue-200 shadow-2xs leading-tight" title={item.tecnico_asignado}>
+                                  <User className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                  <span className="whitespace-normal break-words font-semibold">{item.tecnico_asignado}</span>
                                 </div>
                               ) : (
-                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-medium bg-amber-50 text-amber-900 border border-amber-200 italic shadow-2xs">
-                                  <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-semibold bg-amber-50 text-amber-900 border border-amber-200 italic shadow-2xs">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                   <span>Sin asignar</span>
                                 </div>
                               )}
                             </td>
 
                             {/* Estado (Badge) */}
-                            <td className="py-2 px-1.5 text-center font-bold whitespace-nowrap">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-bold border shadow-2xs ${
+                            <td className="py-2.5 px-2 text-center font-bold whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold border shadow-2xs ${
                                 item.estado === 'Resuelta' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
                                 item.estado === 'En Proceso' ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-rose-50 text-rose-800 border-rose-300'
                               }`}>
@@ -5247,28 +5427,28 @@ export default function GestionMantenimientoPage() {
                             </td>
 
                             {/* Acción Correctiva */}
-                            <td className="py-2 px-2 text-gray-700">
+                            <td className="py-2.5 px-3 text-gray-700">
                               {item.accion_tomada ? (
-                                <div className="bg-slate-50 p-1.5 rounded-lg border border-gray-200 text-[10px] max-h-16 overflow-y-auto line-clamp-2" title={item.accion_tomada}>
+                                <div className="bg-slate-50 p-2 rounded-xl border border-gray-200 text-[10.5px] whitespace-normal break-words leading-snug max-h-24 overflow-y-auto" title={item.accion_tomada}>
                                   {item.accion_tomada}
                                 </div>
                               ) : (
-                                <span className="text-gray-400 italic text-[10px]">Sin registrar</span>
+                                <span className="text-gray-400 italic text-[10.5px]">Sin registrar</span>
                               )}
                             </td>
 
                             {/* Botón Ver Detalle */}
-                            <td className="py-2 px-1 text-center">
+                            <td className="py-2.5 px-2 text-center">
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleOpenCorrectivoDetail(item);
                                 }}
-                                className="px-2 py-1 bg-[#324354] text-white hover:bg-[#324354]/90 rounded-lg text-[10px] font-bold transition-all shadow-2xs flex items-center gap-0.5 mx-auto cursor-pointer group-hover:scale-105"
+                                className="px-2.5 py-1.5 bg-[#324354] text-white hover:bg-[#324354]/90 rounded-xl text-[10.5px] font-bold transition-all shadow-2xs flex items-center gap-1 mx-auto cursor-pointer hover:scale-105"
                                 title="Abrir ficha y gestionar correctivo"
                               >
-                                <ExternalLink className="w-2.5 h-2.5" />
+                                <ExternalLink className="w-3 h-3" />
                                 <span>Ver</span>
                               </button>
                             </td>
@@ -5283,18 +5463,6 @@ export default function GestionMantenimientoPage() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* VIEW: TARJETAS DE ANOMALÍAS (TPM) */}
-        {/* ========================================================================= */}
-        {activeTab === 'tarjetas' && (
-          <TarjetasTpmTab
-            userEmail={userEmail}
-            onCardCreated={() => {
-              fetchCorrectivoRecords();
-            }}
-            onNavigateToCorrectivo={() => setActiveTab('correctivo')}
-          />
-        )}
 
         {/* ========================================================================= */}
         {/* VIEW 5: HISTORIAL DE EJECUCIONES */}
@@ -8215,21 +8383,25 @@ export default function GestionMantenimientoPage() {
                     </div>
                   </div>
 
-                  {/* Prioridad */}
+                  {/* Prioridad / Criticidad (Solo Lectura - No editable) */}
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-[#324354]" />
-                      <span>Nivel de Prioridad</span>
+                    <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-[#324354]" />
+                        <span>Nivel de Prioridad / Criticidad</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">Fijada en reporte</span>
                     </label>
-                    <select
-                      value={editingCorrectivoForm.prioridad}
-                      onChange={(e) => setEditingCorrectivoForm(prev => prev ? ({ ...prev, prioridad: e.target.value as any }) : null)}
-                      className="w-full px-3 py-2.5 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs sm:text-sm font-semibold text-[#324354] focus:outline-none focus:border-[#324354] cursor-pointer"
-                    >
-                      <option value="Alta">🚨 Alta (Crítica)</option>
-                      <option value="Media">⚠️ Media</option>
-                      <option value="Baja">ℹ️ Baja</option>
-                    </select>
+                    <div className={`w-full px-3 py-2.5 rounded-xl border text-xs sm:text-sm font-bold flex items-center justify-between select-none ${
+                      editingCorrectivoForm.prioridad === 'Alta' ? 'bg-rose-50 text-rose-800 border-rose-200' :
+                      editingCorrectivoForm.prioridad === 'Media' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                      'bg-blue-50 text-blue-800 border-blue-200'
+                    }`}>
+                      <span className="flex items-center gap-1.5">
+                        <span>{editingCorrectivoForm.prioridad === 'Alta' ? '🚨 Alta (Crítica)' : editingCorrectivoForm.prioridad === 'Media' ? '⚠️ Media' : 'ℹ️ Baja'}</span>
+                      </span>
+                      <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" title="La criticidad no puede ser modificada" />
+                    </div>
                   </div>
                 </div>
 
@@ -8246,6 +8418,111 @@ export default function GestionMantenimientoPage() {
                     placeholder="Describe los repuestos usados, reparaciones efectuadas, causas raíz identificadas o pruebas realizadas..."
                     className="w-full p-3 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs sm:text-sm text-[#324354] focus:outline-none focus:border-[#324354] resize-y"
                   />
+                </div>
+
+                {/* Evidencia Fotográfica de la Solución / Cierre por el Técnico */}
+                <div className="mt-3 bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <span className="text-xs font-black text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-[#324354]" />
+                        <span>Evidencia de la Solución (Fotos del Técnico)</span>
+                      </span>
+                      <p className="text-[10.5px] text-gray-500">
+                        Toma foto o adjunta imagen y usa el lápiz rojo para señalar/rayar la solución aplicada.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Hidden inputs for camera and upload */}
+                      <input
+                        ref={solutionCameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleSolutionFileForAnnotation}
+                      />
+                      <input
+                        ref={solutionFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleSolutionFileForAnnotation}
+                      />
+
+                      <button
+                        type="button"
+                        disabled={(editingCorrectivoForm.fotos_solucion || []).length >= 3}
+                        onClick={() => solutionCameraInputRef.current?.click()}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-[#324354] text-white rounded-xl text-xs font-bold hover:bg-[#324354]/90 transition-all cursor-pointer shadow-xs disabled:opacity-40"
+                        title="Tomar foto con la cámara y abrir editor para rayar"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Tomar Foto</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={(editingCorrectivoForm.fotos_solucion || []).length >= 3}
+                        onClick={() => solutionFileInputRef.current?.click()}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-white text-[#324354] border border-[#e2ded5] rounded-xl text-xs font-bold hover:bg-gray-50 transition-all cursor-pointer shadow-xs disabled:opacity-40"
+                        title="Subir archivo o foto desde tu dispositivo"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Subir Imagen</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Photos List Preview with Rayar/Marcar Editor Button */}
+                  {editingCorrectivoForm.fotos_solucion && editingCorrectivoForm.fotos_solucion.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+                      {editingCorrectivoForm.fotos_solucion.map((foto, idx) => (
+                        <div key={idx} className="relative group bg-white p-1 rounded-xl border-2 border-emerald-500/40 shadow-xs flex flex-col items-center">
+                          <img
+                            src={foto}
+                            alt={`Solución ${idx + 1}`}
+                            onClick={() => setPreviewImage(foto)}
+                            className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            title="Clic para ver en grande"
+                          />
+                          <div className="absolute top-2 right-2 flex items-center gap-1">
+                            {/* Button to open red annotation editor */}
+                            <button
+                              type="button"
+                              onClick={() => setAnnotatingSolutionImage({ src: foto, index: idx })}
+                              className="p-1 bg-red-600 hover:bg-red-700 text-white rounded-md shadow-md transition-transform hover:scale-110 cursor-pointer"
+                              title="Rayar / Marcar con lápiz rojo"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
+                            {/* Button to delete photo */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCorrectivoForm(prev => prev ? ({
+                                  ...prev,
+                                  fotos_solucion: prev.fotos_solucion.filter((_, i) => i !== idx)
+                                }) : null);
+                              }}
+                              className="p-1 bg-black/70 hover:bg-black text-white rounded-md shadow-md transition-transform hover:scale-110 cursor-pointer"
+                              title="Eliminar foto"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <span className="text-[9.5px] font-bold text-emerald-800 mt-1">
+                            ✓ Solución #{idx + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-white/70 rounded-xl border border-dashed border-gray-300 text-center text-xs text-gray-400 font-medium">
+                      Sin fotos de solución adjuntas aún. Puedes tomar foto o subir una imagen de la reparación.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -8284,6 +8561,234 @@ export default function GestionMantenimientoPage() {
                     <>
                       <Check className="w-4 h-4" />
                       <span>Guardar Cambios</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Annotation Editor Modal for Solution Photos */}
+      {annotatingSolutionImage && (
+        <PhotoAnnotationEditor
+          imageSrc={annotatingSolutionImage.src}
+          onSave={handleSaveAnnotatedSolutionPhoto}
+          onCancel={() => setAnnotatingSolutionImage(null)}
+        />
+      )}
+
+      {/* Modal: Ejecución y Cierre de Mantenimiento Preventivo (PMP) */}
+      {executingPreventivo && executingPreventivoForm && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-20 pb-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !savingPreventivoModal) {
+              setExecutingPreventivo(null);
+              setExecutingPreventivoForm(null);
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[88vh] overflow-y-auto flex flex-col gap-5 relative my-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4">
+              <div className="flex flex-col gap-1 pr-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200">
+                    #{executingPreventivo.code || executingPreventivo.csvId}
+                  </span>
+                  <span className="px-2.5 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                    <span className="font-bold text-[#324354]">{obtenerCodigoPlanta(executingPreventivo.planta)}</span>
+                    <span className="text-gray-400">·</span>
+                    <span>{executingPreventivo.planta}</span>
+                  </span>
+                  <span className="px-2.5 py-1 bg-sky-50 border border-sky-200 text-sky-800 rounded-lg text-xs font-bold flex items-center gap-1">
+                    <Wrench className="w-3.5 h-3.5" />
+                    <span>Mantenimiento Preventivo</span>
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-[#324354] leading-snug mt-1">
+                  {executingPreventivo.title}
+                </h3>
+                {executingPreventivo.maquina && (
+                  <p className="text-xs text-gray-500 font-semibold flex items-center gap-1 mt-0.5">
+                    <span>🏭 Equipo:</span>
+                    <span className="text-[#324354]">{executingPreventivo.maquina}</span>
+                    {executingPreventivo.durationMinutes && (
+                      <span className="text-gray-400">· ⏱️ {executingPreventivo.durationMinutes} min ({executingPreventivo.durationHours.toFixed(1)}h)</span>
+                    )}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setExecutingPreventivo(null);
+                  setExecutingPreventivoForm(null);
+                }}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer shrink-0"
+                title="Cerrar ventana"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Technical Instructions */}
+            <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2">
+              <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-[#7B8E90]" />
+                <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
+              </h4>
+              <div className="text-xs sm:text-sm text-gray-800 bg-white p-3.5 rounded-xl border border-gray-200/80 leading-relaxed font-normal shadow-2xs">
+                {executingPreventivo.detalle || 'Realizar inspección preventiva, limpieza, lubricación y comprobación de parámetros operativos de acuerdo con el estándar de la máquina.'}
+              </div>
+            </div>
+
+            {/* Execution Form */}
+            <form onSubmit={handleSavePreventivoExecution} className="flex flex-col gap-4">
+              <div className="border-t border-[#e2ded5] pt-4">
+                <h4 className="text-xs font-black text-[#324354] uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Reporte de Ejecución y Cierre</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Estado */}
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#324354]" />
+                      <span>Estado del Mantenimiento</span>
+                    </label>
+                    <select
+                      value={executingPreventivoForm.status}
+                      onChange={(e) => {
+                        const newSt = e.target.value as any;
+                        setExecutingPreventivoForm(prev => prev ? ({
+                          ...prev,
+                          status: newSt,
+                          fechaCierre: newSt === 'Completado' ? (prev.fechaCierre || getLocalDatetimeString().slice(0, 16)) : prev.fechaCierre
+                        }) : null);
+                      }}
+                      className={`w-full px-3 py-2.5 rounded-xl border text-xs sm:text-sm font-bold focus:outline-none transition-all cursor-pointer ${
+                        executingPreventivoForm.status === 'Completado' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
+                        executingPreventivoForm.status === 'Incompleto' ? 'bg-amber-50 text-amber-800 border-amber-300' :
+                        'bg-slate-100 text-slate-800 border-slate-300'
+                      }`}
+                    >
+                      <option value="Pendiente">⏳ Pendiente</option>
+                      <option value="Incompleto">⚠️ Incompleto / En Espera</option>
+                      <option value="Completado">✅ Completado (Cerrar)</option>
+                    </select>
+                  </div>
+
+                  {/* Quick Close Button */}
+                  <div className="flex flex-col justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExecutingPreventivoForm(prev => prev ? ({
+                          ...prev,
+                          status: 'Completado',
+                          fechaCierre: getLocalDatetimeString().slice(0, 16)
+                        }) : null);
+                      }}
+                      className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs border ${
+                        executingPreventivoForm.status === 'Completado'
+                          ? 'bg-emerald-700 text-white border-emerald-800'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{executingPreventivoForm.status === 'Completado' ? '✓ Listo para Cerrar' : 'Marcar como Completado'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Timestamps */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#324354]" />
+                      <span>Fecha / Hora de Apertura</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={executingPreventivoForm.fechaApertura}
+                      onChange={(e) => setExecutingPreventivoForm(prev => prev ? ({ ...prev, fechaApertura: e.target.value }) : null)}
+                      className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs sm:text-sm font-semibold text-[#324354] focus:outline-none focus:border-[#324354]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Fecha / Hora de Cierre</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={executingPreventivoForm.fechaCierre}
+                      onChange={(e) => setExecutingPreventivoForm(prev => prev ? ({ ...prev, fechaCierre: e.target.value }) : null)}
+                      className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs sm:text-sm font-semibold text-[#324354] focus:outline-none focus:border-[#324354]"
+                    />
+                  </div>
+                </div>
+
+                {/* Observaciones de Ejecución */}
+                <div className="mt-3">
+                  <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#324354]" />
+                    <span>Observaciones de Ejecución / Diagnóstico Técnico</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={executingPreventivoForm.observations}
+                    onChange={(e) => setExecutingPreventivoForm(prev => prev ? ({ ...prev, observations: e.target.value }) : null)}
+                    placeholder="Detalla las actividades realizadas, ajustes, lubricantes o repuestos aplicados..."
+                    className="w-full p-3 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs sm:text-sm text-[#324354] focus:outline-none focus:border-[#324354] resize-y"
+                  />
+                </div>
+              </div>
+
+              {/* Feedback Message */}
+              {preventivoModalFeedback && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{preventivoModalFeedback}</span>
+                </div>
+              )}
+
+              {/* Actions Footer */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#e2ded5]">
+                <button
+                  type="button"
+                  disabled={savingPreventivoModal}
+                  onClick={() => {
+                    setExecutingPreventivo(null);
+                    setExecutingPreventivoForm(null);
+                  }}
+                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPreventivoModal}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-md disabled:opacity-50"
+                >
+                  {savingPreventivoModal ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Guardar y Cerrar</span>
                     </>
                   )}
                 </button>
