@@ -1474,7 +1474,7 @@ export default function TarjetasAnomaliasPage() {
                       </div>
                     )}
 
-                    {/* Hidden input para adjuntar archivos directamente en cualquier momento */}
+                    {/* Selector de archivos 100% oculto de la pantalla (no ocupa espacio ni intercepta clics) */}
                     <input
                       id="tpm-direct-file-input"
                       ref={fileInputRef}
@@ -1482,7 +1482,9 @@ export default function TarjetasAnomaliasPage() {
                       accept="image/*,.png,.jpg,.jpeg,.webp"
                       multiple
                       onChange={handleDirectFileAttach}
-                      className="hidden"
+                      style={{ display: 'none' }}
+                      tabIndex={-1}
+                      aria-hidden="true"
                     />
 
                     {/* Vista previa de miniaturas adjuntas */}

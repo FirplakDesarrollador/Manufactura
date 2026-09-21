@@ -35,6 +35,7 @@
   height: 50vh;
   background: radial-gradient(circle, rgba(26,68,91,0.04) 0%, rgba(250,250,250,0) 70%);
   z-index: 0;
+  pointer-events: none;
 }
 
 .mtto-app::after {
@@ -46,6 +47,7 @@
   height: 60vh;
   background: radial-gradient(circle, rgba(47,108,138,0.03) 0%, rgba(250,250,250,0) 70%);
   z-index: 0;
+  pointer-events: none;
 }
 
 .login-container {
