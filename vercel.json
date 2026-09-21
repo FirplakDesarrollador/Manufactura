@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/sap/inventory/save",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/sap/liberacion-muebles",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

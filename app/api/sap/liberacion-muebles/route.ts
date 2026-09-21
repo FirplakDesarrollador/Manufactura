@@ -33,11 +33,12 @@ export async function GET() {
             cache: 'no-store'
         });
 
-        let rawRows: any[] = [];
-        if (response.ok) {
-            const json = await response.json();
-            rawRows = json.value || [];
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Error al consultar SAP Service Layer (${response.status}): ${errText.slice(0, 200)}`);
         }
+        const json = await response.json();
+        rawRows = json.value || [];
 
         // Agrupar filas devueltas por orden de fabricación
         const orderMap = new Map<string, any>();
