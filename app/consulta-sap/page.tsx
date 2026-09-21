@@ -685,6 +685,28 @@ export default function ConsultaSAPPage() {
         return semaforoSortDir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
     });
 
+    // Helper seguro para consultar la API de Semáforo evitando errores de parsing HTML
+    const fetchSemaforoApi = async () => {
+        const res = await fetch('/api/sap/semaforo');
+        const contentType = res.headers.get('content-type') || '';
+        if (!res.ok || !contentType.includes('application/json')) {
+            const text = await res.text();
+            let errorMsg = `Error HTTP ${res.status}`;
+            try {
+                const json = JSON.parse(text);
+                errorMsg = json.details || json.error || errorMsg;
+            } catch {
+                if (text.startsWith('<')) {
+                    errorMsg = `El servidor respondió con HTML (${res.status}). Verifique la conexión a Cloudflare.`;
+                } else if (text) {
+                    errorMsg = text.slice(0, 150);
+                }
+            }
+            throw new Error(errorMsg);
+        }
+        return await res.json();
+    };
+
     // Exportar Query FPK - Semaforo - DJP a Excel con TODAS las 39 columnas
     const handleExportExcel = async () => {
         try {
@@ -692,15 +714,14 @@ export default function ConsultaSAPPage() {
             if (dataToExport.length === 0) {
                 const toastId = toast.loading("Consultando datos del Semáforo para generar Excel...");
                 try {
-                    const res = await fetch('/api/sap/semaforo');
-                    const result = await res.json();
+                    const result = await fetchSemaforoApi();
                     if (result.success && result.data) {
                         dataToExport = result.data;
                         setSemaforoDataList(result.data);
                         setSemaforoHasLoaded(true);
                         toast.dismiss(toastId);
                     } else {
-                        toast.error(`Error al consultar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
+                        toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
                         return;
                     }
                 } catch (err: any) {
@@ -770,15 +791,14 @@ export default function ConsultaSAPPage() {
             if (dataToExport.length === 0) {
                 const toastId = toast.loading("Consultando datos del Semáforo para generar Prioridades...");
                 try {
-                    const res = await fetch('/api/sap/semaforo');
-                    const result = await res.json();
+                    const result = await fetchSemaforoApi();
                     if (result.success && result.data) {
                         dataToExport = result.data;
                         setSemaforoDataList(result.data);
                         setSemaforoHasLoaded(true);
                         toast.dismiss(toastId);
                     } else {
-                        toast.error(`Error al consultar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
+                        toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
                         return;
                     }
                 } catch (err: any) {
@@ -802,15 +822,14 @@ export default function ConsultaSAPPage() {
         setIsExecuting(true);
         const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP'...");
         try {
-            const res = await fetch('/api/sap/semaforo');
-            const result = await res.json();
+            const result = await fetchSemaforoApi();
             if (result.success && result.data) {
                 setSemaforoDataList(result.data);
                 setSemaforoDataSource(result.source || 'Desconocido');
                 setSemaforoHasLoaded(true);
                 toast.success(`Semáforo actualizado correctamente (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
             } else {
-                toast.error(`Error al actualizar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
+                toast.error(`Error al actualizar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
             }
         } catch (err: any) {
             toast.error(`Error al actualizar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
@@ -830,15 +849,14 @@ export default function ConsultaSAPPage() {
         if (dataToCopy.length === 0) {
             const toastId = toast.loading("Consultando datos del Semáforo para copiar...");
             try {
-                const res = await fetch('/api/sap/semaforo');
-                const result = await res.json();
+                const result = await fetchSemaforoApi();
                 if (result.success && result.data) {
                     dataToCopy = result.data;
                     setSemaforoDataList(dataToCopy);
                     setSemaforoHasLoaded(true);
                     toast.dismiss(toastId);
                 } else {
-                    toast.error(`Error al consultar Semáforo: ${result.error || 'respuesta inválida'}`, { id: toastId });
+                    toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
                     return;
                 }
             } catch (err: any) {

@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import https from 'https';
 import { supabase } from '@/lib/supabase';
 
+export async function GET(req: Request) {
+  return POST(req);
+}
+
 export async function POST(req: Request) {
   try {
     // 1. Fetch live furniture data

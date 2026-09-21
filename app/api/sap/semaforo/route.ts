@@ -9,7 +9,7 @@ export async function GET() {
     try {
         console.log("Iniciando solicitud a la nueva API Python (Cloudflare) para semaforo...");
         
-        const apiUrl = "https://bibliographic-transmitted-eleven-tale.trycloudflare.com/semaforo/";
+        const apiUrl = "https://bookstore-workplace-roster-window.trycloudflare.com/semaforo";
         
         const listRes = await fetch(apiUrl, {
             headers: {
@@ -89,7 +89,7 @@ export async function GET() {
     } catch (error: any) {
         console.error("Error en API semáforo (Python API):", error);
         return NextResponse.json(
-            { success: false, error: 'Failed to fetch from Python API', details: error.message },
+            { success: false, error: error.message || 'Failed to fetch from Python API', details: error.message },
             { status: 500 }
         );
     }

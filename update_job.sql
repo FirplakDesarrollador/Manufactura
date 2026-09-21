@@ -4,17 +4,14 @@ GO
 DECLARE @JobName NVARCHAR(100) = 'FIRPLAK - Semaforo SAP Sync';
 DECLARE @JobId BINARY(16);
 
--- 1. Obtener el ID del Job
 SELECT @JobId = job_id FROM msdb.dbo.sysjobs WHERE name = @JobName;
 
 IF @JobId IS NOT NULL
 BEGIN
-    -- 2. Eliminar el paso 2 de PowerShell que hacía el Webhook
     EXEC msdb.dbo.sp_delete_jobstep 
         @job_id = @JobId, 
         @step_id = 2;
 
-    -- 3. Crear el nuevo paso 2 que inserta los datos en el UDT de SAP
     EXEC msdb.dbo.sp_add_jobstep 
         @job_id = @JobId, 
         @step_name = N'Paso 2: Insertar en SAP UDT @F_SEMAFORO', 
@@ -27,7 +24,28 @@ BEGIN
 -- 1. Vaciar la tabla UDT
 DELETE FROM [Firplak_SA].[dbo].[@F_SEMAFORO];
 
--- 2. Insertar los datos del SP directamente en el UDT
+-- 2. Crear tabla temporal para capturar el resultado exacto del SP
+CREATE TABLE #TEMP_SEMAFORO (
+    Originnum NVARCHAR(50), [Nro OP] NVARCHAR(50), SKU NVARCHAR(100), [Descripción Artículo] NVARCHAR(200),
+    Planta NVARCHAR(100), Familia NVARCHAR(50), [Tipo Orden] NVARCHAR(50),
+    [Cant. Pendiente] NUMERIC(19,6), [Cant. Pend. Item] NUMERIC(19,6), [Cantidad total] NUMERIC(19,6),
+    [Disponible PT01] NUMERIC(19,6), [Fecha Creación OP] DATE, Estado NVARCHAR(50),
+    [Fecha Recomendada Liberación] DATE, [Fecha Real Liberación] DATE, [Consumo Para Liberar] NUMERIC(19,6),
+    [Color Liberación Txt] NVARCHAR(20), [Color Liberación] NUMERIC(19,6), [Cumplimiento Liberación] NVARCHAR(50),
+    [Fecha Entrega Lote] DATE, [Fecha Recomendada de Entrega] DATE, [Fecha Cierre OP] DATE,
+    [Fecha Ideal Entrega Producción] DATE, [Consumo Amortiguador Planta] NUMERIC(19,6),
+    [Color Producción Txt] NVARCHAR(20), [Color Producción] NUMERIC(19,6), [Cumplimiento Planta] NVARCHAR(50),
+    [Dias Retrazo Firplak] NUMERIC(19,6), [Color Firplak Txt] NVARCHAR(20), [Color Firplak] NUMERIC(19,6),
+    [Cumplimiento Firplak] NVARCHAR(50), [Fecha Prometida Entrega Item] DATE, Destino NVARCHAR(50),
+    NumLote NVARCHAR(50), Molde NVARCHAR(100), [Capacidad Molde] NVARCHAR(100),
+    [Fecha Carga Molde] DATE, Amortiguador NUMERIC(19,6), Cliente NVARCHAR(200)
+);
+
+-- 3. Insertar el resultado exacto del SP en la tabla temporal
+INSERT INTO #TEMP_SEMAFORO
+EXEC [Planos_Symphony].[dbo].[SEMAFORO];
+
+-- 4. Insertar de la temporal al UDT de SAP
 INSERT INTO [Firplak_SA].[dbo].[@F_SEMAFORO] (
     Code, Name,
     U_Originnum, U_NroOP, U_SKU, U_DescArticulo, U_Planta, U_Familia, U_TipoOrden,
@@ -43,58 +61,29 @@ INSERT INTO [Firplak_SA].[dbo].[@F_SEMAFORO] (
 SELECT 
     CAST(NEWID() AS NVARCHAR(50)), -- Code
     CAST(NEWID() AS NVARCHAR(50)), -- Name
-    CAST([Originnum] AS NVARCHAR(50)),
-    CAST([Nro OP] AS NVARCHAR(50)),
-    CAST([SKU] AS NVARCHAR(100)),
-    CAST([Descripción Artículo] AS NVARCHAR(200)),
-    CAST([Planta] AS NVARCHAR(100)),
-    CAST([Familia] AS NVARCHAR(50)),
-    CAST([Tipo Orden] AS NVARCHAR(50)),
-    CAST([Cant. Pendiente] AS NUMERIC(19,6)),
-    CAST([Cant. Pend. Item] AS NUMERIC(19,6)),
-    CAST([Cantidad total] AS NUMERIC(19,6)),
-    CAST([Disponible PT01] AS NUMERIC(19,6)),
-    CAST([Fecha Creación OP] AS DATE),
-    CAST([Estado] AS NVARCHAR(50)),
-    CAST([Fecha Recomendada Liberación] AS DATE),
-    CAST([Fecha Real Liberación] AS DATE),
-    CAST([Consumo Para Liberar] AS NUMERIC(19,6)),
-    CAST([Color Liberación Txt] AS NVARCHAR(20)),
-    CAST([Color Liberación] AS NUMERIC(19,6)),
-    CAST([Cumplimiento Liberación] AS NVARCHAR(50)),
-    CAST([Fecha Entrega Lote] AS DATE),
-    CAST([Fecha Recomendada de Entrega] AS DATE),
-    CAST([Fecha Cierre OP] AS DATE),
-    CAST([Fecha Ideal Entrega Producción] AS DATE),
-    CAST([Consumo Amortiguador Planta] AS NUMERIC(19,6)),
-    CAST([Color Producción Txt] AS NVARCHAR(20)),
-    CAST([Color Producción] AS NUMERIC(19,6)),
-    CAST([Cumplimiento Planta] AS NVARCHAR(50)),
-    CAST([Dias Retrazo Firplak] AS NUMERIC(19,6)),
-    CAST([Color Firplak Txt] AS NVARCHAR(20)),
-    CAST([Color Firplak] AS NUMERIC(19,6)),
-    CAST([Cumplimiento Firplak] AS NVARCHAR(50)),
-    CAST([Fecha Prometida Entrega Item] AS DATE),
-    CAST([Destino] AS NVARCHAR(50)),
-    CAST([NumLote] AS NVARCHAR(50)),
-    CAST([Molde] AS NVARCHAR(100)),
-    CAST([Capacidad Molde] AS NVARCHAR(100)),
-    CAST([Fecha Carga Molde] AS DATE),
-    CAST([Amortiguador] AS NUMERIC(19,6)),
-    CAST([Cliente] AS NVARCHAR(200))
-FROM [Firplak_SA].[dbo].[SEMAFORO_SNAPSHOT];
+    Originnum, [Nro OP], SKU, [Descripción Artículo], Planta, Familia, [Tipo Orden],
+    [Cant. Pendiente], [Cant. Pend. Item], [Cantidad total], [Disponible PT01],
+    [Fecha Creación OP], Estado, [Fecha Recomendada Liberación], [Fecha Real Liberación],
+    [Consumo Para Liberar], [Color Liberación Txt], [Color Liberación], [Cumplimiento Liberación],
+    [Fecha Entrega Lote], [Fecha Recomendada de Entrega], [Fecha Cierre OP], [Fecha Ideal Entrega Producción],
+    [Consumo Amortiguador Planta], [Color Producción Txt], [Color Producción], [Cumplimiento Planta],
+    [Dias Retrazo Firplak], [Color Firplak Txt], [Color Firplak], [Cumplimiento Firplak],
+    [Fecha Prometida Entrega Item], Destino, NumLote, Molde, [Capacidad Molde],
+    [Fecha Carga Molde], Amortiguador, Cliente
+FROM #TEMP_SEMAFORO;
+
+DROP TABLE #TEMP_SEMAFORO;
 ', 
         @database_name = N'Firplak_SA', 
         @flags = 0;
 
-    -- Ligar el Paso 1 al nuevo Paso 2
     EXEC msdb.dbo.sp_update_jobstep 
         @job_id = @JobId, 
         @step_id = 1, 
         @on_success_action = 4, 
         @on_success_step_id = 2;
 
-    PRINT 'El Job fue actualizado exitosamente. Ahora inserta los datos en SAP UDT.';
+    PRINT 'El Job fue actualizado exitosamente. Ahora inserta los datos exactos del SP en SAP UDT.';
 END
 ELSE
 BEGIN
