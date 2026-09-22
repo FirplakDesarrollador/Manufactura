@@ -42,10 +42,11 @@ import TarjetasGuia from '@/components/mantenimiento/TarjetasGuia';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import TarjetaDetailModal from '@/components/mantenimiento/TarjetaDetailModal';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
+import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 import * as XLSX from 'xlsx';
 
 type TpmColor = 'roja' | 'azul' | 'amarilla' | 'verde';
-type TarjetaSortField = 'evidencia' | 'codigo' | 'tipo_tarjeta' | 'maquina' | 'planta' | 'fecha_apertura' | 'descripcion_que' | 'detectada_por' | 'prioridad' | 'estado' | 'accion_inmediata';
+type TarjetaSortField = 'evidencia' | 'codigo' | 'tipo_tarjeta' | 'maquina' | 'planta' | 'fecha_apertura' | 'descripcion_que' | 'detectada_por' | 'prioridad' | 'estado' | 'accion_inmediata' | 'plazo' | 'tecnico_asignado';
 
 interface Empleado {
   id: number;
@@ -65,16 +66,48 @@ interface TarjetaTpm {
   planta: string;
   detectada_por: string; // Empleado que reporta
   descripcion_que: string; // Síntoma / Falla
+  sintoma?: string;
   prioridad: 'Alta' | 'Media' | 'Baja';
   accion_inmediata?: string;
+  accion_tomada?: string;
   estado: 'abierta' | 'en_proceso' | 'cerrada';
   fecha_apertura: string;
   fecha_cierre?: string;
+  fecha_limite?: string;
+  tecnico_asignado?: string;
+  origen?: string;
   fotos?: string[];
   id_orden_correctivo?: number;
   created_at?: string;
   created_by?: string;
 }
+
+export const formatFechaDDMMAAAA = (rawDate?: string | null): string => {
+  if (!rawDate || rawDate === '—' || rawDate === '-' || rawDate === 'null' || rawDate === 'undefined') return '—';
+  const clean = String(rawDate).trim();
+  if (!clean) return '—';
+
+  // Format YYYY-MM-DD (e.g. 2026-09-21 20:58:00+00:00 or 2026-09-22T01:57:00 or 2026-09-22)
+  if (clean.length >= 10 && clean[4] === '-' && clean[7] === '-') {
+    const yyyy = clean.slice(0, 4);
+    const mm = clean.slice(5, 7);
+    const dd = clean.slice(8, 10);
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // Fallback Date object parsing
+  try {
+    const d = new Date(clean);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+  } catch {}
+
+  return clean;
+};
 
 export default function TarjetasAnomaliasPage() {
   const router = useRouter();
@@ -134,6 +167,7 @@ export default function TarjetasAnomaliasPage() {
   // Voice dictation & Photo Annotation states
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const initialTextRef = useRef<string>('');
   const [annotatingImage, setAnnotatingImage] = useState<{ src: string; index?: number } | null>(null);
   const [showLiveCamera, setShowLiveCamera] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -251,67 +285,66 @@ export default function TarjetasAnomaliasPage() {
         setPlantasNomenclatura(data);
       }
     } catch (e) {
-      console.warn('Error cargando plantas:', e);
+      console.warn('Error fetching nomenclatura_plantas:', e);
     }
   };
 
-  // Fetch Empleados from Talento Humano
-  const fetchEmpleados = async (currentUser?: any) => {
-    try {
-      const { data, error } = await supabaseTalentoHumano
-        .from('empleados')
-        .select('id, nombreCompleto, cargo, planta, correo_electronico, activo')
-        .eq('activo', true)
-        .order('nombreCompleto', { ascending: true });
-      if (data && data.length > 0) {
-        setEmpleadosList(data);
-
-        // Resolve active user full name and initialize detectada_por
-        const userToUse = currentUser || sessionUser;
-        const emailToUse = userToUse?.email || userEmail;
-        const resolvedName = resolveUserFullName(userToUse, emailToUse, data);
-        if (resolvedName) {
-          setCurrentUserFullName(resolvedName);
-          setFormData(prev => ({
-            ...prev,
-            detectada_por: prev.detectada_por || resolvedName
-          }));
-        }
-      }
-    } catch (err) {
-      console.warn('Error cargando empleados de Talento Humano:', err);
-    }
-  };
-
-  // Fetch Machines Catalog
+  // Fetch Maquinas Catalogo
   const fetchMaquinas = async () => {
     try {
       const { data } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas')
         .select('*')
         .order('nombre_equipo', { ascending: true });
       if (data && data.length > 0) {
         setMaquinasCatalogo(data);
       }
     } catch (e) {
-      console.warn('Error cargando máquinas:', e);
+      console.warn('Error fetching maquinas:', e);
     }
   };
 
-  const INITIAL_MOCK_TARJETAS: TarjetaTpm[] = [
+  // Fetch Empleados from Talento Humano Supabase
+  const fetchEmpleados = async (userObj: any) => {
+    try {
+      const { data, error } = await supabaseTalentoHumano
+        .from('empleados')
+        .select('id, nombreCompleto, cargo, planta, correo_electronico, activo')
+        .eq('activo', true)
+        .order('nombreCompleto', { ascending: true });
+      
+      let list: Empleado[] = [];
+      if (!error && data && data.length > 0) {
+        list = data;
+        setEmpleadosList(data);
+      }
+
+      // Auto-populate detectada_por with current user's name
+      const resolvedName = resolveUserFullName(userObj, userObj?.email || '', list);
+      if (resolvedName) {
+        setCurrentUserFullName(resolvedName);
+        setFormData(prev => ({ ...prev, detectada_por: resolvedName }));
+      }
+    } catch (err) {
+      console.warn('Error fetching empleados from Talento Humano:', err);
+    }
+  };
+
+  // Mock Tarjetas fallbacks
+  const mockTarjetas: TarjetaTpm[] = [
     {
       id: 'mock_1',
       codigo: 'TPM-0101',
       tipo_tarjeta: 'roja',
       tipo_aviso: 'Mantenimiento',
-      maquina: 'Prensa Hidráulica 02',
+      maquina: 'Inyectora Battenfeld 01',
       planta: 'Mármol Sintético',
-      detectada_por: 'Carlos Alberto Giraldo Mazo',
-      descripcion_que: 'Fuga de aceite hidráulico en manguera de retorno del pistón principal',
+      detectada_por: 'Hector José Chinchilla Trigos',
+      descripcion_que: 'Fuga constante de aceite hidráulico por retén principal del cilindro de inyección',
       prioridad: 'Alta',
-      accion_inmediata: 'Contención con paño absorbente y ajuste preliminar',
-      estado: 'en_proceso',
-      fecha_apertura: '2026-09-08 08:30',
+      accion_inmediata: 'Contención con bandeja de goteo y reemplazo de empaque programado',
+      estado: 'abierta',
+      fecha_apertura: '2026-09-10 08:30',
       fotos: []
     },
     {
@@ -319,14 +352,14 @@ export default function TarjetasAnomaliasPage() {
       codigo: 'TPM-0102',
       tipo_tarjeta: 'azul',
       tipo_aviso: 'Autónomo',
-      maquina: 'Cabina de Pintura C-0154',
-      planta: 'Mármol Sintético',
-      detectada_por: 'Anderson David Plata Peña',
-      descripcion_que: 'Filtro de aire saturado y guías con polvo acumulado',
+      maquina: 'Compresor Kaeser 02',
+      planta: 'Ensamble',
+      detectada_por: 'John Alexander Villa Morales',
+      descripcion_que: 'Filtro de aire saturado de polvo y falta de lubricación en correa',
       prioridad: 'Media',
-      accion_inmediata: 'Limpieza básica de ducto y purga de condensado',
-      estado: 'cerrada',
-      fecha_apertura: '2026-09-07 14:15',
+      accion_inmediata: 'Soplado con aire a presión y aplicación de grasa dieléctrica',
+      estado: 'en_proceso',
+      fecha_apertura: '2026-09-11 14:15',
       fotos: []
     },
     {
@@ -421,14 +454,19 @@ export default function TarjetasAnomaliasPage() {
               planta: d.planta || d.planta_proceso || 'Mármol Sintético',
               detectada_por: d.detectada_por || d.responsable || d.reportado_por || 'Operador',
               descripcion_que: d.descripcion_que || d.descripcion_anomalia || d.sintoma || d.falla || 'Anomalía detectada',
+              sintoma: d.descripcion_que || d.descripcion_anomalia || d.sintoma || d.falla || 'Anomalía detectada',
               prioridad: (d.prioridad as any) || 'Alta',
               accion_inmediata: d.accion_inmediata || d.accion_correctiva || d.observacion || d.observaciones || '',
+              accion_tomada: d.accion_inmediata || d.accion_correctiva || d.observacion || d.observaciones || '',
               estado,
               fecha_apertura: d.fecha_apertura || (d.created_at ? d.created_at.slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ')),
               fecha_cierre: d.fecha_cierre || null,
+              fecha_limite: d.fecha_limite || d.plazo || null,
+              tecnico_asignado: d.tecnico_asignado || d.tecnico_nombre || d.tecnico || 'Sin asignar',
+              origen: 'Tarjeta TPM',
               fotos: fotosArr,
               created_at: d.created_at,
-              created_by: d.created_by || d.user_email || d.creado_por || undefined
+              created_by: d.created_by
             });
           });
         }
@@ -436,7 +474,7 @@ export default function TarjetasAnomaliasPage() {
         console.warn('Consulta tarjetas_falla_anomalia:', errDb);
       }
 
-      // 3. Query from Supabase mantenimiento_ordenes for any missing TPM cards
+      // 3. Query from Supabase mantenimiento_ordenes ONLY for TPM-origin cards / Anomalías
       try {
         const { data: oData } = await supabase
           .from('mantenimiento_ordenes')
@@ -444,23 +482,43 @@ export default function TarjetasAnomaliasPage() {
           .order('created_at', { ascending: false });
 
         if (oData && oData.length > 0) {
-          const tpmOrders = oData.filter((o: any) => 
-            o.origen === 'TARJETA_TPM' || (o.codigo && o.codigo.startsWith('TPM-')) || o.id_tarjeta_falla != null
-          );
-          tpmOrders.forEach((o: any) => {
-            const cod = o.codigo || `TPM-${o.id}`;
+          const tpmOrders = oData.filter((o: any) => {
+            const orig = (o.origen || '').toUpperCase();
+            const cod = (o.codigo || '').toUpperCase();
+            const tit = (o.titulo || '').toUpperCase();
+            return (
+              orig.includes('TARJETA') || 
+              orig.includes('TPM') || 
+              orig.includes('ANOMALIA') || 
+              cod.startsWith('TPM-') || 
+              cod.startsWith('TFA-') || 
+              tit.includes('TARJETA') || 
+              tit.includes('TPM') || 
+              tit.includes('ANOMALIA') ||
+              o.id_tarjeta_falla != null
+            );
+          });
+
+          tpmOrders.forEach((o: any, index: number) => {
+            const cod = o.codigo || (o.id_tarjeta_falla ? `TPM-${o.id_tarjeta_falla}` : `TPM-${o.id || index + 1}`);
             if (!tarjetaMap.has(cod)) {
               let fotosArr: string[] = [];
               if (Array.isArray(o.fotos_antes)) fotosArr = o.fotos_antes;
               else if (Array.isArray(o.fotos)) fotosArr = o.fotos;
+              else if (typeof o.fotos === 'string' && o.fotos.trim().startsWith('[')) {
+                try { fotosArr = JSON.parse(o.fotos); } catch {}
+              } else if (typeof o.fotos === 'string' && o.fotos.trim().length > 0) {
+                fotosArr = [o.fotos];
+              }
 
               let color: TpmColor = 'roja';
               const tit = (o.titulo || '').toLowerCase();
-              if (tit.includes('azul') || tit.includes('autónomo')) color = 'azul';
-              else if (tit.includes('amarilla') || tit.includes('seguridad')) color = 'amarilla';
-              else if (tit.includes('verde') || tit.includes('mejora')) color = 'verde';
+              const tAviso = (o.tipo_tarjeta || o.tipo_aviso || '').toLowerCase();
+              if (tit.includes('azul') || tAviso.includes('azul') || tit.includes('autónomo') || tAviso.includes('autonomo')) color = 'azul';
+              else if (tit.includes('amarilla') || tAviso.includes('amarilla') || tit.includes('seguridad') || tAviso.includes('5s')) color = 'amarilla';
+              else if (tit.includes('verde') || tAviso.includes('verde') || tit.includes('mejora') || tAviso.includes('kaizen')) color = 'verde';
 
-              let cleanSintoma = o.sintoma_falla || o.titulo || 'Anomalía reportada';
+              let cleanSintoma = o.sintoma_falla || o.sintoma || o.titulo || 'Anomalía reportada';
               if (cleanSintoma.startsWith('[')) {
                 const idx = cleanSintoma.indexOf(']');
                 if (idx !== -1 && idx < cleanSintoma.length - 1) cleanSintoma = cleanSintoma.slice(idx + 1).trim();
@@ -472,18 +530,24 @@ export default function TarjetasAnomaliasPage() {
                 rawEstado === 'en proceso' || rawEstado === 'en_proceso' ? 'en_proceso' : 'abierta';
 
               tarjetaMap.set(cod, {
-                id: o.id_tarjeta_falla || o.id,
+                id: o.id_tarjeta_falla || o.id || index + 1,
                 codigo: cod,
                 tipo_tarjeta: color,
                 tipo_aviso: color === 'roja' ? 'Mantenimiento' : color === 'azul' ? 'Autónomo' : color === 'amarilla' ? 'Seguridad/5S' : 'Mejora Kaizen',
-                maquina: o.maquina || 'Equipo General',
+                maquina: o.maquina || o.equipo || 'Equipo General',
                 planta: o.planta || 'Mármol Sintético',
-                detectada_por: o.reportado_por || 'Operario',
+                detectada_por: o.reportado_por || o.detectada_por || o.tecnico_nombre || 'Operario',
                 descripcion_que: cleanSintoma,
+                sintoma: cleanSintoma,
                 prioridad: (o.prioridad as any) || 'Alta',
-                accion_inmediata: o.accion_realizada || '',
+                accion_inmediata: o.accion_realizada || o.accion_tomada || o.comentarios_ejecucion || '',
+                accion_tomada: o.accion_realizada || o.accion_tomada || o.comentarios_ejecucion || '',
                 estado,
-                fecha_apertura: o.created_at ? o.created_at.slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' '),
+                fecha_apertura: o.fecha_apertura || o.fecha_reporte || (o.created_at ? o.created_at.slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ')),
+                fecha_cierre: o.fecha_cierre || null,
+                fecha_limite: o.fecha_limite || o.plazo || null,
+                tecnico_asignado: o.tecnico_nombre || o.tecnico_asignado || o.responsable || 'Sin asignar',
+                origen: 'Tarjeta TPM',
                 fotos: fotosArr,
                 created_at: o.created_at
               });
@@ -495,7 +559,7 @@ export default function TarjetasAnomaliasPage() {
       }
 
       // 4. Merge initial mocks if needed
-      INITIAL_MOCK_TARJETAS.forEach(m => {
+      mockTarjetas.forEach(m => {
         if (!tarjetaMap.has(m.codigo)) {
           tarjetaMap.set(m.codigo, m);
         }
@@ -1614,114 +1678,17 @@ export default function TarjetasAnomaliasPage() {
                 </button>
               </div>
             )}
-            {/* Filter Bar */}
-            <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-[#e2ded5] shadow-xs flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <h3 className="font-bold text-[#324354] text-xs sm:text-sm flex items-center gap-1.5">
-                  <Filter className="w-3.5 h-3.5 text-[#7B8E90]" />
-                  <span>Filtros de Tarjetas TPM ({filteredTarjetas.length} registradas)</span>
-                </h3>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleExportExcel}
-                className="flex items-center gap-1 px-2.5 py-1 bg-emerald-700 text-white font-bold rounded-xl text-xs hover:bg-emerald-800 transition-all shadow-xs cursor-pointer"
-              >
-                <Download className="w-3 h-3" />
-                <span>Exportar Excel</span>
-              </button>
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterColor('todos');
-                  setFilterEstado('todos');
-                  setFilterPrioridad('todas');
-                  setFilterPlanta('todas');
-                }}
-                className="text-xs text-[#7B8E90] hover:text-[#324354] font-semibold underline cursor-pointer ml-1"
-              >
-                Limpiar Filtros
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-            {/* Global Search */}
-            <div className="relative lg:col-span-2">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por código, máquina, síntoma o empleado..."
-                className="w-full pl-8 pr-3 py-1.5 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs focus:outline-none focus:border-[#324354]"
-              />
-            </div>
-
-            {/* TPM Color Filter */}
-            <div>
-              <select
-                value={filterColor}
-                onChange={(e) => setFilterColor(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
-              >
-                <option value="todos">Color TPM: Todos</option>
-                <option value="roja">🔴 Tarjeta Roja (Mtto)</option>
-                <option value="azul">🔵 Tarjeta Azul (Autónomo)</option>
-                <option value="amarilla">🟡 Tarjeta Amarilla (5S)</option>
-                <option value="verde">🟢 Tarjeta Verde (Kaizen)</option>
-              </select>
-            </div>
-
-            {/* Estado Filter */}
-            <div>
-              <select
-                value={filterEstado}
-                onChange={(e) => setFilterEstado(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
-              >
-                <option value="todos">Estado: Todos</option>
-                <option value="abierta">🔴 Abierta</option>
-                <option value="en_proceso">🟡 En Proceso</option>
-                <option value="cerrada">🟢 Cerrada / Resuelta</option>
-              </select>
-            </div>
-
-            {/* Prioridad Filter */}
-            <div>
-              <select
-                value={filterPrioridad}
-                onChange={(e) => setFilterPrioridad(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
-              >
-                <option value="todas">Prioridad: Todas</option>
-                <option value="Alta">🚨 Alta (Crítica)</option>
-                <option value="Media">⚠️ Media</option>
-                <option value="Baja">ℹ️ Baja</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Tarjetas Table - Full Width No Scroll */}
-        <div className="bg-white rounded-2xl border border-[#e2ded5] shadow-xs overflow-hidden w-full">
-          <div className="overflow-x-auto max-h-[calc(100vh-250px)] overflow-y-auto scrollbar-thin">
-            <table className="w-full text-left text-xs border-collapse table-auto">
+        {/* Tarjetas Table - Copied from Correctivo layout, TPM Origin Only */}
+        <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-xs overflow-hidden w-full">
+          <div className="w-full overflow-x-auto scrollbar-none">
+            <table className="w-full text-left text-xs border-collapse min-w-full md:min-w-[960px] table-auto">
               <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                 <tr>
-                  <th 
-                    onClick={() => handleSort('evidencia')}
-                    className="py-2.5 px-2 font-bold text-center w-[60px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
-                    title="Ordenar por evidencia fotográfica"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <span>Evidencia</span>
-                      {renderSortIcon('evidencia')}
-                    </div>
-                  </th>
+                  <th className="py-3 px-2 font-bold text-center w-[54px] min-w-[54px]">Foto</th>
                   <th 
                     onClick={() => handleSort('codigo')}
-                    className="py-2.5 px-2 font-bold text-center w-[80px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    className="py-3 px-2 font-bold text-center w-[110px] min-w-[100px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
                     title="Ordenar por código"
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -1730,68 +1697,39 @@ export default function TarjetasAnomaliasPage() {
                     </div>
                   </th>
                   <th 
-                    onClick={() => handleSort('tipo_tarjeta')}
-                    className="py-2.5 px-2 font-bold w-[125px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
-                    title="Ordenar por tipo / color TPM"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>Tipo / Color</span>
-                      {renderSortIcon('tipo_tarjeta')}
-                    </div>
-                  </th>
-                  <th 
                     onClick={() => handleSort('maquina')}
-                    className="py-2.5 px-2.5 font-bold w-[135px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    className="py-3 px-3 font-bold w-[180px] min-w-[150px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
                     title="Ordenar por máquina"
                   >
                     <div className="flex items-center gap-1">
-                      <span>Máquinas y Equipos</span>
+                      <span>Máquinas / Equipos</span>
                       {renderSortIcon('maquina')}
                     </div>
                   </th>
                   <th 
                     onClick={() => handleSort('planta')}
-                    className="py-2.5 px-2 font-bold w-[90px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    className="py-3 px-2 font-bold text-center w-[75px] min-w-[65px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
                     title="Ordenar por planta"
                   >
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-center gap-1">
                       <span>Planta</span>
                       {renderSortIcon('planta')}
                     </div>
                   </th>
-                  <th 
-                    onClick={() => handleSort('fecha_apertura')}
-                    className="py-2.5 px-2 font-bold text-center w-[95px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
-                    title="Ordenar por fecha de reporte"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <span>Fecha</span>
-                      {renderSortIcon('fecha_apertura')}
-                    </div>
-                  </th>
+                  <th className="py-3 px-2 font-bold text-center w-[85px] min-w-[75px]">Origen</th>
                   <th 
                     onClick={() => handleSort('descripcion_que')}
-                    className="py-2.5 px-3 font-bold min-w-[170px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
-                    title="Ordenar por anomalía / falla"
+                    className="py-3 px-3 font-bold min-w-[220px] max-w-[320px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    title="Ordenar por síntoma / falla"
                   >
                     <div className="flex items-center gap-1">
-                      <span>Anomalía / Falla Detectada</span>
+                      <span>Síntoma / Falla</span>
                       {renderSortIcon('descripcion_que')}
                     </div>
                   </th>
                   <th 
-                    onClick={() => handleSort('detectada_por')}
-                    className="py-2.5 px-2.5 font-bold w-[130px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
-                    title="Ordenar por persona que reporta"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>Reportado Por</span>
-                      {renderSortIcon('detectada_por')}
-                    </div>
-                  </th>
-                  <th 
                     onClick={() => handleSort('prioridad')}
-                    className="py-2.5 px-2 font-bold text-center w-[75px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    className="py-3 px-2 font-bold text-center w-[75px] min-w-[70px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
                     title="Ordenar por prioridad"
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -1800,8 +1738,28 @@ export default function TarjetasAnomaliasPage() {
                     </div>
                   </th>
                   <th 
+                    onClick={() => handleSort('plazo')}
+                    className="py-3 px-2 font-bold text-center w-[110px] min-w-[100px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    title="Ordenar por plazo"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Plazo</span>
+                      {renderSortIcon('plazo')}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('tecnico_asignado')}
+                    className="py-3 px-3 font-bold min-w-[170px] max-w-[240px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    title="Ordenar por técnico asignado"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Técnico Asignado</span>
+                      {renderSortIcon('tecnico_asignado')}
+                    </div>
+                  </th>
+                  <th 
                     onClick={() => handleSort('estado')}
-                    className="py-2.5 px-2 font-bold text-center w-[105px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    className="py-3 px-2 font-bold text-center w-[110px] min-w-[100px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
                     title="Ordenar por estado"
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -1809,147 +1767,184 @@ export default function TarjetasAnomaliasPage() {
                       {renderSortIcon('estado')}
                     </div>
                   </th>
-                  <th 
-                    onClick={() => handleSort('accion_inmediata')}
-                    className="py-2.5 px-3 font-bold w-[150px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
-                    title="Ordenar por acción realizada"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>Acción / Solución</span>
-                      {renderSortIcon('accion_inmediata')}
-                    </div>
-                  </th>
+                  <th className="py-3 px-3 font-bold min-w-[150px] max-w-[240px]">Acción / Solución</th>
+                  <th className="py-3 px-2 font-bold text-center w-[70px] min-w-[60px]">Detalle</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredTarjetas.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-gray-400">
-                      No se encontraron tarjetas de anomalías con los filtros aplicados.
+                    <td colSpan={12} className="py-12 text-center text-gray-400">
+                      No se encontraron tarjetas de anomalías TPM con los filtros aplicados.
                     </td>
                   </tr>
                 ) : (
                   filteredTarjetas.map((item) => {
                     const isCerrada = item.estado === 'cerrada';
                     const isEnProceso = item.estado === 'en_proceso';
-                    const fechaSolo = (item.fecha_apertura || item.created_at || '').slice(0, 10).replace('T', ' ');
 
                     return (
                       <tr 
                         key={item.codigo || `tpm_${item.id}`} 
                         onClick={() => setSelectedTarjetaDetail(item)}
-                        className="hover:bg-slate-100/80 cursor-pointer transition-colors group"
-                        title="Haz clic para ver el detalle completo de la tarjeta"
+                        className="hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                        title="Haz clic para ver o editar el detalle de la tarjeta TPM"
                       >
                         {/* Evidencia Foto */}
-                        <td className="py-2.5 px-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
                           {item.fotos && item.fotos.length > 0 ? (
-                            <div className="relative inline-block group/img">
+                            <div className="relative inline-block group">
                               <img
                                 src={item.fotos[0]}
                                 alt={item.codigo}
-                                onClick={() => setPreviewImage(item.fotos![0])}
-                                className="w-9 h-9 object-cover rounded-lg border border-[#324354] shadow-2xs cursor-pointer hover:scale-110 transition-transform"
-                                title="Clic para ampliar foto"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewImage(item.fotos![0]);
+                                }}
+                                className="w-10 h-10 object-cover rounded-xl border-2 border-[#324354] shadow-xs cursor-pointer hover:scale-105 hover:shadow-md transition-all"
+                                title="Clic para ampliar foto principal"
                               />
                               {item.fotos.length > 1 && (
                                 <span 
-                                  onClick={() => setPreviewImage(item.fotos![1])}
-                                  className="absolute -bottom-1 -right-1 bg-[#324354] text-white text-[8px] font-bold px-1 py-0.2 rounded-full cursor-pointer shadow-xs border border-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewImage(item.fotos![1]);
+                                  }}
+                                  className="absolute -bottom-1 -right-1 bg-[#324354] text-white text-[9px] font-bold px-1 py-0.2 rounded-full cursor-pointer shadow-xs border border-white"
                                   title="Ver segunda foto"
                                 >
-                                  +1
+                                  +{item.fotos.length - 1}
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <div className="w-8 h-8 mx-auto rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
-                              <Camera className="w-3.5 h-3.5" />
+                            <div className="w-9 h-9 mx-auto rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
+                              <Camera className="w-4 h-4" />
                             </div>
                           )}
                         </td>
 
                         {/* Código */}
-                        <td className="py-2.5 px-2 text-center font-bold text-[#324354]">
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-800 border border-slate-200 rounded font-mono text-[10.5px] group-hover:bg-[#324354] group-hover:text-white transition-colors">
+                        <td className="py-2.5 px-2 font-bold text-[#324354] text-center">
+                          <span className="px-2 py-1 bg-purple-50 text-purple-800 border-purple-200 rounded-lg font-mono text-[10.5px] border block whitespace-normal break-words leading-tight shadow-2xs" title={item.codigo}>
                             {item.codigo}
                           </span>
                         </td>
 
-                        {/* Color TPM Badge */}
-                        <td className="py-2.5 px-2">
-                          {renderColorBadge(item.tipo_tarjeta)}
-                        </td>
-
-                        {/* Máquina */}
-                        <td className="py-2.5 px-2 font-bold text-[#324354] text-[11px]" title={item.maquina}>
-                          <span className="break-words">{item.maquina}</span>
-                        </td>
-
-                        {/* Planta */}
-                        <td className="py-2.5 px-2 font-medium text-gray-600 text-[11px]" title={item.planta}>
-                          <span className="break-words">{item.planta}</span>
-                        </td>
-
-                        {/* Fecha (Columna separada, solo fecha sin hora) */}
-                        <td className="py-2.5 px-2 text-center font-medium text-gray-700 text-[11px] whitespace-nowrap">
-                          {fechaSolo || 'N/A'}
-                        </td>
-
-                        {/* Descripción / Falla (Limpia sin fecha redundante) */}
-                        <td className="py-2.5 px-3 text-[#324354] font-medium text-[11px]">
-                          <div className="line-clamp-2 leading-snug" title={item.descripcion_que}>
-                            {item.descripcion_que}
+                        {/* Máquinas / Equipos */}
+                        <td className="py-2.5 px-3 font-bold text-[#324354]">
+                          <div className="whitespace-normal break-words leading-snug text-[11.5px]" title={item.maquina}>
+                            {item.maquina}
                           </div>
                         </td>
 
-                        {/* Reportado Por - Nombre completo en múltiples líneas sin recortar (...) */}
-                        <td className="py-2.5 px-3 font-semibold text-[#324354] text-[11px] min-w-[140px] max-w-[220px]">
-                          <div className="flex items-start gap-1.5 leading-snug">
-                            <User className="w-3.5 h-3.5 text-[#7B8E90] shrink-0 mt-0.5" />
-                            <span className="whitespace-normal break-words font-medium">{item.detectada_por}</span>
+                        {/* Planta */}
+                        <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                          <span className="px-2 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-[10.5px] font-bold text-[#324354] inline-block shadow-2xs">
+                            {obtenerCodigoPlanta(item.planta, plantasNomenclatura)}
+                          </span>
+                        </td>
+
+                        {/* Origen */}
+                        <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                            TPM
+                          </span>
+                        </td>
+
+                        {/* Síntoma / Falla */}
+                        <td className="py-2.5 px-3 text-[#324354]">
+                          <div className="whitespace-normal break-words font-medium leading-snug text-[11px]" title={item.sintoma || item.descripcion_que}>
+                            {item.sintoma || item.descripcion_que}
+                          </div>
+                          <div className="text-[9.5px] text-gray-400 mt-1 font-medium flex items-center gap-2 flex-wrap">
+                            <span>📅 {formatFechaDDMMAAAA(item.fecha_apertura)}</span>
+                            {item.detectada_por && (
+                              <span>👤 {item.detectada_por}</span>
+                            )}
                           </div>
                         </td>
 
                         {/* Prioridad */}
-                        <td className="py-2.5 px-1.5 text-center font-bold">
-                          <span className={`px-2 py-0.5 rounded text-[10px] inline-block ${
-                            item.prioridad === 'Alta' ? 'bg-rose-100 text-rose-800' :
-                            item.prioridad === 'Media' ? 'bg-amber-100 text-amber-800' :
-                            'bg-blue-100 text-blue-800'
+                        <td className="py-2.5 px-2 text-center font-bold whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[10px] inline-block shadow-2xs ${
+                            item.prioridad === 'Alta' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                            item.prioridad === 'Media' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
                           }`}>
                             {item.prioridad}
                           </span>
                         </td>
 
-                        {/* Estado (Solo lectura - Modificable únicamente desde Correctivo) */}
-                        <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
-                          <span 
-                            className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border select-none ${
-                              isCerrada ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
-                              isEnProceso ? 'bg-amber-50 text-amber-800 border-amber-300' :
-                              'bg-rose-50 text-rose-800 border-rose-300'
-                            }`}
-                            title="El estado de la anomalía se actualiza únicamente desde la Orden de Mantenimiento Correctivo"
-                          >
+                        {/* Plazo */}
+                        <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                          {item.fecha_limite ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] shadow-2xs">
+                              <Clock className="w-3 h-3 text-[#7B8E90] shrink-0" />
+                              <span>{formatFechaDDMMAAAA(item.fecha_limite)}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-gray-400 italic bg-gray-50 border border-gray-200 shadow-2xs">
+                              <Clock className="w-3 h-3 text-gray-400 shrink-0" />
+                              Sin plazo
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Técnico Asignado */}
+                        <td className="py-2.5 px-3 font-semibold text-[#324354]">
+                          {item.tecnico_asignado && item.tecnico_asignado !== 'Sin asignar' && item.tecnico_asignado !== 'Por asignar' ? (
+                            <div className="flex items-start gap-1.5 p-1.5 rounded-xl text-[10.5px] font-bold bg-blue-50 text-[#324354] border border-blue-200 shadow-2xs leading-tight" title={item.tecnico_asignado}>
+                              <User className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                              <span className="whitespace-normal break-words font-semibold">{item.tecnico_asignado}</span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-semibold bg-amber-50 text-amber-900 border border-amber-200 italic shadow-2xs">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>Sin asignar</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Estado */}
+                        <td className="py-2.5 px-2 text-center font-bold whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold border shadow-2xs ${
+                            isCerrada ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
+                            isEnProceso ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-rose-50 text-rose-800 border-rose-300'
+                          }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
                               isCerrada ? 'bg-emerald-500' :
-                              isEnProceso ? 'bg-amber-500' :
-                              'bg-rose-500'
+                              isEnProceso ? 'bg-amber-500 animate-pulse' : 'bg-rose-500 animate-pulse'
                             }`}></span>
-                            {isCerrada ? 'Cerrada' : isEnProceso ? 'En Proceso' : 'Abierta'}
+                            {isCerrada ? 'Resuelta' : isEnProceso ? 'En Proceso' : 'Abierta'}
                           </span>
                         </td>
 
                         {/* Acción / Solución */}
-                        <td className="py-2.5 px-2.5 text-gray-700 text-[10.5px]">
-                          {item.accion_inmediata ? (
-                            <div className="bg-slate-50 p-1.5 rounded-lg border border-gray-200 text-[10px] max-h-16 overflow-y-auto leading-tight" title={item.accion_inmediata}>
-                              {item.accion_inmediata}
+                        <td className="py-2.5 px-3 text-gray-700">
+                          {item.accion_tomada || item.accion_inmediata ? (
+                            <div className="bg-slate-50 p-2 rounded-xl border border-gray-200 text-[10.5px] whitespace-normal break-words leading-snug max-h-24 overflow-y-auto" title={item.accion_tomada || item.accion_inmediata}>
+                              {item.accion_tomada || item.accion_inmediata}
                             </div>
                           ) : (
-                            <span className="text-gray-400 italic text-[10px]">Sin registrar</span>
+                            <span className="text-gray-400 italic text-[10.5px]">Sin registrar</span>
                           )}
+                        </td>
+
+                        {/* Detalle */}
+                        <td className="py-2.5 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTarjetaDetail(item);
+                            }}
+                            className="px-2.5 py-1.5 bg-[#324354] text-white hover:bg-[#324354]/90 rounded-xl text-[10.5px] font-bold transition-all shadow-2xs flex items-center gap-1 mx-auto cursor-pointer hover:scale-105"
+                            title="Abrir ficha y gestionar tarjeta TPM"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Ver</span>
+                          </button>
                         </td>
                       </tr>
                     );

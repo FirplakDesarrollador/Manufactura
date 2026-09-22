@@ -80,6 +80,33 @@ export interface Empleado {
   activo?: boolean;
 }
 
+export const formatFechaDDMMAAAA = (rawDate?: string | null): string => {
+  if (!rawDate || rawDate === '—' || rawDate === '-' || rawDate === 'null' || rawDate === 'undefined') return '—';
+  const clean = String(rawDate).trim();
+  if (!clean) return '—';
+
+  // Format YYYY-MM-DD (e.g. 2026-09-21 20:58:00+00:00 or 2026-09-22T01:57:00 or 2026-09-22)
+  if (clean.length >= 10 && clean[4] === '-' && clean[7] === '-') {
+    const yyyy = clean.slice(0, 4);
+    const mm = clean.slice(5, 7);
+    const dd = clean.slice(8, 10);
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // Fallback Date object parsing
+  try {
+    const d = new Date(clean);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+  } catch {}
+
+  return clean;
+};
+
 export const parseTechPlantas = (val?: string | string[] | null, catalogo: NomenclaturaPlanta[] = []): string[] => {
   if (!val) return ['MS'];
   if (Array.isArray(val)) {
@@ -145,6 +172,7 @@ interface MaintenanceTask {
   observations?: string;
   fechaApertura?: string | null;
   fechaCierre?: string | null;
+  fotos?: string[];
   activo?: boolean;
 }
 
@@ -155,10 +183,17 @@ interface HistoryRecord {
   'TECNICO'?: string;
   'TIPO'?: string;
   tipo?: string;
+  'ORIGEN'?: string;
+  origen?: string;
+  'CODIGO'?: string;
+  codigo?: string;
   'FECHA DE APERTURA'?: string;
+  fecha_apertura?: string;
   'FECHA DE CIERRE'?: string;
+  fecha_cierre?: string;
   'COMENTARIO DE EJECUCION'?: string;
   created_at?: string;
+  [key: string]: any;
 }
 
 interface CorrectiveRecord {
@@ -234,7 +269,7 @@ export default function GestionMantenimientoPage() {
   const [historyEstado, setHistoryEstado] = useState('Todos');
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
-  type HistorySortField = 'id' | 'titulo' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
+  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
   const [historySortField, setHistorySortField] = useState<HistorySortField>('id');
   const [historySortAsc, setHistorySortAsc] = useState<boolean>(true);
 
@@ -276,7 +311,11 @@ export default function GestionMantenimientoPage() {
     observations: string;
     fechaApertura: string;
     fechaCierre: string;
+    fotos?: string[];
   } | null>(null);
+  const [annotatingPreventivoImage, setAnnotatingPreventivoImage] = useState<{ src: string; index?: number } | null>(null);
+  const preventivoCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const preventivoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [savingPreventivoModal, setSavingPreventivoModal] = useState(false);
   const [preventivoModalFeedback, setPreventivoModalFeedback] = useState<string | null>(null);
 
@@ -715,50 +754,140 @@ export default function GestionMantenimientoPage() {
     fetchEmpleados();
   }, []);
 
-  // Auto-fetch correctivos when switching to 'correctivo' or 'planificador'
+  // Auto-fetch records when switching tabs
   useEffect(() => {
     if (activeTab === 'correctivo' || activeTab === 'planificador') {
       fetchCorrectivoRecords();
     }
+    if (activeTab === 'historial') {
+      fetchHistoryRecords();
+    }
   }, [activeTab]);
 
-  // Fetch Supabase History Records from mantenimiento_ordenes
+  // Fetch Supabase History Records from mantenimiento_ordenes + tarjetas_falla_anomalia
   const fetchHistoryRecords = async () => {
     setHistoryLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Query ordenes
+      const { data: ordenesData, error: ordErr } = await supabase
         .from('mantenimiento_ordenes')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data) {
-        const mappedHistory: HistoryRecord[] = data.map((d: any) => {
-          let tipoMtto = d.tipo || d.tipo_mantenimiento || d.clasificacion || d['TIPO'] || '';
-          if (!tipoMtto) {
-            const tUpper = (d.titulo || '').toUpperCase();
-            const cUpper = (d.codigo || '').toUpperCase();
-            if (tUpper.includes('PREDICTIVO') || cUpper.includes('PRED') || cUpper.startsWith('MPRED')) {
-              tipoMtto = 'Predictivo';
-            } else if (tUpper.includes('CORRECTIVO') || cUpper.includes('CORR') || cUpper.startsWith('MC-') || d.id_correctivo) {
-              tipoMtto = 'Correctivo';
-            } else {
-              tipoMtto = 'Preventivo';
-            }
+
+      if (ordErr) console.warn('Aviso consultando mantenimiento_ordenes en historial:', ordErr);
+
+      // 2. Query tarjetas
+      const { data: tarjetasData, error: tarjErr } = await supabase
+        .from('tarjetas_falla_anomalia')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (tarjErr) console.warn('Aviso consultando tarjetas_falla_anomalia en historial:', tarjErr);
+
+      const historyMap = new Map<string, HistoryRecord>();
+
+      // A. Populate from mantenimiento_ordenes
+      if (ordenesData && ordenesData.length > 0) {
+        ordenesData.forEach((d: any, idx: number) => {
+          let tipoMtto = d.tipo || d.tipo_mantenimiento || d.clasificacion || d.origen || d['TIPO'] || '';
+          const origUpper = (d.origen || '').toUpperCase();
+          const codUpper = (d.codigo || '').toUpperCase();
+          const titUpper = (d.titulo || '').toUpperCase();
+
+          if (origUpper.includes('TARJETA') || origUpper.includes('TPM') || codUpper.startsWith('TPM-') || codUpper.startsWith('TFA-') || titUpper.includes('TARJETA')) {
+            tipoMtto = 'TPM';
+          } else if (origUpper.includes('CORRECTIV') || codUpper.startsWith('CORR-') || codUpper.startsWith('MC-') || d.id_correctivo) {
+            tipoMtto = 'Correctivo';
+          } else if (!tipoMtto) {
+            tipoMtto = 'Preventivo';
           }
-          return {
-            id: d.id,
+
+          const key = d.codigo || (tipoMtto === 'TPM' ? `TPM-${d.id || idx + 1}` : tipoMtto === 'Correctivo' ? `CORR-${d.id || idx + 1}` : `MP-${d.id || idx + 1}`);
+          historyMap.set(key, {
+            id: d.id || idx + 1,
+            codigo: key,
             'Título': d.titulo || d['Título'] || 'Mantenimiento',
-            'ESTADO': d.estado || d['ESTADO'] || 'Completado',
-            'TECNICO': d.tecnico_nombre || d['TECNICO'] || 'Técnico',
+            'ESTADO': d.estado || d['ESTADO'] || 'Abierta',
+            'TECNICO': d.tecnico_nombre || d.tecnico_asignado || d['TECNICO'] || 'Sin asignar',
             'TIPO': tipoMtto,
             tipo: tipoMtto,
-            'FECHA DE APERTURA': d.fecha_apertura || d['FECHA DE APERTURA'] || '',
+            origen: tipoMtto,
+            'FECHA DE APERTURA': d.fecha_apertura || d['FECHA DE APERTURA'] || (d.created_at ? d.created_at.slice(0, 10) : ''),
             'FECHA DE CIERRE': d.fecha_cierre || d['FECHA DE CIERRE'] || '',
-            'COMENTARIO DE EJECUCION': d.comentarios_ejecucion || d['COMENTARIO DE EJECUCION'] || '',
+            'COMENTARIO DE EJECUCION': d.comentarios_ejecucion || d.accion_realizada || d['COMENTARIO DE EJECUCION'] || '',
             created_at: d.created_at
-          };
+          });
         });
-        setHistoryRows(mappedHistory);
       }
+
+      // B. Populate / Merge from tarjetas_falla_anomalia
+      if (tarjetasData && tarjetasData.length > 0) {
+        tarjetasData.forEach((d: any, idx: number) => {
+          const cod = d.codigo || d.codigo_tarjeta || `TPM-${d.id || idx + 1}`;
+          const existing = historyMap.get(cod);
+
+          const rawEstado = (d.estado || '').toLowerCase();
+          const estado = rawEstado === 'resuelta' || rawEstado === 'cerrada' || rawEstado === 'completado' ? 'Completado' :
+                         rawEstado === 'en proceso' || rawEstado === 'en_proceso' ? 'En Proceso' : 'Abierta';
+
+          const rawTitle = d.descripcion_que || d.descripcion_anomalia || d.sintoma || d.falla || d.titulo || 'Anomalía reportada';
+
+          if (!existing) {
+            historyMap.set(cod, {
+              id: d.id || idx + 5000,
+              codigo: cod,
+              'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
+              'ESTADO': estado,
+              'TECNICO': d.tecnico_asignado || d.responsable_tecnico || 'Sin asignar',
+              'TIPO': 'TPM',
+              tipo: 'TPM',
+              origen: 'TPM',
+              'FECHA DE APERTURA': d.fecha_apertura || (d.created_at ? d.created_at.slice(0, 10) : ''),
+              'FECHA DE CIERRE': d.fecha_cierre || '',
+              'COMENTARIO DE EJECUCION': d.accion_inmediata || d.accion_correctiva || '',
+              created_at: d.created_at
+            });
+          } else {
+            if (d.tecnico_asignado && d.tecnico_asignado !== 'Sin asignar') {
+              existing['TECNICO'] = d.tecnico_asignado;
+            }
+          }
+        });
+      }
+
+      // C. Include LocalStorage records if present to guarantee matching counts
+      if (typeof window !== 'undefined') {
+        const localSaved = localStorage.getItem('firplak_tarjetas_tpm_records');
+        if (localSaved) {
+          try {
+            const parsed = JSON.parse(localSaved);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((item: any, idx: number) => {
+                const cod = item.codigo || `TPM-${item.id || idx + 1}`;
+                if (!historyMap.has(cod)) {
+                  const rawTitle = item.sintoma || item.descripcion_que || item.titulo || 'Anomalía local';
+                  historyMap.set(cod, {
+                    id: item.id || idx + 9000,
+                    codigo: cod,
+                    'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
+                    'ESTADO': item.estado || 'Abierta',
+                    'TECNICO': item.tecnico_asignado || 'Sin asignar',
+                    'TIPO': 'TPM',
+                    tipo: 'TPM',
+                    origen: 'TPM',
+                    'FECHA DE APERTURA': item.fecha_apertura || item.fecha_reporte || '',
+                    'FECHA DE CIERRE': item.fecha_cierre || '',
+                    'COMENTARIO DE EJECUCION': item.accion_tomada || '',
+                    created_at: item.created_at
+                  });
+                }
+              });
+            }
+          } catch (e) {}
+        }
+      }
+
+      setHistoryRows(Array.from(historyMap.values()));
     } catch (e) {
       console.warn('Error fetching Supabase history:', e);
     } finally {
@@ -2338,7 +2467,7 @@ export default function GestionMantenimientoPage() {
     setViewingCorrectivo(item);
     setEditingCorrectivoForm({
       tecnico_asignado: item.tecnico_asignado && item.tecnico_asignado !== 'Por asignar' ? item.tecnico_asignado : 'Sin asignar',
-      estado: item.estado,
+      estado: item.estado as any,
       fecha_limite: item.fecha_limite ? item.fecha_limite.slice(0, 10) : '',
       accion_tomada: item.accion_tomada || '',
       prioridad: item.prioridad,
@@ -2498,6 +2627,35 @@ export default function GestionMantenimientoPage() {
     }
   };
 
+  // Helpers for Preventivo photo upload and annotation
+  const handlePreventivoPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAnnotatingPreventivoImage({ src: reader.result });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleSaveAnnotatedPreventivoPhoto = (annotatedDataUrl: string) => {
+    if (annotatingPreventivoImage?.index !== undefined) {
+      setExecutingPreventivoForm(prev => prev ? ({
+        ...prev,
+        fotos: (prev.fotos || []).map((f, i) => i === annotatingPreventivoImage.index ? annotatedDataUrl : f)
+      }) : null);
+    } else {
+      setExecutingPreventivoForm(prev => prev ? ({
+        ...prev,
+        fotos: [...(prev.fotos || []), annotatedDataUrl].slice(0, 3)
+      }) : null);
+    }
+    setAnnotatingPreventivoImage(null);
+  };
+
   // Handler to open the Preventivo Execution Modal (Portal Técnicos / Planificador)
   const handleOpenPreventivoExecution = (task: MaintenanceTask) => {
     setExecutingPreventivo(task);
@@ -2505,7 +2663,8 @@ export default function GestionMantenimientoPage() {
       status: (task.status as any) || 'Pendiente',
       observations: task.observations || '',
       fechaApertura: task.fechaApertura ? task.fechaApertura.slice(0, 16) : getLocalDatetimeString().slice(0, 16),
-      fechaCierre: task.fechaCierre ? task.fechaCierre.slice(0, 16) : (task.status === 'Completado' ? getLocalDatetimeString().slice(0, 16) : '')
+      fechaCierre: task.fechaCierre ? task.fechaCierre.slice(0, 16) : (task.status === 'Completado' ? getLocalDatetimeString().slice(0, 16) : ''),
+      fotos: task.fotos || []
     });
     setPreventivoModalFeedback(null);
   };
@@ -2528,6 +2687,7 @@ export default function GestionMantenimientoPage() {
       observations: form.observations.trim(),
       fechaApertura: finalFechaApertura,
       fechaCierre: finalFechaCierre,
+      fotos: form.fotos || [],
       refFrecuencia: isCompleted ? 0 : executingPreventivo.refFrecuencia,
       isDue: isCompleted ? false : executingPreventivo.isDue
     };
@@ -2557,6 +2717,7 @@ export default function GestionMantenimientoPage() {
         fecha_apertura: formatDateForSupabase(finalFechaApertura),
         fecha_cierre: formatDateForSupabase(finalFechaCierre),
         comentarios_ejecucion: form.observations.trim(),
+        fotos: form.fotos || [],
         adelantada: !!updatedTask.adelantada
       });
 
@@ -3352,17 +3513,26 @@ export default function GestionMantenimientoPage() {
       // Global search
       if (historySearch.trim()) {
         const q = normalize(historySearch);
+        const matchCodigo = normalize(row.codigo || row['CODIGO'] || '').includes(q);
         const matchTitle = normalize(row['Título'] || '').includes(q);
         const matchTech = normalize(row['TECNICO'] || '').includes(q);
         const matchTipo = normalize(row['TIPO'] || '').includes(q);
         const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || '').includes(q);
-        if (!matchTitle && !matchTech && !matchTipo && !matchObs) return false;
+        if (!matchCodigo && !matchTitle && !matchTech && !matchTipo && !matchObs) return false;
       }
 
-      // Global tipo / clasificacion filter
+      // Global Origen filter (TPM, Correctivo, Preventivo)
       if (historyTipo !== 'Todos') {
-        const rowTipo = (row['TIPO'] || row.tipo || 'Preventivo').toLowerCase();
-        if (!rowTipo.includes(historyTipo.toLowerCase())) return false;
+        const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').toLowerCase();
+        const codRaw = (row['CODIGO'] || row.codigo || row['Título'] || '').toLowerCase();
+
+        const isTpm = origRaw.includes('tpm') || origRaw.includes('tarjeta') || origRaw.includes('anomalia') || codRaw.includes('tpm-') || codRaw.includes('tfa-') || codRaw.includes('tarjeta');
+        const isCorrectivo = !isTpm && (origRaw.includes('correctiv') || codRaw.includes('corr-') || origRaw.includes('directo'));
+        const isPreventivo = !isTpm && !isCorrectivo;
+
+        if (historyTipo === 'TPM' && !isTpm) return false;
+        if (historyTipo === 'Correctivo' && !isCorrectivo) return false;
+        if (historyTipo === 'Preventivo' && !isPreventivo) return false;
       }
 
       // Global status / tech filters
@@ -3385,6 +3555,10 @@ export default function GestionMantenimientoPage() {
         case 'id':
           valA = a.id || 0;
           valB = b.id || 0;
+          break;
+        case 'codigo':
+          valA = (a.codigo || a['CODIGO'] || '').toLowerCase();
+          valB = (b.codigo || b['CODIGO'] || '').toLowerCase();
           break;
         case 'titulo':
           valA = (a['Título'] || '').toLowerCase();
@@ -4085,9 +4259,9 @@ export default function GestionMantenimientoPage() {
         }}
       />
 
-      {/* SubHeader with Main Functions matching FIRPLAK System - No Horizontal Scrollbar */}
+      {/* SubHeader with Main Functions matching FIRPLAK System - Single Row with Lateral Scroll on Mobile */}
       <div className="fixed top-20 left-0 right-0 z-40 bg-white border-b border-[#e2ded5] py-1.5 px-2 shadow-xs font-sans">
-        <div className="max-w-[1700px] mx-auto flex flex-row items-center justify-center gap-1 xl:gap-1.5 py-0.5 overflow-hidden flex-wrap md:flex-nowrap">
+        <div className="max-w-[1700px] mx-auto flex flex-row items-center justify-start sm:justify-center gap-1.5 py-0.5 overflow-x-auto scrollbar-none flex-nowrap">
           {subNavItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -4102,7 +4276,7 @@ export default function GestionMantenimientoPage() {
                     fetchCorrectivoRecords();
                   }
                 }}
-                className={`flex items-center gap-1 px-2 lg:px-2.5 py-1.5 rounded-xl font-bold transition-all text-[11px] lg:text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                className={`flex items-center gap-1 px-2.5 lg:px-3 py-1.5 rounded-xl font-bold transition-all text-[11px] lg:text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
                   isActive
                     ? 'bg-[#324354] text-white shadow-md'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -4298,11 +4472,11 @@ export default function GestionMantenimientoPage() {
 
                 </div>
 
-                {/* 2. 4-Column Board View: Atrasadas, Hoy, Próximas, Completadas (4 en paralelo) */}
-                <div className="grid grid-cols-4 gap-2.5 items-start w-full min-w-0">
+                {/* 2. 4-Column Board View: Atrasadas, Hoy, Próximas, Completadas (1 columna por pantalla en celular con scroll lateral, 4 columnas en PC) */}
+                <div className="flex md:grid md:grid-cols-4 gap-2.5 items-start w-full min-w-0 overflow-x-auto scrollbar-thin pb-2 snap-x snap-mandatory">
                   
                   {/* COLUMNA 1: ATRASADAS */}
-                  <div className="min-w-0 flex flex-col bg-slate-100/90 rounded-2xl border border-rose-200 shadow-2xs overflow-hidden">
+                  <div className="w-[88vw] sm:w-[340px] md:w-full shrink-0 min-w-[280px] md:min-w-0 snap-align-start flex flex-col bg-slate-100/90 rounded-2xl border border-rose-200 shadow-2xs overflow-hidden">
                     <div className="px-3 py-2 bg-rose-100/90 border-b border-rose-200 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse"></span>
@@ -4395,7 +4569,7 @@ export default function GestionMantenimientoPage() {
                   </div>
 
                   {/* COLUMNA 2: HOY */}
-                  <div className="min-w-0 flex flex-col bg-slate-100/90 rounded-2xl border border-[#324354]/20 shadow-2xs overflow-hidden">
+                  <div className="w-[88vw] sm:w-[340px] md:w-full shrink-0 min-w-[280px] md:min-w-0 snap-align-start flex flex-col bg-slate-100/90 rounded-2xl border border-[#324354]/20 shadow-2xs overflow-hidden">
                     <div className="px-3 py-2 bg-[#324354]/10 border-b border-[#324354]/20 flex items-center justify-between gap-1">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="w-2 h-2 rounded-full bg-[#324354] shrink-0"></span>
@@ -4502,7 +4676,7 @@ export default function GestionMantenimientoPage() {
                   </div>
 
                   {/* COLUMNA 3: PRÓXIMAS */}
-                  <div className="min-w-0 flex flex-col bg-slate-100/90 rounded-2xl border border-sky-200 shadow-2xs overflow-hidden">
+                  <div className="w-[88vw] sm:w-[340px] md:w-full shrink-0 min-w-[280px] md:min-w-0 snap-align-start flex flex-col bg-slate-100/90 rounded-2xl border border-sky-200 shadow-2xs overflow-hidden">
                     <div className="px-3 py-2 bg-sky-100/90 border-b border-sky-200 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-sky-600"></span>
@@ -4601,7 +4775,7 @@ export default function GestionMantenimientoPage() {
                   </div>
 
                   {/* COLUMNA 4: COMPLETADAS */}
-                  <div className="min-w-0 flex flex-col bg-slate-100/90 rounded-2xl border border-emerald-200 shadow-2xs overflow-hidden">
+                  <div className="w-[88vw] sm:w-[340px] md:w-full shrink-0 min-w-[280px] md:min-w-0 snap-align-start flex flex-col bg-slate-100/90 rounded-2xl border border-emerald-200 shadow-2xs overflow-hidden">
                     <div className="px-3 py-2 bg-emerald-100/90 border-b border-emerald-200 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
@@ -5196,21 +5370,11 @@ export default function GestionMantenimientoPage() {
                     <Download className="w-3.5 h-3.5" />
                     <span>Exportar Excel</span>
                   </button>
-                  <button
-                    onClick={() => {
-                      setCorrectivoSearch('');
-                      setCorrectivoPrioridad('Todas');
-                      setCorrectivoEstado('Todos');
-                    }}
-                    className="text-xs text-[#7B8E90] hover:text-[#324354] font-semibold underline cursor-pointer ml-1"
-                  >
-                    Limpiar Filtros
-                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="relative">
+              <div className="w-full">
+                <div className="relative w-full">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
@@ -5220,39 +5384,13 @@ export default function GestionMantenimientoPage() {
                     className="w-full pl-9 pr-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs focus:outline-none focus:border-[#324354]"
                   />
                 </div>
-
-                <div>
-                  <select
-                    value={correctivoPrioridad}
-                    onChange={(e) => setCorrectivoPrioridad(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
-                  >
-                    <option value="Todas">Prioridad: Todas</option>
-                    <option value="Alta">🚨 Alta (Crítica)</option>
-                    <option value="Media">⚠️ Media</option>
-                    <option value="Baja">ℹ️ Baja</option>
-                  </select>
-                </div>
-
-                <div>
-                  <select
-                    value={correctivoEstado}
-                    onChange={(e) => setCorrectivoEstado(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
-                  >
-                    <option value="Todos">Estado: Todos</option>
-                    <option value="Abierta">🔴 Abierta</option>
-                    <option value="En Proceso">🟡 En Proceso</option>
-                    <option value="Resuelta">🟢 Resuelta</option>
-                  </select>
-                </div>
               </div>
             </div>
 
             {/* Correctivo Table - Fully Responsive & Multi-Line Text Wrapping */}
             <div className="bg-white rounded-3xl border border-[#e2ded5] shadow-xs overflow-hidden w-full">
-              <div className="w-full overflow-x-auto max-h-[calc(100vh-230px)] overflow-y-auto scrollbar-thin">
-                <table className="w-full text-left text-xs border-collapse min-w-[1240px] table-auto">
+              <div className="w-full overflow-x-auto scrollbar-none">
+                <table className="w-full text-left text-xs border-collapse min-w-full md:min-w-[960px] table-auto">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
                       <th className="py-3 px-2 font-bold text-center w-[54px] min-w-[54px]">Foto</th>
@@ -5368,7 +5506,7 @@ export default function GestionMantenimientoPage() {
                               </div>
                               <div className="text-[9.5px] text-gray-400 mt-1 font-medium flex items-center gap-1">
                                 <span>📅</span>
-                                <span>{item.fecha_reporte}</span>
+                                <span>{formatFechaDDMMAAAA(item.fecha_reporte)}</span>
                               </div>
                             </td>
 
@@ -5387,7 +5525,7 @@ export default function GestionMantenimientoPage() {
                               {item.fecha_limite ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] shadow-2xs">
                                   <Calendar className="w-3 h-3 text-[#7B8E90] shrink-0" />
-                                  <span>{item.fecha_limite.slice(0, 10)}</span>
+                                  <span>{formatFechaDDMMAAAA(item.fecha_limite)}</span>
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-gray-400 italic bg-gray-50 border border-gray-200 shadow-2xs">
@@ -5521,17 +5659,17 @@ export default function GestionMantenimientoPage() {
                   />
                 </div>
 
-                {/* Clasificación / Tipo */}
+                {/* Origen / Tipo */}
                 <div>
                   <select
                     value={historyTipo}
                     onChange={(e) => setHistoryTipo(e.target.value)}
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
                   >
-                    <option value="Todos">Clasificación: Todos</option>
-                    <option value="Preventivo">📋 Preventivo</option>
+                    <option value="Todos">Origen: Todos</option>
+                    <option value="TPM">🟣 TPM</option>
                     <option value="Correctivo">🚨 Correctivo</option>
-                    <option value="Predictivo">⚡ Predictivo</option>
+                    <option value="Preventivo">📋 Preventivo</option>
                   </select>
                 </div>
 
@@ -5571,15 +5709,15 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full text-left text-xs border-collapse table-fixed">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
-                      {/* # ID */}
+                      {/* Código Único */}
                       <th
-                        onClick={() => handleHistorySort('id')}
-                        className="py-3 px-2 font-bold text-center w-[5%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por ID"
+                        onClick={() => handleHistorySort('codigo')}
+                        className="py-3 px-2 font-bold text-center w-[12%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Código Único"
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>#</span>
-                          {historySortField === 'id' ? (
+                          <span>Código</span>
+                          {historySortField === 'codigo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
@@ -5606,7 +5744,7 @@ export default function GestionMantenimientoPage() {
                       {/* Técnico Responsable */}
                       <th 
                         onClick={() => handleHistorySort('tecnico')}
-                        className="py-3 px-3 font-bold w-[15%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[16%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Técnico"
                       >
                         <div className="flex items-center gap-1.5">
@@ -5619,14 +5757,14 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Clasificación (Nueva Columna: Preventivo, Correctivo, Predictivo) */}
+                      {/* Origen (TPM, Correctivo, Preventivo) */}
                       <th 
                         onClick={() => handleHistorySort('tipo')}
-                        className="py-3 px-2 font-bold text-center w-[12%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Clasificación"
+                        className="py-3 px-2 font-bold text-center w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Origen"
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>Clasificación</span>
+                          <span>Origen</span>
                           {historySortField === 'tipo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
@@ -5654,7 +5792,7 @@ export default function GestionMantenimientoPage() {
                       {/* Fecha Apertura */}
                       <th 
                         onClick={() => handleHistorySort('apertura')}
-                        className="py-3 px-2 font-bold w-[11%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Fecha Apertura"
                       >
                         <div className="flex items-center gap-1">
@@ -5670,7 +5808,7 @@ export default function GestionMantenimientoPage() {
                       {/* Fecha Cierre */}
                       <th 
                         onClick={() => handleHistorySort('cierre')}
-                        className="py-3 px-2 font-bold w-[11%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Fecha Cierre"
                       >
                         <div className="flex items-center gap-1">
@@ -5686,7 +5824,7 @@ export default function GestionMantenimientoPage() {
                       {/* Observaciones */}
                       <th 
                         onClick={() => handleHistorySort('observaciones')}
-                        className="py-3 px-3 font-bold w-[14%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Observaciones"
                       >
                         <div className="flex items-center gap-1.5">
@@ -5710,18 +5848,37 @@ export default function GestionMantenimientoPage() {
                     ) : (
                       filteredHistoryRows.map((row, idx) => {
                         const estado = row['ESTADO'] || 'Pendiente';
-                        const isComplete = estado.toLowerCase() === 'completado';
+                        const isComplete = estado.toLowerCase() === 'completado' || estado.toLowerCase() === 'resuelta' || estado.toLowerCase() === 'cerrada';
                         const isIncomplete = estado.toLowerCase() === 'incompleto';
                         
-                        const tipo = (row['TIPO'] || row.tipo || 'Preventivo').trim();
-                        const isCorrectivo = tipo.toLowerCase().includes('correctiv');
-                        const isPredictivo = tipo.toLowerCase().includes('predictiv');
+                        const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').trim().toLowerCase();
+                        const codRaw = (row['CODIGO'] || row.codigo || row['Título'] || '').trim().toLowerCase();
+
+                        const isTpm = origRaw.includes('tpm') || origRaw.includes('tarjeta') || origRaw.includes('anomalia') || codRaw.includes('tpm-') || codRaw.includes('tfa-') || codRaw.includes('tarjeta');
+                        const isCorrectivo = !isTpm && (origRaw.includes('correctiv') || codRaw.includes('corr-') || origRaw.includes('directo'));
+
+                        let rawCode = row['CODIGO'] || row.codigo;
+                        if (rawCode && rawCode.startsWith('TFA-')) {
+                          const parts = rawCode.split('-');
+                          const num = parseInt(parts[parts.length - 1], 10);
+                          rawCode = !isNaN(num) ? `TPM-${num}` : rawCode.replace('TFA-', 'TPM-');
+                        } else if (rawCode && rawCode.startsWith('MP-')) {
+                          rawCode = rawCode.replace('MP-', 'PREV-');
+                        }
+                        const codigoDisplay = rawCode || (isTpm ? `TPM-${row.id || idx + 1}` : isCorrectivo ? `CORR-${row.id || idx + 1}` : `PREV-${row.id || idx + 1}`);
 
                         return (
                           <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-3 px-2 text-center font-bold text-gray-400">
-                              {idx + 1}
+                            {/* Código Badge */}
+                            <td className="py-3 px-2 text-center font-bold">
+                              <span className={`px-2 py-1 rounded-lg font-mono text-[10.5px] border inline-block whitespace-nowrap shadow-2xs ${
+                                isTpm ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                                isCorrectivo ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-sky-50 text-sky-800 border-sky-200'
+                              }`} title={codigoDisplay}>
+                                {codigoDisplay}
+                              </span>
                             </td>
+
                             <td className="py-3 px-3 font-bold text-[#324354] break-words">
                               {row['Título'] || 'Mantenimiento General'}
                             </td>
@@ -5729,22 +5886,22 @@ export default function GestionMantenimientoPage() {
                               👤 {row['TECNICO'] || 'Sin asignar'}
                             </td>
                             
-                            {/* Clasificación Badge */}
-                            <td className="py-3 px-2 text-center">
-                              {isCorrectivo ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                                  🚨 Correctivo
+                            {/* Origen Badge */}
+                            <td className="py-3 px-2 text-center whitespace-nowrap">
+                              {isTpm ? (
+                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                                  TPM
                                 </span>
-                              ) : isPredictivo ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                                  ⚡ Predictivo
+                              ) : isCorrectivo ? (
+                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  Correctivo
                                 </span>
                               ) : (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                  📋 Preventivo
+                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                  Preventivo
                                 </span>
                               )}
                             </td>
@@ -5757,11 +5914,11 @@ export default function GestionMantenimientoPage() {
                                 {isComplete ? '✅ ' : isIncomplete ? '⚠️ ' : '⏳ '}{estado}
                               </span>
                             </td>
-                            <td className="py-3 px-2 text-gray-600 font-medium text-[11px] break-words">
-                              {row['FECHA DE APERTURA'] ? row['FECHA DE APERTURA'].replace('T', ' ') : '—'}
+                            <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
+                              {formatFechaDDMMAAAA(row['FECHA DE APERTURA'] || row.fecha_apertura)}
                             </td>
-                            <td className="py-3 px-2 text-gray-600 font-medium text-[11px] break-words">
-                              {row['FECHA DE CIERRE'] ? row['FECHA DE CIERRE'].replace('T', ' ') : '—'}
+                            <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
+                              {formatFechaDDMMAAAA(row['FECHA DE CIERRE'] || row.fecha_cierre)}
                             </td>
                             <td className="py-3 px-3 text-gray-700">
                               {row['COMENTARIO DE EJECUCION'] ? (
@@ -8400,7 +8557,9 @@ export default function GestionMantenimientoPage() {
                       <span className="flex items-center gap-1.5">
                         <span>{editingCorrectivoForm.prioridad === 'Alta' ? '🚨 Alta (Crítica)' : editingCorrectivoForm.prioridad === 'Media' ? '⚠️ Media' : 'ℹ️ Baja'}</span>
                       </span>
-                      <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" title="La criticidad no puede ser modificada" />
+                      <span title="La criticidad no puede ser modificada">
+                        <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -8579,6 +8738,15 @@ export default function GestionMantenimientoPage() {
         />
       )}
 
+      {/* Photo Annotation Editor Modal for Preventivo Execution Photos */}
+      {annotatingPreventivoImage && (
+        <PhotoAnnotationEditor
+          imageSrc={annotatingPreventivoImage.src}
+          onSave={handleSaveAnnotatedPreventivoPhoto}
+          onCancel={() => setAnnotatingPreventivoImage(null)}
+        />
+      )}
+
       {/* Modal: Ejecución y Cierre de Mantenimiento Preventivo (PMP) */}
       {executingPreventivo && executingPreventivoForm && (
         <div
@@ -8751,6 +8919,83 @@ export default function GestionMantenimientoPage() {
                     placeholder="Detalla las actividades realizadas, ajustes, lubricantes o repuestos aplicados..."
                     className="w-full p-3 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs sm:text-sm text-[#324354] focus:outline-none focus:border-[#324354] resize-y"
                   />
+                </div>
+
+                {/* Evidencia Fotográfica / Adjunto de Ejecución */}
+                <div className="mt-4">
+                  <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-[#324354]" />
+                    <span>Fotos o Evidencias de Ejecución (Máximo 3)</span>
+                  </label>
+
+                  <input
+                    type="file"
+                    ref={preventivoCameraInputRef}
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePreventivoPhotoSelect}
+                    className="hidden"
+                  />
+                  <input
+                    type="file"
+                    ref={preventivoFileInputRef}
+                    accept="image/*,application/pdf"
+                    onChange={handlePreventivoPhotoSelect}
+                    className="hidden"
+                  />
+
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => preventivoCameraInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-[#324354] text-white font-bold rounded-xl text-xs hover:bg-[#324354]/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Tomar Foto</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => preventivoFileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-slate-100 text-[#324354] font-bold rounded-xl text-xs hover:bg-slate-200 border border-slate-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 text-[#7B8E90]" />
+                      <span>Adjuntar Archivo / Foto</span>
+                    </button>
+                  </div>
+
+                  {executingPreventivoForm.fotos && executingPreventivoForm.fotos.length > 0 && (
+                    <div className="flex items-center gap-3 flex-wrap bg-[#F6F3EE] p-3 rounded-xl border border-[#e2ded5]">
+                      {executingPreventivoForm.fotos.map((foto, idx) => (
+                        <div key={idx} className="relative group/thumb rounded-xl overflow-hidden border-2 border-[#324354] w-16 h-16 shadow-2xs bg-white">
+                          <img src={foto} alt={`Foto ejecución ${idx + 1}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setAnnotatingPreventivoImage({ src: foto, index: idx })}
+                              className="p-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors shadow-2xs cursor-pointer"
+                              title="Señalar en rojo (Editar con anotador)"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExecutingPreventivoForm(prev => prev ? ({
+                                  ...prev,
+                                  fotos: (prev.fotos || []).filter((_, i) => i !== idx)
+                                }) : null);
+                              }}
+                              className="p-1 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition-colors shadow-2xs cursor-pointer"
+                              title="Eliminar foto"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
