@@ -82,6 +82,7 @@ export default function TarjetaDetailModal({
   // Voice dictation state
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const initialTextRef = useRef<string>('');
 
   // Photo annotation editor state
   const [annotatingImage, setAnnotatingImage] = useState<{ src: string; index?: number } | null>(null);
@@ -148,6 +149,9 @@ export default function TarjetaDetailModal({
       return;
     }
 
+    const initialText = editData.descripcion_que || '';
+    initialTextRef.current = initialText;
+
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = 'es-CO';
@@ -156,16 +160,18 @@ export default function TarjetaDetailModal({
 
       recognition.onstart = () => setIsListening(true);
       recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        let sessionTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript;
+            sessionTranscript += event.results[i][0].transcript + ' ';
           }
         }
-        if (transcript) {
+        if (sessionTranscript.trim()) {
+          const base = initialTextRef.current.trim();
+          const cleanSession = sessionTranscript.trim();
           setEditData(prev => ({
             ...prev,
-            descripcion_que: prev.descripcion_que ? `${prev.descripcion_que} ${transcript.trim()}` : transcript.trim()
+            descripcion_que: base ? `${base} ${cleanSession}` : cleanSession
           }));
         }
       };
