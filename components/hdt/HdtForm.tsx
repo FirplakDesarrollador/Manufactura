@@ -7,7 +7,7 @@ import { ArrowLeft, Home, Save, Plus, Trash2, Loader2, AlertCircle, CheckCircle2
 import { supabase } from '@/lib/supabase'
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano'
 import { Database } from '@/lib/hdt/database.types'
-import { isAuthorizedEditor } from '@/lib/hdt/authorized-editors'
+import { isAuthorizedEditor, checkUserHdtEditPermission } from '@/lib/hdt/authorized-editors'
 import { moveToTrash } from '@/lib/hdt/papelera'
 
 import {
@@ -222,7 +222,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
             const { data: { user } } = await supabase.auth.getUser()
             if (user && user.email) {
                 setCurrentUserEmail(user.email)
-                const authorized = isAuthorizedEditor(user.email)
+                const authorized = await checkUserHdtEditPermission(user.email, user.id)
                 setCanDelete(authorized)
                 // Si llegó al modo edit sin autorización, forzar vista solo lectura
                 if (!authorized && (mode === 'edit')) {
@@ -287,8 +287,11 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                 // If mode is 'view' and HDT is vigente, check if user is authorized and switch to edit
                 if (mode === 'view' && hdtData.is_current) {
                     const { data: { user } } = await supabase.auth.getUser()
-                    if (user?.email && isAuthorizedEditor(user.email)) {
-                        setCurrentMode('edit')
+                    if (user?.email) {
+                        const authorized = await checkUserHdtEditPermission(user.email, user.id)
+                        if (authorized) {
+                            setCurrentMode('edit')
+                        }
                     }
                 }
 

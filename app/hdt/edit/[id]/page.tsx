@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { isAuthorizedEditor } from '@/lib/hdt/authorized-editors'
+import { checkUserHdtEditPermission } from '@/lib/hdt/authorized-editors'
 import HdtForm from '@/components/hdt/HdtForm'
 import { Loader2, ShieldX } from 'lucide-react'
 
@@ -25,15 +25,7 @@ export default function EditHdtPage({ params }: EditHdtPageProps) {
                 return
             }
 
-            // Fetch dynamic permissions from Supabase
-            const { data: userData } = await supabase
-                .from('usuarios')
-                .select('permisos')
-                .eq('uuid', user.id)
-                .single()
-
-            const permisos = (userData?.permisos as any) || {}
-            const isAuthorized = permisos.hdt?.editar || permisos.hdt === true || isAuthorizedEditor(user.email)
+            const isAuthorized = await checkUserHdtEditPermission(user.email, user.id)
 
             if (isAuthorized) {
                 setAuthState('authorized')
