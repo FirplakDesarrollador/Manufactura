@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { getTrazabilidadOperarios, TrazabilidadRecord } from '@/lib/supabase/queries/muebles'
 import { getEmpleadoById } from '@/lib/supabase/queries/talento_humano'
-import { Calendar, Search, Users, Clock, Hash, CheckCircle2, User, Package, ListFilter } from 'lucide-react'
+import { Calendar, Search, Users, Clock, Hash, CheckCircle2, User, Package, ListFilter, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { toast } from 'sonner'
 
 interface OperarioStats {
     cedula: string
@@ -205,6 +207,89 @@ export default function SeguimientoModule({ plantaMuebles }: SeguimientoModulePr
         return `${seconds}s`
     }
 
+    const handleDownloadExcel = () => {
+        if (records.length === 0) {
+            toast.error('No hay datos de seguimiento para exportar en esta fecha')
+            return
+        }
+
+        try {
+            // Hoja 1: Detalle de Registros de Trazabilidad
+            const detalleData = records.map(r => {
+                let tiempoStr = '0s'
+                if (r.fecha_inicio && r.created_at) {
+                    const start = new Date(r.fecha_inicio).getTime()
+                    const end = new Date(r.created_at).getTime()
+                    if (end > start) {
+                        tiempoStr = formatTime(end - start)
+                    }
+                }
+
+                return {
+                    'Fecha Registro': r.created_at ? new Date(r.created_at).toLocaleDateString() : '',
+                    'Hora Inicio': r.fecha_inicio ? new Date(r.fecha_inicio).toLocaleTimeString() : '',
+                    'Hora Fin': r.created_at ? new Date(r.created_at).toLocaleTimeString() : '',
+                    'Duración': tiempoStr,
+                    'Cédula Operario': r.cedula_operario || '',
+                    'Nombre Operario': r.nombre_operario || '',
+                    'OF': r.orden_fabricacion || '',
+                    'Proceso': r.proceso || 'Corte',
+                    'Piezas Cortadas': r.cantidad || 0
+                }
+            })
+
+            // Hoja 2: Resumen por Operario
+            const resumenOperarios = statsPersonas.map(op => ({
+                'Cédula': op.cedula,
+                'Nombre': op.nombre,
+                'Piezas Cortadas': op.piezasCortadas,
+                'Total Operaciones': op.operaciones,
+                'Tiempo Promedio': op.operaciones > 0 ? formatTime(op.tiempoTotalMs / op.operaciones) : '0s',
+                'Tiempo Total': formatTime(op.tiempoTotalMs),
+                'Cant. Órdenes': op.ordenes.size,
+                'Órdenes': Array.from(op.ordenes).join(', ')
+            }))
+
+            // Hoja 3: Resumen por Orden
+            const resumenOrdenes = statsOrdenes.map(ord => ({
+                'OF': ord.orden_fabricacion,
+                'Total Piezas Cortadas': ord.piezasCortadas,
+                'Total Operaciones': ord.operaciones,
+                'Tiempo Total': formatTime(ord.tiempoTotalMs),
+                'Cant. Operarios': ord.operarios.size,
+                'Operarios': Array.from(ord.operarios.values()).map(o => `${o.nombre} (${o.cedula})`).join(', ')
+            }))
+
+            const wb = XLSX.utils.book_new()
+
+            const wsDetalle = XLSX.utils.json_to_sheet(detalleData)
+            const wsOperarios = XLSX.utils.json_to_sheet(resumenOperarios)
+            const wsOrdenes = XLSX.utils.json_to_sheet(resumenOrdenes)
+
+            // Auto-width columns
+            const autoWidth = (data: any[]) => {
+                if (!data.length) return []
+                return Object.keys(data[0]).map(key => ({
+                    wch: Math.max(key.length, ...data.map(row => String(row[key] ?? '').length)) + 3
+                }))
+            }
+
+            wsDetalle['!cols'] = autoWidth(detalleData)
+            wsOperarios['!cols'] = autoWidth(resumenOperarios)
+            wsOrdenes['!cols'] = autoWidth(resumenOrdenes)
+
+            XLSX.utils.book_append_sheet(wb, wsDetalle, 'Detalle Seguimiento')
+            XLSX.utils.book_append_sheet(wb, wsOperarios, 'Resumen Operarios')
+            XLSX.utils.book_append_sheet(wb, wsOrdenes, 'Resumen Órdenes')
+
+            XLSX.writeFile(wb, `Informe_Seguimiento_Corte_${selectedDate}.xlsx`)
+            toast.success('Informe de seguimiento descargado en Excel')
+        } catch (error) {
+            console.error('Error exporting seguimiento to Excel:', error)
+            toast.error('Error al generar el archivo Excel')
+        }
+    }
+
     return (
         <div className="h-full flex flex-col bg-gray-50/80">
             {/* Header / Filters */}
@@ -219,19 +304,30 @@ export default function SeguimientoModule({ plantaMuebles }: SeguimientoModulePr
                             <p className="text-gray-500 text-sm mt-1">Monitorea el rendimiento diario por personal u órdenes de fabricación.</p>
                         </div>
                         
-                        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                        <div className="flex items-center gap-3">
                             <button
-                                onClick={() => setViewMode('personas')}
-                                className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'personas' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={handleDownloadExcel}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm font-bold text-sm"
+                                title="Descargar informe de seguimiento en Excel"
                             >
-                                <Users size={16} /> Por Personas
+                                <Download size={18} />
+                                DESCARGAR EXCEL
                             </button>
-                            <button
-                                onClick={() => setViewMode('ordenes')}
-                                className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'ordenes' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                <Package size={16} /> Por Órdenes
-                            </button>
+
+                            <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => setViewMode('personas')}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'personas' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    <Users size={16} /> Por Personas
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('ordenes')}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'ordenes' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    <Package size={16} /> Por Órdenes
+                                </button>
+                            </div>
                         </div>
                     </div>
 
