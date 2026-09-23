@@ -12,7 +12,7 @@ import {
     Loader2,
     CheckCircle2
 } from 'lucide-react'
-import TrazabilidadModal from './TrazabilidadModal'
+import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
 
 interface EditOrderModalProps {
     orden: OrdenMueble
@@ -82,16 +82,10 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail,
 
     if (showTraceability) {
         return (
-            <TrazabilidadModal 
-                isOpen={true}
+            <HistorialTrazabilidadModal 
                 orden={orden} 
-                proceso="Corte" // Basic entry point
-                usuarioNombre={usuarioNombre}
-                turno={turno}
-                userEmail={userEmail}
                 onSuccess={() => {
                     onSuccess()
-                    setShowTraceability(false)
                 }}
                 onClose={() => setShowTraceability(false)} 
             />
