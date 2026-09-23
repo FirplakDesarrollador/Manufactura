@@ -300,6 +300,11 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                         clearSelection()
                         onStartTask?.(tarea)
                     }}
+                    onReportDefect={(ord) => {
+                        clearSelection()
+                        setDefectoSelectedOrden(ord)
+                        setIsDefectoModalOpen(true)
+                    }}
                     onSuccess={() => {
                         clearSelection()
                         loadData()

@@ -20,6 +20,7 @@ interface TrazabilidadModalProps {
     userEmail: string
     onSuccess: () => void
     onStartTask?: (tarea: TareaMuebleActiva) => void
+    onReportDefect?: (orden: OrdenMueble) => void
 }
 
 export default function TrazabilidadModal({ 
@@ -33,7 +34,8 @@ export default function TrazabilidadModal({
     taladro,
     userEmail,
     onSuccess,
-    onStartTask
+    onStartTask,
+    onReportDefect
 }: TrazabilidadModalProps) {
     const [step, setStep] = useState<'identificacion' | 'registro'>('identificacion')
     const [identificacion, setIdentificacion] = useState('')
@@ -398,6 +400,20 @@ export default function TrazabilidadModal({
                                     </>
                                 )}
                             </button>
+
+                            {(proceso === 'Inspeccion' || proceso === 'Inspección') && onReportDefect && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onClose()
+                                        onReportDefect(orden)
+                                    }}
+                                    className="w-full py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 font-black text-amber-900 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 shadow-sm transition-all active:scale-[0.98] uppercase text-xs"
+                                >
+                                    <AlertTriangle size={18} className="text-amber-600" />
+                                    <span>REPORTAR DEFECTO / REPOSICIÓN</span>
+                                </button>
+                            )}
                         </div>
                     ) : (
                         /* Step 2: Quantity & Submit */
@@ -537,6 +553,20 @@ export default function TrazabilidadModal({
                                                 <><Send size={20} /><span>REGISTRAR</span></>
                                             )
                                         )}
+                                    </button>
+                                )}
+
+                                {(proceso === 'Inspeccion' || proceso === 'Inspección') && onReportDefect && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            onClose()
+                                            onReportDefect(orden)
+                                        }}
+                                        className="w-full py-3.5 px-4 mt-3 rounded-2xl flex items-center justify-center gap-2 font-black text-amber-900 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 shadow-sm transition-all active:scale-[0.98] uppercase text-xs"
+                                    >
+                                        <AlertTriangle size={18} className="text-amber-600" />
+                                        <span>REPORTAR DEFECTO / REPOSICIÓN</span>
                                     </button>
                                 )}
                             </div>
