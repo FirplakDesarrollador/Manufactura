@@ -38,7 +38,7 @@ export default function EnchapeModule({ userEmail, turno, usuarioNombre, plantaM
         }
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(plantaMuebles),
+                getOrdenesMuebles(plantaMuebles, true),
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)

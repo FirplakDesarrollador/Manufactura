@@ -39,13 +39,14 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
     const [endDate, setEndDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
     const [selectedPlanta, setSelectedPlanta] = useState<string>('todas')
+    const [selectedEstado, setSelectedEstado] = useState<string>('todas')
     const [selectedOrder, setSelectedOrder] = useState<OrdenMueble | null>(null)
 
     const loadData = React.useCallback(async () => {
         setLoading(true)
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(), // Trae todas las órdenes de Muebles y Cefi
+                getOrdenesMuebles(), // Trae todas las órdenes de Muebles y Cefi (abiertas y cerradas)
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)
@@ -68,6 +69,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         setStartDate('')
         setEndDate('')
         setSelectedPlanta('todas')
+        setSelectedEstado('todas')
     }
 
     const filteredOrdenes = useMemo(() => {
@@ -77,6 +79,10 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
             const matchesPlanta = selectedPlanta === 'todas' || 
                 (orden.planta || '').toLowerCase() === selectedPlanta.toLowerCase()
 
+            // Estado filter (Abierta / Cerrada)
+            const matchesEstado = selectedEstado === 'todas' ||
+                (selectedEstado === 'abierta' ? orden.pendiente === true : orden.pendiente === false)
+
             // Search filter
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
@@ -84,7 +90,8 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                 (orden.numero_pedido || '').toLowerCase().includes(search) ||
                 (orden.producto_sku || '').toLowerCase().includes(search) ||
                 (orden.cliente || '').toLowerCase().includes(search) ||
-                (orden.planta || '').toLowerCase().includes(search)
+                (orden.planta || '').toLowerCase().includes(search) ||
+                (orden.pendiente ? 'abierta' : 'cerrada').includes(search)
 
             // Date filter (Single or Range)
             const ordenDateStr = dateType === 'entrega' 
@@ -104,9 +111,9 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                 matchesDate = ordenDate <= end + 86400000
             }
 
-            return matchesPlanta && matchesSearch && matchesDate
+            return matchesPlanta && matchesEstado && matchesSearch && matchesDate
         })
-    }, [ordenes, searchText, startDate, endDate, dateType, selectedPlanta])
+    }, [ordenes, searchText, startDate, endDate, dateType, selectedPlanta, selectedEstado])
 
     const handleSyncSAP = async () => {
         if (!confirm('¿Desea cargar y sincronizar las órdenes de Muebles y Cefi desde SAP Service Layer?')) {
@@ -144,6 +151,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         try {
             const dataToExport = filteredOrdenes.map(o => ({
                 'OF': o.orden_fabricacion,
+                'Estado': o.pendiente ? 'ABIERTA' : 'CERRADA',
                 'Pedido': o.numero_pedido,
                 'Cliente': o.cliente,
                 'Planta': o.planta || 'N/A',
@@ -262,6 +270,19 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                                         <option value="todas">TODAS LAS PLANTAS</option>
                                         <option value="Muebles">MUEBLES</option>
                                         <option value="Cefi">CEFI</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Estado:</span>
+                                    <select
+                                        value={selectedEstado}
+                                        onChange={(e) => setSelectedEstado(e.target.value)}
+                                        className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 cursor-pointer"
+                                    >
+                                        <option value="todas">TODOS LOS ESTADOS</option>
+                                        <option value="abierta">ABIERTAS</option>
+                                        <option value="cerrada">CERRADAS</option>
                                     </select>
                                 </div>
 

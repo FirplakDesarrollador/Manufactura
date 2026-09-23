@@ -38,7 +38,7 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
         }
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(plantaMuebles),
+                getOrdenesMuebles(plantaMuebles, true),
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)

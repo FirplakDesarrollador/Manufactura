@@ -29,7 +29,7 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
         setLoading(true)
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(plantaMuebles),
+                getOrdenesMuebles(plantaMuebles, true),
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)

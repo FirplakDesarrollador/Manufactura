@@ -43,7 +43,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
         }
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(plantaMuebles),
+                getOrdenesMuebles(plantaMuebles, true),
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)

@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { OrdenMueble, MetricasMuebles, Defecto, ConteoDefecto, ReposicionMueble, Turno, Supervisor, SupervisorTurno } from '@/types/muebles'
 
-export async function getOrdenesMuebles(planta?: string) {
+export async function getOrdenesMuebles(planta?: string, soloPendientes: boolean = false) {
     let query = supabase
         .from('query_of_muebles')
         .select('*')
@@ -9,6 +9,10 @@ export async function getOrdenesMuebles(planta?: string) {
 
     if (planta) {
         query = query.eq('planta', planta)
+    }
+
+    if (soloPendientes) {
+        query = query.eq('pendiente', true)
     }
 
     const { data, error } = await query

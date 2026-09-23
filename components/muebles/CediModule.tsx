@@ -31,7 +31,7 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
         setLoading(true)
         try {
             const [ordenesData, metricasData, cediData] = await Promise.all([
-                getOrdenesMuebles(plantaMuebles),
+                getOrdenesMuebles(plantaMuebles, true),
                 getMetricasMueblesHoy(turno),
                 getCediActual(plantaMuebles)
             ])

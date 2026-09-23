@@ -64,10 +64,12 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
                         </div>
                     )}
                     <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <FileText size={16} className={`${isReponer ? 'text-red-600' : 'text-blue-600'}`} />
                             <span className={`font-bold text-sm ${isReponer ? 'text-red-700' : 'text-gray-900'}`}>OF: {orden.orden_fabricacion}</span>
-
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${orden.pendiente ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
+                                {orden.pendiente ? 'Abierta' : 'Cerrada'}
+                            </span>
                         </div>
                     <div className="text-xs flex flex-col gap-1">
                         <div className="flex justify-between items-center bg-gray-50 px-2 py-1 rounded">

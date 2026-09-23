@@ -30,7 +30,7 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
         setLoading(true)
         try {
             const [ordenesData, metricasData, cediData] = await Promise.all([
-                getOrdenesMuebles(plantaMuebles),
+                getOrdenesMuebles(plantaMuebles, true),
                 getMetricasMueblesHoy(turno),
                 getCediActual(plantaMuebles)
             ])
