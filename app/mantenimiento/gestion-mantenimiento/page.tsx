@@ -272,6 +272,7 @@ export default function GestionMantenimientoPage() {
   const [historyEstado, setHistoryEstado] = useState('Todos');
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
+  const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
   type HistorySortField = 'id' | 'codigo' | 'titulo' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
   const [historySortField, setHistorySortField] = useState<HistorySortField>('id');
   const [historySortAsc, setHistorySortAsc] = useState<boolean>(true);
@@ -817,6 +818,7 @@ export default function GestionMantenimientoPage() {
 
           const key = d.codigo || (tipoMtto === 'TPM' ? `TPM-${d.id || idx + 1}` : tipoMtto === 'Correctivo' ? `CORR-${d.id || idx + 1}` : `MP-${d.id || idx + 1}`);
           historyMap.set(key, {
+            ...d,
             id: d.id || idx + 1,
             codigo: key,
             'Título': d.titulo || d['Título'] || 'Mantenimiento',
@@ -847,6 +849,7 @@ export default function GestionMantenimientoPage() {
 
           if (!existing) {
             historyMap.set(cod, {
+              ...d,
               id: d.id || idx + 5000,
               codigo: cod,
               'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
@@ -857,7 +860,7 @@ export default function GestionMantenimientoPage() {
               origen: 'TPM',
               'FECHA DE APERTURA': d.fecha_apertura || (d.created_at ? d.created_at.slice(0, 10) : ''),
               'FECHA DE CIERRE': d.fecha_cierre || '',
-              'COMENTARIO DE EJECUCION': d.accion_inmediata || d.accion_correctiva || '',
+              'COMENTARIO DE EJECUCION': d.accion_inmediata || d.accion_correctiva || d.comentarios_ejecucion || '',
               created_at: d.created_at
             });
           } else {
@@ -6054,7 +6057,12 @@ export default function GestionMantenimientoPage() {
                         const codigoDisplay = rawCode || (isTpm ? `TPM-${row.id || idx + 1}` : isCorrectivo ? `CORR-${row.id || idx + 1}` : `PREV-${row.id || idx + 1}`);
 
                         return (
-                          <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
+                          <tr 
+                            key={row.id || idx} 
+                            onClick={() => setViewingHistoryRecord(row)}
+                            className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
+                            title="Haz clic para ver la información completa de esta orden de trabajo"
+                          >
                             {/* Código Badge */}
                             <td className="py-3 px-2 text-center font-bold">
                               <span className={`px-2 py-1 rounded-lg font-mono text-[10.5px] border inline-block whitespace-nowrap shadow-2xs ${
@@ -9583,6 +9591,188 @@ export default function GestionMantenimientoPage() {
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors shadow-xs"
               >
                 Sí, Eliminar Mantenimiento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Detalle Completo de Historial OT */}
+      {viewingHistoryRecord && (
+        <div 
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 pt-16 sm:pt-20 pb-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setViewingHistoryRecord(null);
+          }}
+        >
+          <div 
+            className="bg-white rounded-3xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] flex flex-col gap-4 relative my-auto overflow-hidden"
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with Title, Code & Badges */}
+            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-3 shrink-0">
+              <div className="flex flex-col gap-1 pr-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Código Badge */}
+                  <span className="px-2.5 py-1 bg-amber-50 font-mono font-bold text-amber-900 rounded-lg text-xs border border-amber-200">
+                    {viewingHistoryRecord.codigo || viewingHistoryRecord['CODIGO'] || 'REGISTRO OT'}
+                  </span>
+                  
+                  {/* Origen Badge */}
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                    (viewingHistoryRecord.tipo || viewingHistoryRecord.TIPO || viewingHistoryRecord.origen || '').toUpperCase().includes('TPM') 
+                      ? 'bg-purple-50 text-purple-800 border-purple-200' 
+                      : (viewingHistoryRecord.tipo || viewingHistoryRecord.TIPO || viewingHistoryRecord.origen || '').toUpperCase().includes('CORRECTIV')
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-sky-50 text-sky-800 border-sky-200'
+                  }`}>
+                    {viewingHistoryRecord.tipo || viewingHistoryRecord.TIPO || viewingHistoryRecord.origen || 'Mantenimiento'}
+                  </span>
+
+                  {/* Estado Badge */}
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                    (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('completad') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('resuelt') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('cerrad')
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('incomplet')
+                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}>
+                    {(viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('completad') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('resuelt') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('cerrad') ? '✅ Completado' : (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('incomplet') ? '⚠️ Incompleto' : '⏳ Pendiente'}
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-[#324354] leading-snug mt-1">
+                  {viewingHistoryRecord['Título'] || viewingHistoryRecord.titulo || viewingHistoryRecord.descripcion_que || 'Detalle de Orden de Trabajo'}
+                </h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setViewingHistoryRecord(null)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer shrink-0"
+                title="Cerrar ventana"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4">
+              {/* Technical Observations / Comments */}
+              <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5] flex flex-col gap-2">
+                <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#7B8E90]" />
+                  <span>Observaciones y Comentarios de Ejecución</span>
+                </h4>
+                {viewingHistoryRecord['COMENTARIO DE EJECUCION'] || viewingHistoryRecord.accion_realizada || viewingHistoryRecord.comentarios_ejecucion || viewingHistoryRecord.accion_inmediata || viewingHistoryRecord.accion_tomada ? (
+                  <div className="text-xs sm:text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-normal bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
+                    {viewingHistoryRecord['COMENTARIO DE EJECUCION'] || viewingHistoryRecord.accion_realizada || viewingHistoryRecord.comentarios_ejecucion || viewingHistoryRecord.accion_inmediata || viewingHistoryRecord.accion_tomada}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 italic bg-white p-3.5 rounded-xl border border-gray-200/80">
+                    Sin observaciones o comentarios de ejecución registrados.
+                  </div>
+                )}
+              </div>
+
+              {/* Grid 1: Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* Técnico Responsable */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
+                  <span className="text-gray-400 font-bold block text-[10px] uppercase">Técnico Responsable</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-[#324354] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                      👤
+                    </div>
+                    <strong className="text-[#324354] text-xs font-bold break-words">
+                      {viewingHistoryRecord['TECNICO'] || viewingHistoryRecord.tecnico_asignado || viewingHistoryRecord.tecnico_nombre || 'Sin asignar'}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Máquinas y Equipos */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
+                  <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquina / Equipo</span>
+                  <div className="flex flex-wrap items-center gap-1.5 leading-snug">
+                    {(viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina) && (
+                      <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
+                        {viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina}
+                      </span>
+                    )}
+                    <strong className="text-[#324354] text-xs font-bold break-words leading-tight">
+                      {viewingHistoryRecord.maquina || viewingHistoryRecord.equipo || viewingHistoryRecord.maquina_nombre || viewingHistoryRecord.maquinas || 'General / Planta'}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Planta */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Planta / Especialidad</span>
+                    <strong className="text-[#324354] text-xs font-bold block">
+                      {viewingHistoryRecord.planta || viewingHistoryRecord.planta_nombre || viewingHistoryRecord.especialidad || 'Todas las Plantas'}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Ubicación operativa</span>
+                </div>
+
+                {/* Prioridad / Turno */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Prioridad / Turno</span>
+                    <strong className="text-[#324354] text-xs font-bold block">
+                      {viewingHistoryRecord.prioridad ? `Prioridad ${viewingHistoryRecord.prioridad}` : viewingHistoryRecord.turno ? `Turno ${viewingHistoryRecord.turno}` : 'Estándar'}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Clasificación operativa</span>
+                </div>
+
+                {/* Fecha Apertura */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Fecha Apertura</span>
+                    <strong className="text-slate-800 text-xs font-bold block">
+                      {formatFechaDDMMAAAA(viewingHistoryRecord['FECHA DE APERTURA'] || viewingHistoryRecord.fecha_apertura || viewingHistoryRecord.created_at)}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Creación / Registro</span>
+                </div>
+
+                {/* Fecha Cierre */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Fecha Cierre</span>
+                    <strong className="text-emerald-800 text-xs font-bold block">
+                      {formatFechaDDMMAAAA(viewingHistoryRecord['FECHA DE CIERRE'] || viewingHistoryRecord.fecha_cierre) || 'En Proceso / Pendiente'}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Finalización de orden</span>
+                </div>
+              </div>
+
+              {/* Evidencias Fotográficas */}
+              {((viewingHistoryRecord.fotos && viewingHistoryRecord.fotos.length > 0) || (viewingHistoryRecord.fotos_solucion && viewingHistoryRecord.fotos_solucion.length > 0)) && (
+                <div className="p-4 bg-white border border-gray-200 rounded-2xl flex flex-col gap-2">
+                  <span className="text-gray-400 font-bold text-[10px] uppercase">Evidencias Fotográficas</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[...(viewingHistoryRecord.fotos || []), ...(viewingHistoryRecord.fotos_solucion || [])].map((imgUrl, i) => (
+                      <a key={i} href={imgUrl} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-xl overflow-hidden border border-gray-200 hover:opacity-90">
+                        <img src={imgUrl} alt={`Evidencia ${i + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions - Fixed at Bottom */}
+            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingHistoryRecord(null)}
+                className="px-5 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs"
+              >
+                Cerrar
               </button>
             </div>
           </div>
