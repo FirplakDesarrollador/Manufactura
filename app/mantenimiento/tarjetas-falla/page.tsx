@@ -42,6 +42,7 @@ import TarjetasGuia from '@/components/mantenimiento/TarjetasGuia';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import TarjetaDetailModal from '@/components/mantenimiento/TarjetaDetailModal';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
+import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
 import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 import * as XLSX from 'xlsx';
 
@@ -1286,42 +1287,22 @@ export default function TarjetasAnomaliasPage() {
                   <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
                     Máquinas y Equipos <span className="text-rose-600">*</span>
                   </label>
-                  <input
+                  <MachineSearchAutocomplete
                     id="field-tpm-maquina"
-                    list="maquinas-options-tpm"
-                    type="text"
                     value={formData.maquina}
-                    onChange={(e) => {
+                    maquinasCatalogo={maquinasCatalogo}
+                    existingTarjetas={tarjetas}
+                    onChange={(selectedMaquina, matchedPlanta) => {
                       if (formValidationMsg) setFormValidationMsg(null);
-                      const val = e.target.value;
-                      const matched = maquinasCatalogo.find(m => 
-                        `${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`.toLowerCase() === val.toLowerCase() ||
-                        m.nombre_equipo?.toLowerCase() === val.toLowerCase()
-                      );
-                      if (matched) {
-                        setFormData(prev => ({
-                          ...prev,
-                          maquina: matched.nombre_equipo,
-                          planta: matched.planta || prev.planta
-                        }));
-                      } else {
-                        setFormData(prev => ({ ...prev, maquina: val }));
-                      }
+                      setFormData(prev => ({
+                        ...prev,
+                        maquina: selectedMaquina,
+                        planta: matchedPlanta || prev.planta
+                      }));
                     }}
-                    placeholder="Buscar o seleccionar equipo..."
+                    placeholder="Buscar o escribir máquina / equipo (ej. Enchapadora, Kaeser, Laser...)"
                     required
-                    className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                   />
-                  <datalist id="maquinas-options-tpm">
-                    {maquinasCatalogo.map(m => (
-                      <option 
-                        key={m.id} 
-                        value={`${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`}
-                      >
-                        {m.planta ? `Planta: ${m.planta}` : ''}
-                      </option>
-                    ))}
-                  </datalist>
                 </div>
 
                 {/* Renglón: Planta (1 solo renglón a todo lo ancho) */}
@@ -2022,6 +2003,7 @@ export default function TarjetasAnomaliasPage() {
           maquinasCatalogo={maquinasCatalogo}
           plantasNomenclatura={plantasNomenclatura}
           empleadosList={empleadosList}
+          existingTarjetas={tarjetas}
           onOpenPhotoPreview={(url) => setPreviewImage(url)}
         />
       )}

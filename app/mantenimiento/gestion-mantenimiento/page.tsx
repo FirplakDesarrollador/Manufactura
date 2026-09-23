@@ -2227,7 +2227,7 @@ export default function GestionMantenimientoPage() {
     });
 
     try {
-      const { data } = await supabase.from('mantenimiento_planes_preventivos').insert([{
+      const insertPayload: any = {
         codigo: codigoGen,
         titulo: newTaskForm.title.trim(),
         duracion_minutos: newTaskForm.durationMinutes,
@@ -2239,16 +2239,22 @@ export default function GestionMantenimientoPage() {
         detalle_instrucciones: newTaskForm.detalle.trim(),
         maquina: newTaskForm.maquina.trim() || 'General',
         planta: plantaStr,
-        plantas: taskPlantas,
-        especialidad: plantaStr,
         activo: true
-      }]).select().single();
+      };
 
-      if (data) {
+      const { data, error } = await supabase
+        .from('mantenimiento_planes_preventivos')
+        .insert([insertPayload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error guardando PMP en Supabase:', error);
+      } else if (data) {
         createdId = data.id;
       }
     } catch (err) {
-      console.warn('Error guardando PMP en Supabase:', err);
+      console.warn('Excepción guardando PMP en Supabase:', err);
     }
 
     const newTask: MaintenanceTask = {
@@ -2342,22 +2348,29 @@ export default function GestionMantenimientoPage() {
     setShowEditTaskModal(false);
 
     try {
-      await supabase.from('mantenimiento_planes_preventivos').update({
+      const updatePayload: any = {
         codigo: editingTask.code,
         titulo: editingTask.title,
         maquina: editingTask.maquina,
         planta: plantaStr,
-        plantas: taskPlantas,
-        especialidad: plantaStr,
         duracion_minutos: editingTask.durationMinutes,
         tipo_intervencion: editingTask.tipoIntervencion,
         frecuencia_dias: editingTask.frecuencia,
         ref_frecuencia: editingTask.refFrecuencia,
         id_tecnicos_autorizados: candidateTechsForTask.map(t => t.id),
         detalle_instrucciones: editingTask.detalle
-      }).eq('id', editingTask.id);
+      };
+
+      const { error } = await supabase
+        .from('mantenimiento_planes_preventivos')
+        .update(updatePayload)
+        .eq('id', editingTask.id);
+
+      if (error) {
+        console.error('Error actualizando PMP en Supabase:', error);
+      }
     } catch (err) {
-      console.warn('Error actualizando PMP en Supabase:', err);
+      console.warn('Excepción actualizando PMP en Supabase:', err);
     }
 
     setEditingTask(null);
