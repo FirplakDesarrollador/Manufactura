@@ -95,12 +95,13 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
         setSelectedDate('')
     }
 
-    const toggleOrden = (orden: OrdenMueble) => {
-        setSelectedOrdenes((current) => {
-            const exists = current.some((item) => item.id === orden.id)
-            if (exists) return []
-            return [orden]
-        })
+    const handleSelectOrden = (orden: OrdenMueble) => {
+        if (!taladro) {
+            setNotification({ message: '¡Por favor selecciona el taladro en el menú superior!', type: 'error' })
+            return
+        }
+        setSelectedOrdenes([orden])
+        setIsModalOpen(true)
     }
 
     const clearSelection = () => {
@@ -234,37 +235,6 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                 )}
                             </div>
 
-                            {selectedOrdenes.length > 0 && (
-                                <div className="sticky top-2 z-20 mb-4 bg-white border border-emerald-100 rounded-xl shadow-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                            <CheckSquare size={20} />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-black text-gray-900">OF {selectedOrdenes[0].orden_fabricacion} seleccionada</p>
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase">
-                                                Total disponible: {(selectedOrdenes[0].enchape || 0) + (selectedOrdenes[0].reponer_inspeccion || 0)} piezas
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={clearSelection}
-                                            className="px-3 py-2 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold text-xs uppercase"
-                                        >
-                                            Limpiar
-                                        </button>
-                                        <button
-                                            onClick={() => setIsModalOpen(true)}
-                                            className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-bold text-xs uppercase flex items-center gap-2 shadow-lg shadow-emerald-100"
-                                        >
-                                            <Play size={16} />
-                                            Iniciar inspección
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                                     <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
@@ -284,7 +254,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                             key={orden.id}
                                             orden={orden}
                                             isActive={selectedOrdenes.some((item) => item.id === orden.id)}
-                                            onClick={() => toggleOrden(orden)}
+                                            onClick={() => handleSelectOrden(orden)}
                                             proceso="Inspeccion"
                                         />
                                     ))}
