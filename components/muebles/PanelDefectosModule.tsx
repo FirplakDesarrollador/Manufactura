@@ -8,15 +8,17 @@ import {
     Filter, 
     RefreshCw, 
     Loader2, 
-    LayoutGrid,
-    Clock,
-    Wrench,
-    CheckCircle2,
-    XCircle,
-    FileText
+    LayoutGrid, 
+    Clock, 
+    Wrench, 
+    CheckCircle2, 
+    XCircle, 
+    FileText, 
+    AlertTriangle 
 } from 'lucide-react'
 import PanelDefectoCard from './PanelDefectoCard'
 import DefectosReportadosModal from './DefectosReportadosModal'
+import ModalReportarDefectoMueble from './ModalReportarDefectoMueble'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -29,6 +31,7 @@ interface PanelDefectosModuleProps {
 export default function PanelDefectosModule({ plantaMuebles, turno }: PanelDefectosModuleProps) {
     const [data, setData] = useState<ConteoDefecto[]>([])
     const [loading, setLoading] = useState(true)
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false)
     
     // Detailed view modal state
     const [selectedDetail, setSelectedDetail] = useState<{
@@ -199,6 +202,14 @@ export default function PanelDefectosModule({ plantaMuebles, turno }: PanelDefec
                         {/* Action Buttons */}
                         <div className="flex items-center gap-3 self-center lg:self-end">
                             <button 
+                                onClick={() => setIsReportModalOpen(true)}
+                                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95 whitespace-nowrap"
+                            >
+                                <AlertTriangle size={16} />
+                                <span>REPORTAR DEFECTO</span>
+                            </button>
+
+                            <button 
                                 onClick={loadData}
                                 className="p-3 text-blue-600 hover:bg-blue-50 rounded-xl border border-transparent hover:border-blue-100 transition-all active:scale-95 shadow-sm bg-white"
                                 title="Actualizar datos"
@@ -287,6 +298,18 @@ export default function PanelDefectosModule({ plantaMuebles, turno }: PanelDefec
                     defectoNombre={selectedDetail.nombre}
                     idsReposiciones={selectedDetail.ids}
                     onClose={() => setSelectedDetail(null)}
+                />
+            )}
+
+            {/* Defect Reporting Modal */}
+            {isReportModalOpen && (
+                <ModalReportarDefectoMueble
+                    isOpen={isReportModalOpen}
+                    onClose={() => setIsReportModalOpen(false)}
+                    usuarioNombre="Inspector Calidad"
+                    turno={selectedTurno === 'all' ? '1' : selectedTurno}
+                    plantaMuebles={plantaMuebles}
+                    onSuccess={loadData}
                 />
             )}
         </div>

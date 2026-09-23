@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import DefectoCard from './DefectoCard'
 import EditDefectoModal from './EditDefectoModal'
+import ModalReportarDefectoMueble from './ModalReportarDefectoMueble'
 import { toast } from 'sonner'
 
 interface DefectosModuleProps {
@@ -29,6 +30,7 @@ export default function DefectosModule({ plantaMuebles }: DefectosModuleProps) {
     const [activeFilter, setActiveFilter] = useState<boolean | undefined>(true) // Default to Active
     const [selectedDefecto, setSelectedDefecto] = useState<Defecto | null>(null)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false)
 
     const loadData = React.useCallback(async () => {
         setLoading(true)
@@ -112,6 +114,14 @@ export default function DefectosModule({ plantaMuebles }: DefectosModuleProps) {
                         </button>
                         
                         <button 
+                            onClick={() => setIsReportModalOpen(true)}
+                            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95 whitespace-nowrap"
+                        >
+                            <AlertCircle size={20} />
+                            <span>REPORTAR DEFECTO</span>
+                        </button>
+
+                        <button 
                             onClick={() => setIsCreateModalOpen(true)}
                             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all active:scale-95 whitespace-nowrap"
                         >
@@ -175,6 +185,16 @@ export default function DefectosModule({ plantaMuebles }: DefectosModuleProps) {
                 <EditDefectoModal 
                     defecto={selectedDefecto}
                     onClose={() => setSelectedDefecto(null)}
+                    onSuccess={loadData}
+                />
+            )}
+
+            {isReportModalOpen && (
+                <ModalReportarDefectoMueble
+                    isOpen={isReportModalOpen}
+                    onClose={() => setIsReportModalOpen(false)}
+                    usuarioNombre="Inspector Calidad"
+                    plantaMuebles={plantaMuebles}
                     onSuccess={loadData}
                 />
             )}

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { OrdenMueble } from '@/types/muebles'
-import { FileText, Calendar, Package, User, AlertCircle, TrendingUp, Truck, CheckCircle, Info } from 'lucide-react'
+import { FileText, Calendar, Package, User, AlertCircle, TrendingUp, Truck, CheckCircle, Info, AlertTriangle } from 'lucide-react'
 import { format, isBefore, isToday, parseISO } from 'date-fns'
 
 interface OrderCardProps {
@@ -10,9 +10,10 @@ interface OrderCardProps {
     isActive: boolean
     onClick: () => void
     proceso?: string // 'Corte', 'Enchape', etc.
+    onReportDefect?: (orden: OrdenMueble) => void
 }
 
-export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' }: OrderCardProps) {
+export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte', onReportDefect }: OrderCardProps) {
     const deliveryDate = orden.fecha_entrega_estimada ? parseISO(orden.fecha_entrega_estimada) : null
     const creationDate = orden.created_at ? parseISO(orden.created_at) : null
     
@@ -86,6 +87,20 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte' 
                             <span className="text-gray-900 font-medium truncate max-w-[180px]">{orden.cliente}</span>
                         </div>
                     </div>
+                    {onReportDefect && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onReportDefect(orden)
+                            }}
+                            className="mt-2 w-full py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95"
+                            title="Reportar Defecto o Reposición para esta OF"
+                        >
+                            <AlertTriangle size={12} className="text-amber-600" />
+                            <span>REPORTAR DEFECTO</span>
+                        </button>
+                    )}
                     </div>
                 </div>
 

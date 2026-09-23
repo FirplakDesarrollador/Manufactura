@@ -234,6 +234,107 @@ export async function updateUserPlant(userUuid: string, newPlant: string) {
     return data
 }
 
+export async function getComponentesByOF(ordenFabricacion: string) {
+    if (!ordenFabricacion) return []
+    const { data, error } = await supabase
+        .from('ordenes_fabricacion_muebles')
+        .select('orden_fabricacion, producto_sku, producto_descripcion, componentes')
+        .eq('orden_fabricacion', ordenFabricacion)
+        .maybeSingle()
+
+    if (error) {
+        console.error('Error fetching componentes for OF:', error)
+        return []
+    }
+    
+    if (!data || !data.componentes) return []
+    
+    return data.componentes as Array<{
+        sku?: string
+        componente?: string
+        cantidad?: number
+    }>
+}
+
+export async function uploadFotoDefectoMuebles(file: File | Blob, customName?: string): Promise<string> {
+    const fileExt = file.type ? file.type.split('/')[1] || 'jpg' : 'jpg'
+    const fileName = customName || `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`
+    const filePath = `defectos/${fileName}`
+
+    // Try primary bucket Calidad_muebles, fallback to fichas-media if error
+    let bucketName = 'Calidad_muebles'
+    let { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file, {
+            contentType: file.type || 'image/jpeg',
+            upsert: true
+        })
+
+    if (error) {
+        console.warn('Fallback to bucket fichas-media:', error)
+        bucketName = 'fichas-media'
+        const fallbackRes = await supabase.storage
+            .from(bucketName)
+            .upload(filePath, file, {
+                contentType: file.type || 'image/jpeg',
+                upsert: true
+            })
+        if (fallbackRes.error) throw fallbackRes.error
+        data = fallbackRes.data
+    }
+
+    const { data: publicUrlData } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath)
+
+    return publicUrlData.publicUrl
+}
+
+export interface RegistrarDefectoPayload {
+    orden_fabricacion: string
+    componente: string
+    sku?: string
+    defecto_id: number
+    reparable: boolean
+    foto?: string
+    cantidad: number
+    turno?: string
+    taladro?: string
+    supervisor?: string
+    created_by: string
+    estado?: string
+}
+
+export async function registrarDefectosMuebles(payload: RegistrarDefectoPayload) {
+    const records = []
+    const count = Math.max(1, payload.cantidad || 1)
+    
+    for (let i = 0; i < count; i++) {
+        records.push({
+            orden_fabricacion: payload.orden_fabricacion,
+            componente: payload.componente || 'GENERAL',
+            sku: payload.sku || 'N/A',
+            defecto_id: payload.defecto_id,
+            reparable: payload.reparable,
+            foto: payload.foto || 'null',
+            turno: payload.turno || '1',
+            taladro: payload.taladro || 'HUAHUA',
+            supervisor: payload.supervisor || 'N/A',
+            created_by: payload.created_by,
+            estado: payload.estado || 'Inspeccion',
+            created_at: new Date().toISOString()
+        })
+    }
+
+    const { data, error } = await supabase
+        .from('reposiciones_muebles')
+        .insert(records)
+        .select()
+
+    if (error) throw error
+    return data
+}
+
 export interface TrazabilidadRecord {
     id: number;
     created_at: string;
@@ -262,3 +363,5 @@ export async function getTrazabilidadOperarios(proceso: string, fecha: string) {
     if (error) throw error
     return data as TrazabilidadRecord[]
 }
+
+

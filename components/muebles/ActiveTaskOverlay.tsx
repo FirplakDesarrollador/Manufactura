@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Timer, CheckCircle2, AlertCircle, Loader2, Play, User } from 'lucide-react'
+import { Timer, CheckCircle2, AlertCircle, Loader2, Play, User, AlertTriangle } from 'lucide-react'
 import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
 import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
 import { TareaMuebleActiva, TareaMuebleActivaOrden } from '@/types/muebles'
+import ModalReportarDefectoMueble from './ModalReportarDefectoMueble'
 import { toast } from 'sonner'
 
 interface ActiveTaskOverlayProps {
@@ -17,6 +18,7 @@ interface ActiveTaskOverlayProps {
 export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onFinished }: ActiveTaskOverlayProps) {
     const [elapsedTime, setElapsedTime] = useState('')
     const [isFinishing, setIsFinishing] = useState(false)
+    const [isDefectoModalOpen, setIsDefectoModalOpen] = useState(false)
     const [cantidades, setCantidades] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(false)
 
@@ -185,13 +187,23 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                         : (taskOrders[0].producto_descripcion && taskOrders[0].producto_descripcion !== 'Sin descripcion' ? taskOrders[0].producto_descripcion : `ORDEN DE FABRICACIÓN #${taskOrders[0].of}`)}
                                 </p>
                             </div>
-                            <button
-                                onClick={() => setIsFinishing(true)}
-                                className="group relative w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 overflow-hidden"
-                            >
-                                <span>FINALIZAR {(tarea.proceso || 'PROCESO').toUpperCase()}</span>
-                                <CheckCircle2 size={24} />
-                            </button>
+                            <div className="w-full flex flex-col gap-3">
+                                <button
+                                    onClick={() => setIsFinishing(true)}
+                                    className="group relative w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 overflow-hidden"
+                                >
+                                    <span>FINALIZAR {(tarea.proceso || 'PROCESO').toUpperCase()}</span>
+                                    <CheckCircle2 size={24} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDefectoModalOpen(true)}
+                                    className="w-full py-3.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-900 border-2 border-amber-300 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+                                >
+                                    <AlertTriangle size={18} className="text-amber-600" />
+                                    <span>REPORTAR DEFECTO / HALLAZGO</span>
+                                </button>
+                            </div>
                         </>
                     ) : (
                         <div className="w-full space-y-6 animate-in slide-in-from-bottom-4 duration-300">
@@ -272,7 +284,7 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                 >
                                     {loading ? <Loader2 className="animate-spin" /> : (
                                         totalCantidad === 0 ? (
-                                            <><span>LIBERAR SIN REGISTRAR</span><CheckCircle2 size={24} /></>
+                                             <><span>LIBERAR SIN REGISTRAR</span><CheckCircle2 size={24} /></>
                                         ) : (
                                             <><span>REGISTRAR Y LIBERAR</span><CheckCircle2 size={24} /></>
                                         )
@@ -290,6 +302,21 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                     )}
                 </div>
             </div>
+
+            {/* Defect Reporting Modal inside Task */}
+            {isDefectoModalOpen && (
+                <ModalReportarDefectoMueble
+                    isOpen={isDefectoModalOpen}
+                    onClose={() => setIsDefectoModalOpen(false)}
+                    ordenFabricacion={taskOrders[0]?.of || tarea.of}
+                    ordenData={{
+                        orden_fabricacion: taskOrders[0]?.of || tarea.of,
+                        producto_descripcion: taskOrders[0]?.producto_descripcion || tarea.producto_descripcion
+                    }}
+                    usuarioNombre={tarea.operario_nombre || usuarioNombre}
+                    taladro={tarea.taladro}
+                />
+            )}
         </div>
     )
 }

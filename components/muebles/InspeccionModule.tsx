@@ -7,7 +7,8 @@ import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
-import { Search, X, Calendar, RefreshCw, Filter, CheckCircle, AlertCircle, ChevronDown, CheckSquare, Play } from 'lucide-react'
+import ModalReportarDefectoMueble from './ModalReportarDefectoMueble'
+import { Search, X, Calendar, RefreshCw, Filter, CheckCircle, AlertCircle, ChevronDown, CheckSquare, Play, AlertTriangle } from 'lucide-react'
 
 interface InspeccionModuleProps {
     userEmail: string
@@ -27,6 +28,8 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
     const [selectedOrdenes, setSelectedOrdenes] = useState<OrdenMueble[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isDefectoModalOpen, setIsDefectoModalOpen] = useState(false)
+    const [defectoSelectedOrden, setDefectoSelectedOrden] = useState<OrdenMueble | null>(null)
     const [taladro, setTaladro] = useState<string>('')
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -184,6 +187,18 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                             </div>
 
                             <button
+                                onClick={() => {
+                                    setDefectoSelectedOrden(null)
+                                    setIsDefectoModalOpen(true)
+                                }}
+                                className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                title="Reportar Defecto / Calidad"
+                            >
+                                <AlertTriangle size={16} />
+                                <span className="hidden sm:inline">REPORTAR DEFECTO</span>
+                            </button>
+
+                            <button
                                 onClick={handleClearFilters}
                                 className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
                             >
@@ -256,6 +271,10 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                             isActive={selectedOrdenes.some((item) => item.id === orden.id)}
                                             onClick={() => handleSelectOrden(orden)}
                                             proceso="Inspeccion"
+                                            onReportDefect={(ord) => {
+                                                setDefectoSelectedOrden(ord)
+                                                setIsDefectoModalOpen(true)
+                                            }}
                                         />
                                     ))}
                                 </div>
@@ -285,6 +304,24 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                         clearSelection()
                         loadData()
                     }}
+                />
+            )}
+
+            {/* Defect Reporting Modal */}
+            {isDefectoModalOpen && (
+                <ModalReportarDefectoMueble
+                    isOpen={isDefectoModalOpen}
+                    onClose={() => {
+                        setIsDefectoModalOpen(false)
+                        setDefectoSelectedOrden(null)
+                    }}
+                    ordenFabricacion={defectoSelectedOrden?.orden_fabricacion || ''}
+                    ordenData={defectoSelectedOrden || undefined}
+                    usuarioNombre={usuarioNombre}
+                    turno={turno}
+                    taladro={taladro}
+                    plantaMuebles={plantaMuebles}
+                    onSuccess={() => loadData(true)}
                 />
             )}
 
