@@ -313,8 +313,11 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                         orden_fabricacion: taskOrders[0]?.of || tarea.of,
                         producto_descripcion: taskOrders[0]?.producto_descripcion || tarea.producto_descripcion
                     }}
-                    usuarioNombre={tarea.operario_nombre || usuarioNombre}
+                    usuarioNombre={usuarioNombre}
+                    operarioCedula={tarea.operario_cedula}
+                    operarioNombre={tarea.operario_nombre}
                     taladro={tarea.taladro}
+                    onFinishInspectionTask={handleFinalizar}
                 />
             )}
         </div>

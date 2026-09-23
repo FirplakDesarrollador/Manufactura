@@ -310,6 +310,44 @@ export default function TrazabilidadModal({
         }
     }
 
+    const handleStartTaskAndReportDefect = async () => {
+        if (!identificacion) {
+            toast.error('Debes ingresar tu cédula primero')
+            return
+        }
+
+        setLoading(true)
+        try {
+            const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
+                of: item.orden_fabricacion,
+                producto_descripcion: item.producto_descripcion,
+                available: ((item.enchape || 0) + (item.reponer_inspeccion || 0))
+            }))
+
+            const nuevaTarea: TareaMuebleActiva = {
+                of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
+                proceso: proceso,
+                inicio: startTime || new Date().toISOString(),
+                operario_nombre: empleado?.nombreCompleto || 'Desconocido',
+                operario_cedula: identificacion,
+                producto_descripcion: tareasOrdenes.length === 1 ? (tareasOrdenes[0].producto_descripcion || '') : `${proceso} de varias ordenes`,
+                available: available,
+                ordenes: tareasOrdenes,
+                taladro: taladro
+            }
+
+            await setTareaActiva(userEmail, nuevaTarea)
+            if (onStartTask) onStartTask(nuevaTarea)
+            if (onReportDefect) onReportDefect(orden)
+            onClose()
+        } catch (error) {
+            console.error('Error starting inspection task for defect:', error)
+            toast.error('Error al iniciar inspección')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     if (!isOpen) return null
 
     return (
@@ -400,20 +438,6 @@ export default function TrazabilidadModal({
                                     </>
                                 )}
                             </button>
-
-                            {(proceso === 'Inspeccion' || proceso === 'Inspección') && onReportDefect && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        onClose()
-                                        onReportDefect(orden)
-                                    }}
-                                    className="w-full py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 font-black text-amber-900 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 shadow-sm transition-all active:scale-[0.98] uppercase text-xs"
-                                >
-                                    <AlertTriangle size={18} className="text-amber-600" />
-                                    <span>REPORTAR DEFECTO / REPOSICIÓN</span>
-                                </button>
-                            )}
                         </div>
                     ) : (
                         /* Step 2: Quantity & Submit */
@@ -556,13 +580,11 @@ export default function TrazabilidadModal({
                                     </button>
                                 )}
 
-                                {(proceso === 'Inspeccion' || proceso === 'Inspección') && onReportDefect && (
+                                {(proceso === 'Inspeccion' || proceso === 'Inspección') && (
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            onClose()
-                                            onReportDefect(orden)
-                                        }}
+                                        onClick={handleStartTaskAndReportDefect}
+                                        disabled={loading}
                                         className="w-full py-3.5 px-4 mt-3 rounded-2xl flex items-center justify-center gap-2 font-black text-amber-900 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 shadow-sm transition-all active:scale-[0.98] uppercase text-xs"
                                     >
                                         <AlertTriangle size={18} className="text-amber-600" />

@@ -35,10 +35,13 @@ interface ModalReportarDefectoMuebleProps {
     ordenFabricacion?: string
     ordenData?: Partial<OrdenMueble>
     usuarioNombre: string
+    operarioCedula?: string
+    operarioNombre?: string
     turno?: string
     taladro?: string
     plantaMuebles?: string
     onSuccess?: () => void
+    onFinishInspectionTask?: () => Promise<void> | void
 }
 
 interface ComponenteItem {
@@ -53,10 +56,13 @@ export default function ModalReportarDefectoMueble({
     ordenFabricacion: initialOF = '',
     ordenData,
     usuarioNombre,
+    operarioCedula,
+    operarioNombre,
     turno: initialTurno = '1',
     taladro: initialTaladro = '',
     plantaMuebles = 'Muebles',
-    onSuccess
+    onSuccess,
+    onFinishInspectionTask
 }: ModalReportarDefectoMuebleProps) {
     // Form states
     const [of, setOf] = useState<string>(initialOF)
@@ -212,7 +218,7 @@ export default function ModalReportarDefectoMueble({
         d.id.toString().includes(searchDefecto)
     )
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (finishInspection = false) => {
         if (!of || of.trim().length < 4) {
             toast.error('Por favor ingresa una Orden de Fabricación válida')
             return
@@ -255,6 +261,10 @@ export default function ModalReportarDefectoMueble({
             const matchedComp = componentes.find(c => c.componente === compName)
             const skuVal = matchedComp?.sku || productoSku || 'N/A'
 
+            const inspectorIdentificado = operarioNombre 
+                ? `${operarioNombre}${operarioCedula ? ` - ID: ${operarioCedula}` : ''}`
+                : (usuarioNombre || 'Inspector Calidad')
+
             await registrarDefectosMuebles({
                 orden_fabricacion: of.trim(),
                 componente: compName,
@@ -266,11 +276,18 @@ export default function ModalReportarDefectoMueble({
                 turno: turno,
                 taladro: taladro || 'HUAHUA',
                 supervisor: supervisor || 'Sin supervisor',
-                created_by: usuarioNombre || 'Inspector Calidad',
+                created_by: inspectorIdentificado,
                 estado: 'Inspeccion'
             })
 
-            toast.success(`¡Defecto registrado exitosamente (${cantidad} ${reparable ? 'Reparación' : 'Reposición'})!`)
+            if (finishInspection && onFinishInspectionTask) {
+                toast.loading('Finalizando proceso de inspección y deteniendo cronómetro...', { id: 'finish-task' })
+                await onFinishInspectionTask()
+                toast.success('¡Defecto registrado e inspección finalizada con éxito!', { id: 'finish-task' })
+            } else {
+                toast.success(`¡Defecto registrado exitosamente (${cantidad} ${reparable ? 'Reparación' : 'Reposición'})!`)
+            }
+
             if (onSuccess) onSuccess()
             onClose()
         } catch (error: any) {
@@ -630,7 +647,7 @@ export default function ModalReportarDefectoMueble({
                 </div>
 
                 {/* Modal Footer */}
-                <div className="bg-white px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+                <div className="bg-white px-6 py-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
                     <button
                         type="button"
                         onClick={onClose}
@@ -640,28 +657,68 @@ export default function ModalReportarDefectoMueble({
                         Cancelar
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={submitting || !selectedDefectoId || !of}
-                        className={`px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-xl flex items-center gap-2 transition-all active:scale-[0.98] ${
-                            submitting || !selectedDefectoId || !of
-                                ? 'bg-gray-300 shadow-none cursor-not-allowed'
-                                : 'bg-[#324354] hover:bg-[#254153] shadow-blue-900/20'
-                        }`}
-                    >
-                        {submitting ? (
+                    <div className="flex items-center gap-2">
+                        {onFinishInspectionTask ? (
                             <>
-                                <Loader2 size={18} className="animate-spin" />
-                                <span>GUARDANDO...</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSubmit(false)}
+                                    disabled={submitting || !selectedDefectoId || !of}
+                                    className={`px-4 py-2.5 rounded-xl font-bold text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-all ${
+                                        submitting || !selectedDefectoId || !of ? 'opacity-50 cursor-not-allowed' : ''
+                                    }`}
+                                >
+                                    <CheckCircle2 size={16} />
+                                    <span>GUARDAR DEFECTO</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSubmit(true)}
+                                    disabled={submitting || !selectedDefectoId || !of}
+                                    className={`px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow-lg flex items-center gap-2 transition-all active:scale-[0.98] ${
+                                        submitting || !selectedDefectoId || !of
+                                            ? 'bg-gray-300 shadow-none cursor-not-allowed'
+                                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                                    }`}
+                                >
+                                    {submitting ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>GUARDANDO...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 size={16} />
+                                            <span>GUARDAR Y FINALIZAR INSPECCIÓN</span>
+                                        </>
+                                    )}
+                                </button>
                             </>
                         ) : (
-                            <>
-                                <CheckCircle2 size={18} />
-                                <span>REGISTRAR {reparable ? 'REPARACIÓN' : 'REPOSICIÓN'}</span>
-                            </>
+                            <button
+                                type="button"
+                                onClick={() => handleSubmit(false)}
+                                disabled={submitting || !selectedDefectoId || !of}
+                                className={`px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-xl flex items-center gap-2 transition-all active:scale-[0.98] ${
+                                    submitting || !selectedDefectoId || !of
+                                        ? 'bg-gray-300 shadow-none cursor-not-allowed'
+                                        : 'bg-[#324354] hover:bg-[#254153] shadow-blue-900/20'
+                                }`}
+                            >
+                                {submitting ? (
+                                    <>
+                                        <Loader2 size={18} className="animate-spin" />
+                                        <span>GUARDANDO...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 size={18} />
+                                        <span>REGISTRAR {reparable ? 'REPARACIÓN' : 'REPOSICIÓN'}</span>
+                                    </>
+                                )}
+                            </button>
                         )}
-                    </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -188,8 +188,16 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
 
                             <button
                                 onClick={() => {
-                                    setDefectoSelectedOrden(null)
-                                    setIsDefectoModalOpen(true)
+                                    if (!taladro) {
+                                        setNotification({ message: '¡Por favor selecciona el taladro en el menú superior!', type: 'error' })
+                                        return
+                                    }
+                                    if (filteredOrdenes.length > 0) {
+                                        handleSelectOrden(filteredOrdenes[0])
+                                    } else {
+                                        setDefectoSelectedOrden(null)
+                                        setIsDefectoModalOpen(true)
+                                    }
                                 }}
                                 className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 whitespace-nowrap"
                                 title="Reportar Defecto / Calidad"
@@ -271,10 +279,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                             isActive={selectedOrdenes.some((item) => item.id === orden.id)}
                                             onClick={() => handleSelectOrden(orden)}
                                             proceso="Inspeccion"
-                                            onReportDefect={(ord) => {
-                                                setDefectoSelectedOrden(ord)
-                                                setIsDefectoModalOpen(true)
-                                            }}
+                                            onReportDefect={(ord) => handleSelectOrden(ord)}
                                         />
                                     ))}
                                 </div>
