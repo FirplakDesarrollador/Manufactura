@@ -223,6 +223,7 @@ export default function GestionMantenimientoPage() {
 
   // Navigation State
   const [activeTab, setActiveTab] = useState<TabType>('planificador');
+  const [isSubHeaderOpen, setIsSubHeaderOpen] = useState(true);
 
   // Core Data State
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -1795,6 +1796,89 @@ export default function GestionMantenimientoPage() {
         console.error('Error guardando detalles en Supabase:', err);
       }
     }, 800);
+  };
+
+  // =========================================================================
+  // SAVE TASK (PREVENTIVO) FROM PLANNER EDIT MODAL
+  // =========================================================================
+  const handleSavePreventivoFromPlanner = async (
+    taskId: number,
+    updates: Partial<MaintenanceTask>
+  ): Promise<boolean> => {
+    try {
+      const payload: Record<string, unknown> = {};
+      if (updates.title !== undefined) payload.titulo = updates.title;
+      if (updates.detalle !== undefined) payload.detalle = updates.detalle;
+      if (updates.durationMinutes !== undefined) payload.duracion_minutos = updates.durationMinutes;
+      if (updates.status !== undefined) payload.status = updates.status;
+      if (updates.observations !== undefined) payload.observations = updates.observations;
+      if (updates.fechaApertura !== undefined) payload.fecha_apertura = updates.fechaApertura || null;
+      if (updates.fechaCierre !== undefined) payload.fecha_cierre = updates.fechaCierre || null;
+      if (updates.idtecs !== undefined) payload.idtecs = updates.idtecs === 9999 ? null : updates.idtecs;
+      if (updates.maquina !== undefined) payload.maquina = updates.maquina;
+      if (updates.planta !== undefined) payload.planta = updates.planta;
+
+      const { error } = await supabase
+        .from('mantenimiento_ordenes')
+        .update(payload)
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      setTasks(prev => prev.map(t =>
+        t.id === taskId ? {
+          ...t,
+          title: updates.title ?? t.title,
+          detalle: updates.detalle ?? t.detalle,
+          durationMinutes: updates.durationMinutes ?? t.durationMinutes,
+          status: updates.status ?? t.status,
+          observations: updates.observations ?? t.observations,
+          fechaApertura: updates.fechaApertura ?? t.fechaApertura,
+          fechaCierre: updates.fechaCierre ?? t.fechaCierre,
+          idtecs: updates.idtecs ?? t.idtecs,
+          maquina: updates.maquina ?? t.maquina,
+          planta: updates.planta ?? t.planta,
+        } : t
+      ));
+      return true;
+    } catch (err) {
+      console.error('[Planner] Error guardando OT preventiva:', err);
+      return false;
+    }
+  };
+
+  // =========================================================================
+  // SAVE CORRECTIVO FROM PLANNER EDIT MODAL
+  // =========================================================================
+  const handleSaveCorrectivoFromPlanner = async (
+    corrId: number | string,
+    updates: Partial<CorrectiveRecord>
+  ): Promise<boolean> => {
+    try {
+      const payload: Record<string, unknown> = {};
+      if (updates.sintoma !== undefined) payload.sintoma = updates.sintoma;
+      if (updates.maquina !== undefined) payload.maquina = updates.maquina;
+      if (updates.planta !== undefined) payload.planta = updates.planta;
+      if (updates.prioridad !== undefined) payload.prioridad = updates.prioridad;
+      if (updates.estado !== undefined) payload.estado = updates.estado;
+      if (updates.tecnico_asignado !== undefined) payload.tecnico_asignado = updates.tecnico_asignado;
+      if (updates.fecha_limite !== undefined) payload.fecha_limite = updates.fecha_limite || null;
+      if (updates.fecha_cierre !== undefined) payload.fecha_cierre = updates.fecha_cierre || null;
+      if (updates.accion_tomada !== undefined) payload.accion_tomada = updates.accion_tomada;
+
+      await Promise.allSettled([
+        supabase.from('tarjetas_falla_anomalia').update(payload).eq('id', corrId),
+        supabase.from('mantenimiento_ordenes').update(payload).eq('id', corrId),
+      ]);
+
+      setCorrectiveRecords(prev => prev.map(c =>
+        c.id === corrId ? { ...c, ...updates } : c
+      ));
+      return true;
+    } catch (err) {
+      console.error('[Planner] Error guardando OT correctiva:', err);
+      return false;
+    }
   };
 
   const handleAssignTask = async (taskId: number, techId: number, forceAdvance = false, stayOnCurrentTech = false) => {
@@ -4259,8 +4343,10 @@ export default function GestionMantenimientoPage() {
         }}
       />
 
-      {/* SubHeader with Main Functions matching FIRPLAK System - Single Row with Lateral Scroll on Mobile */}
-      <div className="fixed top-20 left-0 right-0 z-40 bg-white border-b border-[#e2ded5] py-1.5 px-2 shadow-xs font-sans">
+      {/* SubHeader with Main Functions matching FIRPLAK System - Single Row with Lateral Scroll on Mobile & Toggleable Collapse */}
+      <div className={`fixed top-20 left-0 right-0 z-40 bg-white border-b border-[#e2ded5] px-2 font-sans transition-all duration-300 shadow-xs ${
+        isSubHeaderOpen ? 'max-h-16 py-1.5 opacity-100' : 'max-h-0 py-0 opacity-0 overflow-hidden pointer-events-none'
+      }`}>
         <div className="max-w-[1700px] mx-auto flex flex-row items-center justify-start sm:justify-center gap-1.5 py-0.5 overflow-x-auto scrollbar-none flex-nowrap">
           {subNavItems.map((item) => {
             const isActive = activeTab === item.id;
@@ -4290,8 +4376,22 @@ export default function GestionMantenimientoPage() {
         </div>
       </div>
 
+      {/* Toggle pill button for SubHeader navigation */}
+      <button
+        type="button"
+        onClick={() => setIsSubHeaderOpen(!isSubHeaderOpen)}
+        className={`fixed left-1/2 -translate-x-1/2 z-40 bg-slate-200 hover:bg-slate-300 text-slate-700 border-x border-b border-slate-300/80 shadow-xs rounded-b-xl px-2.5 py-0.5 flex items-center justify-center transition-all duration-300 cursor-pointer active:scale-95 opacity-100 ${
+          isSubHeaderOpen ? 'top-[116px]' : 'top-20'
+        }`}
+        title={isSubHeaderOpen ? 'Ocultar menú' : 'Mostrar menú'}
+      >
+        {isSubHeaderOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-700 stroke-[2.5]" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-700 stroke-[2.5]" />}
+      </button>
+
       {/* Main Content Area */}
-      <main className="relative z-10 max-w-[1700px] w-full mx-auto px-2 sm:px-4 lg:px-6 pt-[118px] sm:pt-[120px] flex-1 flex flex-col gap-1.5">
+      <main className={`relative z-10 max-w-[1700px] w-full mx-auto px-2 sm:px-4 lg:px-6 flex-1 flex flex-col gap-1.5 transition-all duration-300 ${
+        isSubHeaderOpen ? 'pt-[124px] sm:pt-[126px]' : 'pt-[88px] sm:pt-[90px]'
+      }`}>
 
         {/* ========================================================================= */}
         {/* VIEW 1: PLANIFICADOR (ADMIN PLANNER DASHBOARD) */}
@@ -4302,6 +4402,7 @@ export default function GestionMantenimientoPage() {
               technicians={technicians}
               tasks={tasks}
               correctiveRecords={correctiveRecords}
+              isSubHeaderOpen={isSubHeaderOpen}
               onUpdateTaskTech={(taskId, newTechId) => handleAssignTask(taskId, newTechId)}
               onUpdateCorrectivoTech={(corrId, newTechName, newTechId) => handleAssignTechToCorrectivo(corrId, newTechName, newTechId)}
               onRefreshData={() => fetchData(true)}
@@ -4311,6 +4412,34 @@ export default function GestionMantenimientoPage() {
                 sessionStorage.setItem('techflow_active_tech_id', techId.toString());
                 setActiveTab('tecnico');
               }}
+              onOpenNewCorrectivo={() => {
+                setNewCorrectivoForm({
+                  maquina: '',
+                  planta: 'Mármol Sintético',
+                  sintoma: '',
+                  prioridad: 'Alta',
+                  tecnico_asignado: '',
+                  fecha_limite: '',
+                  accion_tomada: '',
+                  fotos: []
+                });
+                setShowCorrectivoModal(true);
+              }}
+              onOpenNewTpm={() => {
+                setNewCorrectivoForm({
+                  maquina: '',
+                  planta: 'Mármol Sintético',
+                  sintoma: '[Tarjeta TPM] ',
+                  prioridad: 'Alta',
+                  tecnico_asignado: '',
+                  fecha_limite: '',
+                  accion_tomada: '',
+                  fotos: []
+                });
+                setShowCorrectivoModal(true);
+              }}
+              onSaveTask={handleSavePreventivoFromPlanner}
+              onSaveCorrectivo={handleSaveCorrectivoFromPlanner}
             />
           </div>
         )}

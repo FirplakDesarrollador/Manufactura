@@ -151,6 +151,42 @@ interface SapItemWarehouse {
     requiredStock?: number;
     itemCost?: number;
     dispReal?: number;
+    amortiguadorToc?: string | number;
+    minOrderQty?: number;
+    leadTime?: number;
+    reabastecimientoMin?: number;
+    tiempoReabastecimiento?: string | number;
+}
+
+export interface SapItemData {
+    itemCode: string;
+    itemName: string;
+    foreignName?: string;
+    itemClass?: string;
+    itemsGroupCode?: string;
+    uomGroup?: string;
+    priceList?: string;
+    price?: string;
+    barCode?: string;
+    inventoryItem?: boolean;
+    salesItem?: boolean;
+    purchaseItem?: boolean;
+    assetItem?: boolean;
+    manufacturer?: string;
+    valid?: boolean;
+    frozen?: boolean;
+    activeStatus?: string;
+    vatLiable?: boolean;
+    taxSubject?: boolean;
+    defaultWarehouse?: string;
+    salesUnit?: string;
+    purchaseUnit?: string;
+    inventoryUOM?: string;
+    quantityOnStock?: number;
+    quantityOrderedFromVendors?: number;
+    quantityOrderedByCustomers?: number;
+    warehouses?: SapItemWarehouse[];
+    bomComponents?: any[];
 }
 
 const DEFAULT_WAREHOUSES_LIST: SapItemWarehouse[] = [
@@ -2155,7 +2191,7 @@ export default function ConsultaSAPPage() {
                 /* TAB 3: CONSULTA POR PRODUCTO (DATOS MAESTROS DE ARTÍCULO SAP) */
                 <main className="flex-1 max-w-[1700px] w-full mx-auto p-2 md:p-3 flex flex-col gap-3 font-sans">
                     {/* SAP CLIENT WINDOW REPLICA CONTAINER */}
-                    <div className="bg-[#eceae6] border border-[#a3a3a3] shadow-2xl flex flex-col font-sans select-none text-xs w-full text-black overflow-hidden relative">
+                    <div className="bg-[#eceae6] border border-[#a3a3a3] shadow-2xl flex flex-col font-sans select-text text-xs w-full text-black overflow-hidden relative">
                         
                         {/* SAP WINDOW TITLE BAR */}
                         <div className="bg-gradient-to-r from-[#eceae6] to-[#d6d3cc] px-3 py-1.5 flex items-center justify-between border-b border-[#a3a3a3]">
@@ -2395,11 +2431,11 @@ export default function ConsultaSAPPage() {
                                                             <td className="px-2 py-1 border-r border-[#c2c0bb]"></td>
                                                             <td className="px-2 py-1 border-r border-[#c2c0bb]"></td>
                                                             <td className="px-2 py-1 border-r border-[#c2c0bb]"></td>
-                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses.reduce((acc, curr) => acc + curr.inStock, 0) || activeItem.quantityOnStock}</td>
-                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses.reduce((acc, curr) => acc + curr.committed, 0) || activeItem.quantityOrderedByCustomers}</td>
-                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses.reduce((acc, curr) => acc + curr.ordered, 0) || activeItem.quantityOrderedFromVendors}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses?.reduce((acc, curr) => acc + curr.inStock, 0) || activeItem.quantityOnStock || 0}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses?.reduce((acc, curr) => acc + curr.committed, 0) || activeItem.quantityOrderedByCustomers || 0}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">{activeItem.warehouses?.reduce((acc, curr) => acc + curr.ordered, 0) || activeItem.quantityOrderedFromVendors || 0}</td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">
-                                                                {activeItem.warehouses.reduce((acc, curr) => acc + (curr.available !== undefined ? curr.available : (curr.inStock - curr.committed + curr.ordered)), 0) || (activeItem.quantityOnStock - activeItem.quantityOrderedByCustomers + activeItem.quantityOrderedFromVendors)}
+                                                                {activeItem.warehouses?.reduce((acc, curr) => acc + (curr.available !== undefined ? curr.available : (curr.inStock - curr.committed + curr.ordered)), 0) || ((activeItem.quantityOnStock || 0) - (activeItem.quantityOrderedByCustomers || 0) + (activeItem.quantityOrderedFromVendors || 0))}
                                                             </td>
                                                             <td className="px-2 py-1 border-r border-[#c2c0bb]" colSpan={13}></td>
                                                         </tr>
@@ -2416,11 +2452,11 @@ export default function ConsultaSAPPage() {
 
                                     {/* PESTAÑA 2: LISTA DE MATERIALES (RÉPLICA EXACTA DE LA VENTANA 'LISTA DE MATERIALES' DE SAP B1 - IMÁGENES 1 Y 2) */}
                                     {itemInnerTab === 'lista-materiales' && (
-                                        <div className="bg-[#f3f0ea] border border-[#a3a3a3] shadow-sm font-sans text-[11px] select-none">
+                                        <div className="bg-[#f3f0ea] border border-[#a3a3a3] shadow-sm font-sans text-[11px] select-text">
                                             
                                             {/* TABLA DE COMPONENTES LdM (LAS 16 COLUMNAS IDÉNTICAS A IMÁGENES 1 Y 2 DE SAP B1) */}
-                                            <div className="bg-white border border-[#a3a3a3] shadow-inner overflow-x-auto max-h-[300px] overflow-y-auto">
-                                                <table className="w-full border-collapse text-[11px] font-sans table-auto whitespace-nowrap">
+                                            <div className="bg-white border border-[#a3a3a3] shadow-inner overflow-x-auto max-h-[300px] overflow-y-auto select-text">
+                                                <table className="w-full border-collapse text-[11px] font-sans table-auto whitespace-nowrap select-text">
                                                     <thead className="sticky top-0 bg-[#eceae6] border-b border-[#c2c0bb] shadow-sm select-none z-10">
                                                         <tr className="text-gray-800 font-semibold">
                                                             <th className="px-1.5 py-1 border-r border-[#c2c0bb] text-center w-8">#</th>
@@ -2441,36 +2477,44 @@ export default function ConsultaSAPPage() {
                                                             <th className="px-2 py-1 text-center">Secuen...</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-[#e0ddd5]">
+                                                    <tbody className="divide-y divide-[#e0ddd5] select-text">
                                                         {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? (
                                                             activeItem.bomComponents.map((row, idx) => (
-                                                                <tr key={idx} className="h-5 hover:bg-[#fff9e6]">
-                                                                    <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600">{row.id}</td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800">{row.tipo}</td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] font-mono text-gray-900">
-                                                                        <span className="flex items-center gap-1">
-                                                                            <SapLinkArrow />
-                                                                            <span>{row.no}</span>
+                                                                <tr key={idx} className="h-5 hover:bg-[#fff9e6] select-text cursor-text">
+                                                                    <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600 select-text">{row.id}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800 select-text">{row.tipo}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] font-mono text-gray-900 select-text">
+                                                                        <span className="flex items-center gap-1 select-text">
+                                                                            <span onClick={() => handleItemSearch('code', row.no)} className="cursor-pointer shrink-0" title="Consultar este artículo en SAP">
+                                                                                <SapLinkArrow />
+                                                                            </span>
+                                                                            <span 
+                                                                                onClick={() => handleItemSearch('code', row.no)}
+                                                                                className="hover:underline cursor-pointer hover:text-blue-700 select-text font-bold"
+                                                                                title="Haz clic para consultar este artículo directamente o selecciónalo para copiar"
+                                                                            >
+                                                                                {row.no}
+                                                                            </span>
                                                                         </span>
                                                                     </td>
-                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-gray-900 font-medium">{row.descripcion}</td>
-                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono font-bold text-black">{row.cantidad}</td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800">{row.uom}</td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] font-mono text-amber-900">
-                                                                        <span className="flex items-center gap-1">
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-gray-900 font-medium select-text">{row.descripcion}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono font-bold text-black select-text">{row.cantidad}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800 select-text">{row.uom}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] font-mono text-amber-900 select-text">
+                                                                        <span className="flex items-center gap-1 select-text">
                                                                             <SapLinkArrow />
-                                                                            <span>{row.almacen}</span>
+                                                                            <span className="select-text">{row.almacen}</span>
                                                                         </span>
                                                                     </td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center text-gray-700">{row.metodoEmision}</td>
-                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500">{row.costoEst}</td>
-                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-gray-700">{row.listaPrecios}</td>
-                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500">{row.costoEstTotal}</td>
-                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-semibold">{row.precioUnitario}</td>
-                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-bold">{row.total}</td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5]"></td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono text-gray-600">{row.ctaWip}</td>
-                                                                    <td className="px-2 py-0.5 text-center"></td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center text-gray-700 select-text">{row.metodoEmision}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500 select-text">{row.costoEst}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-gray-700 select-text">{row.listaPrecios}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500 select-text">{row.costoEstTotal}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-semibold select-text">{row.precioUnitario}</td>
+                                                                    <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-bold select-text">{row.total}</td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] select-text"></td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono text-gray-600 select-text">{row.ctaWip}</td>
+                                                                    <td className="px-2 py-0.5 text-center select-text"></td>
                                                                 </tr>
                                                             ))
                                                         ) : (

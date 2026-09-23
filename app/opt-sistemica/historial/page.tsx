@@ -105,6 +105,7 @@ export default function HistorialPage() {
   const [editPersona, setEditPersona] = useState('');
   const [editResponses, setEditResponses] = useState<Record<string, { value: 'SI' | 'NO' | null; comment: string }>>({});
   const [editActionPlans, setEditActionPlans] = useState('');
+  const [editCreatedAt, setEditCreatedAt] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   const startEditing = (record: OPTRecord) => {
@@ -112,6 +113,17 @@ export default function HistorialPage() {
     setEditPersona(record.persona_evaluada || '');
     setEditResponses(JSON.parse(JSON.stringify(record.responses || {})));
     setEditActionPlans(record.action_plans || '');
+    if (record.created_at) {
+      const d = new Date(record.created_at);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      setEditCreatedAt(`${year}-${month}-${day}T${hours}:${minutes}`);
+    } else {
+      setEditCreatedAt('');
+    }
   };
 
   const handleEditResponseChange = (id: string, value: 'SI' | 'NO') => {
@@ -140,9 +152,12 @@ export default function HistorialPage() {
     if (!editingRecord) return;
     setSavingEdit(true);
     try {
+      const updatedDateIso = editCreatedAt ? new Date(editCreatedAt).toISOString() : editingRecord.created_at;
+
       const { error } = await supabase
         .from('opt_registros')
         .update({
+          created_at: updatedDateIso,
           persona_evaluada: editPersona.trim() || null,
           responses: editResponses,
           percentage: editCalculatedPercentage,
@@ -152,13 +167,7 @@ export default function HistorialPage() {
 
       if (error) throw error;
 
-      setRecords(prev => prev.map(r => r.id === editingRecord.id ? {
-        ...r,
-        persona_evaluada: editPersona.trim() || null,
-        responses: editResponses,
-        percentage: editCalculatedPercentage,
-        action_plans: editActionPlans.trim()
-      } : r));
+      await fetchRecords();
 
       setEditingRecord(null);
       alert('Registro actualizado exitosamente.');
@@ -628,19 +637,34 @@ export default function HistorialPage() {
 
             {/* Modal Body (Scrollable) */}
             <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6">
-              {/* Persona Evaluada con SearchableSelect */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
-                <label className="block text-xs font-bold text-[#324354] uppercase tracking-wider">
-                  Operario / Persona Evaluada
-                </label>
-                <SearchableSelect
-                  name="personaEvaluada"
-                  options={personas}
-                  placeholder="Buscar y seleccionar operario..."
-                  defaultValue={editPersona}
-                  onValueChange={(val) => setEditPersona(val)}
-                  className="h-11 text-sm font-semibold rounded-xl"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Fecha de Creación del Registro */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                  <label className="block text-xs font-bold text-[#324354] uppercase tracking-wider">
+                    Fecha del Registro
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editCreatedAt}
+                    onChange={(e) => setEditCreatedAt(e.target.value)}
+                    className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#324354] focus:outline-none"
+                  />
+                </div>
+
+                {/* Persona Evaluada con SearchableSelect */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                  <label className="block text-xs font-bold text-[#324354] uppercase tracking-wider">
+                    Operario / Persona Evaluada
+                  </label>
+                  <SearchableSelect
+                    name="personaEvaluada"
+                    options={personas}
+                    placeholder="Buscar y seleccionar operario..."
+                    defaultValue={editPersona}
+                    onValueChange={(val) => setEditPersona(val)}
+                    className="h-11 text-sm font-semibold rounded-xl"
+                  />
+                </div>
               </div>
 
               {/* Questions List */}
