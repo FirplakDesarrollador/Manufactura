@@ -121,6 +121,48 @@ export const parseTechPlantas = (val?: string | string[] | null, catalogo: Nomen
     .map(p => obtenerCodigoPlanta(p, catalogo))
     .filter(c => c && c.toUpperCase() !== 'MECÁNICO' && c.toUpperCase() !== 'MECANICO');
   return list.length > 0 ? Array.from(new Set(list)) : ['MS'];
+export const getHistoryRecordCategory = (row: any): 'TPM' | 'Correctivo' | 'Preventivo' => {
+  if (!row) return 'Preventivo';
+  const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').toString().toUpperCase();
+  const codRaw = (row['CODIGO'] || row.codigo || '').toString().toUpperCase();
+  const titRaw = (row['Título'] || row.titulo || row.descripcion_que || '').toString().toUpperCase();
+
+  if (
+    origRaw.includes('TPM') || 
+    origRaw.includes('TARJETA') || 
+    titRaw.includes('TPM') || 
+    titRaw.includes('TARJETA') || 
+    codRaw.startsWith('TPM-') || 
+    codRaw.startsWith('TFA-') ||
+    row.id_tarjeta_falla
+  ) {
+    return 'TPM';
+  }
+
+  if (
+    titRaw.includes('[CORRECTIVO') || 
+    titRaw.includes('CORRECTIVO DIRECTO') || 
+    codRaw.startsWith('CORR-') || 
+    codRaw.startsWith('MC-') || 
+    row.id_correctivo
+  ) {
+    return 'Correctivo';
+  }
+
+  return 'Preventivo';
+};
+
+export const getHistoryRecordCode = (row: any, idx?: number): string => {
+  if (!row) return 'PREV-0001';
+  const category = getHistoryRecordCategory(row);
+  const rawCode = (row['CODIGO'] || row.codigo || '').toString().trim();
+  const numDigits = rawCode.replace(/[^0-9]/g, '');
+  const numVal = numDigits ? parseInt(numDigits, 10) : (row.id || (idx !== undefined ? idx + 1 : 1));
+  const numPadded = String(numVal).padStart(4, '0');
+
+  if (category === 'TPM') return `TPM-${numPadded}`;
+  if (category === 'Correctivo') return `CORR-${numPadded}`;
+  return `PREV-${numPadded}`;
 };
 
 // Interfaces
@@ -803,30 +845,19 @@ export default function GestionMantenimientoPage() {
       // A. Populate from mantenimiento_ordenes
       if (ordenesData && ordenesData.length > 0) {
         ordenesData.forEach((d: any, idx: number) => {
-          let tipoMtto = d.tipo || d.tipo_mantenimiento || d.clasificacion || d.origen || d['TIPO'] || '';
-          const origUpper = (d.origen || '').toUpperCase();
-          const codUpper = (d.codigo || '').toUpperCase();
-          const titUpper = (d.titulo || '').toUpperCase();
+          const category = getHistoryRecordCategory(d);
+          const cleanCode = getHistoryRecordCode(d, idx);
 
-          if (origUpper.includes('TARJETA') || origUpper.includes('TPM') || codUpper.startsWith('TPM-') || codUpper.startsWith('TFA-') || titUpper.includes('TARJETA')) {
-            tipoMtto = 'TPM';
-          } else if (origUpper.includes('CORRECTIV') || codUpper.startsWith('CORR-') || codUpper.startsWith('MC-') || d.id_correctivo) {
-            tipoMtto = 'Correctivo';
-          } else if (!tipoMtto) {
-            tipoMtto = 'Preventivo';
-          }
-
-          const key = d.codigo || (tipoMtto === 'TPM' ? `TPM-${d.id || idx + 1}` : tipoMtto === 'Correctivo' ? `CORR-${d.id || idx + 1}` : `MP-${d.id || idx + 1}`);
-          historyMap.set(key, {
+          historyMap.set(cleanCode, {
             ...d,
             id: d.id || idx + 1,
-            codigo: key,
+            codigo: cleanCode,
             'Título': d.titulo || d['Título'] || 'Mantenimiento',
             'ESTADO': d.estado || d['ESTADO'] || 'Abierta',
             'TECNICO': d.tecnico_nombre || d.tecnico_asignado || d['TECNICO'] || 'Sin asignar',
-            'TIPO': tipoMtto,
-            tipo: tipoMtto,
-            origen: tipoMtto,
+            'TIPO': category,
+            tipo: category,
+            origen: category,
             'FECHA DE APERTURA': d.fecha_apertura || d['FECHA DE APERTURA'] || (d.created_at ? d.created_at.slice(0, 10) : ''),
             'FECHA DE CIERRE': d.fecha_cierre || d['FECHA DE CIERRE'] || '',
             'COMENTARIO DE EJECUCION': d.comentarios_ejecucion || d.accion_realizada || d['COMENTARIO DE EJECUCION'] || '',
@@ -3672,16 +3703,8 @@ export default function GestionMantenimientoPage() {
 
       // Global Origen filter (TPM, Correctivo, Preventivo)
       if (historyTipo !== 'Todos') {
-        const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').toLowerCase();
-        const codRaw = (row['CODIGO'] || row.codigo || row['Título'] || '').toLowerCase();
-
-        const isTpm = origRaw.includes('tpm') || origRaw.includes('tarjeta') || origRaw.includes('anomalia') || codRaw.includes('tpm-') || codRaw.includes('tfa-') || codRaw.includes('tarjeta');
-        const isCorrectivo = !isTpm && (origRaw.includes('correctiv') || codRaw.includes('corr-') || origRaw.includes('directo'));
-        const isPreventivo = !isTpm && !isCorrectivo;
-
-        if (historyTipo === 'TPM' && !isTpm) return false;
-        if (historyTipo === 'Correctivo' && !isCorrectivo) return false;
-        if (historyTipo === 'Preventivo' && !isPreventivo) return false;
+        const category = getHistoryRecordCategory(row);
+        if (historyTipo !== category) return false;
       }
 
       // Global status / tech filters
@@ -5898,14 +5921,14 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full text-left text-xs border-collapse table-fixed">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
-                      {/* Código Único */}
+                      {/* Número OT */}
                       <th
                         onClick={() => handleHistorySort('codigo')}
                         className="py-3 px-2 font-bold text-center w-[12%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Código Único"
+                        title="Clic para ordenar por Número OT"
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>Código</span>
+                          <span>Número OT</span>
                           {historySortField === 'codigo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
@@ -6040,30 +6063,19 @@ export default function GestionMantenimientoPage() {
                         const isComplete = estado.toLowerCase() === 'completado' || estado.toLowerCase() === 'resuelta' || estado.toLowerCase() === 'cerrada';
                         const isIncomplete = estado.toLowerCase() === 'incompleto';
                         
-                        const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').trim().toLowerCase();
-                        const codRaw = (row['CODIGO'] || row.codigo || row['Título'] || '').trim().toLowerCase();
-
-                        const isTpm = origRaw.includes('tpm') || origRaw.includes('tarjeta') || origRaw.includes('anomalia') || codRaw.includes('tpm-') || codRaw.includes('tfa-') || codRaw.includes('tarjeta');
-                        const isCorrectivo = !isTpm && (origRaw.includes('correctiv') || codRaw.includes('corr-') || origRaw.includes('directo'));
-
-                        let rawCode = row['CODIGO'] || row.codigo;
-                        if (rawCode && rawCode.startsWith('TFA-')) {
-                          const parts = rawCode.split('-');
-                          const num = parseInt(parts[parts.length - 1], 10);
-                          rawCode = !isNaN(num) ? `TPM-${num}` : rawCode.replace('TFA-', 'TPM-');
-                        } else if (rawCode && rawCode.startsWith('MP-')) {
-                          rawCode = rawCode.replace('MP-', 'PREV-');
-                        }
-                        const codigoDisplay = rawCode || (isTpm ? `TPM-${row.id || idx + 1}` : isCorrectivo ? `CORR-${row.id || idx + 1}` : `PREV-${row.id || idx + 1}`);
+                        const category = getHistoryRecordCategory(row);
+                        const isTpm = category === 'TPM';
+                        const isCorrectivo = category === 'Correctivo';
+                        const codigoDisplay = getHistoryRecordCode(row, idx);
 
                         return (
                           <tr 
                             key={row.id || idx} 
-                            onClick={() => setViewingHistoryRecord(row)}
+                            onClick={() => setViewingHistoryRecord({ ...row, codigoDisplay, category })}
                             className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
                             title="Haz clic para ver la información completa de esta orden de trabajo"
                           >
-                            {/* Código Badge */}
+                            {/* Número OT Badge */}
                             <td className="py-3 px-2 text-center font-bold">
                               <span className={`px-2 py-1 rounded-lg font-mono text-[10.5px] border inline-block whitespace-nowrap shadow-2xs ${
                                 isTpm ? 'bg-purple-50 text-purple-800 border-purple-200' :
