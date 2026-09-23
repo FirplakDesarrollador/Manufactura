@@ -194,3 +194,61 @@ export function obtenerNombresOficialesPlantas(
 ): string[] {
   return catalogo.filter(p => p.activo !== false).map(p => p.nombre_oficial);
 }
+
+/**
+ * Extrae la nomenclatura existente entre corchetes (ej: [S04RTMNPT60]) o calcula
+ * la nomenclatura estándar FIRPLAK según la regla: [S{seccion}{plantaCode}{tipoCode}{duracion}]
+ */
+export function computeNomenclatura(
+  planta?: string | null,
+  tipoIntervencion?: string | null,
+  duracionMinutos?: number | null,
+  rawCodeOrTitle?: string | null
+): string {
+  if (rawCodeOrTitle) {
+    const match = String(rawCodeOrTitle).match(/\[([A-Z0-9_-]+)\]/i);
+    if (match && match[0]) {
+      return match[0].toUpperCase();
+    }
+  }
+
+  const seccion = '04';
+  let pCode = 'MS';
+  if (planta) {
+    const cleanPlanta = String(planta).toUpperCase();
+    if (cleanPlanta.includes('RTM')) pCode = 'RTM';
+    else if (cleanPlanta.includes('CEFI') || cleanPlanta.includes('MUEBLE') || cleanPlanta.includes('MBL')) pCode = 'MBL';
+    else if (cleanPlanta.includes('ACR')) pCode = 'ACR';
+    else if (cleanPlanta.includes('FIBRA') || cleanPlanta.includes('FV')) pCode = 'FV';
+    else if (cleanPlanta.includes('SERV') || cleanPlanta.includes('SG')) pCode = 'SG';
+    else pCode = 'MS';
+  }
+
+  let tCode = 'NPT';
+  if (tipoIntervencion) {
+    const cleanTipo = String(tipoIntervencion).toUpperCase();
+    if (cleanTipo.includes('PR') && !cleanTipo.includes('NP')) {
+      tCode = 'PRT';
+    } else {
+      tCode = 'NPT';
+    }
+  }
+
+  const dur = duracionMinutos || 60;
+  return `[S${seccion}${pCode}${tCode}${dur}]`;
+}
+
+/**
+ * Limpia el título del mantenimiento removiendo nomenclaturas repetidas en corchetes
+ */
+export function cleanTaskTitle(title: string, nomenclature?: string): string {
+  if (!title) return '';
+  let clean = String(title).trim();
+  if (nomenclature) {
+    const escNom = nomenclature.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    clean = clean.replace(new RegExp(escNom, 'gi'), '').trim();
+  }
+  clean = clean.replace(/\[\s*\]/g, '').replace(/\s{2,}/g, ' ').trim();
+  return clean || String(title).trim();
+}
+

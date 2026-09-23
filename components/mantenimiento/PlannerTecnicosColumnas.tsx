@@ -39,6 +39,7 @@ export interface MaintenanceTask {
   id: number;
   csvId: string;
   code: string;
+  nomenclatura?: string;
   title: string;
   durationMinutes: number;
   durationHours: number;

@@ -70,7 +70,7 @@ import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSeman
 import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosColumnas';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import * as XLSX from 'xlsx';
-import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
   id: number | string;
@@ -149,6 +149,7 @@ interface MaintenanceTask {
   id: number;
   csvId: string;
   code: string;
+  nomenclatura: string;
   title: string;
   durationMinutes: number;
   durationHours: number;
@@ -247,7 +248,7 @@ export default function GestionMantenimientoPage() {
   const [preventivoPlanta, setPreventivoPlanta] = useState('Todas');
   const [preventivoFrecuencia, setPreventivoFrecuencia] = useState('Todas');
   const [preventivoTurno, setPreventivoTurno] = useState('Todos');
-  type PmpSortField = 'id' | 'code' | 'title' | 'detalle' | 'planta' | 'plantas' | 'maquina' | 'frecuencia' | 'refFrecuencia' | 'durationMinutes' | 'tipoIntervencion' | 'tecnicos' | 'activo';
+  type PmpSortField = 'id' | 'code' | 'nomenclatura' | 'title' | 'detalle' | 'planta' | 'plantas' | 'maquina' | 'frecuencia' | 'refFrecuencia' | 'durationMinutes' | 'tipoIntervencion' | 'tecnicos' | 'activo';
   const [pmpSortField, setPmpSortField] = useState<PmpSortField>('id');
   const [pmpSortAsc, setPmpSortAsc] = useState<boolean>(true);
 
@@ -1645,11 +1646,16 @@ export default function GestionMantenimientoPage() {
       const finalApertura = matchingOrden?.fecha_apertura || matchingLocal?.fechaApertura || (finalCandidate !== 9999 ? getLocalDatetimeString() : null);
       const finalCierre = matchingOrden?.fecha_cierre || matchingLocal?.fechaCierre || null;
 
+      const codeFormatted = `PMP-${String(id).padStart(4, '0')}`;
+      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title);
+      const cleanTitle = cleanTaskTitle(title, nomenclaturaCalculated);
+
       newTasks.push({
         id: id,
         csvId: `MP-${id}`,
-        code: codigo,
-        title: title,
+        code: codeFormatted,
+        nomenclatura: nomenclaturaCalculated,
+        title: cleanTitle,
         durationMinutes: tiempoMinutos,
         durationHours: tiempoMinutos / 60,
         idtecs: finalCandidate,
@@ -2221,11 +2227,13 @@ export default function GestionMantenimientoPage() {
     if (!newTaskForm.title.trim()) return;
 
     let createdId = Date.now();
-    const codigoGen = `MP-${Math.floor(100 + Math.random() * 900)}`;
     const taskPlantas = (newTaskForm.plantas && newTaskForm.plantas.length > 0)
       ? newTaskForm.plantas
       : parseTechPlantas(newTaskForm.planta, plantasNomenclatura);
     const plantaStr = taskPlantas.join(', ');
+
+    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes);
+    const cleanTitle = cleanTaskTitle(newTaskForm.title.trim(), nomenclaturaGen);
 
     // Candidate technicians matching Planta/Especialidad & Turno
     const candidateTechsForTask = technicians.filter(t => {
@@ -2236,10 +2244,12 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
+    let codeFormatted = `PMP-${String(createdId).padStart(4, '0')}`;
+
     try {
       const insertPayload: any = {
-        codigo: codigoGen,
-        titulo: newTaskForm.title.trim(),
+        codigo: codeFormatted,
+        titulo: cleanTitle,
         duracion_minutos: newTaskForm.durationMinutes,
         tipo_intervencion: newTaskForm.intervencion,
         turno_requerido: 'General',
@@ -2262,6 +2272,7 @@ export default function GestionMantenimientoPage() {
         console.error('Error guardando PMP en Supabase:', error);
       } else if (data) {
         createdId = data.id;
+        codeFormatted = `PMP-${String(data.id).padStart(4, '0')}`;
       }
     } catch (err) {
       console.warn('Excepción guardando PMP en Supabase:', err);
@@ -2270,8 +2281,9 @@ export default function GestionMantenimientoPage() {
     const newTask: MaintenanceTask = {
       id: createdId,
       csvId: `MP-${createdId}`,
-      code: codigoGen,
-      title: newTaskForm.title.trim(),
+      code: codeFormatted,
+      nomenclatura: nomenclaturaGen,
+      title: cleanTitle,
       durationMinutes: newTaskForm.durationMinutes,
       durationHours: newTaskForm.durationMinutes / 60,
       idtecs: 9999,
@@ -3518,6 +3530,8 @@ export default function GestionMantenimientoPage() {
         const matches =
           normalize(task.title).includes(q) ||
           normalize(task.code).includes(q) ||
+          normalize(task.nomenclatura || '').includes(q) ||
+          normalize(String(task.id)).includes(q) ||
           normalize(task.csvId).includes(q) ||
           normalize(task.maquina).includes(q) ||
           normalize(task.codigoMaquina || '').includes(q) ||
@@ -3561,6 +3575,10 @@ export default function GestionMantenimientoPage() {
         case 'code':
           valA = (a.code || a.csvId || '').toLowerCase();
           valB = (b.code || b.csvId || '').toLowerCase();
+          break;
+        case 'nomenclatura':
+          valA = (a.nomenclatura || '').toLowerCase();
+          valB = (b.nomenclatura || '').toLowerCase();
           break;
         case 'title':
           valA = (a.title || '').toLowerCase();
@@ -3897,8 +3915,9 @@ export default function GestionMantenimientoPage() {
         const plantasLabel = taskPlantas.join(', ');
 
         return {
-          'ID': t.id,
-          'Código': t.code || t.csvId,
+          '#': t.id,
+          'Código': t.code || `PMP-${String(t.id).padStart(4, '0')}`,
+          'Nomenclatura': t.nomenclatura || computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes),
           'Mantenimiento / Tarea': t.title,
           'Detalle / Instrucciones': t.detalle || '',
           'Planta / Especialidad': plantasLabel || t.planta,
@@ -5118,17 +5137,18 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full table-fixed text-left text-[11px] border-collapse">
                   <colgroup>
                     <col className="w-[3.5%]" />
+                    <col className="w-[7.5%]" />
                     <col className="w-[10.5%]" />
-                    <col className="w-[24.5%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[14.5%]" />
+                    <col className="w-[22.5%]" />
                     <col className="w-[4.5%]" />
-                    <col className="w-[6%]" />
+                    <col className="w-[13.5%]" />
+                    <col className="w-[4.5%]" />
+                    <col className="w-[5.5%]" />
                     <col className="w-[4.5%]" />
                     <col className="w-[4.5%]" />
-                    <col className="w-[12.5%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[5%]" />
+                    <col className="w-[10.5%]" />
+                    <col className="w-[4.5%]" />
+                    <col className="w-[4%]" />
                   </colgroup>
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
@@ -5136,7 +5156,7 @@ export default function GestionMantenimientoPage() {
                       <th
                         onClick={() => handlePmpSort('id')}
                         className="py-2.5 px-1 font-bold text-center cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por ID"
+                        title="Clic para ordenar por ID en base de datos"
                       >
                         <div className="flex items-center justify-center gap-0.5">
                           <span>#</span>
@@ -5148,15 +5168,31 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Código */}
+                      {/* Código Único (PMP-XXXX) */}
                       <th
                         onClick={() => handlePmpSort('code')}
                         className="py-2.5 px-1.5 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors truncate"
-                        title="Clic para ordenar por Código/Nomenclatura"
+                        title="Clic para ordenar por Código Único (PMP-XXXX)"
                       >
                         <div className="flex items-center gap-1">
                           <span className="truncate">Código</span>
                           {pmpSortField === 'code' ? (
+                            pmpSortAsc ? <ArrowUp className="w-3 h-3 text-amber-300 shrink-0" /> : <ArrowDown className="w-3 h-3 text-amber-300 shrink-0" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40 shrink-0" />
+                          )}
+                        </div>
+                      </th>
+
+                      {/* Nomenclatura Estándar ([S...]) */}
+                      <th
+                        onClick={() => handlePmpSort('nomenclatura')}
+                        className="py-2.5 px-1.5 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors truncate"
+                        title="Clic para ordenar por Nomenclatura ([S...])"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="truncate">Nomenclatura</span>
+                          {pmpSortField === 'nomenclatura' ? (
                             pmpSortAsc ? <ArrowUp className="w-3 h-3 text-amber-300 shrink-0" /> : <ArrowDown className="w-3 h-3 text-amber-300 shrink-0" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 text-white/40 shrink-0" />
@@ -5315,7 +5351,7 @@ export default function GestionMantenimientoPage() {
                   <tbody className="divide-y divide-gray-200">
                     {filteredPreventivoTasks.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="py-12 text-center text-gray-400">
+                        <td colSpan={13} className="py-12 text-center text-gray-400">
                           No se encontraron mantenimientos en la base de datos con los filtros seleccionados.
                         </td>
                       </tr>
@@ -5328,15 +5364,22 @@ export default function GestionMantenimientoPage() {
                             className="hover:bg-slate-100/90 active:bg-slate-200/50 cursor-pointer transition-colors group"
                             title="Haz clic para ver la ficha técnica y procedimiento completo"
                           >
-                            {/* ID */}
+                            {/* # ID */}
                             <td className="py-2 px-1 text-center font-bold text-gray-400 overflow-hidden">
                               <span className="font-mono text-[10px] text-slate-500 group-hover:text-[#324354] font-semibold">#{task.id}</span>
                             </td>
 
-                            {/* Código / Nomenclatura */}
+                            {/* Código Único (PMP-XXXX) */}
                             <td className="py-2 px-1.5 font-bold text-[#324354] overflow-hidden">
-                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[10px] group-hover:bg-white group-hover:border-slate-300 transition-colors block truncate" title={task.code || task.csvId}>
-                                {task.code || task.csvId}
+                              <span className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 text-amber-900 rounded font-mono text-[10px] group-hover:bg-amber-100 transition-colors block truncate" title={task.code}>
+                                {task.code || `PMP-${String(task.id).padStart(4, '0')}`}
+                              </span>
+                            </td>
+
+                            {/* Nomenclatura Estándar ([S...]) */}
+                            <td className="py-2 px-1.5 font-bold text-[#324354] overflow-hidden">
+                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[10px] group-hover:bg-white group-hover:border-slate-300 transition-colors block truncate" title={task.nomenclatura}>
+                                {task.nomenclatura || computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes)}
                               </span>
                             </td>
 
@@ -7824,6 +7867,20 @@ export default function GestionMantenimientoPage() {
                   <span>Nuevo Mantenimiento Base (PMP)</span>
                 </h3>
                 <p className="text-xs text-gray-500">Registra un nuevo estándar preventivo fijo en el catálogo maestro.</p>
+              </div>
+            </div>
+
+            {/* Banner de Nomenclatura Estándar y Código PMP */}
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-center justify-between gap-2 mb-2">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Código Único (PMP)</span>
+                <span className="text-xs font-mono font-bold text-amber-900">PMP-AUTO (Asignado al guardar)</span>
+              </div>
+              <div className="flex flex-col text-right">
+                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Nomenclatura Estándar</span>
+                <span className="text-xs font-mono font-bold text-slate-800 px-2 py-0.5 bg-white border border-slate-300 rounded">
+                  {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes)}
+                </span>
               </div>
             </div>
 
