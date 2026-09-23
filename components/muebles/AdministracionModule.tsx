@@ -146,17 +146,21 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                 'OF': o.orden_fabricacion,
                 'Pedido': o.numero_pedido,
                 'Cliente': o.cliente,
+                'Planta': o.planta || 'N/A',
                 'Producto': o.producto_descripcion,
                 'SKU': o.producto_sku,
                 'Cant. Muebles': o.cantidad,
                 'Cant. Piezas': o.piezas,
                 'F. Entrega': o.fecha_entrega_estimada ? new Date(o.fecha_entrega_estimada).toLocaleDateString() : 'N/A',
                 'F. Creación': o.created_at ? new Date(o.created_at).toLocaleDateString() : 'N/A',
-                'Corte (Tot)': o.sum_cortados,
-                'Enchape (Tot)': o.sum_enchapado,
-                'Inspección (Tot)': o.sum_inspeccion,
-                'Empaque (Tot)': o.sum_empacado,
-                'A Reponer': o.por_reponer
+                'Corte (Tot)': o.sum_cortados ?? o.corte ?? 0,
+                'Enchape (Tot)': o.sum_enchapado ?? o.enchape ?? 0,
+                'Inspección (Tot)': o.sum_inspeccion ?? o.inspeccion ?? 0,
+                'Empaque (Tot)': o.sum_empacado ?? o.empaque ?? 0,
+                'Digitado (Tot)': o.sum_digitado ?? o.digitado ?? 0,
+                'Transito': o.sum_transito ?? o.transito ?? 0,
+                'CEDI': o.sum_cedi ?? o.cedi ?? 0,
+                'A Reponer': o.por_reponer ?? 0
             }))
 
             const ws = XLSX.utils.json_to_sheet(dataToExport)
