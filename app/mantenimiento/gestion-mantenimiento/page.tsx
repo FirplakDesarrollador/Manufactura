@@ -9484,24 +9484,24 @@ export default function GestionMantenimientoPage() {
               </div>
             )}
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#e2ded5] flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
+            {/* Modal Actions - En un solo renglón */}
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#e2ded5] whitespace-nowrap overflow-x-auto">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   disabled={forcingTaskId === viewingTask.id}
                   onClick={() => handleForceTask(viewingTask)}
-                  className="flex items-center gap-2 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs disabled:opacity-50 shrink-0"
                   title="Genera y activa la orden de trabajo de este mantenimiento inmediatamente en el planificador semanal"
                 >
                   {forcingTaskId === viewingTask.id ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Forzando Generación...</span>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Forzando...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 text-amber-200" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-200" />
                       <span>Forzar Mantenimiento</span>
                     </>
                   )}
@@ -9510,10 +9510,10 @@ export default function GestionMantenimientoPage() {
                 <button
                   type="button"
                   onClick={() => setDeletingTaskConfirm(viewingTask)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs cursor-pointer transition-all shrink-0"
                   title="Eliminar este mantenimiento preventivo de la base de datos"
                 >
-                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                   <span>Eliminar</span>
                 </button>
               </div>
@@ -9522,7 +9522,7 @@ export default function GestionMantenimientoPage() {
                 <button
                   type="button"
                   onClick={() => setViewingTask(null)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all"
+                  className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-all shrink-0"
                 >
                   Cerrar
                 </button>
@@ -9533,9 +9533,9 @@ export default function GestionMantenimientoPage() {
                     setViewingTask(null);
                     handleOpenEditTask(taskToEdit);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs"
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs shrink-0"
                 >
-                  <Pencil className="w-4 h-4" />
+                  <Pencil className="w-3.5 h-3.5" />
                   <span>Editar Estándar</span>
                 </button>
               </div>
