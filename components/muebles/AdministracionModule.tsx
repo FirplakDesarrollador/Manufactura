@@ -38,13 +38,14 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
     const [startDate, setStartDate] = useState<string>('')
     const [endDate, setEndDate] = useState<string>('')
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
+    const [selectedPlanta, setSelectedPlanta] = useState<string>('todas')
     const [selectedOrder, setSelectedOrder] = useState<OrdenMueble | null>(null)
 
     const loadData = React.useCallback(async () => {
         setLoading(true)
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(plantaMuebles),
+                getOrdenesMuebles(), // Trae todas las órdenes de Muebles y Cefi
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)
@@ -56,7 +57,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         } finally {
             setLoading(false)
         }
-    }, [turno, plantaMuebles])
+    }, [turno])
 
     useEffect(() => {
         loadData()
@@ -66,18 +67,24 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         setSearchText('')
         setStartDate('')
         setEndDate('')
+        setSelectedPlanta('todas')
     }
 
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
         return ordenes.filter((orden) => {
+            // Plant filter
+            const matchesPlanta = selectedPlanta === 'todas' || 
+                (orden.planta || '').toLowerCase() === selectedPlanta.toLowerCase()
+
             // Search filter
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
                 (orden.numero_pedido || '').toLowerCase().includes(search) ||
                 (orden.producto_sku || '').toLowerCase().includes(search) ||
-                (orden.cliente || '').toLowerCase().includes(search)
+                (orden.cliente || '').toLowerCase().includes(search) ||
+                (orden.planta || '').toLowerCase().includes(search)
 
             // Date filter (Single or Range)
             const ordenDateStr = dateType === 'entrega' 
@@ -97,12 +104,9 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                 matchesDate = ordenDate <= end + 86400000
             }
 
-            // Operario filter (Removed per user request)
-            // const matchesOperario = selectedOperario === 'todos' || orden.operario_corte === selectedOperario
-
-            return matchesSearch && matchesDate
+            return matchesPlanta && matchesSearch && matchesDate
         })
-    }, [ordenes, searchText, startDate, endDate, dateType])
+    }, [ordenes, searchText, startDate, endDate, dateType, selectedPlanta])
 
     const handleSyncSAP = async () => {
         if (!confirm('¿Desea cargar y sincronizar las órdenes de Muebles y Cefi desde SAP Service Layer?')) {
@@ -242,6 +246,19 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                                             className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Planta:</span>
+                                    <select
+                                        value={selectedPlanta}
+                                        onChange={(e) => setSelectedPlanta(e.target.value)}
+                                        className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 cursor-pointer"
+                                    >
+                                        <option value="todas">TODAS LAS PLANTAS</option>
+                                        <option value="Muebles">MUEBLES</option>
+                                        <option value="Cefi">CEFI</option>
+                                    </select>
                                 </div>
 
                                 <div className="flex flex-col gap-0.5 ml-4">
