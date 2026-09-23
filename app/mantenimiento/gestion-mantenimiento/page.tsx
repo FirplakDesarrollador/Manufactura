@@ -121,6 +121,8 @@ export const parseTechPlantas = (val?: string | string[] | null, catalogo: Nomen
     .map(p => obtenerCodigoPlanta(p, catalogo))
     .filter(c => c && c.toUpperCase() !== 'MECÁNICO' && c.toUpperCase() !== 'MECANICO');
   return list.length > 0 ? Array.from(new Set(list)) : ['MS'];
+};
+
 export const getHistoryRecordCategory = (row: any): 'TPM' | 'Correctivo' | 'Preventivo' => {
   if (!row) return 'Preventivo';
   const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').toString().toUpperCase();
