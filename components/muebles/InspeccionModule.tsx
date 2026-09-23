@@ -98,8 +98,8 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
     const toggleOrden = (orden: OrdenMueble) => {
         setSelectedOrdenes((current) => {
             const exists = current.some((item) => item.id === orden.id)
-            if (exists) return current.filter((item) => item.id !== orden.id)
-            return [...current, orden]
+            if (exists) return []
+            return [orden]
         })
     }
 
@@ -241,9 +241,9 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                                             <CheckSquare size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-black text-gray-900">{selectedOrdenes.length} orden{selectedOrdenes.length === 1 ? '' : 'es'} seleccionada{selectedOrdenes.length === 1 ? '' : 's'}</p>
+                                            <p className="text-sm font-black text-gray-900">OF {selectedOrdenes[0].orden_fabricacion} seleccionada</p>
                                             <p className="text-[10px] text-gray-400 font-bold uppercase">
-                                                Total disponible: {selectedOrdenes.reduce((sum, item) => sum + (item.enchape || 0) + (item.reponer_inspeccion || 0), 0)} piezas
+                                                Total disponible: {(selectedOrdenes[0].enchape || 0) + (selectedOrdenes[0].reponer_inspeccion || 0)} piezas
                                             </p>
                                         </div>
                                     </div>
