@@ -265,6 +265,7 @@ export default function GestionMantenimientoPage() {
   const [editingTask, setEditingTask] = useState<MaintenanceTask | null>(null);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [viewingTask, setViewingTask] = useState<MaintenanceTask | null>(null);
+  const [deletingTaskConfirm, setDeletingTaskConfirm] = useState<MaintenanceTask | null>(null);
 
   // Historial View State & Filters
   const [historySearch, setHistorySearch] = useState('');
@@ -1516,11 +1517,12 @@ export default function GestionMantenimientoPage() {
 
     const newTasks: MaintenanceTask[] = [];
 
-    preventivosRaw.forEach(p => {
+    preventivosRaw.forEach((p, pIdx) => {
       const title = p.titulo;
       const tiempoMinutos = p.duracion_minutos || 60;
       const id = p.id;
-      const codigo = p.codigo || `MP-${p.id}`;
+      const consecutiveNum = pIdx + 1;
+      const codeFormatted = `PMP-${String(consecutiveNum).padStart(4, '0')}`;
       const detalle = p.detalle_instrucciones || '';
       const maquina = p.maquina || 'Equipo General';
       const tipoIntervencion = p.tipo_intervencion || 'NP';
@@ -1646,7 +1648,6 @@ export default function GestionMantenimientoPage() {
       const finalApertura = matchingOrden?.fecha_apertura || matchingLocal?.fechaApertura || (finalCandidate !== 9999 ? getLocalDatetimeString() : null);
       const finalCierre = matchingOrden?.fecha_cierre || matchingLocal?.fechaCierre || null;
 
-      const codeFormatted = `PMP-${String(id).padStart(4, '0')}`;
       const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title);
       const cleanTitle = cleanTaskTitle(title, nomenclaturaCalculated);
 
@@ -2244,7 +2245,8 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
-    let codeFormatted = `PMP-${String(createdId).padStart(4, '0')}`;
+    const nextConsecutive = tasks.length + 1;
+    let codeFormatted = `PMP-${String(nextConsecutive).padStart(4, '0')}`;
 
     try {
       const insertPayload: any = {
@@ -2272,7 +2274,6 @@ export default function GestionMantenimientoPage() {
         console.error('Error guardando PMP en Supabase:', error);
       } else if (data) {
         createdId = data.id;
-        codeFormatted = `PMP-${String(data.id).padStart(4, '0')}`;
       }
     } catch (err) {
       console.warn('Excepción guardando PMP en Supabase:', err);
@@ -2401,14 +2402,34 @@ export default function GestionMantenimientoPage() {
   const handleDeleteTask = async (taskId: number) => {
     const taskToDelete = tasks.find(t => t.id === taskId);
     if (!taskToDelete) return;
-    if (confirm(`¿Estás seguro de eliminar el mantenimiento "${taskToDelete.title}" de la base maestra de Supabase?`)) {
-      const updatedTasks = tasks.filter(t => t.id !== taskId);
-      persistState(updatedTasks, technicians);
-      try {
-        await supabase.from('mantenimiento_planes_preventivos').delete().eq('id', taskId);
-      } catch (err) {
-        console.warn('Error eliminando PMP en Supabase:', err);
-      }
+    const updatedTasks = tasks.filter(t => t.id !== taskId);
+    persistState(updatedTasks, technicians);
+    try {
+      await supabase.from('mantenimiento_planes_preventivos').delete().eq('id', taskId);
+    } catch (err) {
+      console.warn('Error eliminando PMP en Supabase:', err);
+    }
+  };
+
+  const handleToggleTaskActive = async (taskId: number) => {
+    const taskToToggle = tasks.find(t => t.id === taskId);
+    if (!taskToToggle) return;
+    const newActive = taskToToggle.activo === false ? true : false;
+
+    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, activo: newActive } : t);
+    setTasks(updatedTasks);
+    if (viewingTask && viewingTask.id === taskId) {
+      setViewingTask({ ...viewingTask, activo: newActive });
+    }
+    persistState(updatedTasks, technicians);
+
+    try {
+      await supabase
+        .from('mantenimiento_planes_preventivos')
+        .update({ activo: newActive })
+        .eq('id', taskId);
+    } catch (err) {
+      console.warn('Error actualizando estado activo en Supabase:', err);
     }
   };
 
@@ -5137,18 +5158,17 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full table-fixed text-left text-[11px] border-collapse">
                   <colgroup>
                     <col className="w-[3.5%]" />
-                    <col className="w-[7.5%]" />
-                    <col className="w-[10.5%]" />
-                    <col className="w-[22.5%]" />
+                    <col className="w-[8.5%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[24.5%]" />
                     <col className="w-[4.5%]" />
-                    <col className="w-[13.5%]" />
+                    <col className="w-[14%]" />
                     <col className="w-[4.5%]" />
                     <col className="w-[5.5%]" />
                     <col className="w-[4.5%]" />
                     <col className="w-[4.5%]" />
                     <col className="w-[10.5%]" />
-                    <col className="w-[4.5%]" />
-                    <col className="w-[4%]" />
+                    <col className="w-[5%]" />
                   </colgroup>
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
@@ -5343,15 +5363,12 @@ export default function GestionMantenimientoPage() {
                           )}
                         </div>
                       </th>
-
-                      {/* Acciones */}
-                      <th className="py-2.5 px-1 font-bold text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredPreventivoTasks.length === 0 ? (
                       <tr>
-                        <td colSpan={13} className="py-12 text-center text-gray-400">
+                        <td colSpan={12} className="py-12 text-center text-gray-400">
                           No se encontraron mantenimientos en la base de datos con los filtros seleccionados.
                         </td>
                       </tr>
@@ -5362,7 +5379,7 @@ export default function GestionMantenimientoPage() {
                             key={task.id || idx} 
                             onClick={() => setViewingTask(task)}
                             className="hover:bg-slate-100/90 active:bg-slate-200/50 cursor-pointer transition-colors group"
-                            title="Haz clic para ver la ficha técnica y procedimiento completo"
+                            title="Haz clic para ver la ficha técnica, editar o eliminar"
                           >
                             {/* # ID */}
                             <td className="py-2 px-1 text-center font-bold text-gray-400 overflow-hidden">
@@ -5498,32 +5515,6 @@ export default function GestionMantenimientoPage() {
                               }`}>
                                 {task.activo !== false ? 'Activo' : 'Inactivo'}
                               </span>
-                            </td>
-
-                            {/* Acciones */}
-                            <td className="py-2 px-1 text-center overflow-hidden">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenEditTask(task);
-                                  }}
-                                  className="p-1 text-[#324354] hover:bg-slate-100 hover:text-blue-600 rounded-lg transition-all cursor-pointer"
-                                  title="Editar mantenimiento base"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteTask(task.id);
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                                  title="Eliminar de la base"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
                             </td>
                           </tr>
                         );
@@ -9278,18 +9269,37 @@ export default function GestionMantenimientoPage() {
             onMouseUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header with Title and Code */}
+            {/* Header with Title, Code, Nomenclature & Active Status Toggle */}
             <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4">
               <div className="flex flex-col gap-1 pr-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200">
-                    #{viewingTask.csvId || viewingTask.code}
+                  <span className="px-2.5 py-1 bg-amber-50 font-mono font-bold text-amber-900 rounded-lg text-xs border border-amber-200" title="Código Único PMP">
+                    {viewingTask.code || `PMP-${String(viewingTask.id).padStart(4, '0')}`}
+                  </span>
+                  <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200" title="Nomenclatura Estándar">
+                    {viewingTask.nomenclatura || computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes)}
                   </span>
                   <span className="px-2.5 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                     <span className="font-bold text-[#324354]">{obtenerCodigoPlanta(viewingTask.planta)}</span>
                     <span className="text-gray-400">·</span>
                     <span>{viewingTask.planta}</span>
                   </span>
+
+                  {/* Estado Activo / Inactivo Switch button */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTaskActive(viewingTask.id)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                      viewingTask.activo !== false
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                        : 'bg-gray-200 text-gray-700 border border-gray-300 hover:bg-gray-300'
+                    }`}
+                    title="Haz clic para cambiar estado Activo / Inactivo"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${viewingTask.activo !== false ? 'bg-emerald-500' : 'bg-gray-500'}`} />
+                    <span>{viewingTask.activo !== false ? 'Activo' : 'Inactivo'}</span>
+                  </button>
+
                   {viewingTask.adelantada && (
                     <span className="px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs font-bold">
                       ⚡ Mantenimiento Adelantado
@@ -9476,31 +9486,43 @@ export default function GestionMantenimientoPage() {
 
             {/* Modal Actions */}
             <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#e2ded5] flex-wrap">
-              <button
-                type="button"
-                disabled={forcingTaskId === viewingTask.id}
-                onClick={() => handleForceTask(viewingTask)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs disabled:opacity-50"
-                title="Genera y activa la orden de trabajo de este mantenimiento inmediatamente en el planificador semanal"
-              >
-                {forcingTaskId === viewingTask.id ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Forzando Generación...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-200" />
-                    <span>Forzar Mantenimiento</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  disabled={forcingTaskId === viewingTask.id}
+                  onClick={() => handleForceTask(viewingTask)}
+                  className="flex items-center gap-2 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs disabled:opacity-50"
+                  title="Genera y activa la orden de trabajo de este mantenimiento inmediatamente en el planificador semanal"
+                >
+                  {forcingTaskId === viewingTask.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Forzando Generación...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-200" />
+                      <span>Forzar Mantenimiento</span>
+                    </>
+                  )}
+                </button>
 
-              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDeletingTaskConfirm(viewingTask)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all"
+                  title="Eliminar este mantenimiento preventivo de la base de datos"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Eliminar</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setViewingTask(null)}
-                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all"
                 >
                   Cerrar
                 </button>
@@ -9511,12 +9533,54 @@ export default function GestionMantenimientoPage() {
                     setViewingTask(null);
                     handleOpenEditTask(taskToEdit);
                   }}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs"
                 >
                   <Pencil className="w-4 h-4" />
                   <span>Editar Estándar</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmación de Eliminación de Mantenimiento Base */}
+      {deletingTaskConfirm && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-red-200 flex flex-col gap-4 my-auto">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-3 bg-red-100 rounded-2xl shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-gray-900">¿Eliminar Mantenimiento?</h4>
+                <p className="text-xs text-gray-500">Confirmación requerida</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-700 bg-gray-50 p-3.5 rounded-xl border border-gray-200 leading-relaxed">
+              ¿Estás seguro de que deseas eliminar permanentemente el estándar preventivo{' '}
+              <strong className="text-red-700 font-mono font-bold">[{deletingTaskConfirm.code}] {deletingTaskConfirm.title}</strong>? Esta acción lo borrará de Supabase y no se podrá deshacer.
+            </p>
+            <div className="flex items-center gap-2 justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setDeletingTaskConfirm(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const taskId = deletingTaskConfirm.id;
+                  setDeletingTaskConfirm(null);
+                  setViewingTask(null);
+                  await handleDeleteTask(taskId);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors shadow-xs"
+              >
+                Sí, Eliminar Mantenimiento
+              </button>
             </div>
           </div>
         </div>
