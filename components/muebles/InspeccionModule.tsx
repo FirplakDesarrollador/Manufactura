@@ -32,7 +32,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
     const taladroOptions = plantaMuebles === 'Muebles' 
-        ? ['CYFLEX S', 'CX200', 'HUAHUA', 'HUA HUA 2']
+        ? ['CX200', 'HUAHUA', 'HUA HUA 2']
         : ['Taladro Cefi', 'CX100']
 
     const loadData = useCallback(async (soft = false) => {

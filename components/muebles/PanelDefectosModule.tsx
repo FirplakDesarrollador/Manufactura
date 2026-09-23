@@ -41,7 +41,7 @@ export default function PanelDefectosModule({ plantaMuebles, turno }: PanelDefec
     const [selectedTurno, setSelectedTurno] = useState<string>(turno)
     
     const taladrosOptions = plantaMuebles === 'Muebles' 
-        ? ["CYFLEX S", "CX100", "CX200", "HUAHUA", "HUA HUA 2"]
+        ? ["CX100", "CX200", "HUAHUA", "HUA HUA 2"]
         : ["Taladro Cefi"]
     const [selectedTaladros, setSelectedTaladros] = useState<string[]>(taladrosOptions)
 
