@@ -9258,19 +9258,19 @@ export default function GestionMantenimientoPage() {
       {/* Modal: View Maintenance Task Details (Ficha Técnica Completa) */}
       {viewingTask && (
         <div 
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-24 pb-8 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in"
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 pt-16 sm:pt-20 pb-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setViewingTask(null);
           }}
         >
           <div 
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[85vh] overflow-y-auto flex flex-col gap-5 relative my-auto"
+            className="bg-white rounded-3xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] flex flex-col gap-4 relative my-auto overflow-hidden"
             onMouseDown={(e) => e.stopPropagation()}
             onMouseUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with Title, Code, Nomenclature & Active Status Toggle */}
-            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4">
+            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-3 shrink-0">
               <div className="flex flex-col gap-1 pr-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-1 bg-amber-50 font-mono font-bold text-amber-900 rounded-lg text-xs border border-amber-200" title="Código Único PMP">
@@ -9320,173 +9320,176 @@ export default function GestionMantenimientoPage() {
               </button>
             </div>
 
-            {/* Technical Instructions Box */}
-            <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5">
-              <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-[#7B8E90]" />
-                <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
-              </h4>
-              {viewingTask.detalle ? (
-                <div className="text-xs sm:text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-normal bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                  {viewingTask.detalle}
+            {/* Scrollable Body Content */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4">
+              {/* Technical Instructions Box */}
+              <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5">
+                <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#7B8E90]" />
+                  <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
+                </h4>
+                {viewingTask.detalle ? (
+                  <div className="text-xs sm:text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-normal bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                    {viewingTask.detalle}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 italic bg-white p-4 rounded-xl border border-gray-200/80">
+                    Sin observaciones o instrucciones adicionales registradas en la base de datos.
+                  </div>
+                )}
+              </div>
+
+              {/* Parameters Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
+                  <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquinas y Equipos</span>
+                  <div className="flex flex-wrap items-center gap-1.5 leading-snug">
+                    {viewingTask.codigoMaquina && (
+                      <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
+                        {viewingTask.codigoMaquina}
+                      </span>
+                    )}
+                    <strong className="text-[#324354] text-xs font-bold break-words leading-tight" title={viewingTask.maquina}>
+                      {viewingTask.maquina}
+                    </strong>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-xs text-gray-400 italic bg-white p-4 rounded-xl border border-gray-200/80">
-                  Sin observaciones o instrucciones adicionales registradas en la base de datos.
+
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Frecuencia Base</span>
+                    <strong className="text-blue-800 text-xs sm:text-sm font-bold block">
+                      {viewingTask.frecuencia} días
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Periodicidad programada</span>
+                </div>
+
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Contador (Días)</span>
+                    <strong className={`text-xs sm:text-sm font-bold block ${
+                      viewingTask.refFrecuencia >= viewingTask.frecuencia ? 'text-amber-700' : 'text-slate-700'
+                    }`}>
+                      {viewingTask.refFrecuencia} días
+                    </strong>
+                  </div>
+                  <span className={`text-[10px] font-bold mt-1 ${
+                    viewingTask.refFrecuencia >= viewingTask.frecuencia 
+                      ? 'text-amber-800' 
+                      : 'text-gray-400'
+                  }`}>
+                    {viewingTask.refFrecuencia >= viewingTask.frecuencia ? '✓ Exigible por ciclo' : 'En acumulación'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Duración Estándar</span>
+                    <strong className="text-[#324354] text-xs sm:text-sm font-bold block">
+                      {viewingTask.durationMinutes}m ({viewingTask.durationHours.toFixed(1)}h)
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Tiempo de ejecución</span>
+                </div>
+              </div>
+
+              {/* Planta / Especialidad y Técnicos Compatibles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
+                  <span className="text-gray-400 font-bold text-[10px] uppercase">Planta / Especialidad Asignada</span>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                    {(() => {
+                      const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
+                        ? viewingTask.plantas 
+                        : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
+                      const activeCount = plantasNomenclatura.filter(p => p.activo !== false).length;
+                      const isAll = activeCount > 0 && taskPlantas.length >= activeCount;
+
+                      if (isAll) {
+                        return (
+                          <span className="px-2.5 py-1 bg-[#324354] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1.5">
+                            <span>🌐</span>
+                            <span>Todas las Plantas / Especialidades</span>
+                          </span>
+                        );
+                      }
+
+                      if (taskPlantas.length === 0) {
+                        return <span className="text-gray-400 italic text-xs">Sin plantas asignadas</span>;
+                      }
+
+                      return taskPlantas.map(cod => {
+                        const nom = plantasNomenclatura.find(pn => pn.codigo === cod);
+                        return (
+                          <span key={cod} className="px-2 py-1 bg-sky-50 border border-sky-200 text-sky-900 text-xs font-semibold rounded-lg flex items-center gap-1">
+                            <strong className="font-bold text-[#324354]">{cod}</strong>
+                            <span className="text-gray-600">· {nom?.nombre_oficial || cod}</span>
+                          </span>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 font-bold text-[10px] uppercase">Técnicos Compatibles</span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 font-bold text-[#324354] rounded">
+                      Turno: {getTurnoLabel(viewingTask.tipoIntervencion)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
+                    {(() => {
+                      const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
+                        ? viewingTask.plantas 
+                        : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
+                      const matchingTechs = technicians.filter(t => {
+                        if (t.id === 9999 || t.activo === false) return false;
+                        const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
+                        const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
+                        const matchesTurno = areTurnosCompatible(viewingTask.tipoIntervencion, t.turno);
+                        return matchesPlanta && matchesTurno;
+                      });
+
+                      if (matchingTechs.length === 0) {
+                        return <span className="text-gray-400 italic text-xs">Sin técnicos directos con este turno y especialidad</span>;
+                      }
+
+                      return matchingTechs.map(ct => (
+                        <span key={ct.id} className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold rounded-md">
+                          {ct.name} ({getTurnoLabel(ct.turno)})
+                        </span>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Feedback Toast / Alert when Force Task is triggered */}
+              {forceTaskFeedback && (
+                <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span>{forceTaskFeedback}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewingTask(null);
+                      setActiveTab('planificador');
+                    }}
+                    className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-bold cursor-pointer transition-all shrink-0"
+                  >
+                    Ir al Planificador →
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* Parameters Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl">
-                <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Máquinas y Equipos</span>
-                <div className="flex items-center gap-1.5 overflow-hidden">
-                  {viewingTask.codigoMaquina && (
-                    <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
-                      {viewingTask.codigoMaquina}
-                    </span>
-                  )}
-                  <strong className="text-[#324354] text-xs sm:text-sm font-bold block truncate" title={viewingTask.maquina}>
-                    {viewingTask.maquina}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Frecuencia Base</span>
-                  <strong className="text-blue-800 text-xs sm:text-sm font-bold block">
-                    {viewingTask.frecuencia} días
-                  </strong>
-                </div>
-                <span className="text-[10px] text-gray-400 mt-1">Periodicidad programada</span>
-              </div>
-
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Contador (Días)</span>
-                  <strong className={`text-xs sm:text-sm font-bold block ${
-                    viewingTask.refFrecuencia >= viewingTask.frecuencia ? 'text-amber-700' : 'text-slate-700'
-                  }`}>
-                    {viewingTask.refFrecuencia} días
-                  </strong>
-                </div>
-                <span className={`text-[10px] font-bold mt-1 ${
-                  viewingTask.refFrecuencia >= viewingTask.frecuencia 
-                    ? 'text-amber-800' 
-                    : 'text-gray-400'
-                }`}>
-                  {viewingTask.refFrecuencia >= viewingTask.frecuencia ? '✓ Exigible por ciclo' : 'En acumulación'}
-                </span>
-              </div>
-
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Duración Estándar</span>
-                  <strong className="text-[#324354] text-xs sm:text-sm font-bold block">
-                    {viewingTask.durationMinutes}m ({viewingTask.durationHours.toFixed(1)}h)
-                  </strong>
-                </div>
-                <span className="text-[10px] text-gray-400 mt-1">Tiempo de ejecución</span>
-              </div>
-            </div>
-
-            {/* Planta / Especialidad y Técnicos Compatibles */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
-                <span className="text-gray-400 font-bold text-[10px] uppercase">Planta / Especialidad Asignada</span>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-                  {(() => {
-                    const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
-                      ? viewingTask.plantas 
-                      : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
-                    const activeCount = plantasNomenclatura.filter(p => p.activo !== false).length;
-                    const isAll = activeCount > 0 && taskPlantas.length >= activeCount;
-
-                    if (isAll) {
-                      return (
-                        <span className="px-2.5 py-1 bg-[#324354] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1.5">
-                          <span>🌐</span>
-                          <span>Todas las Plantas / Especialidades</span>
-                        </span>
-                      );
-                    }
-
-                    if (taskPlantas.length === 0) {
-                      return <span className="text-gray-400 italic text-xs">Sin plantas asignadas</span>;
-                    }
-
-                    return taskPlantas.map(cod => {
-                      const nom = plantasNomenclatura.find(pn => pn.codigo === cod);
-                      return (
-                        <span key={cod} className="px-2 py-1 bg-sky-50 border border-sky-200 text-sky-900 text-xs font-semibold rounded-lg flex items-center gap-1">
-                          <strong className="font-bold text-[#324354]">{cod}</strong>
-                          <span className="text-gray-600">· {nom?.nombre_oficial || cod}</span>
-                        </span>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 font-bold text-[10px] uppercase">Técnicos Compatibles</span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 font-bold text-[#324354] rounded">
-                    Turno: {getTurnoLabel(viewingTask.tipoIntervencion)}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
-                  {(() => {
-                    const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
-                      ? viewingTask.plantas 
-                      : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
-                    const matchingTechs = technicians.filter(t => {
-                      if (t.id === 9999 || t.activo === false) return false;
-                      const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
-                      const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
-                      const matchesTurno = areTurnosCompatible(viewingTask.tipoIntervencion, t.turno);
-                      return matchesPlanta && matchesTurno;
-                    });
-
-                    if (matchingTechs.length === 0) {
-                      return <span className="text-gray-400 italic text-xs">Sin técnicos directos con este turno y especialidad</span>;
-                    }
-
-                    return matchingTechs.map(ct => (
-                      <span key={ct.id} className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold rounded-md">
-                        {ct.name} ({getTurnoLabel(ct.turno)})
-                      </span>
-                    ));
-                  })()}
-                </div>
-              </div>
-            </div>
-
-            {/* Feedback Toast / Alert when Force Task is triggered */}
-            {forceTaskFeedback && (
-              <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>{forceTaskFeedback}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewingTask(null);
-                    setActiveTab('planificador');
-                  }}
-                  className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-bold cursor-pointer transition-all shrink-0"
-                >
-                  Ir al Planificador →
-                </button>
-              </div>
-            )}
-
-            {/* Modal Actions - En un solo renglón */}
-            <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#e2ded5] whitespace-nowrap overflow-x-auto">
-              <div className="flex items-center gap-2">
+            {/* Modal Actions - Fixed at Bottom */}
+            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   disabled={forcingTaskId === viewingTask.id}
@@ -9518,7 +9521,7 @@ export default function GestionMantenimientoPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setViewingTask(null)}
