@@ -527,20 +527,30 @@ export default function GestionMantenimientoPage() {
     const alt = normalize(m.nombre_alterno || '');
 
     return tasks.filter(p => {
-      const pTitle = normalize(p.title || '');
-      const pCode = (p.code || p.csvId || '').toUpperCase();
+      // 1. Direct Machine ID match
+      if (p.idMaquina && p.idMaquina === m.id) return true;
+
+      const pTitle = normalize(p.title || (p as any).titulo || '');
+      const pCode = (p.code || (p as any).codigo || p.csvId || '').toUpperCase();
       const pMaq = normalize(p.maquina || '');
 
-      if (code && code !== '-' && code !== 'N/A' && code !== '0') {
+      // 2. Specific machine code match (e.g. "0976" in pMaq, pCode, or pTitle)
+      if (code && code !== '-' && code !== 'N/A' && code !== '0' && code.length >= 2) {
         const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
-        if (regex.test(p.title || '') || regex.test(pCode) || regex.test(p.maquina || '')) {
+        if (regex.test(pTitle) || regex.test(pCode) || regex.test(pMaq)) {
           return true;
         }
       }
 
+      // 3. Exact machine name or alternate name match
       if (pMaq && (pMaq === name || (alt && pMaq === alt))) return true;
-      if (name.length >= 5 && (pMaq.includes(name) || name.includes(pMaq))) return true;
+
+      // 4. Exact prefix/suffix or full sub-name match when pMaq is specific (prevent short generic word match like "taladro")
+      if (pMaq && pMaq.length >= 8 && name.length >= 8) {
+        if (pMaq.includes(name) || (pMaq.startsWith(name) || name.startsWith(pMaq))) return true;
+      }
+
       return false;
     });
   };
