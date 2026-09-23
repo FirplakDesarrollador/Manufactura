@@ -47,6 +47,19 @@ export async function GET() {
             if (!docNum) return;
 
             if (!orderMap.has(docNum)) {
+                const sku = String(row.producto_sku || '').toUpperCase();
+                const linea = String(row.u_linea || '').toUpperCase();
+                const desc = String(row.producto_descripcion || '').toUpperCase();
+                const isCefi = ['F09', 'F11'].includes(linea) ||
+                    sku.startsWith('VCOC08') ||
+                    sku.startsWith('VBAN27') ||
+                    sku.startsWith('VCLO01') ||
+                    sku.startsWith('VROP10') ||
+                    (row.planta && String(row.planta).toLowerCase().includes('cefi')) ||
+                    desc.includes('TABLERO COMPUESTO') ||
+                    desc.includes('MODULAR');
+                const calculatedPlant = isCefi ? 'Cefi' : 'Muebles';
+
                 orderMap.set(docNum, {
                     orden_fabricacion: docNum,
                     numero_pedido: row.numero_pedido || docNum,
@@ -55,7 +68,7 @@ export async function GET() {
                     cantidad: Number(row.cantidad) || 1,
                     cliente: row.cliente || 'FIRPLAK S A',
                     fecha_entrega_estimada: parseDate(row.fecha_entrega_estimada),
-                    planta: row.planta || 'Muebles',
+                    planta: calculatedPlant,
                     modificado_por: 'SAP Service Layer Sync',
                     created_at: parseDate(row.fecha_liberacion) || new Date().toISOString(),
                     componentes: []
