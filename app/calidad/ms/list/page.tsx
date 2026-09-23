@@ -71,9 +71,11 @@ export default function ReportedDefectsListPage() {
         defecto_especifico: string
         cantidad: number
         productos_lista: string
+        moldes_lista?: string
         creado_por: string
         reporters: Set<string>
         productos: Set<string>
+        moldes: Set<string>
         hora_registro: string
         Molde: string
         fotos: { url: string, referencia: string, hora: string }[]
@@ -216,9 +218,11 @@ export default function ReportedDefectsListPage() {
                             defecto_especifico: key,
                             cantidad: 0,
                             productos_lista: '',
+                            moldes_lista: '',
                             creado_por: '',
                             reporters: new Set(),
                             productos: new Set(),
+                            moldes: new Set(),
                             hora_registro: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -232,6 +236,9 @@ export default function ReportedDefectsListPage() {
                     }
                     groupedMap[key].cantidad += 1
                     groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
+                    if (r.Molde) {
+                        groupedMap[key].moldes.add(r.Molde)
+                    }
                     if (!groupedMap[key].reporters.has(usersMap[r.create_by] || 'Anónimo')) {
                         groupedMap[key].reporters.add(usersMap[r.create_by] || 'Anónimo')
                     }
@@ -269,9 +276,11 @@ export default function ReportedDefectsListPage() {
                                 defecto_especifico: defectName,
                                 cantidad: 0,
                                 productos_lista: '',
+                                moldes_lista: '',
                                 creado_por: '',
                                 reporters: new Set(),
                                 productos: new Set(),
+                                moldes: new Set(),
                                 hora_registro: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
                                     hour: '2-digit',
                                     minute: '2-digit',
@@ -286,6 +295,9 @@ export default function ReportedDefectsListPage() {
 
                         groupedMap[key].cantidad += 1
                         groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
+                        if (r.Molde) {
+                            groupedMap[key].moldes.add(r.Molde)
+                        }
                         if (!groupedMap[key].reporters.has(usersMap[r.create_by] || 'Anónimo')) {
                             groupedMap[key].reporters.add(usersMap[r.create_by] || 'Anónimo')
                         }
@@ -329,7 +341,8 @@ export default function ReportedDefectsListPage() {
                 .map(item => ({
                     ...item,
                     creado_por: Array.from(item.reporters).join(', '),
-                    productos_lista: Array.from(item.productos).join(', ')
+                    productos_lista: Array.from(item.productos).join(', '),
+                    moldes_lista: Array.from(item.moldes).filter(Boolean).join(', ')
                 }))
                 .sort((a, b) => b.cantidad - a.cantidad)
 
@@ -442,7 +455,11 @@ export default function ReportedDefectsListPage() {
         const matchesSearch = searchTerm === '' ||
             (report.productos_lista.toLowerCase().includes(searchLower)) ||
             (report.defecto_especifico && report.defecto_especifico.toLowerCase().includes(searchLower)) ||
-            (report.creado_por && report.creado_por.toLowerCase().includes(searchLower))
+            (report.creado_por && report.creado_por.toLowerCase().includes(searchLower)) ||
+            (report.moldes_lista && report.moldes_lista.toLowerCase().includes(searchLower))
+
+        return matchesProductFilter && matchesDefectFilter && matchesSearch
+    })
 
         return matchesProductFilter && matchesDefectFilter && matchesSearch
     })
@@ -845,13 +862,13 @@ export default function ReportedDefectsListPage() {
                                 <input 
                                     type="text" 
                                     list="modal-references-list"
-                                    placeholder="Buscar por referencia..."
+                                    placeholder="Buscar por referencia o molde..."
                                     value={modalProductSearch} 
                                     onChange={(e) => setModalProductSearch(e.target.value)}
                                     className="text-xs font-black text-[#254153] outline-none bg-transparent w-full uppercase placeholder:normal-case placeholder:font-bold"
                                 />
                                 <datalist id="modal-references-list">
-                                    {Array.from(new Set(selectedDetails.items?.map(i => i.referencia))).sort().map(ref => (
+                                    {Array.from(new Set(selectedDetails.items?.flatMap(i => [i.referencia, i.molde ? `MOLDE: ${i.molde}` : '']))).filter(Boolean).sort().map(ref => (
                                         <option key={ref} value={ref} />
                                     ))}
                                 </datalist>
@@ -880,7 +897,10 @@ export default function ReportedDefectsListPage() {
                                         }
                                     }
                                     if (modalProductSearch) {
-                                        if (!item.referencia.toLowerCase().includes(modalProductSearch.toLowerCase())) {
+                                        const cleanSearch = modalProductSearch.toLowerCase().trim().replace(/^molde:\s*/, '')
+                                        const matchRef = item.referencia.toLowerCase().includes(cleanSearch)
+                                        const matchMolde = item.molde && item.molde.toLowerCase().includes(cleanSearch)
+                                        if (!matchRef && !matchMolde) {
                                             return false
                                         }
                                     }
@@ -894,9 +914,16 @@ export default function ReportedDefectsListPage() {
                                         </div>
                                     )}
                                     <div className="p-3 bg-white border-t border-gray-200">
-                                        <p className="text-[10px] font-black text-[#254153] uppercase mb-1 truncate" title={item.referencia}>
-                                            Ref: {item.referencia}
-                                        </p>
+                                        <div className="flex items-start justify-between gap-1 mb-1">
+                                            <p className="text-[10px] font-black text-[#254153] uppercase truncate flex-1" title={item.referencia}>
+                                                Ref: {item.referencia}
+                                            </p>
+                                            {item.molde && (
+                                                <span className="text-[9px] font-black text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 whitespace-nowrap shadow-sm">
+                                                    MOLDE: {item.molde}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex justify-between items-center mt-2">
                                             <p className="text-[10px] font-bold text-gray-500 uppercase">
                                                 Hora: {item.hora}
