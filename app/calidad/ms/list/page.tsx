@@ -461,9 +461,6 @@ export default function ReportedDefectsListPage() {
         return matchesProductFilter && matchesDefectFilter && matchesSearch
     })
 
-        return matchesProductFilter && matchesDefectFilter && matchesSearch
-    })
-
     const handleUpdateReport = async (id: number) => {
         if (!editForm.producto_id || editForm.defectos.length === 0) {
             alert('Debe seleccionar producto y al menos un defecto')
