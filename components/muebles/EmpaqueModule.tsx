@@ -227,8 +227,8 @@ export default function EmpaqueModule({ userEmail, turno, usuarioNombre, plantaM
                                     onClick={() => setIsModalOpen(true)}
                                     className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 font-bold text-xs uppercase flex items-center gap-2 shadow-lg shadow-amber-100"
                                 >
-                                    <Play size={16} />
-                                    Iniciar empaque
+                                    <Package size={16} />
+                                    Registrar empaque
                                 </button>
                             </div>
                         </div>

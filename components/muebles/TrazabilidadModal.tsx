@@ -44,11 +44,11 @@ export default function TrazabilidadModal({
     const [empleado, setEmpleado] = useState<{ nombreCompleto: string, foto: string } | null>(null)
     const [isSearching, setIsSearching] = useState(false)
     const [startTime, setStartTime] = useState<string>('')
-    const isTaskBasedProcess = proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección' || proceso === 'Empaque'
+    const isTaskBasedProcess = proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección'
 
     const ordenesSeleccionadas = React.useMemo(
-        () => isTaskBasedProcess && ordenes?.length ? ordenes : [orden],
-        [orden, ordenes, isTaskBasedProcess]
+        () => ordenes?.length ? ordenes : [orden],
+        [orden, ordenes]
     )
 
     const validateQuantity = React.useCallback((val: number) => {
@@ -102,14 +102,26 @@ export default function TrazabilidadModal({
     useEffect(() => {
         if (isOpen) {
             setStartTime(new Date().toISOString())
-            setStep('identificacion')
-            setIdentificacion('')
-            setEmpleado(null)
-            setCantidad(1)
-            setValidationError(null)
+            if (proceso === 'Empaque') {
+                setStep('registro')
+                setIdentificacion('NO APLICA')
+                setEmpleado({ nombreCompleto: usuarioNombre, foto: '' })
+            } else {
+                setStep('identificacion')
+                setIdentificacion('')
+                setEmpleado(null)
+            }
             validateQuantity(1)
+            setValidationError(null)
         }
-    }, [isOpen, validateQuantity])
+    }, [isOpen, validateQuantity, proceso, usuarioNombre])
+
+    // Set default quantity to available when available changes in Empaque
+    useEffect(() => {
+        if (isOpen && proceso === 'Empaque' && available > 0) {
+            setCantidad(available)
+        }
+    }, [isOpen, proceso, available])
 
     const handleValidarOperario = async () => {
         if (identificacion.length < 4) return
@@ -191,9 +203,10 @@ export default function TrazabilidadModal({
     }
 
     const handleSubmit = async () => {
-        if (validationError || !identificacion) return
+        if (validationError) return
+        if (proceso !== 'Empaque' && !identificacion) return
 
-        // Si es un proceso basado en tareas (Corte, Enchape, Inspección), iniciamos la tarea en lugar de registrar inmediatamente
+        // Si es un proceso basado en tareas (Corte, Enchape, Inspección), iniciamos la tarea con cronómetro
         if (isTaskBasedProcess) {
             setLoading(true)
             try {
@@ -204,8 +217,6 @@ export default function TrazabilidadModal({
                         ? (item.por_cortar || 0)
                         : proceso === 'Enchape'
                         ? ((item.corte || 0) + (item.reponer_enchape || 0))
-                        : proceso === 'Empaque'
-                        ? (item.inspeccion || 0)
                         : ((item.enchape || 0) + (item.reponer_inspeccion || 0))
                 }))
 
@@ -235,6 +246,37 @@ export default function TrazabilidadModal({
             return
         }
 
+        // Si es Empaque con múltiples órdenes seleccionadas (registro inmediato sin tarea ni tiempo)
+        if (proceso === 'Empaque' && ordenesSeleccionadas.length > 1) {
+            setLoading(true)
+            try {
+                for (const item of ordenesSeleccionadas) {
+                    const cantItem = item.inspeccion || 0
+                    if (cantItem > 0) {
+                        await registrarTrazabilidadMueble({
+                            orden_fabricacion: item.orden_fabricacion,
+                            creado_por: usuarioNombre,
+                            cantidad: cantItem,
+                            proceso: 'Empaque',
+                            cedula_operario: 'NO APLICA',
+                            nombre_operario: usuarioNombre,
+                            fecha_inicio: startTime,
+                            taladro: 'NO APLICA'
+                        })
+                    }
+                }
+                toast.success('Empaque registrado exitosamente')
+                onSuccess()
+                onClose()
+            } catch (error) {
+                console.error('Error al registrar empaque múltiple:', error)
+                toast.error('Error al registrar empaque')
+            } finally {
+                setLoading(false)
+            }
+            return
+        }
+
         if (cantidad <= 0) return
 
         // Extra business logic from Flutter
@@ -247,15 +289,15 @@ export default function TrazabilidadModal({
         try {
             await registrarTrazabilidadMueble({
                 orden_fabricacion: orden.orden_fabricacion,
-                creado_por: `${usuarioNombre} - ID: ${identificacion}`,
+                creado_por: proceso === 'Empaque' ? usuarioNombre : `${usuarioNombre} - ID: ${identificacion}`,
                 cantidad: cantidad,
                 proceso: proceso,
-                cedula_operario: identificacion,
-                nombre_operario: empleado?.nombreCompleto || 'Desconocido',
+                cedula_operario: proceso === 'Empaque' ? 'NO APLICA' : identificacion,
+                nombre_operario: proceso === 'Empaque' ? usuarioNombre : (empleado?.nombreCompleto || 'Desconocido'),
                 fecha_inicio: startTime,
                 taladro: taladro
             })
-            toast.success('Registro exitoso')
+            toast.success(proceso === 'Empaque' ? 'Empaque registrado exitosamente' : 'Registro exitoso')
             onSuccess()
             onClose()
         } catch (error) {
@@ -360,15 +402,17 @@ export default function TrazabilidadModal({
                     ) : (
                         /* Step 2: Quantity & Submit */
                         <div className="space-y-6 flex flex-col items-center animate-in slide-in-from-right-4 duration-300">
-                            <button 
-                                onClick={() => setStep('identificacion')}
-                                className="self-start flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-blue-500 transition-colors uppercase"
-                            >
-                                <ChevronLeft size={14} />
-                                Volver
-                            </button>
+                            {proceso !== 'Empaque' && (
+                                <button 
+                                    onClick={() => setStep('identificacion')}
+                                    className="self-start flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-blue-500 transition-colors uppercase"
+                                >
+                                    <ChevronLeft size={14} />
+                                    Volver
+                                </button>
+                            )}
 
-                            {empleado && (
+                            {empleado && proceso !== 'Empaque' && (
                                 <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-300">
                                     <div className="w-20 h-20 rounded-full border-4 border-blue-50 overflow-hidden shadow-md bg-gray-100 flex items-center justify-center">
                                         {empleado.foto ? (
@@ -387,7 +431,7 @@ export default function TrazabilidadModal({
                                 </div>
                             )}
 
-                            {isTaskBasedProcess && ordenesSeleccionadas.length > 1 ? (
+                            {ordenesSeleccionadas.length > 1 ? (
                                 <div className="w-full max-h-36 overflow-y-auto rounded-2xl border border-gray-100 divide-y divide-gray-100">
                                     {ordenesSeleccionadas.map((item) => (
                                         <div key={item.id} className="p-3 text-left">
@@ -421,8 +465,12 @@ export default function TrazabilidadModal({
 
                             <div className="flex justify-center gap-8 w-full border-y border-gray-100 py-3">
                                 <div className="text-center">
-                                    <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Identificado</span>
-                                    <span className="text-gray-800 font-bold text-sm">{identificacion}</span>
+                                    <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">
+                                        {proceso === 'Empaque' ? 'Usuario' : 'Identificado'}
+                                    </span>
+                                    <span className="text-gray-800 font-bold text-sm">
+                                        {proceso === 'Empaque' ? usuarioNombre : identificacion}
+                                    </span>
                                 </div>
                                 <div className="text-center">
                                     <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Disponible</span>
@@ -430,7 +478,7 @@ export default function TrazabilidadModal({
                                 </div>
                             </div>
                             
-                            {!isTaskBasedProcess && (
+                            {!isTaskBasedProcess && (proceso !== 'Empaque' || ordenesSeleccionadas.length === 1) && (
                                 <div className="flex items-center gap-4">
                                     <button 
                                         onClick={handleDecrement} 
@@ -473,12 +521,18 @@ export default function TrazabilidadModal({
                                         onClick={handleSubmit}
                                         disabled={loading}
                                         className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-bold text-white shadow-xl transition-all active:scale-[0.98] ${
-                                            loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+                                            loading 
+                                                ? 'bg-blue-400' 
+                                                : proceso === 'Empaque'
+                                                ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'
+                                                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                         }`}
                                     >
                                         {loading ? <Loader2 className="animate-spin" size={24} /> : (
                                             isTaskBasedProcess ? (
                                                 <><Play size={20} /><span>INICIAR PROCESO</span></>
+                                            ) : proceso === 'Empaque' ? (
+                                                <><Send size={20} /><span>REGISTRAR EMPAQUE</span></>
                                             ) : (
                                                 <><Send size={20} /><span>REGISTRAR</span></>
                                             )
