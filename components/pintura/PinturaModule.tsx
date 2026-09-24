@@ -147,8 +147,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         })
 
         return filtered.sort((a, b) => {
-            const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
-            const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
+            const dateAStr = a.fecha_ideal_produccion || a.fecha_entrega_estimada
+            const dateBStr = b.fecha_ideal_produccion || b.fecha_entrega_estimada
+            const dateA = dateAStr ? new Date(dateAStr).getTime() : Infinity
+            const dateB = dateBStr ? new Date(dateBStr).getTime() : Infinity
             const valA = isNaN(dateA) ? Infinity : dateA
             const valB = isNaN(dateB) ? Infinity : dateB
             return valA - valB
