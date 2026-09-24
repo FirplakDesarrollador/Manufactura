@@ -102,20 +102,25 @@ export default function MaquinasPage() {
     const alt = normalizeText(m.nombre_alterno || "");
 
     return planesPreventivos.filter(p => {
+      if (p.id_maquina && p.id_maquina === m.id) return true;
+
       const pTitle = normalizeText(p.titulo || "");
       const pCode = (p.codigo || "").toUpperCase();
       const pMaq = normalizeText(p.maquina || "");
 
-      if (code && code !== "-" && code !== "N/A" && code !== "0") {
+      if (code && code !== "-" && code !== "N/A" && code !== "0" && code.length >= 2) {
         const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
-        if (regex.test(p.titulo || "") || regex.test(pCode) || regex.test(p.maquina || "")) {
+        if (regex.test(pTitle) || regex.test(pCode) || regex.test(pMaq)) {
           return true;
         }
       }
 
       if (pMaq && (pMaq === name || (alt && pMaq === alt))) return true;
-      if (name.length >= 5 && (pMaq.includes(name) || name.includes(pMaq))) return true;
+      if (pMaq && pMaq.length >= 8 && name.length >= 8) {
+        if (pMaq.includes(name) || (pMaq.startsWith(name) || name.startsWith(pMaq))) return true;
+      }
+
       return false;
     });
   };

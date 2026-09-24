@@ -70,7 +70,7 @@ import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSeman
 import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosColumnas';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import * as XLSX from 'xlsx';
-import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
   id: number | string;
@@ -123,6 +123,50 @@ export const parseTechPlantas = (val?: string | string[] | null, catalogo: Nomen
   return list.length > 0 ? Array.from(new Set(list)) : ['MS'];
 };
 
+export const getHistoryRecordCategory = (row: any): 'TPM' | 'Correctivo' | 'Preventivo' => {
+  if (!row) return 'Preventivo';
+  const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').toString().toUpperCase();
+  const codRaw = (row['CODIGO'] || row.codigo || '').toString().toUpperCase();
+  const titRaw = (row['Título'] || row.titulo || row.descripcion_que || '').toString().toUpperCase();
+
+  if (
+    origRaw.includes('TPM') || 
+    origRaw.includes('TARJETA') || 
+    titRaw.includes('TPM') || 
+    titRaw.includes('TARJETA') || 
+    codRaw.startsWith('TPM-') || 
+    codRaw.startsWith('TFA-') ||
+    row.id_tarjeta_falla
+  ) {
+    return 'TPM';
+  }
+
+  if (
+    titRaw.includes('[CORRECTIVO') || 
+    titRaw.includes('CORRECTIVO DIRECTO') || 
+    codRaw.startsWith('CORR-') || 
+    codRaw.startsWith('MC-') || 
+    row.id_correctivo
+  ) {
+    return 'Correctivo';
+  }
+
+  return 'Preventivo';
+};
+
+export const getHistoryRecordCode = (row: any, idx?: number): string => {
+  if (!row) return 'PREV-0001';
+  const category = getHistoryRecordCategory(row);
+  const rawCode = (row['CODIGO'] || row.codigo || '').toString().trim();
+  const numDigits = rawCode.replace(/[^0-9]/g, '');
+  const numVal = numDigits ? parseInt(numDigits, 10) : (row.id || (idx !== undefined ? idx + 1 : 1));
+  const numPadded = String(numVal).padStart(4, '0');
+
+  if (category === 'TPM') return `TPM-${numPadded}`;
+  if (category === 'Correctivo') return `CORR-${numPadded}`;
+  return `PREV-${numPadded}`;
+};
+
 // Interfaces
 interface Technician {
   id: number;
@@ -149,6 +193,7 @@ interface MaintenanceTask {
   id: number;
   csvId: string;
   code: string;
+  nomenclatura: string;
   title: string;
   durationMinutes: number;
   durationHours: number;
@@ -247,7 +292,7 @@ export default function GestionMantenimientoPage() {
   const [preventivoPlanta, setPreventivoPlanta] = useState('Todas');
   const [preventivoFrecuencia, setPreventivoFrecuencia] = useState('Todas');
   const [preventivoTurno, setPreventivoTurno] = useState('Todos');
-  type PmpSortField = 'id' | 'code' | 'title' | 'detalle' | 'planta' | 'plantas' | 'maquina' | 'frecuencia' | 'refFrecuencia' | 'durationMinutes' | 'tipoIntervencion' | 'tecnicos' | 'activo';
+  type PmpSortField = 'id' | 'code' | 'nomenclatura' | 'title' | 'detalle' | 'planta' | 'plantas' | 'maquina' | 'frecuencia' | 'refFrecuencia' | 'durationMinutes' | 'tipoIntervencion' | 'tecnicos' | 'activo';
   const [pmpSortField, setPmpSortField] = useState<PmpSortField>('id');
   const [pmpSortAsc, setPmpSortAsc] = useState<boolean>(true);
 
@@ -264,12 +309,14 @@ export default function GestionMantenimientoPage() {
   const [editingTask, setEditingTask] = useState<MaintenanceTask | null>(null);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [viewingTask, setViewingTask] = useState<MaintenanceTask | null>(null);
+  const [deletingTaskConfirm, setDeletingTaskConfirm] = useState<MaintenanceTask | null>(null);
 
   // Historial View State & Filters
   const [historySearch, setHistorySearch] = useState('');
   const [historyEstado, setHistoryEstado] = useState('Todos');
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
+  const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
   type HistorySortField = 'id' | 'codigo' | 'titulo' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
   const [historySortField, setHistorySortField] = useState<HistorySortField>('id');
   const [historySortAsc, setHistorySortAsc] = useState<boolean>(true);
@@ -527,20 +574,30 @@ export default function GestionMantenimientoPage() {
     const alt = normalize(m.nombre_alterno || '');
 
     return tasks.filter(p => {
-      const pTitle = normalize(p.title || '');
-      const pCode = (p.code || p.csvId || '').toUpperCase();
+      // 1. Direct Machine ID match
+      if (p.idMaquina && p.idMaquina === m.id) return true;
+
+      const pTitle = normalize(p.title || (p as any).titulo || '');
+      const pCode = (p.code || (p as any).codigo || p.csvId || '').toUpperCase();
       const pMaq = normalize(p.maquina || '');
 
-      if (code && code !== '-' && code !== 'N/A' && code !== '0') {
+      // 2. Specific machine code match (e.g. "0976" in pMaq, pCode, or pTitle)
+      if (code && code !== '-' && code !== 'N/A' && code !== '0' && code.length >= 2) {
         const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
-        if (regex.test(p.title || '') || regex.test(pCode) || regex.test(p.maquina || '')) {
+        if (regex.test(pTitle) || regex.test(pCode) || regex.test(pMaq)) {
           return true;
         }
       }
 
+      // 3. Exact machine name or alternate name match
       if (pMaq && (pMaq === name || (alt && pMaq === alt))) return true;
-      if (name.length >= 5 && (pMaq.includes(name) || name.includes(pMaq))) return true;
+
+      // 4. Exact prefix/suffix or full sub-name match when pMaq is specific (prevent short generic word match like "taladro")
+      if (pMaq && pMaq.length >= 8 && name.length >= 8) {
+        if (pMaq.includes(name) || (pMaq.startsWith(name) || name.startsWith(pMaq))) return true;
+      }
+
       return false;
     });
   };
@@ -790,29 +847,19 @@ export default function GestionMantenimientoPage() {
       // A. Populate from mantenimiento_ordenes
       if (ordenesData && ordenesData.length > 0) {
         ordenesData.forEach((d: any, idx: number) => {
-          let tipoMtto = d.tipo || d.tipo_mantenimiento || d.clasificacion || d.origen || d['TIPO'] || '';
-          const origUpper = (d.origen || '').toUpperCase();
-          const codUpper = (d.codigo || '').toUpperCase();
-          const titUpper = (d.titulo || '').toUpperCase();
+          const category = getHistoryRecordCategory(d);
+          const cleanCode = getHistoryRecordCode(d, idx);
 
-          if (origUpper.includes('TARJETA') || origUpper.includes('TPM') || codUpper.startsWith('TPM-') || codUpper.startsWith('TFA-') || titUpper.includes('TARJETA')) {
-            tipoMtto = 'TPM';
-          } else if (origUpper.includes('CORRECTIV') || codUpper.startsWith('CORR-') || codUpper.startsWith('MC-') || d.id_correctivo) {
-            tipoMtto = 'Correctivo';
-          } else if (!tipoMtto) {
-            tipoMtto = 'Preventivo';
-          }
-
-          const key = d.codigo || (tipoMtto === 'TPM' ? `TPM-${d.id || idx + 1}` : tipoMtto === 'Correctivo' ? `CORR-${d.id || idx + 1}` : `MP-${d.id || idx + 1}`);
-          historyMap.set(key, {
+          historyMap.set(cleanCode, {
+            ...d,
             id: d.id || idx + 1,
-            codigo: key,
+            codigo: cleanCode,
             'Título': d.titulo || d['Título'] || 'Mantenimiento',
             'ESTADO': d.estado || d['ESTADO'] || 'Abierta',
             'TECNICO': d.tecnico_nombre || d.tecnico_asignado || d['TECNICO'] || 'Sin asignar',
-            'TIPO': tipoMtto,
-            tipo: tipoMtto,
-            origen: tipoMtto,
+            'TIPO': category,
+            tipo: category,
+            origen: category,
             'FECHA DE APERTURA': d.fecha_apertura || d['FECHA DE APERTURA'] || (d.created_at ? d.created_at.slice(0, 10) : ''),
             'FECHA DE CIERRE': d.fecha_cierre || d['FECHA DE CIERRE'] || '',
             'COMENTARIO DE EJECUCION': d.comentarios_ejecucion || d.accion_realizada || d['COMENTARIO DE EJECUCION'] || '',
@@ -835,6 +882,7 @@ export default function GestionMantenimientoPage() {
 
           if (!existing) {
             historyMap.set(cod, {
+              ...d,
               id: d.id || idx + 5000,
               codigo: cod,
               'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
@@ -845,7 +893,7 @@ export default function GestionMantenimientoPage() {
               origen: 'TPM',
               'FECHA DE APERTURA': d.fecha_apertura || (d.created_at ? d.created_at.slice(0, 10) : ''),
               'FECHA DE CIERRE': d.fecha_cierre || '',
-              'COMENTARIO DE EJECUCION': d.accion_inmediata || d.accion_correctiva || '',
+              'COMENTARIO DE EJECUCION': d.accion_inmediata || d.accion_correctiva || d.comentarios_ejecucion || '',
               created_at: d.created_at
             });
           } else {
@@ -1505,11 +1553,12 @@ export default function GestionMantenimientoPage() {
 
     const newTasks: MaintenanceTask[] = [];
 
-    preventivosRaw.forEach(p => {
+    preventivosRaw.forEach((p, pIdx) => {
       const title = p.titulo;
       const tiempoMinutos = p.duracion_minutos || 60;
       const id = p.id;
-      const codigo = p.codigo || `MP-${p.id}`;
+      const consecutiveNum = pIdx + 1;
+      const codeFormatted = `PMP-${String(consecutiveNum).padStart(4, '0')}`;
       const detalle = p.detalle_instrucciones || '';
       const maquina = p.maquina || 'Equipo General';
       const tipoIntervencion = p.tipo_intervencion || 'NP';
@@ -1635,11 +1684,15 @@ export default function GestionMantenimientoPage() {
       const finalApertura = matchingOrden?.fecha_apertura || matchingLocal?.fechaApertura || (finalCandidate !== 9999 ? getLocalDatetimeString() : null);
       const finalCierre = matchingOrden?.fecha_cierre || matchingLocal?.fechaCierre || null;
 
+      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title);
+      const cleanTitle = cleanTaskTitle(title, nomenclaturaCalculated);
+
       newTasks.push({
         id: id,
         csvId: `MP-${id}`,
-        code: codigo,
-        title: title,
+        code: codeFormatted,
+        nomenclatura: nomenclaturaCalculated,
+        title: cleanTitle,
         durationMinutes: tiempoMinutos,
         durationHours: tiempoMinutos / 60,
         idtecs: finalCandidate,
@@ -2211,11 +2264,13 @@ export default function GestionMantenimientoPage() {
     if (!newTaskForm.title.trim()) return;
 
     let createdId = Date.now();
-    const codigoGen = `MP-${Math.floor(100 + Math.random() * 900)}`;
     const taskPlantas = (newTaskForm.plantas && newTaskForm.plantas.length > 0)
       ? newTaskForm.plantas
       : parseTechPlantas(newTaskForm.planta, plantasNomenclatura);
     const plantaStr = taskPlantas.join(', ');
+
+    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes);
+    const cleanTitle = cleanTaskTitle(newTaskForm.title.trim(), nomenclaturaGen);
 
     // Candidate technicians matching Planta/Especialidad & Turno
     const candidateTechsForTask = technicians.filter(t => {
@@ -2226,10 +2281,13 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
+    const nextConsecutive = tasks.length + 1;
+    let codeFormatted = `PMP-${String(nextConsecutive).padStart(4, '0')}`;
+
     try {
-      const { data } = await supabase.from('mantenimiento_planes_preventivos').insert([{
-        codigo: codigoGen,
-        titulo: newTaskForm.title.trim(),
+      const insertPayload: any = {
+        codigo: codeFormatted,
+        titulo: cleanTitle,
         duracion_minutos: newTaskForm.durationMinutes,
         tipo_intervencion: newTaskForm.intervencion,
         turno_requerido: 'General',
@@ -2239,23 +2297,30 @@ export default function GestionMantenimientoPage() {
         detalle_instrucciones: newTaskForm.detalle.trim(),
         maquina: newTaskForm.maquina.trim() || 'General',
         planta: plantaStr,
-        plantas: taskPlantas,
-        especialidad: plantaStr,
         activo: true
-      }]).select().single();
+      };
 
-      if (data) {
+      const { data, error } = await supabase
+        .from('mantenimiento_planes_preventivos')
+        .insert([insertPayload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error guardando PMP en Supabase:', error);
+      } else if (data) {
         createdId = data.id;
       }
     } catch (err) {
-      console.warn('Error guardando PMP en Supabase:', err);
+      console.warn('Excepción guardando PMP en Supabase:', err);
     }
 
     const newTask: MaintenanceTask = {
       id: createdId,
       csvId: `MP-${createdId}`,
-      code: codigoGen,
-      title: newTaskForm.title.trim(),
+      code: codeFormatted,
+      nomenclatura: nomenclaturaGen,
+      title: cleanTitle,
       durationMinutes: newTaskForm.durationMinutes,
       durationHours: newTaskForm.durationMinutes / 60,
       idtecs: 9999,
@@ -2342,22 +2407,29 @@ export default function GestionMantenimientoPage() {
     setShowEditTaskModal(false);
 
     try {
-      await supabase.from('mantenimiento_planes_preventivos').update({
+      const updatePayload: any = {
         codigo: editingTask.code,
         titulo: editingTask.title,
         maquina: editingTask.maquina,
         planta: plantaStr,
-        plantas: taskPlantas,
-        especialidad: plantaStr,
         duracion_minutos: editingTask.durationMinutes,
         tipo_intervencion: editingTask.tipoIntervencion,
         frecuencia_dias: editingTask.frecuencia,
         ref_frecuencia: editingTask.refFrecuencia,
         id_tecnicos_autorizados: candidateTechsForTask.map(t => t.id),
         detalle_instrucciones: editingTask.detalle
-      }).eq('id', editingTask.id);
+      };
+
+      const { error } = await supabase
+        .from('mantenimiento_planes_preventivos')
+        .update(updatePayload)
+        .eq('id', editingTask.id);
+
+      if (error) {
+        console.error('Error actualizando PMP en Supabase:', error);
+      }
     } catch (err) {
-      console.warn('Error actualizando PMP en Supabase:', err);
+      console.warn('Excepción actualizando PMP en Supabase:', err);
     }
 
     setEditingTask(null);
@@ -2366,14 +2438,34 @@ export default function GestionMantenimientoPage() {
   const handleDeleteTask = async (taskId: number) => {
     const taskToDelete = tasks.find(t => t.id === taskId);
     if (!taskToDelete) return;
-    if (confirm(`¿Estás seguro de eliminar el mantenimiento "${taskToDelete.title}" de la base maestra de Supabase?`)) {
-      const updatedTasks = tasks.filter(t => t.id !== taskId);
-      persistState(updatedTasks, technicians);
-      try {
-        await supabase.from('mantenimiento_planes_preventivos').delete().eq('id', taskId);
-      } catch (err) {
-        console.warn('Error eliminando PMP en Supabase:', err);
-      }
+    const updatedTasks = tasks.filter(t => t.id !== taskId);
+    persistState(updatedTasks, technicians);
+    try {
+      await supabase.from('mantenimiento_planes_preventivos').delete().eq('id', taskId);
+    } catch (err) {
+      console.warn('Error eliminando PMP en Supabase:', err);
+    }
+  };
+
+  const handleToggleTaskActive = async (taskId: number) => {
+    const taskToToggle = tasks.find(t => t.id === taskId);
+    if (!taskToToggle) return;
+    const newActive = taskToToggle.activo === false ? true : false;
+
+    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, activo: newActive } : t);
+    setTasks(updatedTasks);
+    if (viewingTask && viewingTask.id === taskId) {
+      setViewingTask({ ...viewingTask, activo: newActive });
+    }
+    persistState(updatedTasks, technicians);
+
+    try {
+      await supabase
+        .from('mantenimiento_planes_preventivos')
+        .update({ activo: newActive })
+        .eq('id', taskId);
+    } catch (err) {
+      console.warn('Error actualizando estado activo en Supabase:', err);
     }
   };
 
@@ -3495,6 +3587,8 @@ export default function GestionMantenimientoPage() {
         const matches =
           normalize(task.title).includes(q) ||
           normalize(task.code).includes(q) ||
+          normalize(task.nomenclatura || '').includes(q) ||
+          normalize(String(task.id)).includes(q) ||
           normalize(task.csvId).includes(q) ||
           normalize(task.maquina).includes(q) ||
           normalize(task.codigoMaquina || '').includes(q) ||
@@ -3538,6 +3632,10 @@ export default function GestionMantenimientoPage() {
         case 'code':
           valA = (a.code || a.csvId || '').toLowerCase();
           valB = (b.code || b.csvId || '').toLowerCase();
+          break;
+        case 'nomenclatura':
+          valA = (a.nomenclatura || '').toLowerCase();
+          valB = (b.nomenclatura || '').toLowerCase();
           break;
         case 'title':
           valA = (a.title || '').toLowerCase();
@@ -3607,16 +3705,8 @@ export default function GestionMantenimientoPage() {
 
       // Global Origen filter (TPM, Correctivo, Preventivo)
       if (historyTipo !== 'Todos') {
-        const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').toLowerCase();
-        const codRaw = (row['CODIGO'] || row.codigo || row['Título'] || '').toLowerCase();
-
-        const isTpm = origRaw.includes('tpm') || origRaw.includes('tarjeta') || origRaw.includes('anomalia') || codRaw.includes('tpm-') || codRaw.includes('tfa-') || codRaw.includes('tarjeta');
-        const isCorrectivo = !isTpm && (origRaw.includes('correctiv') || codRaw.includes('corr-') || origRaw.includes('directo'));
-        const isPreventivo = !isTpm && !isCorrectivo;
-
-        if (historyTipo === 'TPM' && !isTpm) return false;
-        if (historyTipo === 'Correctivo' && !isCorrectivo) return false;
-        if (historyTipo === 'Preventivo' && !isPreventivo) return false;
+        const category = getHistoryRecordCategory(row);
+        if (historyTipo !== category) return false;
       }
 
       // Global status / tech filters
@@ -3874,8 +3964,9 @@ export default function GestionMantenimientoPage() {
         const plantasLabel = taskPlantas.join(', ');
 
         return {
-          'ID': t.id,
-          'Código': t.code || t.csvId,
+          '#': t.id,
+          'Código': t.code || `PMP-${String(t.id).padStart(4, '0')}`,
+          'Nomenclatura': t.nomenclatura || computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes),
           'Mantenimiento / Tarea': t.title,
           'Detalle / Instrucciones': t.detalle || '',
           'Planta / Especialidad': plantasLabel || t.planta,
@@ -5095,16 +5186,16 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full table-fixed text-left text-[11px] border-collapse">
                   <colgroup>
                     <col className="w-[3.5%]" />
-                    <col className="w-[10.5%]" />
+                    <col className="w-[8.5%]" />
+                    <col className="w-[11%]" />
                     <col className="w-[24.5%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[14.5%]" />
                     <col className="w-[4.5%]" />
-                    <col className="w-[6%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[4.5%]" />
+                    <col className="w-[5.5%]" />
                     <col className="w-[4.5%]" />
                     <col className="w-[4.5%]" />
-                    <col className="w-[12.5%]" />
-                    <col className="w-[5%]" />
+                    <col className="w-[10.5%]" />
                     <col className="w-[5%]" />
                   </colgroup>
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
@@ -5113,7 +5204,7 @@ export default function GestionMantenimientoPage() {
                       <th
                         onClick={() => handlePmpSort('id')}
                         className="py-2.5 px-1 font-bold text-center cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por ID"
+                        title="Clic para ordenar por ID en base de datos"
                       >
                         <div className="flex items-center justify-center gap-0.5">
                           <span>#</span>
@@ -5125,15 +5216,31 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Código */}
+                      {/* Código Único (PMP-XXXX) */}
                       <th
                         onClick={() => handlePmpSort('code')}
                         className="py-2.5 px-1.5 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors truncate"
-                        title="Clic para ordenar por Código/Nomenclatura"
+                        title="Clic para ordenar por Código Único (PMP-XXXX)"
                       >
                         <div className="flex items-center gap-1">
                           <span className="truncate">Código</span>
                           {pmpSortField === 'code' ? (
+                            pmpSortAsc ? <ArrowUp className="w-3 h-3 text-amber-300 shrink-0" /> : <ArrowDown className="w-3 h-3 text-amber-300 shrink-0" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40 shrink-0" />
+                          )}
+                        </div>
+                      </th>
+
+                      {/* Nomenclatura Estándar ([S...]) */}
+                      <th
+                        onClick={() => handlePmpSort('nomenclatura')}
+                        className="py-2.5 px-1.5 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors truncate"
+                        title="Clic para ordenar por Nomenclatura ([S...])"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="truncate">Nomenclatura</span>
+                          {pmpSortField === 'nomenclatura' ? (
                             pmpSortAsc ? <ArrowUp className="w-3 h-3 text-amber-300 shrink-0" /> : <ArrowDown className="w-3 h-3 text-amber-300 shrink-0" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 text-white/40 shrink-0" />
@@ -5284,9 +5391,6 @@ export default function GestionMantenimientoPage() {
                           )}
                         </div>
                       </th>
-
-                      {/* Acciones */}
-                      <th className="py-2.5 px-1 font-bold text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -5303,17 +5407,24 @@ export default function GestionMantenimientoPage() {
                             key={task.id || idx} 
                             onClick={() => setViewingTask(task)}
                             className="hover:bg-slate-100/90 active:bg-slate-200/50 cursor-pointer transition-colors group"
-                            title="Haz clic para ver la ficha técnica y procedimiento completo"
+                            title="Haz clic para ver la ficha técnica, editar o eliminar"
                           >
-                            {/* ID */}
+                            {/* # ID */}
                             <td className="py-2 px-1 text-center font-bold text-gray-400 overflow-hidden">
                               <span className="font-mono text-[10px] text-slate-500 group-hover:text-[#324354] font-semibold">#{task.id}</span>
                             </td>
 
-                            {/* Código / Nomenclatura */}
+                            {/* Código Único (PMP-XXXX) */}
                             <td className="py-2 px-1.5 font-bold text-[#324354] overflow-hidden">
-                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[10px] group-hover:bg-white group-hover:border-slate-300 transition-colors block truncate" title={task.code || task.csvId}>
-                                {task.code || task.csvId}
+                              <span className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 text-amber-900 rounded font-mono text-[10px] group-hover:bg-amber-100 transition-colors block truncate" title={task.code}>
+                                {task.code || `PMP-${String(task.id).padStart(4, '0')}`}
+                              </span>
+                            </td>
+
+                            {/* Nomenclatura Estándar ([S...]) */}
+                            <td className="py-2 px-1.5 font-bold text-[#324354] overflow-hidden">
+                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[10px] group-hover:bg-white group-hover:border-slate-300 transition-colors block truncate" title={task.nomenclatura}>
+                                {task.nomenclatura || computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes)}
                               </span>
                             </td>
 
@@ -5432,32 +5543,6 @@ export default function GestionMantenimientoPage() {
                               }`}>
                                 {task.activo !== false ? 'Activo' : 'Inactivo'}
                               </span>
-                            </td>
-
-                            {/* Acciones */}
-                            <td className="py-2 px-1 text-center overflow-hidden">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenEditTask(task);
-                                  }}
-                                  className="p-1 text-[#324354] hover:bg-slate-100 hover:text-blue-600 rounded-lg transition-all cursor-pointer"
-                                  title="Editar mantenimiento base"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteTask(task.id);
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                                  title="Eliminar de la base"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
                             </td>
                           </tr>
                         );
@@ -5838,14 +5923,14 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full text-left text-xs border-collapse table-fixed">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
-                      {/* Código Único */}
+                      {/* Número OT */}
                       <th
                         onClick={() => handleHistorySort('codigo')}
                         className="py-3 px-2 font-bold text-center w-[12%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Código Único"
+                        title="Clic para ordenar por Número OT"
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>Código</span>
+                          <span>Número OT</span>
                           {historySortField === 'codigo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
@@ -5980,25 +6065,19 @@ export default function GestionMantenimientoPage() {
                         const isComplete = estado.toLowerCase() === 'completado' || estado.toLowerCase() === 'resuelta' || estado.toLowerCase() === 'cerrada';
                         const isIncomplete = estado.toLowerCase() === 'incompleto';
                         
-                        const origRaw = (row['TIPO'] || row.tipo || row['ORIGEN'] || row.origen || '').trim().toLowerCase();
-                        const codRaw = (row['CODIGO'] || row.codigo || row['Título'] || '').trim().toLowerCase();
-
-                        const isTpm = origRaw.includes('tpm') || origRaw.includes('tarjeta') || origRaw.includes('anomalia') || codRaw.includes('tpm-') || codRaw.includes('tfa-') || codRaw.includes('tarjeta');
-                        const isCorrectivo = !isTpm && (origRaw.includes('correctiv') || codRaw.includes('corr-') || origRaw.includes('directo'));
-
-                        let rawCode = row['CODIGO'] || row.codigo;
-                        if (rawCode && rawCode.startsWith('TFA-')) {
-                          const parts = rawCode.split('-');
-                          const num = parseInt(parts[parts.length - 1], 10);
-                          rawCode = !isNaN(num) ? `TPM-${num}` : rawCode.replace('TFA-', 'TPM-');
-                        } else if (rawCode && rawCode.startsWith('MP-')) {
-                          rawCode = rawCode.replace('MP-', 'PREV-');
-                        }
-                        const codigoDisplay = rawCode || (isTpm ? `TPM-${row.id || idx + 1}` : isCorrectivo ? `CORR-${row.id || idx + 1}` : `PREV-${row.id || idx + 1}`);
+                        const category = getHistoryRecordCategory(row);
+                        const isTpm = category === 'TPM';
+                        const isCorrectivo = category === 'Correctivo';
+                        const codigoDisplay = getHistoryRecordCode(row, idx);
 
                         return (
-                          <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
-                            {/* Código Badge */}
+                          <tr 
+                            key={row.id || idx} 
+                            onClick={() => setViewingHistoryRecord({ ...row, codigoDisplay, category })}
+                            className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
+                            title="Haz clic para ver la información completa de esta orden de trabajo"
+                          >
+                            {/* Número OT Badge */}
                             <td className="py-3 px-2 text-center font-bold">
                               <span className={`px-2 py-1 rounded-lg font-mono text-[10.5px] border inline-block whitespace-nowrap shadow-2xs ${
                                 isTpm ? 'bg-purple-50 text-purple-800 border-purple-200' :
@@ -7804,6 +7883,20 @@ export default function GestionMantenimientoPage() {
               </div>
             </div>
 
+            {/* Banner de Nomenclatura Estándar y Código PMP */}
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-center justify-between gap-2 mb-2">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Código Único (PMP)</span>
+                <span className="text-xs font-mono font-bold text-amber-900">PMP-AUTO (Asignado al guardar)</span>
+              </div>
+              <div className="flex flex-col text-right">
+                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Nomenclatura Estándar</span>
+                <span className="text-xs font-mono font-bold text-slate-800 px-2 py-0.5 bg-white border border-slate-300 rounded">
+                  {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes)}
+                </span>
+              </div>
+            </div>
+
             <form onSubmit={handleAddTaskSubmit} className="flex flex-col gap-3.5">
               <div>
                 <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Título del Mantenimiento</label>
@@ -9187,29 +9280,48 @@ export default function GestionMantenimientoPage() {
       {/* Modal: View Maintenance Task Details (Ficha Técnica Completa) */}
       {viewingTask && (
         <div 
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-24 pb-8 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in"
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 pt-16 sm:pt-20 pb-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setViewingTask(null);
           }}
         >
           <div 
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[85vh] overflow-y-auto flex flex-col gap-5 relative my-auto"
+            className="bg-white rounded-3xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] flex flex-col gap-4 relative my-auto overflow-hidden"
             onMouseDown={(e) => e.stopPropagation()}
             onMouseUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header with Title and Code */}
-            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4">
+            {/* Header with Title, Code, Nomenclature & Active Status Toggle */}
+            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-3 shrink-0">
               <div className="flex flex-col gap-1 pr-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200">
-                    #{viewingTask.csvId || viewingTask.code}
+                  <span className="px-2.5 py-1 bg-amber-50 font-mono font-bold text-amber-900 rounded-lg text-xs border border-amber-200" title="Código Único PMP">
+                    {viewingTask.code || `PMP-${String(viewingTask.id).padStart(4, '0')}`}
+                  </span>
+                  <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200" title="Nomenclatura Estándar">
+                    {viewingTask.nomenclatura || computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes)}
                   </span>
                   <span className="px-2.5 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                     <span className="font-bold text-[#324354]">{obtenerCodigoPlanta(viewingTask.planta)}</span>
                     <span className="text-gray-400">·</span>
                     <span>{viewingTask.planta}</span>
                   </span>
+
+                  {/* Estado Activo / Inactivo Switch button */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTaskActive(viewingTask.id)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                      viewingTask.activo !== false
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                        : 'bg-gray-200 text-gray-700 border border-gray-300 hover:bg-gray-300'
+                    }`}
+                    title="Haz clic para cambiar estado Activo / Inactivo"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${viewingTask.activo !== false ? 'bg-emerald-500' : 'bg-gray-500'}`} />
+                    <span>{viewingTask.activo !== false ? 'Activo' : 'Inactivo'}</span>
+                  </button>
+
                   {viewingTask.adelantada && (
                     <span className="px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs font-bold">
                       ⚡ Mantenimiento Adelantado
@@ -9230,197 +9342,212 @@ export default function GestionMantenimientoPage() {
               </button>
             </div>
 
-            {/* Technical Instructions Box */}
-            <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5">
-              <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-[#7B8E90]" />
-                <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
-              </h4>
-              {viewingTask.detalle ? (
-                <div className="text-xs sm:text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-normal bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                  {viewingTask.detalle}
+            {/* Scrollable Body Content */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4">
+              {/* Technical Instructions Box */}
+              <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5">
+                <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#7B8E90]" />
+                  <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
+                </h4>
+                {viewingTask.detalle ? (
+                  <div className="text-xs sm:text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-normal bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                    {viewingTask.detalle}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 italic bg-white p-4 rounded-xl border border-gray-200/80">
+                    Sin observaciones o instrucciones adicionales registradas en la base de datos.
+                  </div>
+                )}
+              </div>
+
+              {/* Parameters Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
+                  <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquinas y Equipos</span>
+                  <div className="flex flex-wrap items-center gap-1.5 leading-snug">
+                    {viewingTask.codigoMaquina && (
+                      <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
+                        {viewingTask.codigoMaquina}
+                      </span>
+                    )}
+                    <strong className="text-[#324354] text-xs font-bold break-words leading-tight" title={viewingTask.maquina}>
+                      {viewingTask.maquina}
+                    </strong>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-xs text-gray-400 italic bg-white p-4 rounded-xl border border-gray-200/80">
-                  Sin observaciones o instrucciones adicionales registradas en la base de datos.
+
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Frecuencia Base</span>
+                    <strong className="text-blue-800 text-xs sm:text-sm font-bold block">
+                      {viewingTask.frecuencia} días
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Periodicidad programada</span>
+                </div>
+
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Contador (Días)</span>
+                    <strong className={`text-xs sm:text-sm font-bold block ${
+                      viewingTask.refFrecuencia >= viewingTask.frecuencia ? 'text-amber-700' : 'text-slate-700'
+                    }`}>
+                      {viewingTask.refFrecuencia} días
+                    </strong>
+                  </div>
+                  <span className={`text-[10px] font-bold mt-1 ${
+                    viewingTask.refFrecuencia >= viewingTask.frecuencia 
+                      ? 'text-amber-800' 
+                      : 'text-gray-400'
+                  }`}>
+                    {viewingTask.refFrecuencia >= viewingTask.frecuencia ? '✓ Exigible por ciclo' : 'En acumulación'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Duración Estándar</span>
+                    <strong className="text-[#324354] text-xs sm:text-sm font-bold block">
+                      {viewingTask.durationMinutes}m ({viewingTask.durationHours.toFixed(1)}h)
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Tiempo de ejecución</span>
+                </div>
+              </div>
+
+              {/* Planta / Especialidad y Técnicos Compatibles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
+                  <span className="text-gray-400 font-bold text-[10px] uppercase">Planta / Especialidad Asignada</span>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                    {(() => {
+                      const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
+                        ? viewingTask.plantas 
+                        : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
+                      const activeCount = plantasNomenclatura.filter(p => p.activo !== false).length;
+                      const isAll = activeCount > 0 && taskPlantas.length >= activeCount;
+
+                      if (isAll) {
+                        return (
+                          <span className="px-2.5 py-1 bg-[#324354] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1.5">
+                            <span>🌐</span>
+                            <span>Todas las Plantas / Especialidades</span>
+                          </span>
+                        );
+                      }
+
+                      if (taskPlantas.length === 0) {
+                        return <span className="text-gray-400 italic text-xs">Sin plantas asignadas</span>;
+                      }
+
+                      return taskPlantas.map(cod => {
+                        const nom = plantasNomenclatura.find(pn => pn.codigo === cod);
+                        return (
+                          <span key={cod} className="px-2 py-1 bg-sky-50 border border-sky-200 text-sky-900 text-xs font-semibold rounded-lg flex items-center gap-1">
+                            <strong className="font-bold text-[#324354]">{cod}</strong>
+                            <span className="text-gray-600">· {nom?.nombre_oficial || cod}</span>
+                          </span>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 font-bold text-[10px] uppercase">Técnicos Compatibles</span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 font-bold text-[#324354] rounded">
+                      Turno: {getTurnoLabel(viewingTask.tipoIntervencion)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
+                    {(() => {
+                      const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
+                        ? viewingTask.plantas 
+                        : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
+                      const matchingTechs = technicians.filter(t => {
+                        if (t.id === 9999 || t.activo === false) return false;
+                        const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
+                        const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
+                        const matchesTurno = areTurnosCompatible(viewingTask.tipoIntervencion, t.turno);
+                        return matchesPlanta && matchesTurno;
+                      });
+
+                      if (matchingTechs.length === 0) {
+                        return <span className="text-gray-400 italic text-xs">Sin técnicos directos con este turno y especialidad</span>;
+                      }
+
+                      return matchingTechs.map(ct => (
+                        <span key={ct.id} className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold rounded-md">
+                          {ct.name} ({getTurnoLabel(ct.turno)})
+                        </span>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Feedback Toast / Alert when Force Task is triggered */}
+              {forceTaskFeedback && (
+                <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span>{forceTaskFeedback}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewingTask(null);
+                      setActiveTab('planificador');
+                    }}
+                    className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-bold cursor-pointer transition-all shrink-0"
+                  >
+                    Ir al Planificador →
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* Parameters Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl">
-                <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Máquinas y Equipos</span>
-                <div className="flex items-center gap-1.5 overflow-hidden">
-                  {viewingTask.codigoMaquina && (
-                    <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
-                      {viewingTask.codigoMaquina}
-                    </span>
-                  )}
-                  <strong className="text-[#324354] text-xs sm:text-sm font-bold block truncate" title={viewingTask.maquina}>
-                    {viewingTask.maquina}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Frecuencia Base</span>
-                  <strong className="text-blue-800 text-xs sm:text-sm font-bold block">
-                    {viewingTask.frecuencia} días
-                  </strong>
-                </div>
-                <span className="text-[10px] text-gray-400 mt-1">Periodicidad programada</span>
-              </div>
-
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Contador (Días)</span>
-                  <strong className={`text-xs sm:text-sm font-bold block ${
-                    viewingTask.refFrecuencia >= viewingTask.frecuencia ? 'text-amber-700' : 'text-slate-700'
-                  }`}>
-                    {viewingTask.refFrecuencia} días
-                  </strong>
-                </div>
-                <span className={`text-[10px] font-bold mt-1 ${
-                  viewingTask.refFrecuencia >= viewingTask.frecuencia 
-                    ? 'text-amber-800' 
-                    : 'text-gray-400'
-                }`}>
-                  {viewingTask.refFrecuencia >= viewingTask.frecuencia ? '✓ Exigible por ciclo' : 'En acumulación'}
-                </span>
-              </div>
-
-              <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
-                <div>
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Duración Estándar</span>
-                  <strong className="text-[#324354] text-xs sm:text-sm font-bold block">
-                    {viewingTask.durationMinutes}m ({viewingTask.durationHours.toFixed(1)}h)
-                  </strong>
-                </div>
-                <span className="text-[10px] text-gray-400 mt-1">Tiempo de ejecución</span>
-              </div>
-            </div>
-
-            {/* Planta / Especialidad y Técnicos Compatibles */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
-                <span className="text-gray-400 font-bold text-[10px] uppercase">Planta / Especialidad Asignada</span>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-                  {(() => {
-                    const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
-                      ? viewingTask.plantas 
-                      : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
-                    const activeCount = plantasNomenclatura.filter(p => p.activo !== false).length;
-                    const isAll = activeCount > 0 && taskPlantas.length >= activeCount;
-
-                    if (isAll) {
-                      return (
-                        <span className="px-2.5 py-1 bg-[#324354] text-white text-xs font-bold rounded-lg inline-flex items-center gap-1.5">
-                          <span>🌐</span>
-                          <span>Todas las Plantas / Especialidades</span>
-                        </span>
-                      );
-                    }
-
-                    if (taskPlantas.length === 0) {
-                      return <span className="text-gray-400 italic text-xs">Sin plantas asignadas</span>;
-                    }
-
-                    return taskPlantas.map(cod => {
-                      const nom = plantasNomenclatura.find(pn => pn.codigo === cod);
-                      return (
-                        <span key={cod} className="px-2 py-1 bg-sky-50 border border-sky-200 text-sky-900 text-xs font-semibold rounded-lg flex items-center gap-1">
-                          <strong className="font-bold text-[#324354]">{cod}</strong>
-                          <span className="text-gray-600">· {nom?.nombre_oficial || cod}</span>
-                        </span>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 font-bold text-[10px] uppercase">Técnicos Compatibles</span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 font-bold text-[#324354] rounded">
-                    Turno: {getTurnoLabel(viewingTask.tipoIntervencion)}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
-                  {(() => {
-                    const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
-                      ? viewingTask.plantas 
-                      : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
-                    const matchingTechs = technicians.filter(t => {
-                      if (t.id === 9999 || t.activo === false) return false;
-                      const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
-                      const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
-                      const matchesTurno = areTurnosCompatible(viewingTask.tipoIntervencion, t.turno);
-                      return matchesPlanta && matchesTurno;
-                    });
-
-                    if (matchingTechs.length === 0) {
-                      return <span className="text-gray-400 italic text-xs">Sin técnicos directos con este turno y especialidad</span>;
-                    }
-
-                    return matchingTechs.map(ct => (
-                      <span key={ct.id} className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold rounded-md">
-                        {ct.name} ({getTurnoLabel(ct.turno)})
-                      </span>
-                    ));
-                  })()}
-                </div>
-              </div>
-            </div>
-
-            {/* Feedback Toast / Alert when Force Task is triggered */}
-            {forceTaskFeedback && (
-              <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>{forceTaskFeedback}</span>
-                </div>
+            {/* Modal Actions - Fixed at Bottom */}
+            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => {
-                    setViewingTask(null);
-                    setActiveTab('planificador');
-                  }}
-                  className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-bold cursor-pointer transition-all shrink-0"
+                  disabled={forcingTaskId === viewingTask.id}
+                  onClick={() => handleForceTask(viewingTask)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs disabled:opacity-50 shrink-0"
+                  title="Genera y activa la orden de trabajo de este mantenimiento inmediatamente en el planificador semanal"
                 >
-                  Ir al Planificador →
+                  {forcingTaskId === viewingTask.id ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Forzando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                      <span>Forzar Mantenimiento</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDeletingTaskConfirm(viewingTask)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs cursor-pointer transition-all shrink-0"
+                  title="Eliminar este mantenimiento preventivo de la base de datos"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Eliminar</span>
                 </button>
               </div>
-            )}
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#e2ded5] flex-wrap">
-              <button
-                type="button"
-                disabled={forcingTaskId === viewingTask.id}
-                onClick={() => handleForceTask(viewingTask)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs disabled:opacity-50"
-                title="Genera y activa la orden de trabajo de este mantenimiento inmediatamente en el planificador semanal"
-              >
-                {forcingTaskId === viewingTask.id ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Forzando Generación...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-200" />
-                    <span>Forzar Mantenimiento</span>
-                  </>
-                )}
-              </button>
-
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setViewingTask(null)}
-                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all"
+                  className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-all shrink-0"
                 >
                   Cerrar
                 </button>
@@ -9431,12 +9558,236 @@ export default function GestionMantenimientoPage() {
                     setViewingTask(null);
                     handleOpenEditTask(taskToEdit);
                   }}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-xs"
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs shrink-0"
                 >
-                  <Pencil className="w-4 h-4" />
+                  <Pencil className="w-3.5 h-3.5" />
                   <span>Editar Estándar</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmación de Eliminación de Mantenimiento Base */}
+      {deletingTaskConfirm && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-red-200 flex flex-col gap-4 my-auto">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-3 bg-red-100 rounded-2xl shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-gray-900">¿Eliminar Mantenimiento?</h4>
+                <p className="text-xs text-gray-500">Confirmación requerida</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-700 bg-gray-50 p-3.5 rounded-xl border border-gray-200 leading-relaxed">
+              ¿Estás seguro de que deseas eliminar permanentemente el estándar preventivo{' '}
+              <strong className="text-red-700 font-mono font-bold">[{deletingTaskConfirm.code}] {deletingTaskConfirm.title}</strong>? Esta acción lo borrará de Supabase y no se podrá deshacer.
+            </p>
+            <div className="flex items-center gap-2 justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setDeletingTaskConfirm(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const taskId = deletingTaskConfirm.id;
+                  setDeletingTaskConfirm(null);
+                  setViewingTask(null);
+                  await handleDeleteTask(taskId);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors shadow-xs"
+              >
+                Sí, Eliminar Mantenimiento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Detalle Completo de Historial OT */}
+      {viewingHistoryRecord && (
+        <div 
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 pt-16 sm:pt-20 pb-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setViewingHistoryRecord(null);
+          }}
+        >
+          <div 
+            className="bg-white rounded-3xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] flex flex-col gap-4 relative my-auto overflow-hidden"
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with Title, Code & Badges */}
+            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-3 shrink-0">
+              <div className="flex flex-col gap-1 pr-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Código Badge */}
+                  <span className="px-2.5 py-1 bg-amber-50 font-mono font-bold text-amber-900 rounded-lg text-xs border border-amber-200">
+                    {viewingHistoryRecord.codigo || viewingHistoryRecord['CODIGO'] || 'REGISTRO OT'}
+                  </span>
+                  
+                  {/* Origen Badge */}
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                    (viewingHistoryRecord.tipo || viewingHistoryRecord.TIPO || viewingHistoryRecord.origen || '').toUpperCase().includes('TPM') 
+                      ? 'bg-purple-50 text-purple-800 border-purple-200' 
+                      : (viewingHistoryRecord.tipo || viewingHistoryRecord.TIPO || viewingHistoryRecord.origen || '').toUpperCase().includes('CORRECTIV')
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-sky-50 text-sky-800 border-sky-200'
+                  }`}>
+                    {viewingHistoryRecord.tipo || viewingHistoryRecord.TIPO || viewingHistoryRecord.origen || 'Mantenimiento'}
+                  </span>
+
+                  {/* Estado Badge */}
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                    (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('completad') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('resuelt') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('cerrad')
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('incomplet')
+                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}>
+                    {(viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('completad') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('resuelt') || (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('cerrad') ? '✅ Completado' : (viewingHistoryRecord.ESTADO || viewingHistoryRecord.estado || '').toLowerCase().includes('incomplet') ? '⚠️ Incompleto' : '⏳ Pendiente'}
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-[#324354] leading-snug mt-1">
+                  {viewingHistoryRecord['Título'] || viewingHistoryRecord.titulo || viewingHistoryRecord.descripcion_que || 'Detalle de Orden de Trabajo'}
+                </h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setViewingHistoryRecord(null)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer shrink-0"
+                title="Cerrar ventana"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4">
+              {/* Technical Observations / Comments */}
+              <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5] flex flex-col gap-2">
+                <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#7B8E90]" />
+                  <span>Observaciones y Comentarios de Ejecución</span>
+                </h4>
+                {viewingHistoryRecord['COMENTARIO DE EJECUCION'] || viewingHistoryRecord.accion_realizada || viewingHistoryRecord.comentarios_ejecucion || viewingHistoryRecord.accion_inmediata || viewingHistoryRecord.accion_tomada ? (
+                  <div className="text-xs sm:text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-normal bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
+                    {viewingHistoryRecord['COMENTARIO DE EJECUCION'] || viewingHistoryRecord.accion_realizada || viewingHistoryRecord.comentarios_ejecucion || viewingHistoryRecord.accion_inmediata || viewingHistoryRecord.accion_tomada}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 italic bg-white p-3.5 rounded-xl border border-gray-200/80">
+                    Sin observaciones o comentarios de ejecución registrados.
+                  </div>
+                )}
+              </div>
+
+              {/* Grid 1: Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* Técnico Responsable */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
+                  <span className="text-gray-400 font-bold block text-[10px] uppercase">Técnico Responsable</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-[#324354] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                      👤
+                    </div>
+                    <strong className="text-[#324354] text-xs font-bold break-words">
+                      {viewingHistoryRecord['TECNICO'] || viewingHistoryRecord.tecnico_asignado || viewingHistoryRecord.tecnico_nombre || 'Sin asignar'}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Máquinas y Equipos */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
+                  <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquina / Equipo</span>
+                  <div className="flex flex-wrap items-center gap-1.5 leading-snug">
+                    {(viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina) && (
+                      <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
+                        {viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina}
+                      </span>
+                    )}
+                    <strong className="text-[#324354] text-xs font-bold break-words leading-tight">
+                      {viewingHistoryRecord.maquina || viewingHistoryRecord.equipo || viewingHistoryRecord.maquina_nombre || viewingHistoryRecord.maquinas || 'General / Planta'}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Planta */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Planta / Especialidad</span>
+                    <strong className="text-[#324354] text-xs font-bold block">
+                      {viewingHistoryRecord.planta || viewingHistoryRecord.planta_nombre || viewingHistoryRecord.especialidad || 'Todas las Plantas'}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Ubicación operativa</span>
+                </div>
+
+                {/* Prioridad / Turno */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Prioridad / Turno</span>
+                    <strong className="text-[#324354] text-xs font-bold block">
+                      {viewingHistoryRecord.prioridad ? `Prioridad ${viewingHistoryRecord.prioridad}` : viewingHistoryRecord.turno ? `Turno ${viewingHistoryRecord.turno}` : 'Estándar'}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Clasificación operativa</span>
+                </div>
+
+                {/* Fecha Apertura */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Fecha Apertura</span>
+                    <strong className="text-slate-800 text-xs font-bold block">
+                      {formatFechaDDMMAAAA(viewingHistoryRecord['FECHA DE APERTURA'] || viewingHistoryRecord.fecha_apertura || viewingHistoryRecord.created_at)}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Creación / Registro</span>
+                </div>
+
+                {/* Fecha Cierre */}
+                <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Fecha Cierre</span>
+                    <strong className="text-emerald-800 text-xs font-bold block">
+                      {formatFechaDDMMAAAA(viewingHistoryRecord['FECHA DE CIERRE'] || viewingHistoryRecord.fecha_cierre) || 'En Proceso / Pendiente'}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-1">Finalización de orden</span>
+                </div>
+              </div>
+
+              {/* Evidencias Fotográficas */}
+              {((viewingHistoryRecord.fotos && viewingHistoryRecord.fotos.length > 0) || (viewingHistoryRecord.fotos_solucion && viewingHistoryRecord.fotos_solucion.length > 0)) && (
+                <div className="p-4 bg-white border border-gray-200 rounded-2xl flex flex-col gap-2">
+                  <span className="text-gray-400 font-bold text-[10px] uppercase">Evidencias Fotográficas</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[...(viewingHistoryRecord.fotos || []), ...(viewingHistoryRecord.fotos_solucion || [])].map((imgUrl, i) => (
+                      <a key={i} href={imgUrl} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-xl overflow-hidden border border-gray-200 hover:opacity-90">
+                        <img src={imgUrl} alt={`Evidencia ${i + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions - Fixed at Bottom */}
+            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingHistoryRecord(null)}
+                className="px-5 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

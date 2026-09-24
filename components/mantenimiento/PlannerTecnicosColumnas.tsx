@@ -39,6 +39,7 @@ export interface MaintenanceTask {
   id: number;
   csvId: string;
   code: string;
+  nomenclatura?: string;
   title: string;
   durationMinutes: number;
   durationHours: number;
@@ -217,13 +218,29 @@ export default function PlannerTecnicosColumnas({
     );
   };
 
+  // Helper: Parse date string in LOCAL time to avoid UTC timezone offset shifts (e.g. 2026-09-23 becoming 22 sept)
+  const parseLocalDate = (dateStr?: string | null): Date => {
+    if (!dateStr || dateStr === '—' || dateStr === '-') return new Date();
+    const clean = String(dateStr).trim();
+    if (clean.length >= 10 && clean[4] === '-' && clean[7] === '-') {
+      const parts = clean.split(/[ T]/);
+      const dateParts = parts[0].split('-');
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10) - 1;
+      const day = parseInt(dateParts[2], 10);
+      return new Date(year, month, day);
+    }
+    const d = new Date(clean.replace(/-/g, '/'));
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
   // Helper: Categorize tasks into Atrasadas, Hoy, Próximas with timestamps for sorting
   const categorizeTask = (task: MaintenanceTask): { category: TaskTimeCategory; dateLabel: string; dateStatus: 'overdue' | 'today' | 'upcoming'; rawTimestamp: number } => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (task.fechaApertura) {
-      const taskDate = new Date(task.fechaApertura);
+      const taskDate = parseLocalDate(task.fechaApertura);
       taskDate.setHours(0, 0, 0, 0);
       const diffDays = Math.round((taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -285,7 +302,7 @@ export default function PlannerTecnicosColumnas({
 
     const refDateStr = corr.fecha_limite || corr.fecha_reporte;
     if (refDateStr) {
-      const corrDate = new Date(refDateStr);
+      const corrDate = parseLocalDate(refDateStr);
       corrDate.setHours(0, 0, 0, 0);
       const diffDays = Math.round((corrDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       

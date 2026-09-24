@@ -27,6 +27,7 @@ import {
   Trash2
 } from 'lucide-react';
 import PhotoAnnotationEditor from './PhotoAnnotationEditor';
+import MachineSearchAutocomplete from './MachineSearchAutocomplete';
 import LiveCameraModal from './LiveCameraModal';
 
 type TpmColor = 'roja' | 'azul' | 'amarilla' | 'verde';
@@ -60,6 +61,7 @@ interface TarjetaDetailModalProps {
   maquinasCatalogo: any[];
   plantasNomenclatura: any[];
   empleadosList: any[];
+  existingTarjetas?: any[];
   onOpenPhotoPreview: (photoUrl: string) => void;
 }
 
@@ -71,6 +73,7 @@ export default function TarjetaDetailModal({
   maquinasCatalogo,
   plantasNomenclatura,
   empleadosList,
+  existingTarjetas = [],
   onOpenPhotoPreview
 }: TarjetaDetailModalProps) {
   if (!tarjeta) return null;
@@ -409,11 +412,19 @@ export default function TarjetaDetailModal({
                 Máquina o Equipo
               </span>
               {isEditing ? (
-                <input
-                  type="text"
+                <MachineSearchAutocomplete
                   value={editData.maquina}
-                  onChange={(e) => setEditData(prev => ({ ...prev, maquina: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 bg-white rounded-xl border border-gray-300 text-xs font-bold text-[#324354]"
+                  maquinasCatalogo={maquinasCatalogo}
+                  existingTarjetas={existingTarjetas}
+                  onChange={(maquinaVal, matchedPlanta) => {
+                    setEditData(prev => ({
+                      ...prev,
+                      maquina: maquinaVal,
+                      planta: matchedPlanta || prev.planta
+                    }));
+                  }}
+                  placeholder="Buscar máquina o equipo..."
+                  className="!py-1.5 !text-xs !bg-white"
                 />
               ) : (
                 <span className="text-xs font-bold text-[#324354]">{tarjeta.maquina}</span>
