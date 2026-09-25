@@ -317,7 +317,7 @@ export default function GestionMantenimientoPage() {
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
   const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
-  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
+  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
   const [historySortField, setHistorySortField] = useState<HistorySortField>('id');
   const [historySortAsc, setHistorySortAsc] = useState<boolean>(true);
 
@@ -3696,11 +3696,12 @@ export default function GestionMantenimientoPage() {
       if (historySearch.trim()) {
         const q = normalize(historySearch);
         const matchCodigo = normalize(row.codigo || row['CODIGO'] || '').includes(q);
-        const matchTitle = normalize(row['Título'] || '').includes(q);
-        const matchTech = normalize(row['TECNICO'] || '').includes(q);
-        const matchTipo = normalize(row['TIPO'] || '').includes(q);
+        const matchTitle = normalize(row['Título'] || row.titulo || '').includes(q);
+        const matchMaquina = normalize(row.maquina || row.equipo || row.maquina_nombre || row.codigo_maquina || '').includes(q);
+        const matchTech = normalize(row['TECNICO'] || row.tecnico_asignado || '').includes(q);
+        const matchTipo = normalize(row['TIPO'] || row.tipo || '').includes(q);
         const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || '').includes(q);
-        if (!matchCodigo && !matchTitle && !matchTech && !matchTipo && !matchObs) return false;
+        if (!matchCodigo && !matchTitle && !matchMaquina && !matchTech && !matchTipo && !matchObs) return false;
       }
 
       // Global Origen filter (TPM, Correctivo, Preventivo)
@@ -3735,8 +3736,12 @@ export default function GestionMantenimientoPage() {
           valB = (b.codigo || b['CODIGO'] || '').toLowerCase();
           break;
         case 'titulo':
-          valA = (a['Título'] || '').toLowerCase();
-          valB = (b['Título'] || '').toLowerCase();
+          valA = (a['Título'] || a.titulo || '').toLowerCase();
+          valB = (b['Título'] || b.titulo || '').toLowerCase();
+          break;
+        case 'maquina':
+          valA = (a.maquina || a.equipo || a.maquina_nombre || '').toLowerCase();
+          valB = (b.maquina || b.equipo || b.maquina_nombre || '').toLowerCase();
           break;
         case 'tecnico':
           valA = (a['TECNICO'] || '').toLowerCase();
@@ -5942,7 +5947,7 @@ export default function GestionMantenimientoPage() {
                       {/* Título de Mantenimiento */}
                       <th 
                         onClick={() => handleHistorySort('titulo')}
-                        className="py-3 px-3 font-bold w-[22%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[18%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Título"
                       >
                         <div className="flex items-center gap-1.5">
@@ -5955,10 +5960,26 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
+                      {/* Máquinas / Equipos */}
+                      <th 
+                        onClick={() => handleHistorySort('maquina')}
+                        className="py-3 px-3 font-bold w-[16%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Máquina / Equipo"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Máquinas / Equipos</span>
+                          {historySortField === 'maquina' ? (
+                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
+                          )}
+                        </div>
+                      </th>
+
                       {/* Técnico Responsable */}
                       <th 
                         onClick={() => handleHistorySort('tecnico')}
-                        className="py-3 px-3 font-bold w-[16%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[15%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Técnico"
                       >
                         <div className="flex items-center gap-1.5">
@@ -6006,7 +6027,7 @@ export default function GestionMantenimientoPage() {
                       {/* Fecha Apertura */}
                       <th 
                         onClick={() => handleHistorySort('apertura')}
-                        className="py-3 px-2 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Fecha Apertura"
                       >
                         <div className="flex items-center gap-1">
@@ -6022,7 +6043,7 @@ export default function GestionMantenimientoPage() {
                       {/* Fecha Cierre */}
                       <th 
                         onClick={() => handleHistorySort('cierre')}
-                        className="py-3 px-2 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Fecha Cierre"
                       >
                         <div className="flex items-center gap-1">
@@ -6038,7 +6059,7 @@ export default function GestionMantenimientoPage() {
                       {/* Observaciones */}
                       <th 
                         onClick={() => handleHistorySort('observaciones')}
-                        className="py-3 px-3 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Observaciones"
                       >
                         <div className="flex items-center gap-1.5">
@@ -6055,7 +6076,7 @@ export default function GestionMantenimientoPage() {
                   <tbody className="divide-y divide-gray-200">
                     {filteredHistoryRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-gray-400">
+                        <td colSpan={9} className="py-12 text-center text-gray-400">
                           {historyLoading ? 'Cargando registros históricos...' : 'No se encontraron registros en el historial con los filtros aplicados.'}
                         </td>
                       </tr>
@@ -6090,6 +6111,21 @@ export default function GestionMantenimientoPage() {
                             <td className="py-3 px-3 font-bold text-[#324354] break-words">
                               {row['Título'] || 'Mantenimiento General'}
                             </td>
+
+                            {/* Máquinas / Equipos */}
+                            <td className="py-3 px-3">
+                              <div className="flex flex-col gap-0.5 max-w-[220px]">
+                                {(row.codigo_maquina || row.codigoMaquina) && (
+                                  <span className="w-fit px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9.5px] font-mono font-bold leading-none">
+                                    {row.codigo_maquina || row.codigoMaquina}
+                                  </span>
+                                )}
+                                <span className="font-semibold text-xs text-[#324354] leading-snug break-words">
+                                  {row.maquina || row.equipo || row.maquina_nombre || row.maquinas || 'General'}
+                                </span>
+                              </div>
+                            </td>
+
                             <td className="py-3 px-3 font-semibold text-[#324354] break-words">
                               👤 {row['TECNICO'] || 'Sin asignar'}
                             </td>
