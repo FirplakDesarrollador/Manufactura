@@ -115,35 +115,36 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
               box-shadow: none !important;
             }
             @page { 
-              size: landscape; 
-              margin: 0.5cm; 
+              margin: 0.2cm; 
             }
-            html, body { 
+            html, body, div, main, #__next { 
               width: 100% !important; 
-              height: auto !important; 
+              max-width: 100% !important; 
               margin: 0 !important; 
               padding: 0 !important; 
               background: #fff !important; 
               font-family: 'Helvetica', 'Arial', sans-serif !important; 
               overflow: visible !important; 
             }
-            .screen-only, .no-print, header, footer, nav { display: none !important; }
-            .print-only { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-            .hdt-container { width: 100% !important; color: #000 !important; background: #fff !important; }
+            .screen-only, .no-print, header, footer, nav, aside { display: none !important; }
+            .print-only { display: block !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            .hdt-container { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; color: #000 !important; background: #fff !important; }
             .hdt-table { width: 100% !important; border-collapse: collapse !important; border: 1.5pt solid #000 !important; table-layout: fixed !important; background: #fff !important; }
-            .hdt-table td { border: 1pt solid #000 !important; padding: 3px 6px !important; vertical-align: middle !important; background: #fff !important; color: #000 !important; }
-            .hdt-header-title { text-align: center !important; font-size: 11pt !important; font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.3px !important; line-height: 1.2 !important; background: #fff !important; color: #000 !important; }
-            .hdt-label { font-size: 6pt !important; font-weight: 800 !important; text-transform: uppercase !important; color: #333 !important; display: block !important; margin-bottom: 1px !important; line-height: 1 !important; }
-            .hdt-value { font-size: 8.5pt !important; font-weight: 700 !important; color: #000 !important; display: block !important; line-height: 1.1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+            .hdt-table td { border: 1pt solid #000 !important; padding: 5px 8px !important; vertical-align: middle !important; background: #fff !important; color: #000 !important; }
+            .hdt-header-title { text-align: center !important; font-size: 14pt !important; font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.3px !important; line-height: 1.2 !important; background: #fff !important; color: #000 !important; }
+            .hdt-label { font-size: 7.5pt !important; font-weight: 800 !important; text-transform: uppercase !important; color: #333 !important; display: block !important; margin-bottom: 2px !important; line-height: 1 !important; }
+            .hdt-value { font-size: 10pt !important; font-weight: 700 !important; color: #000 !important; display: block !important; line-height: 1.1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
             .hdt-matrix-table { width: 100% !important; border-collapse: collapse !important; border: 1.5pt solid #000 !important; margin-top: -1pt !important; table-layout: fixed !important; page-break-inside: auto !important; }
             .hdt-matrix-table thead { display: table-header-group !important; }
             .hdt-matrix-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-            .hdt-matrix-table th, .hdt-matrix-table td { border: 1pt solid #000 !important; padding: 2px 2px !important; text-align: center !important; font-size: 6.5pt !important; line-height: 1.1 !important; word-break: break-word !important; overflow-wrap: break-word !important; }
-            .hdt-matrix-table th { background-color: #fff !important; font-weight: 800 !important; font-size: 6pt !important; color: #000 !important; }
-            .pt-eq { font-size: 6.5pt !important; width: 14% !important; text-align: left !important; padding-left: 4px !important; font-weight: 700 !important; vertical-align: top !important; text-transform: uppercase !important; }
-            .pt-rev { font-size: 6.5pt !important; width: 25% !important; text-align: left !important; padding-left: 4px !important; vertical-align: top !important; }
-            .pt-frec { font-size: 6.5pt !important; width: 4% !important; text-align: center !important; font-weight: 700 !important; vertical-align: top !important; }
-            .hdt-footer { margin-top: 6px !important; font-size: 6.5pt !important; text-align: center !important; font-style: italic !important; }
+            .hdt-matrix-table th, .hdt-matrix-table td { border: 1pt solid #000 !important; padding: 8px 10px !important; text-align: left !important; font-size: 10pt !important; line-height: 1.3 !important; word-break: break-word !important; overflow-wrap: break-word !important; }
+            .hdt-matrix-table th { background-color: #f2f2f2 !important; font-weight: 800 !important; font-size: 9.5pt !important; color: #000 !important; text-transform: uppercase !important; white-space: nowrap !important; }
+            .pt-eq { font-size: 10pt !important; width: 20% !important; text-align: left !important; padding: 8px 10px !important; font-weight: 700 !important; vertical-align: top !important; text-transform: uppercase !important; }
+            .pt-rev { font-size: 10pt !important; width: 44% !important; text-align: left !important; padding: 8px 10px !important; vertical-align: top !important; }
+            .pt-frec { font-size: 10pt !important; width: 10% !important; text-align: center !important; font-weight: 700 !important; vertical-align: top !important; text-transform: uppercase !important; white-space: nowrap !important; }
+            .pt-day { width: 4.33% !important; text-align: center !important; font-weight: 800 !important; font-size: 9.5pt !important; background-color: #f2f2f2 !important; white-space: nowrap !important; }
+            .pt-day-cell { width: 4.33% !important; text-align: center !important; font-weight: 700 !important; font-size: 10pt !important; vertical-align: middle !important; }
+            .hdt-footer { margin-top: 12px !important; font-size: 8pt !important; text-align: center !important; font-style: italic !important; }
           }
         `}} />
 
@@ -250,18 +251,26 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
                   <th className="pt-eq">EQUIPO / HERRAMIENTA</th>
                   <th className="pt-rev">ACTIVIDAD A REVISAR</th>
                   <th className="pt-frec">FREC.</th>
-                  {[...Array(31)].map((_, i) => (<th key={i} style={{ width: '1.83%' }}>{i + 1}</th>))}
+                  {['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'].map((d, i) => (
+                    <th key={i} className="pt-day">{d}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, idx) => (
                   <tr key={idx}>
-                    <td className="pt-eq">{item.equipo}</td>
+                    {(rowSpans[idx] ?? 0) > 0 && (
+                      <td rowSpan={rowSpans[idx] ?? 1} className="pt-eq">{item.equipo}</td>
+                    )}
                     <td className="pt-rev">{item.revisar}</td>
                     <td className="pt-frec">{item.frecuencia ? item.frecuencia.charAt(0) : 'D'}</td>
-                    {[...Array(31)].map((_, dia) => {
-                      const v = item.dias[String(dia + 1)];
-                      return (<td key={dia}>{v && v !== 'N/A' ? v.charAt(0).toUpperCase() : ''}</td>);
+                    {[1, 2, 3, 4, 5, 6].map((diaNum) => {
+                      const v = item.dias[String(diaNum)];
+                      return (
+                        <td key={diaNum} className="pt-day-cell">
+                          {v && v !== 'N/A' ? v.charAt(0).toUpperCase() : ''}
+                        </td>
+                      );
                     })}
                   </tr>
                 ))}
