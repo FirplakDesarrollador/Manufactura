@@ -1575,6 +1575,7 @@ export default function GestionMantenimientoPage() {
 
       // Resolve assigned Planta(s) and Especialidad for this PMP
       let taskPlantas: string[] = [];
+      const pmpCodeStr = (codigoMaquina || codeFormatted || title).toUpperCase();
       if (p.plantas && Array.isArray(p.plantas) && p.plantas.length > 0) {
         taskPlantas = parseTechPlantas(p.plantas, plantasNomenclatura);
       } else if (p.plantas && typeof p.plantas === 'string') {
@@ -1583,13 +1584,13 @@ export default function GestionMantenimientoPage() {
         taskPlantas = parseTechPlantas(p.planta, plantasNomenclatura);
       } else if (matchResult.matched?.planta) {
         taskPlantas = parseTechPlantas(matchResult.matched.planta, plantasNomenclatura);
-      } else if (codigo.toUpperCase().includes('RTM')) {
+      } else if (pmpCodeStr.includes('RTM')) {
         taskPlantas = ['RTM'];
-      } else if (codigo.toUpperCase().includes('MBL') || codigo.toUpperCase().includes('CEFI')) {
+      } else if (pmpCodeStr.includes('MBL') || pmpCodeStr.includes('CEFI')) {
         taskPlantas = ['CEFI'];
-      } else if (codigo.toUpperCase().includes('ACR')) {
+      } else if (pmpCodeStr.includes('ACR')) {
         taskPlantas = ['ACR'];
-      } else if (codigo.toUpperCase().includes('FV')) {
+      } else if (pmpCodeStr.includes('FV')) {
         taskPlantas = ['FV'];
       } else {
         taskPlantas = ['MS'];
