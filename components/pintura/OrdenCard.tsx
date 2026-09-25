@@ -70,14 +70,14 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                     </div>
                     <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || orden.numero_pedido || 'Sin pedido'}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
-                        {orden.fecha_ideal_produccion && (
+                        {(orden.fecha_ideal_produccion || orden.fecha_entrega_estimada) && (
                             <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
-                                📅 Ideal: {parseDBDate(orden.fecha_ideal_produccion).toLocaleDateString('es-ES')}
+                                📅 Entrega Ideal: {parseDBDate(orden.fecha_ideal_produccion || orden.fecha_entrega_estimada).toLocaleDateString('es-ES')}
                             </div>
                         )}
-                        {orden.fecha_entrega_estimada && (
+                        {orden.fecha_ideal_produccion && orden.fecha_entrega_estimada && orden.fecha_ideal_produccion !== orden.fecha_entrega_estimada && (
                             <div className="text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded inline-block">
-                                📦 Entrega: {parseDBDate(orden.fecha_entrega_estimada).toLocaleDateString('es-ES')}
+                                📦 Entrega Estimada: {parseDBDate(orden.fecha_entrega_estimada).toLocaleDateString('es-ES')}
                             </div>
                         )}
                     </div>
