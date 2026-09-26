@@ -605,6 +605,45 @@ export default function GestionMantenimientoPage() {
     });
   };
 
+  // Helper to fetch all work orders created from/linked to a specific PMP Preventive Plan
+  const getOrdersForPmp = (task: any) => {
+    if (!task) return [];
+
+    const taskId = task.id;
+    const taskCode = (task.code || task.csvId || '').toString().toUpperCase().trim();
+    const taskTitle = normalize(task.title || (task as any).titulo || '');
+
+    return historyRows.filter((row: any) => {
+      // 1. Direct id_plan_preventivo match
+      if (row.id_plan_preventivo && (row.id_plan_preventivo === taskId || String(row.id_plan_preventivo) === String(taskId))) {
+        return true;
+      }
+      if (row.plan_id && (row.plan_id === taskId || String(row.plan_id) === String(taskId))) {
+        return true;
+      }
+
+      // 2. Title match
+      const rowTitle = normalize(row['Título'] || row.titulo || '');
+      if (rowTitle && taskTitle && (rowTitle === taskTitle || rowTitle.includes(taskTitle) || taskTitle.includes(rowTitle))) {
+        return true;
+      }
+
+      // 3. Code match
+      if (taskCode && taskCode.length >= 3) {
+        const rowCode = (row.codigo || row['CODIGO'] || '').toUpperCase();
+        if (rowCode.includes(taskCode) || rowTitle.includes(taskCode)) {
+          return true;
+        }
+      }
+
+      return false;
+    }).sort((a: any, b: any) => {
+      const dateA = new Date(a['FECHA DE APERTURA'] || a.fecha_apertura || a.created_at || '1970-01-01').getTime();
+      const dateB = new Date(b['FECHA DE APERTURA'] || b.fecha_apertura || b.created_at || '1970-01-01').getTime();
+      return dateB - dateA;
+    });
+  };
+
   // Helper to fetch all intervention records (Correctivos, Preventivos, TPM, Autónomo) related to a specific Machine
   const getInterventionsForMachine = (m: any) => {
     if (!m) return [];
@@ -932,6 +971,13 @@ export default function GestionMantenimientoPage() {
       if (correctiveRecords.length === 0) fetchCorrectivoRecords();
     }
   }, [selectedMachineModal]);
+
+  // Auto-fetch history records when viewing a PMP task modal
+  useEffect(() => {
+    if (viewingTask) {
+      if (historyRows.length === 0) fetchHistoryRecords();
+    }
+  }, [viewingTask]);
 
   // Fetch Supabase History Records from mantenimiento_ordenes + tarjetas_falla_anomalia
   const fetchHistoryRecords = async () => {
@@ -9703,6 +9749,83 @@ export default function GestionMantenimientoPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Órdenes de Trabajo Generadas para este Plan */}
+              {viewingTask && (() => {
+                const orders = getOrdersForPmp(viewingTask);
+
+                return (
+                  <div className="p-4 bg-white border border-gray-200 rounded-2xl flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-[#7B8E90]" />
+                        <span>Órdenes de Trabajo Creadas de este Plan</span>
+                      </h4>
+                      <span className="px-2.5 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full text-xs font-bold">
+                        {orders.length} Orden(es)
+                      </span>
+                    </div>
+
+                    {orders.length === 0 ? (
+                      <div className="p-3 bg-[#F6F3EE] rounded-xl text-center text-xs text-gray-500">
+                        Aún no se han generado órdenes de trabajo ejecutadas para este plan preventivo.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+                        {orders.map((ord, idx) => {
+                          const category = getHistoryRecordCategory(ord);
+                          const codigoDisplay = ord.codigoDisplay || getHistoryRecordCode(ord, idx);
+                          const estado = ord['ESTADO'] || ord.estado || 'Pendiente';
+                          const isComplete = estado.toLowerCase().includes('completad') || estado.toLowerCase().includes('resuelt') || estado.toLowerCase().includes('cerrad');
+                          const isIncomplete = estado.toLowerCase().includes('incomplet');
+                          const fechaCreada = ord['FECHA DE APERTURA'] || ord.fecha_apertura || (ord.created_at ? ord.created_at.slice(0, 10) : 'Sin fecha');
+
+                          return (
+                            <div
+                              key={ord.id || idx}
+                              onClick={() => {
+                                setViewingHistoryRecord({ ...ord, codigoDisplay, category });
+                              }}
+                              className="p-3 bg-white hover:bg-amber-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                              title="Haz clic para ver la orden completa"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="px-2 py-1 bg-sky-50 text-sky-800 border border-sky-200 font-mono font-bold rounded text-[11px] shrink-0">
+                                  {codigoDisplay}
+                                </span>
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                  <span className="font-bold text-xs text-[#324354] group-hover:text-blue-900 truncate">
+                                    {ord['Título'] || ord.titulo || viewingTask.title}
+                                  </span>
+                                  <div className="text-[11px] text-gray-500 flex items-center gap-2 flex-wrap">
+                                    <span>📅 Creada: <strong>{fechaCreada}</strong></span>
+                                    <span>👤 Técnico: <strong>{ord['TECNICO'] || ord.tecnico_asignado || 'Sin asignar'}</strong></span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                  isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  isIncomplete ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {isComplete ? '✅ Completado' : isIncomplete ? '⚠️ Incompleto' : '⏳ Pendiente'}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-100 group-hover:bg-[#324354] group-hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                  Ver Detalle
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Feedback Toast / Alert when Force Task is triggered */}
               {forceTaskFeedback && (
