@@ -1491,6 +1491,68 @@ export default function GestionMantenimientoPage() {
     };
   };
 
+  // Helper to resolve clean machine code and name for any history or intervention record
+  const resolveHistoryRowMachine = (row: any, catalog: any[]) => {
+    if (!row) return { code: null, name: 'General' };
+
+    let code = row.codigo_maquina || row.codigoMaquina || row.codigo_equipo || null;
+    let name = row.maquina || row.equipo || row.maquina_nombre || row.maquinas || '';
+
+    const isGenericName = !name || name === 'Planta' || name === 'General' || name === 'undefined' || name === 'null';
+
+    // 1. Check match against official machines catalog
+    if (catalog && catalog.length > 0) {
+      const match = matchPlanWithMaquina(row, catalog);
+      if (match && match.matched) {
+        return {
+          code: match.codigo || code || match.matched.codigo_equipo || null,
+          name: match.nombre || (isGenericName ? match.matched.nombre_equipo : name)
+        };
+      }
+    }
+
+    const title = row['Título'] || row.titulo || '';
+
+    // 2. Extract code in brackets like [S01MBLNPT240] or [S02MBLPRT120]
+    if (!code) {
+      const bracketMatch = title.match(/\[([A-Z0-9_-]+)\]/i);
+      if (bracketMatch && bracketMatch[1]) {
+        code = bracketMatch[1].toUpperCase();
+      }
+    }
+
+    // 3. Extract machine code like C-0139 or C-0243
+    if (!code) {
+      const cCodeMatch = title.match(/\b(C-\d{3,4})\b/i);
+      if (cCodeMatch && cCodeMatch[1]) {
+        code = cCodeMatch[1].toUpperCase();
+      }
+    }
+
+    // 4. Derive machine name from title if original name is generic ("Planta")
+    if (isGenericName) {
+      if (title) {
+        let cleanTitle = title
+          .replace(/^Mantenimiento\s+de\s+/i, '')
+          .replace(/^Mantenimiento\s+/i, '')
+          .replace(/^Inspeccion,\s*limpieza\s*y\s*lubricacion\s*de\s*/i, '')
+          .replace(/^Limpieza\s*e\s*inspección\s*/i, '')
+          .replace(/\s*\[.*?\]/g, '')
+          .trim();
+
+        if (cleanTitle.length > 0) {
+          name = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+        } else {
+          name = row.planta || row.especialidad || 'Equipo General';
+        }
+      } else {
+        name = row.planta || row.especialidad || 'Equipo General';
+      }
+    }
+
+    return { code, name };
+  };
+
   // 2. Fetch Data 100% from Supabase Native Tables
   const fetchData = async (showNotification = false) => {
     setSyncing(true);
@@ -3809,7 +3871,8 @@ export default function GestionMantenimientoPage() {
         const q = normalize(historySearch);
         const matchCodigo = normalize(row.codigo || row['CODIGO'] || '').includes(q);
         const matchTitle = normalize(row['Título'] || row.titulo || '').includes(q);
-        const matchMaquina = normalize(row.maquina || row.equipo || row.maquina_nombre || row.codigo_maquina || '').includes(q);
+        const resolvedMaq = resolveHistoryRowMachine(row, maquinasCatalogo);
+        const matchMaquina = normalize(resolvedMaq.name + ' ' + (resolvedMaq.code || '')).includes(q);
         const matchTech = normalize(row['TECNICO'] || row.tecnico_asignado || '').includes(q);
         const matchTipo = normalize(row['TIPO'] || row.tipo || '').includes(q);
         const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || '').includes(q);
@@ -3852,8 +3915,8 @@ export default function GestionMantenimientoPage() {
           valB = (b['Título'] || b.titulo || '').toLowerCase();
           break;
         case 'maquina':
-          valA = (a.maquina || a.equipo || a.maquina_nombre || '').toLowerCase();
-          valB = (b.maquina || b.equipo || b.maquina_nombre || '').toLowerCase();
+          valA = resolveHistoryRowMachine(a, maquinasCatalogo).name.toLowerCase();
+          valB = resolveHistoryRowMachine(b, maquinasCatalogo).name.toLowerCase();
           break;
         case 'tecnico':
           valA = (a['TECNICO'] || '').toLowerCase();
@@ -3888,7 +3951,7 @@ export default function GestionMantenimientoPage() {
       if (valA > valB) return historySortAsc ? 1 : -1;
       return 0;
     });
-  }, [historyRows, historySearch, historyTipo, historyEstado, historyTecnico, historySortField, historySortAsc]);
+  }, [historyRows, historySearch, historyTipo, historyEstado, historyTecnico, historySortField, historySortAsc, maquinasCatalogo]);
 
   // Correctivo Filtered Records
   const filteredCorrectivos = useMemo(() => {
@@ -6226,16 +6289,21 @@ export default function GestionMantenimientoPage() {
 
                             {/* Máquinas / Equipos */}
                             <td className="py-3 px-3">
-                              <div className="flex flex-col gap-0.5 max-w-[220px]">
-                                {(row.codigo_maquina || row.codigoMaquina) && (
-                                  <span className="w-fit px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9.5px] font-mono font-bold leading-none">
-                                    {row.codigo_maquina || row.codigoMaquina}
-                                  </span>
-                                )}
-                                <span className="font-semibold text-xs text-[#324354] leading-snug break-words">
-                                  {row.maquina || row.equipo || row.maquina_nombre || row.maquinas || 'General'}
-                                </span>
-                              </div>
+                              {(() => {
+                                const { code, name } = resolveHistoryRowMachine(row, maquinasCatalogo);
+                                return (
+                                  <div className="flex flex-col gap-0.5 max-w-[220px]">
+                                    {code && (
+                                      <span className="w-fit px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9.5px] font-mono font-bold leading-none">
+                                        {code}
+                                      </span>
+                                    )}
+                                    <span className="font-semibold text-xs text-[#324354] leading-snug break-words">
+                                      {name}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             <td className="py-3 px-3 font-semibold text-[#324354] break-words">
@@ -9855,16 +9923,21 @@ export default function GestionMantenimientoPage() {
                 {/* Máquinas y Equipos */}
                 <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
                   <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquina / Equipo</span>
-                  <div className="flex flex-wrap items-center gap-1.5 leading-snug">
-                    {(viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina) && (
-                      <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
-                        {viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina}
-                      </span>
-                    )}
-                    <strong className="text-[#324354] text-xs font-bold break-words leading-tight">
-                      {viewingHistoryRecord.maquina || viewingHistoryRecord.equipo || viewingHistoryRecord.maquina_nombre || viewingHistoryRecord.maquinas || 'General / Planta'}
-                    </strong>
-                  </div>
+                  {(() => {
+                    const { code, name } = resolveHistoryRowMachine(viewingHistoryRecord, maquinasCatalogo);
+                    return (
+                      <div className="flex flex-wrap items-center gap-1.5 leading-snug">
+                        {code && (
+                          <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
+                            {code}
+                          </span>
+                        )}
+                        <strong className="text-[#324354] text-xs font-bold break-words leading-tight">
+                          {name}
+                        </strong>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Planta */}
