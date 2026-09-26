@@ -470,6 +470,9 @@ export default function GestionMantenimientoPage() {
   const [maquinasPage, setMaquinasPage] = useState<number>(1);
   const [maquinasPageSize, setMaquinasPageSize] = useState<number>(50);
   const [selectedMachineModal, setSelectedMachineModal] = useState<any | null>(null);
+  const [machineInterventionSearch, setMachineInterventionSearch] = useState('');
+  const [machineInterventionCategory, setMachineInterventionCategory] = useState('Todos');
+  const [machineInterventionSortAsc, setMachineInterventionSortAsc] = useState(false);
   const [zoomMachineImage, setZoomMachineImage] = useState<string | null>(null);
   const [machineToDelete, setMachineToDelete] = useState<{ id: number; nombre: string; codigo?: string; planta?: string } | null>(null);
   const [deletingMachine, setDeletingMachine] = useState<boolean>(false);
@@ -600,6 +603,106 @@ export default function GestionMantenimientoPage() {
 
       return false;
     });
+  };
+
+  // Helper to fetch all intervention records (Correctivos, Preventivos, TPM, Autónomo) related to a specific Machine
+  const getInterventionsForMachine = (m: any) => {
+    if (!m) return [];
+
+    const mId = m.id;
+    const code = (m.codigo_equipo || m.codigo_maquina || m.codigo || '').trim().toUpperCase();
+    const name = normalize(m.nombre_equipo || m.maquina || m.nombre || '');
+    const alt = normalize(m.nombre_alterno || '');
+    const af = (m.activo_fijo || '').trim().toLowerCase();
+
+    const combined: any[] = [];
+    const seenKeys = new Set<string>();
+
+    const checkMatch = (rec: any) => {
+      if (!rec) return false;
+
+      // 1. Direct machine ID match
+      if (rec.id_maquina && rec.id_maquina === mId) return true;
+      if (rec.maquina_id && rec.maquina_id === mId) return true;
+      if (rec.equipo_id && rec.equipo_id === mId) return true;
+      if (rec.id_equipo && rec.id_equipo === mId) return true;
+      if (rec.maquinaId && rec.maquinaId === mId) return true;
+
+      // 2. Machine Code regex boundary match
+      if (code && code !== '-' && code !== 'N/A' && code !== '0' && code.length >= 2) {
+        const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
+        const recCodMaq = (rec.codigo_maquina || rec.codigoMaquina || '').toUpperCase();
+        const recMaq = (rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '').toUpperCase();
+        const recTit = (rec['Título'] || rec.titulo || rec.sintoma || rec.descripcion_que || rec.falla || '').toUpperCase();
+        const recCod = (rec.codigo || rec.codigo_tarjeta || '').toUpperCase();
+
+        if (regex.test(recCodMaq) || regex.test(recMaq) || regex.test(recTit) || regex.test(recCod)) {
+          return true;
+        }
+      }
+
+      // 3. Activo Fijo match
+      if (af && af.length >= 3) {
+        const recAf = (rec.activo_fijo || rec.af || rec.activoFijo || '').trim().toLowerCase();
+        if (recAf && recAf.includes(af)) return true;
+      }
+
+      // 4. Exact or sub-name match
+      const recMaqNorm = normalize(rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '');
+      if (recMaqNorm && (recMaqNorm === name || (alt && recMaqNorm === alt))) return true;
+
+      if (recMaqNorm && recMaqNorm.length >= 8 && name.length >= 8) {
+        if (recMaqNorm.includes(name) || name.includes(recMaqNorm)) return true;
+      }
+
+      return false;
+    };
+
+    // Filter from historyRows
+    historyRows.forEach((row, idx) => {
+      if (checkMatch(row)) {
+        const key = row.codigo || `HIST-${row.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const category = getHistoryRecordCategory(row);
+          const codigoDisplay = getHistoryRecordCode(row, idx);
+          combined.push({
+            ...row,
+            codigoDisplay,
+            category,
+            sourceDate: row['FECHA DE APERTURA'] || row.fecha_apertura || row.created_at || row.fecha || ''
+          });
+        }
+      }
+    });
+
+    // Filter from correctivos state
+    correctivos.forEach((c: any, idx: number) => {
+      if (checkMatch(c)) {
+        const key = c.codigo || c.codigo_tarjeta || `CORR-${c.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const isTpm = c.origen === 'TARJETA_TPM' || (c.codigo && c.codigo.startsWith('TPM-')) || c.id_tarjeta_falla != null;
+          const category = isTpm ? 'TPM' : 'Correctivo';
+          const codigoDisplay = c.codigo || c.codigo_tarjeta || (isTpm ? `TPM-${String(c.id || idx + 1).padStart(4, '0')}` : `CORR-${String(c.id || idx + 1).padStart(4, '0')}`);
+          combined.push({
+            ...c,
+            codigoDisplay,
+            category,
+            'Título': c.titulo || c.sintoma || c.descripcion_que || c.descripcion_anomalia || 'Mantenimiento Correctivo',
+            'ESTADO': c.estado || 'Pendiente',
+            'TECNICO': c.tecnico_asignado || c.tecnico_nombre || 'Sin asignar',
+            'FECHA DE APERTURA': c.fecha_apertura || (c.created_at ? c.created_at.slice(0, 10) : ''),
+            'FECHA DE CIERRE': c.fecha_cierre || '',
+            'COMENTARIO DE EJECUCION': c.accion_realizada || c.accion_correctiva || c.comentarios_ejecucion || '',
+            sourceDate: c.fecha_apertura || c.created_at || ''
+          });
+        }
+      }
+    });
+
+    return combined;
   };
 
   // Helper to compute effective capacity with overload margin
@@ -821,6 +924,14 @@ export default function GestionMantenimientoPage() {
       fetchHistoryRecords();
     }
   }, [activeTab]);
+
+  // Auto-fetch intervention history when a machine modal is selected
+  useEffect(() => {
+    if (selectedMachineModal) {
+      if (historyRows.length === 0) fetchHistoryRecords();
+      if (correctivos.length === 0) fetchCorrectivoRecords();
+    }
+  }, [selectedMachineModal]);
 
   // Fetch Supabase History Records from mantenimiento_ordenes + tarjetas_falla_anomalia
   const fetchHistoryRecords = async () => {
@@ -10058,6 +10169,225 @@ export default function GestionMantenimientoPage() {
                   </div>
                 )}
               </div>
+
+              {/* Complete Intervention History for this Machine */}
+              {selectedMachineModal && (() => {
+                const allInterventions = getInterventionsForMachine(selectedMachineModal);
+                
+                const filteredInterventions = allInterventions.filter(item => {
+                  const cat = item.category || item.tipo || item['TIPO'] || 'Correctivo';
+                  if (machineInterventionCategory !== 'Todos') {
+                    if (machineInterventionCategory === 'Correctivo' && cat !== 'Correctivo') return false;
+                    if (machineInterventionCategory === 'Preventivo' && cat !== 'Preventivo') return false;
+                    if (machineInterventionCategory === 'TPM' && cat !== 'TPM' && !cat.includes('TPM') && !cat.includes('Tarjeta')) return false;
+                    if (machineInterventionCategory === 'Autónomo' && cat !== 'Autónomo' && !cat.includes('Autónomo') && !cat.includes('Autonomo')) return false;
+                  }
+
+                  if (machineInterventionSearch.trim()) {
+                    const q = normalize(machineInterventionSearch);
+                    const tit = normalize(item['Título'] || item.titulo || item.sintoma || '');
+                    const cod = normalize(item.codigoDisplay || item.codigo || '');
+                    const tec = normalize(item['TECNICO'] || item.tecnico_nombre || '');
+                    const obs = normalize(item['COMENTARIO DE EJECUCION'] || item.observaciones || item.accion_realizada || '');
+                    if (!tit.includes(q) && !cod.includes(q) && !tec.includes(q) && !obs.includes(q)) return false;
+                  }
+
+                  return true;
+                }).sort((a, b) => {
+                  const dateA = new Date(a.sourceDate || a.created_at || a['FECHA DE APERTURA'] || '1970-01-01').getTime();
+                  const dateB = new Date(b.sourceDate || b.created_at || b['FECHA DE APERTURA'] || '1970-01-01').getTime();
+                  return machineInterventionSortAsc ? dateA - dateB : dateB - dateA;
+                });
+
+                const countCorrectivos = allInterventions.filter(i => (i.category === 'Correctivo')).length;
+                const countPreventivos = allInterventions.filter(i => (i.category === 'Preventivo')).length;
+                const countTpm = allInterventions.filter(i => (i.category === 'TPM' || (i.category || '').includes('Tarjeta'))).length;
+                const countAutonomo = allInterventions.filter(i => ((i.category || '').includes('Autónomo') || (i.category || '').includes('Autonomo'))).length;
+
+                return (
+                  <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+                    {/* Header & Counters */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                          <History className="w-4 h-4 text-[#324354]" />
+                          <span>Historial de Intervenciones del Equipo</span>
+                        </h4>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Registro cronológico de órdenes de trabajo, correctivos, preventivos y tarjetas TPM
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2.5 py-0.5 bg-[#324354] text-white rounded-full text-xs font-bold shadow-2xs">
+                          {allInterventions.length} Intervención(es)
+                        </span>
+                        {countCorrectivos > 0 && (
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10.5px] font-bold">
+                            {countCorrectivos} Correctivos
+                          </span>
+                        )}
+                        {countPreventivos > 0 && (
+                          <span className="px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-full text-[10.5px] font-bold">
+                            {countPreventivos} Preventivos
+                          </span>
+                        )}
+                        {(countTpm > 0 || countAutonomo > 0) && (
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-full text-[10.5px] font-bold">
+                            {countTpm + countAutonomo} TPM / Autónomo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-[#F6F3EE] p-2.5 rounded-2xl border border-gray-200">
+                      {/* Search */}
+                      <div className="relative w-full sm:w-64">
+                        <input
+                          type="text"
+                          value={machineInterventionSearch}
+                          onChange={(e) => setMachineInterventionSearch(e.target.value)}
+                          placeholder="Buscar por título, código o técnico..."
+                          className="w-full pl-8 pr-3 py-1.5 bg-white text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#324354]/30"
+                        />
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                        {machineInterventionSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setMachineInterventionSearch('')}
+                            className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 text-xs font-bold"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Category Filter Tabs & Sort */}
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto justify-between sm:justify-end">
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200">
+                          {['Todos', 'Correctivo', 'Preventivo', 'TPM'].map(cat => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setMachineInterventionCategory(cat)}
+                              className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-colors whitespace-nowrap ${
+                                machineInterventionCategory === cat 
+                                  ? 'bg-[#324354] text-white shadow-2xs' 
+                                  : 'text-gray-600 hover:bg-gray-100'
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setMachineInterventionSortAsc(!machineInterventionSortAsc)}
+                          className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-[10.5px] font-bold text-[#324354] hover:bg-gray-50 transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                          title="Cambiar orden por fecha"
+                        >
+                          <ArrowUpDown className="w-3 h-3 text-[#7B8E90]" />
+                          <span>{machineInterventionSortAsc ? 'Más antiguo' : 'Más reciente'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Table / List */}
+                    {filteredInterventions.length === 0 ? (
+                      <div className="p-6 bg-[#F6F3EE] rounded-2xl border border-gray-200 text-center text-xs text-gray-500">
+                        {allInterventions.length === 0
+                          ? 'No hay registros de intervenciones o mantenimientos asociadas a este equipo.'
+                          : 'No se encontraron intervenciones con los filtros aplicados.'}
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-72 overflow-y-auto bg-white shadow-2xs">
+                        {filteredInterventions.map((item, idx) => {
+                          const category = item.category || item.tipo || 'Correctivo';
+                          const isTpm = category === 'TPM' || (category || '').includes('Tarjeta') || (category || '').includes('Autónomo');
+                          const isCorrectivo = category === 'Correctivo';
+                          const isPreventivo = category === 'Preventivo';
+
+                          const estado = item['ESTADO'] || item.estado || 'Pendiente';
+                          const isComplete = estado.toLowerCase().includes('completad') || estado.toLowerCase().includes('resuelt') || estado.toLowerCase().includes('cerrad');
+                          const isIncomplete = estado.toLowerCase().includes('incomplet');
+
+                          const codigoDisplay = item.codigoDisplay || item.codigo || `OT-${idx + 1}`;
+                          const fechaStr = item['FECHA DE APERTURA'] || item.fecha_apertura || (item.created_at ? item.created_at.slice(0, 10) : 'Sin fecha');
+                          const fechaCierreStr = item['FECHA DE CIERRE'] || item.fecha_cierre || '';
+
+                          return (
+                            <div
+                              key={item.id || idx}
+                              onClick={() => {
+                                setViewingHistoryRecord({ ...item, codigoDisplay, category });
+                              }}
+                              className="p-3 hover:bg-amber-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                              title="Haz clic para ver el detalle completo de esta intervención"
+                            >
+                              <div className="flex items-start sm:items-center gap-3 min-w-0">
+                                {/* Code Badge */}
+                                <span className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold border shrink-0 shadow-2xs ${
+                                  isTpm ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                                  isCorrectivo ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-sky-50 text-sky-800 border-sky-200'
+                                }`}>
+                                  {codigoDisplay}
+                                </span>
+
+                                {/* Info */}
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-xs text-[#324354] group-hover:text-blue-900 truncate">
+                                      {item['Título'] || item.titulo || item.sintoma || 'Mantenimiento General'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border ${
+                                      isTpm ? 'bg-purple-100/70 text-purple-800 border-purple-200' :
+                                      isCorrectivo ? 'bg-amber-100/70 text-amber-800 border-amber-200' : 'bg-sky-100/70 text-sky-800 border-sky-200'
+                                    }`}>
+                                      {category}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="text-[11px] text-gray-500 flex items-center gap-3 flex-wrap">
+                                    <span>📅 Apertura: <strong>{fechaStr}</strong></span>
+                                    {fechaCierreStr && (
+                                      <span>🏁 Cierre: <strong>{fechaCierreStr}</strong></span>
+                                    )}
+                                    <span>👤 Técnico: <strong>{item['TECNICO'] || item.tecnico_asignado || 'Sin asignar'}</strong></span>
+                                  </div>
+
+                                  {(item['COMENTARIO DE EJECUCION'] || item.accion_realizada || item.observaciones) && (
+                                    <p className="text-[10.5px] text-gray-600 italic line-clamp-1 mt-0.5">
+                                      "{item['COMENTARIO DE EJECUCION'] || item.accion_realizada || item.observaciones}"
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right Badge & Action */}
+                              <div className="flex items-center gap-2 shrink-0 justify-between sm:justify-end">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                  isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  isIncomplete ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {isComplete ? '✅ Completado' : isIncomplete ? '⚠️ Incompleto' : '⏳ Pendiente'}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  className="px-2.5 py-1 bg-gray-100 group-hover:bg-[#324354] group-hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                  Ver Detalle
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Fixed Footer */}
