@@ -677,8 +677,8 @@ export default function GestionMantenimientoPage() {
       }
     });
 
-    // Filter from correctivos state
-    correctivos.forEach((c: any, idx: number) => {
+    // Filter from correctiveRecords state
+    correctiveRecords.forEach((c: any, idx: number) => {
       if (checkMatch(c)) {
         const key = c.codigo || c.codigo_tarjeta || `CORR-${c.id || idx}`;
         if (!seenKeys.has(key)) {
@@ -929,7 +929,7 @@ export default function GestionMantenimientoPage() {
   useEffect(() => {
     if (selectedMachineModal) {
       if (historyRows.length === 0) fetchHistoryRecords();
-      if (correctivos.length === 0) fetchCorrectivoRecords();
+      if (correctiveRecords.length === 0) fetchCorrectivoRecords();
     }
   }, [selectedMachineModal]);
 
