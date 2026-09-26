@@ -606,40 +606,107 @@ export default function GestionMantenimientoPage() {
   };
 
   // Helper to fetch all work orders created from/linked to a specific PMP Preventive Plan
-  const getOrdersForPmp = (task: any) => {
-    if (!task) return [];
+  const getOrdersForPmp = (pmpTask: any) => {
+    if (!pmpTask) return [];
 
-    const taskId = task.id;
-    const taskCode = (task.code || task.csvId || '').toString().toUpperCase().trim();
-    const taskTitle = normalize(task.title || (task as any).titulo || '');
+    const pmpId = pmpTask.id;
+    const pmpCode = (pmpTask.code || pmpTask.csvId || '').toString().toUpperCase().trim();
+    const pmpCsvId = (pmpTask.csvId || '').toString().toUpperCase().trim();
+    const pmpTitleNorm = normalize(pmpTask.title || pmpTask.titulo || '');
 
-    return historyRows.filter((row: any) => {
-      // 1. Direct id_plan_preventivo match
-      if (row.id_plan_preventivo && (row.id_plan_preventivo === taskId || String(row.id_plan_preventivo) === String(taskId))) {
-        return true;
+    const combined: any[] = [];
+    const seenKeys = new Set<string>();
+
+    const checkTitleMatch = (rawTitle: string) => {
+      const norm = normalize(rawTitle || '');
+      if (!norm || !pmpTitleNorm) return false;
+      return norm === pmpTitleNorm || norm.includes(pmpTitleNorm) || pmpTitleNorm.includes(norm);
+    };
+
+    const checkCodeMatch = (rawCode: string) => {
+      const c = (rawCode || '').toUpperCase().trim();
+      if (!c) return false;
+      if (pmpCode && pmpCode.length >= 2 && (c === pmpCode || c.includes(pmpCode) || pmpCode.includes(c))) return true;
+      if (pmpCsvId && pmpCsvId.length >= 2 && (c === pmpCsvId || c.includes(pmpCsvId))) return true;
+      return false;
+    };
+
+    // 1. Check historyRows (records from DB)
+    historyRows.forEach((row: any, idx: number) => {
+      let isMatch = false;
+
+      if (row.id_plan_preventivo && (row.id_plan_preventivo === pmpId || String(row.id_plan_preventivo) === String(pmpId))) {
+        isMatch = true;
+      } else if (row.plan_id && (row.plan_id === pmpId || String(row.plan_id) === String(pmpId))) {
+        isMatch = true;
+      } else if (checkCodeMatch(row.codigo || row['CODIGO'] || '')) {
+        isMatch = true;
+      } else if (checkTitleMatch(row['Título'] || row.titulo || '')) {
+        isMatch = true;
       }
-      if (row.plan_id && (row.plan_id === taskId || String(row.plan_id) === String(taskId))) {
-        return true;
-      }
 
-      // 2. Title match
-      const rowTitle = normalize(row['Título'] || row.titulo || '');
-      if (rowTitle && taskTitle && (rowTitle === taskTitle || rowTitle.includes(taskTitle) || taskTitle.includes(rowTitle))) {
-        return true;
-      }
-
-      // 3. Code match
-      if (taskCode && taskCode.length >= 3) {
-        const rowCode = (row.codigo || row['CODIGO'] || '').toUpperCase();
-        if (rowCode.includes(taskCode) || rowTitle.includes(taskCode)) {
-          return true;
+      if (isMatch) {
+        const key = row.codigo || `HIST-${row.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const category = getHistoryRecordCategory(row);
+          const codigoDisplay = row.codigoDisplay || getHistoryRecordCode(row, idx);
+          combined.push({
+            ...row,
+            codigoDisplay,
+            category,
+            fechaCreada: row['FECHA DE APERTURA'] || row.fecha_apertura || (row.created_at ? row.created_at.slice(0, 10) : 'Sin fecha'),
+            tecnicoNombre: row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || 'Sin asignar',
+            estadoDisplay: row['ESTADO'] || row.estado || 'Pendiente'
+          });
         }
       }
+    });
 
-      return false;
-    }).sort((a: any, b: any) => {
-      const dateA = new Date(a['FECHA DE APERTURA'] || a.fecha_apertura || a.created_at || '1970-01-01').getTime();
-      const dateB = new Date(b['FECHA DE APERTURA'] || b.fecha_apertura || b.created_at || '1970-01-01').getTime();
+    // 2. Check active tasks from Planner state (assigned or scheduled OTs)
+    tasks.forEach((t: any, idx: number) => {
+      const hasAssignment = (t.idtecs && t.idtecs !== 9999) || t.assignedDate || t.adelantada || t.fecha || t.isCompleted;
+      
+      let isMatch = false;
+      if (t.id_plan_preventivo && (t.id_plan_preventivo === pmpId || String(t.id_plan_preventivo) === String(pmpId))) {
+        isMatch = true;
+      } else if (checkCodeMatch(t.code || t.csvId || '')) {
+        isMatch = true;
+      } else if (checkTitleMatch(t.title || t.titulo || '')) {
+        isMatch = true;
+      }
+
+      if (isMatch && hasAssignment) {
+        const key = t.code ? (t.code.startsWith('PMP-') || t.code.startsWith('PREV-') ? t.code : `PMP-${t.code}`) : `TASK-${t.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+
+          const techObj = technicians.find(tc => tc.id === (t.idtecs || t.assignedTechId));
+          const techName = techObj ? techObj.name : (t.tecnico_nombre || t.tecnico_asignado || 'Técnico asignado');
+
+          const fechaTask = t.assignedDate || t.fecha || (t.created_at ? t.created_at.slice(0, 10) : '23 sept');
+          const isComp = t.isCompleted || (t.estado && t.estado.toLowerCase().includes('completad'));
+          const isAtrasada = t.refFrecuencia >= t.frecuencia;
+          const estadoDisp = isComp ? 'Completado' : isAtrasada ? 'Atrasada' : (t.estado || 'Pendiente');
+
+          const cleanCode = t.code ? (t.code.startsWith('PMP-') || t.code.startsWith('PREV-') ? t.code : `PMP-${t.code}`) : `PMP-${pmpCsvId || pmpId}`;
+
+          combined.push({
+            ...t,
+            codigoDisplay: cleanCode,
+            category: 'Preventivo',
+            'Título': t.title || pmpTask.title,
+            fechaCreada: fechaTask,
+            tecnicoNombre: techName,
+            estadoDisplay: estadoDisp
+          });
+        }
+      }
+    });
+
+    return combined.sort((a: any, b: any) => {
+      const dateA = new Date(a.fechaCreada || a['FECHA DE APERTURA'] || a.created_at || '1970-01-01').getTime();
+      const dateB = new Date(b.fechaCreada || b['FECHA DE APERTURA'] || b.created_at || '1970-01-01').getTime();
       return dateB - dateA;
     });
   };
@@ -9773,18 +9840,20 @@ export default function GestionMantenimientoPage() {
                     ) : (
                       <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
                         {orders.map((ord, idx) => {
-                          const category = getHistoryRecordCategory(ord);
+                          const category = ord.category || getHistoryRecordCategory(ord);
                           const codigoDisplay = ord.codigoDisplay || getHistoryRecordCode(ord, idx);
-                          const estado = ord['ESTADO'] || ord.estado || 'Pendiente';
+                          const estado = ord.estadoDisplay || ord['ESTADO'] || ord.estado || 'Pendiente';
                           const isComplete = estado.toLowerCase().includes('completad') || estado.toLowerCase().includes('resuelt') || estado.toLowerCase().includes('cerrad');
+                          const isAtrasada = estado.toLowerCase().includes('atrasad');
                           const isIncomplete = estado.toLowerCase().includes('incomplet');
-                          const fechaCreada = ord['FECHA DE APERTURA'] || ord.fecha_apertura || (ord.created_at ? ord.created_at.slice(0, 10) : 'Sin fecha');
+                          const fechaCreada = ord.fechaCreada || ord['FECHA DE APERTURA'] || ord.fecha_apertura || (ord.created_at ? ord.created_at.slice(0, 10) : 'Sin fecha');
+                          const tecnicoNombre = ord.tecnicoNombre || ord['TECNICO'] || ord.tecnico_asignado || 'Sin asignar';
 
                           return (
                             <div
                               key={ord.id || idx}
                               onClick={() => {
-                                setViewingHistoryRecord({ ...ord, codigoDisplay, category });
+                                setViewingHistoryRecord({ ...ord, codigoDisplay, category, 'TECNICO': tecnicoNombre, 'ESTADO': estado });
                               }}
                               className="p-3 bg-white hover:bg-amber-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
                               title="Haz clic para ver la orden completa"
@@ -9799,7 +9868,7 @@ export default function GestionMantenimientoPage() {
                                   </span>
                                   <div className="text-[11px] text-gray-500 flex items-center gap-2 flex-wrap">
                                     <span>📅 Creada: <strong>{fechaCreada}</strong></span>
-                                    <span>👤 Técnico: <strong>{ord['TECNICO'] || ord.tecnico_asignado || 'Sin asignar'}</strong></span>
+                                    <span>👤 Técnico: <strong>{tecnicoNombre}</strong></span>
                                   </div>
                                 </div>
                               </div>
@@ -9807,9 +9876,10 @@ export default function GestionMantenimientoPage() {
                               <div className="flex items-center gap-2 shrink-0">
                                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                                   isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                  isIncomplete ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                  isAtrasada ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                  isIncomplete ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-50 text-amber-700 border-amber-200'
                                 }`}>
-                                  {isComplete ? '✅ Completado' : isIncomplete ? '⚠️ Incompleto' : '⏳ Pendiente'}
+                                  {isComplete ? '✅ Completado' : isAtrasada ? '🚨 Atrasada' : isIncomplete ? '⚠️ Incompleto' : '⏳ Pendiente'}
                                 </span>
                                 <button
                                   type="button"
