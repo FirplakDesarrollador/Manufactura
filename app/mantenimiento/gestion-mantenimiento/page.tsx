@@ -74,6 +74,7 @@ import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEdi
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import * as XLSX from 'xlsx';
+import { getNextConsecutiveCode } from '@/lib/consecutivos';
 import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
@@ -159,16 +160,18 @@ export const getHistoryRecordCategory = (row: any): 'TPM' | 'Correctivo' | 'Prev
 };
 
 export const getHistoryRecordCode = (row: any, idx?: number): string => {
-  if (!row) return 'PREV-0001';
+  if (!row) return 'PREV-1';
+  const rawCode = (row.codigo || row['CODIGO'] || row.codigo_tarjeta || '').toString().trim();
+  if (rawCode && (rawCode.startsWith('PREV-') || rawCode.startsWith('CORR-') || rawCode.startsWith('TPM-'))) {
+    return rawCode;
+  }
   const category = getHistoryRecordCategory(row);
-  const rawCode = (row['CODIGO'] || row.codigo || '').toString().trim();
   const numDigits = rawCode.replace(/[^0-9]/g, '');
   const numVal = numDigits ? parseInt(numDigits, 10) : (row.id || (idx !== undefined ? idx + 1 : 1));
-  const numPadded = String(numVal).padStart(4, '0');
 
-  if (category === 'TPM') return `TPM-${numPadded}`;
-  if (category === 'Correctivo') return `CORR-${numPadded}`;
-  return `PREV-${numPadded}`;
+  if (category === 'TPM') return `TPM-${numVal}`;
+  if (category === 'Correctivo') return `CORR-${numVal}`;
+  return `PREV-${numVal}`;
 };
 
 // Interfaces
@@ -2855,7 +2858,7 @@ export default function GestionMantenimientoPage() {
     e.preventDefault();
     if (!newCorrectivoForm.maquina.trim() || !newCorrectivoForm.sintoma.trim()) return;
 
-    const generatedCode = `CORR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const generatedCode = await getNextConsecutiveCode('CORR');
     const newRecord: CorrectiveRecord = {
       id: Date.now(),
       codigo: generatedCode,
@@ -4464,7 +4467,7 @@ export default function GestionMantenimientoPage() {
     setSubmittingTpm(true);
     setTpmValidationMsg(null);
 
-    const generatedCode = `TPM-${Date.now().toString().slice(-6)}`;
+    const generatedCode = await getNextConsecutiveCode('TPM');
     const fechaApertura = new Date().toISOString();
     const cleanMaquina = tpmFormData.maquina.trim();
     const cleanDescripcion = tpmFormData.descripcion_que.trim();

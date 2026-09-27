@@ -23,6 +23,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
+import { getNextConsecutiveCode } from '@/lib/consecutivos';
 import { supabase } from '@/lib/supabase';
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import * as XLSX from 'xlsx';
@@ -468,7 +469,7 @@ export default function TarjetasTpmTab({
     }
 
     setSubmitting(true);
-    const newCode = `TPM-${Math.floor(100 + Math.random() * 900)}`;
+    const newCode = await getNextConsecutiveCode('TPM');
     const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
     try {
