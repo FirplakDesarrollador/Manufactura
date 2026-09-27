@@ -9288,129 +9288,160 @@ export default function GestionMantenimientoPage() {
 
       {/* Modal: Report Corrective Maintenance */}
       {showCorrectivoModal && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-24 pb-8 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
           <div 
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-[#e2ded5] max-h-[85vh] overflow-y-auto my-auto"
+            className="bg-white rounded-3xl p-5 sm:p-7 md:p-8 max-w-2xl lg:max-w-3xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] overflow-y-auto my-auto relative"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-bold text-[#324354] mb-4">Reportar Mantenimiento Correctivo / Anomalía</h3>
-            <form onSubmit={handleAddCorrectivoSubmit} className="flex flex-col gap-3.5">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos</label>
-                  <input
-                    list="maquinas-catalogo-options"
-                    type="text"
-                    value={newCorrectivoForm.maquina}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const matched = maquinasCatalogo.find(m => 
-                        `${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`.toLowerCase() === val.toLowerCase() ||
-                        m.nombre_equipo?.toLowerCase() === val.toLowerCase() ||
-                        (m.codigo_equipo && m.codigo_equipo.toLowerCase() === val.toLowerCase())
-                      );
-                      if (matched) {
-                        setNewCorrectivoForm(prev => ({
-                          ...prev,
-                          maquina: matched.nombre_equipo,
-                          planta: obtenerCodigoPlanta(matched.planta || prev.planta)
-                        }));
-                      } else {
-                        setNewCorrectivoForm(prev => ({ ...prev, maquina: val }));
-                      }
-                    }}
-                    placeholder="Buscar o seleccionar equipo..."
-                    required
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Planta (Código Corto)</label>
-                  <select
-                    value={obtenerCodigoPlanta(newCorrectivoForm.planta, plantasNomenclatura)}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, planta: e.target.value }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354]"
-                  >
-                    {plantasNomenclatura.filter(p => p.activo !== false).map(p => (
-                      <option key={p.codigo} value={p.codigo}>
-                        {p.codigo} - {p.nombre_oficial}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#e2ded5] mb-5">
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold text-[#324354] leading-tight">
+                  Reportar Mantenimiento Correctivo / Anomalía
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Registra una avería o falla operativa para asignación y seguimiento técnico.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCorrectivoModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCorrectivoSubmit} className="flex flex-col gap-4">
+              
+              {/* 1. Máquinas y Equipos (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Máquinas y Equipos <span className="text-rose-600">*</span>
+                </label>
+                <MachineSearchAutocomplete
+                  id="correctivo-modal-maquina"
+                  value={newCorrectivoForm.maquina}
+                  maquinasCatalogo={maquinasCatalogo}
+                  onChange={(selectedMaquina, matchedPlanta) => {
+                    setNewCorrectivoForm(prev => ({
+                      ...prev,
+                      maquina: selectedMaquina,
+                      planta: matchedPlanta ? obtenerCodigoPlanta(matchedPlanta, plantasNomenclatura) : prev.planta
+                    }));
+                  }}
+                  placeholder="Buscar o seleccionar equipo por nombre, código o proceso..."
+                  required
+                />
               </div>
 
+              {/* 2. Planta (Código Corto) (1 campo por renglón) */}
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Descripción de la Avería / Síntoma</label>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Planta (Código Corto) <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={obtenerCodigoPlanta(newCorrectivoForm.planta, plantasNomenclatura)}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, planta: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  {plantasNomenclatura.filter(p => p.activo !== false).map(p => (
+                    <option key={p.codigo} value={p.codigo}>
+                      {p.codigo} - {p.nombre_oficial}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Descripción de la Avería / Síntoma (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Descripción de la Avería / Síntoma <span className="text-rose-600">*</span>
+                </label>
                 <textarea
                   value={newCorrectivoForm.sintoma}
                   onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, sintoma: e.target.value }))}
-                  placeholder="Describe la anomalía detectada, ruido, fuga o falla de funcionamiento..."
+                  placeholder="Describe detalladamente la anomalía detectada, ruido, fuga o falla de funcionamiento..."
                   required
-                  className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none min-h-[60px]"
+                  rows={3}
+                  className="w-full p-3 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Nivel de Prioridad</label>
-                  <select
-                    value={newCorrectivoForm.prioridad}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, prioridad: e.target.value as any }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354]"
-                  >
-                    <option value="Alta">🚨 Alta (Crítica)</option>
-                    <option value="Media">⚠️ Media</option>
-                    <option value="Baja">ℹ️ Baja</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Técnico Asignado</label>
-                  <select
-                    value={newCorrectivoForm.tecnico_asignado}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, tecnico_asignado: e.target.value }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354]"
-                  >
-                    <option value="">Seleccionar técnico...</option>
-                    {technicians.filter(t => t.id !== 9999).map(t => (
-                      <option key={t.id} value={t.name}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Plazo / Fecha Cierre</label>
-                  <input
-                    type="date"
-                    value={newCorrectivoForm.fecha_limite}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, fecha_limite: e.target.value }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-semibold text-[#324354]"
-                  />
-                </div>
+              {/* 4. Nivel de Prioridad (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Nivel de Prioridad <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={newCorrectivoForm.prioridad}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, prioridad: e.target.value as any }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  <option value="Alta">🚨 Alta (Crítica)</option>
+                  <option value="Media">⚠️ Media</option>
+                  <option value="Baja">ℹ️ Baja</option>
+                </select>
               </div>
 
+              {/* 5. Técnico Asignado (1 campo por renglón) */}
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Acción Correctiva Preliminar</label>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Técnico Asignado
+                </label>
+                <select
+                  value={newCorrectivoForm.tecnico_asignado}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, tecnico_asignado: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  <option value="">Seleccionar técnico...</option>
+                  {technicians.filter(t => t.id !== 9999).map(t => (
+                    <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 6. Plazo / Fecha Cierre (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Plazo / Fecha Cierre
+                </label>
+                <input
+                  type="date"
+                  value={newCorrectivoForm.fecha_limite}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, fecha_limite: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                />
+              </div>
+
+              {/* 7. Acción Correctiva Preliminar (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Acción Correctiva Preliminar
+                </label>
                 <textarea
                   value={newCorrectivoForm.accion_tomada}
                   onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, accion_tomada: e.target.value }))}
-                  placeholder="Acciones tomadas para mitigar o reparar la falla..."
-                  className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none min-h-[50px]"
+                  placeholder="Acciones tomadas para mitigar o reparar la falla (opcional)..."
+                  rows={2}
+                  className="w-full p-3 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
-              {/* Adjuntar Fotos de Evidencia (Máximo 2) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-gray-600 uppercase">
-                    Fotos de Evidencia (Máximo 2)
+              {/* 8. Adjuntar Fotos de Evidencia (Máximo 2) (1 campo por renglón) */}
+              <div className="p-4 bg-[#F6F3EE] rounded-2xl border border-gray-200 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-[#7B8E90]" />
+                    <span>Fotos de Evidencia (Máximo 2)</span>
                   </label>
-                  <span className="text-[11px] text-gray-500 font-medium">
+                  <span className="text-[11px] text-gray-500 font-bold bg-white px-2 py-0.5 rounded-md border border-gray-200">
                     {newCorrectivoForm.fotos?.length || 0}/2 adjuntadas
                   </span>
                 </div>
                 
-                <div className="p-3 bg-[#F6F3EE] rounded-2xl border border-dashed border-gray-300 flex items-center gap-3 flex-wrap">
+                <div className="p-3 bg-white rounded-2xl border border-dashed border-gray-300 flex items-center gap-3 flex-wrap">
                   {/* Thumbnails of already attached photos */}
                   {newCorrectivoForm.fotos && newCorrectivoForm.fotos.map((foto, index) => (
                     <div key={index} className="relative group w-20 h-20 rounded-xl overflow-hidden border-2 border-[#324354] shadow-xs shrink-0">
@@ -9436,13 +9467,13 @@ export default function GestionMantenimientoPage() {
 
                   {/* Upload button if less than 2 */}
                   {(newCorrectivoForm.fotos?.length || 0) < 2 && (
-                    <label className={`flex flex-col items-center justify-center w-20 h-20 bg-white hover:bg-slate-100 border-2 border-dashed border-[#7B8E90] rounded-xl cursor-pointer transition-all shrink-0 ${uploadingPhotos ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`flex flex-col items-center justify-center w-24 h-20 bg-[#F6F3EE] hover:bg-slate-200 border-2 border-dashed border-[#7B8E90] rounded-xl cursor-pointer transition-all shrink-0 ${uploadingPhotos ? 'opacity-50 pointer-events-none' : ''}`}>
                       {uploadingPhotos ? (
                         <Loader2 className="w-5 h-5 text-[#324354] animate-spin" />
                       ) : (
                         <>
                           <Camera className="w-5 h-5 text-[#324354] mb-1" />
-                          <span className="text-[10px] font-bold text-[#324354]">Adjuntar</span>
+                          <span className="text-[11px] font-bold text-[#324354]">Adjuntar</span>
                         </>
                       )}
                       <input
@@ -9463,18 +9494,19 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-3">
+              {/* Botones de Acción */}
+              <div className="flex gap-3 pt-3 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => setShowCorrectivoModal(false)}
-                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs sm:text-sm hover:bg-gray-200 cursor-pointer"
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs sm:text-sm hover:bg-gray-200 cursor-pointer transition-all"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={uploadingPhotos}
-                  className="flex-1 py-2.5 bg-[#324354] text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-[#324354]/90 cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-3 bg-[#324354] text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-[#324354]/90 cursor-pointer transition-all shadow-xs disabled:opacity-50"
                 >
                   Reportar Correctivo
                 </button>
