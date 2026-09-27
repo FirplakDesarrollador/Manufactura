@@ -38,9 +38,17 @@ export default function LowStockChart({ onPlantClick, selectedPlant }: LowStockC
 
     useEffect(() => {
         async function fetchParts() {
-            const { data, error } = await supabase
-                .from('REPUESTOS_MANTENIMIENTO')
+            let { data, error } = await supabase
+                .from('mantenimiento_repuestos')
                 .select('Taller, Minimo, "Stock actual"')
+
+            if (error) {
+                const res = await supabase
+                    .from('REPUESTOS_MANTENIMIENTO')
+                    .select('Taller, Minimo, "Stock actual"')
+                data = res.data
+                error = res.error
+            }
 
             if (!error && data) {
                 setParts(data)
