@@ -318,8 +318,8 @@ export default function GestionMantenimientoPage() {
   const [historyTipo, setHistoryTipo] = useState('Todos');
   const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
   type HistorySortField = 'id' | 'codigo' | 'titulo' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
-  const [historySortField, setHistorySortField] = useState<HistorySortField>('id');
-  const [historySortAsc, setHistorySortAsc] = useState<boolean>(true);
+  const [historySortField, setHistorySortField] = useState<HistorySortField>('apertura');
+  const [historySortAsc, setHistorySortAsc] = useState<boolean>(false);
 
   const handleHistorySort = (field: HistorySortField) => {
     if (historySortField === field) {
@@ -3978,17 +3978,21 @@ export default function GestionMantenimientoPage() {
   // Historial Memoized Filtered & Sorted Records
   const filteredHistoryRows = useMemo(() => {
     const list = historyRows.filter(row => {
-      // Global search
+      // Global multi-column search
       if (historySearch.trim()) {
         const q = normalize(historySearch);
         const matchCodigo = normalize(row.codigo || row['CODIGO'] || '').includes(q);
-        const matchTitle = normalize(row['Título'] || row.titulo || '').includes(q);
+        const matchTitle = normalize(row['Título'] || row.titulo || row.sintoma || '').includes(q);
         const resolvedMaq = resolveHistoryRowMachine(row, maquinasCatalogo);
-        const matchMaquina = normalize(resolvedMaq.name + ' ' + (resolvedMaq.code || '')).includes(q);
-        const matchTech = normalize(row['TECNICO'] || row.tecnico_asignado || '').includes(q);
-        const matchTipo = normalize(row['TIPO'] || row.tipo || '').includes(q);
-        const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || '').includes(q);
-        if (!matchCodigo && !matchTitle && !matchMaquina && !matchTech && !matchTipo && !matchObs) return false;
+        const matchMaquina = normalize(resolvedMaq.name + ' ' + (resolvedMaq.code || '') + ' ' + (row.maquina || '')).includes(q);
+        const matchTech = normalize(row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || '').includes(q);
+        const matchTipo = normalize(row['TIPO'] || row.tipo || row.origen || getHistoryRecordCategory(row)).includes(q);
+        const matchEstado = normalize(row['ESTADO'] || row.estado || '').includes(q);
+        const matchApertura = normalize(row['FECHA DE APERTURA'] || row.fecha_reporte || row.created_at || '').includes(q);
+        const matchCierre = normalize(row['FECHA DE CIERRE'] || row.fecha_cierre || '').includes(q);
+        const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || row.accion_tomada || row.observaciones || '').includes(q);
+        
+        if (!matchCodigo && !matchTitle && !matchMaquina && !matchTech && !matchTipo && !matchEstado && !matchApertura && !matchCierre && !matchObs) return false;
       }
 
       // Global Origen filter (TPM, Correctivo, Preventivo)
@@ -4042,14 +4046,24 @@ export default function GestionMantenimientoPage() {
           valA = (a['ESTADO'] || 'Pendiente').toLowerCase();
           valB = (b['ESTADO'] || 'Pendiente').toLowerCase();
           break;
-        case 'apertura':
-          valA = a['FECHA DE APERTURA'] || '';
-          valB = b['FECHA DE APERTURA'] || '';
+        case 'apertura': {
+          const rawA = a['FECHA DE APERTURA'] || a['fecha_reporte'] || a.created_at || '';
+          const rawB = b['FECHA DE APERTURA'] || b['fecha_reporte'] || b.created_at || '';
+          const tA = rawA ? new Date(rawA).getTime() : 0;
+          const tB = rawB ? new Date(rawB).getTime() : 0;
+          valA = isNaN(tA) ? 0 : tA;
+          valB = isNaN(tB) ? 0 : tB;
           break;
-        case 'cierre':
-          valA = a['FECHA DE CIERRE'] || '';
-          valB = b['FECHA DE CIERRE'] || '';
+        }
+        case 'cierre': {
+          const rawA = a['FECHA DE CIERRE'] || a.fecha_cierre || '';
+          const rawB = b['FECHA DE CIERRE'] || b.fecha_cierre || '';
+          const tA = rawA ? new Date(rawA).getTime() : 0;
+          const tB = rawB ? new Date(rawB).getTime() : 0;
+          valA = isNaN(tA) ? 0 : tA;
+          valB = isNaN(tB) ? 0 : tB;
           break;
+        }
         case 'observaciones':
           valA = (a['COMENTARIO DE EJECUCION'] || '').toLowerCase();
           valB = (b['COMENTARIO DE EJECUCION'] || '').toLowerCase();
@@ -4287,6 +4301,35 @@ export default function GestionMantenimientoPage() {
       console.error('Error exportando preventivo a Excel:', err);
       alert('Hubo un error al generar el archivo Excel.');
     }
+  };
+
+  // Modal Trigger Handlers for + Correctivo & + TPM
+  const handleOpenNewCorrectivo = () => {
+    setNewCorrectivoForm({
+      maquina: '',
+      planta: 'Mármol Sintético',
+      sintoma: '',
+      prioridad: 'Alta',
+      tecnico_asignado: '',
+      fecha_limite: '',
+      accion_tomada: '',
+      fotos: []
+    });
+    setShowCorrectivoModal(true);
+  };
+
+  const handleOpenNewTpm = () => {
+    setNewCorrectivoForm({
+      maquina: '',
+      planta: 'Mármol Sintético',
+      sintoma: '[Tarjeta TPM] ',
+      prioridad: 'Alta',
+      tecnico_asignado: '',
+      fecha_limite: '',
+      accion_tomada: '',
+      fotos: []
+    });
+    setShowCorrectivoModal(true);
   };
 
   // Excel Export for Historial
@@ -4687,7 +4730,7 @@ export default function GestionMantenimientoPage() {
     { id: 'planificador', label: 'Planificador', icon: <Layers size={14} /> },
     { id: 'tecnico', label: 'Portal Técnicos', icon: <User size={14} /> },
     { id: 'preventivo', label: 'Preventivo (PMP)', icon: <FileSpreadsheet size={14} /> },
-    { id: 'historial', label: 'Historial OT', icon: <History size={14} /> },
+    { id: 'historial', label: 'Órdenes de Trabajo', icon: <History size={14} /> },
     { id: 'indicadores', label: 'Indicadores', icon: <BarChart3 size={14} /> },
     { id: 'maquinas', label: 'Máquinas y Equipos', icon: <Cpu size={14} /> },
     { id: 'configuracion', label: 'Configuración', icon: <Settings size={14} /> },
@@ -6113,30 +6156,38 @@ export default function GestionMantenimientoPage() {
         {activeTab === 'historial' && (
           <div className="flex flex-col gap-6 animate-in fade-in duration-300">
             
-            {/* Filter Bar for Historial */}
+            {/* Filter Bar for Órdenes de Trabajo */}
             <div className="bg-white rounded-3xl p-5 border border-[#e2ded5] shadow-xs flex flex-col gap-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="font-bold text-[#324354] text-sm sm:text-base flex items-center gap-2">
                   <Filter className="w-4 h-4 text-[#7B8E90]" />
-                  <span>Historial Órdenes de Trabajo ({filteredHistoryRows.length} registros)</span>
+                  <span>Órdenes de Trabajo ({filteredHistoryRows.length} registros)</span>
                 </h3>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  {/* + Correctivo Button */}
                   <button
-                    onClick={() => setShowCorrectivoModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#324354] text-white font-bold rounded-xl text-xs hover:bg-[#253342] transition-all shadow-xs cursor-pointer"
+                    type="button"
+                    onClick={handleOpenNewCorrectivo}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap border border-rose-700"
+                    title="Reportar y generar nueva orden de mantenimiento correctivo"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Reportar Correctivo</span>
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>+ Correctivo</span>
                   </button>
+
+                  {/* + TPM Button */}
                   <button
-                    onClick={fetchHistoryRecords}
-                    disabled={historyLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F6F3EE] text-[#324354] hover:bg-gray-200 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                    type="button"
+                    onClick={handleOpenNewTpm}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap border border-[#25323f]"
+                    title="Crear nueva tarjeta TPM / Mantenimiento Autónomo"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${historyLoading ? 'animate-spin' : ''}`} />
-                    <span>Actualizar</span>
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>+ TPM</span>
                   </button>
+
+                  {/* Exportar Excel */}
                   <button
                     onClick={handleDownloadHistorialExcel}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white font-bold rounded-xl text-xs hover:bg-emerald-800 transition-all shadow-xs cursor-pointer"
@@ -6144,12 +6195,16 @@ export default function GestionMantenimientoPage() {
                     <Download className="w-3.5 h-3.5" />
                     <span>Exportar Excel</span>
                   </button>
+
+                  {/* Limpiar Filtros */}
                   <button
                     onClick={() => {
                       setHistorySearch('');
                       setHistoryTipo('Todos');
                       setHistoryEstado('Todos');
                       setHistoryTecnico('Todos');
+                      setHistorySortField('apertura');
+                      setHistorySortAsc(false);
                     }}
                     className="text-xs text-[#7B8E90] hover:text-[#324354] font-semibold underline cursor-pointer ml-1"
                   >
@@ -6158,21 +6213,22 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                {/* Search */}
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              {/* Enhanced Wider Search & Filter Bar */}
+              <div className="flex flex-col md:flex-row items-center gap-3 w-full">
+                {/* Wider Search Input */}
+                <div className="flex-[2.5] min-w-[280px] w-full relative">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Búsqueda global..."
-                    className="w-full pl-9 pr-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs focus:outline-none focus:border-[#324354]"
+                    placeholder="Búsqueda global (OT, máquina, técnico, síntoma, estado, fecha...)"
+                    className="w-full pl-10 pr-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-medium focus:outline-none focus:border-[#324354] transition-all"
                   />
                 </div>
 
                 {/* Origen / Tipo */}
-                <div>
+                <div className="flex-1 min-w-[150px] w-full">
                   <select
                     value={historyTipo}
                     onChange={(e) => setHistoryTipo(e.target.value)}
@@ -6186,7 +6242,7 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* Estado */}
-                <div>
+                <div className="flex-1 min-w-[150px] w-full">
                   <select
                     value={historyEstado}
                     onChange={(e) => setHistoryEstado(e.target.value)}
@@ -6200,7 +6256,7 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* Técnico */}
-                <div>
+                <div className="flex-1 min-w-[160px] w-full">
                   <select
                     value={historyTecnico}
                     onChange={(e) => setHistoryTecnico(e.target.value)}
