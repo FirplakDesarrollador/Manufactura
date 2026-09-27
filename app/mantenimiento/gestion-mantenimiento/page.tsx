@@ -60,6 +60,8 @@ import {
   Lock,
   Edit3,
   Image as ImageIcon,
+  Mic,
+  Square,
   X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -69,6 +71,8 @@ import TarjetasTpmTab from '@/components/mantenimiento/TarjetasTpmTab';
 import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSemanalPlanner';
 import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosColumnas';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
+import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
+import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import * as XLSX from 'xlsx';
 import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
 
@@ -335,6 +339,35 @@ export default function GestionMantenimientoPage() {
   const [correctivoPrioridad, setCorrectivoPrioridad] = useState('Todas');
   const [correctivoEstado, setCorrectivoEstado] = useState('Todos');
   const [showCorrectivoModal, setShowCorrectivoModal] = useState(false);
+
+  // TPM Card Form Modal State (Matching /mantenimiento/tarjetas-falla)
+  const [showCreateTpmModal, setShowCreateTpmModal] = useState(false);
+  const [tpmFormData, setTpmFormData] = useState<{
+    tipo_tarjeta: 'roja' | 'azul' | 'amarilla' | 'verde';
+    maquina: string;
+    planta: string;
+    detectada_por: string;
+    descripcion_que: string;
+    prioridad: 'Alta' | 'Media' | 'Baja';
+    accion_inmediata: string;
+    fotos: string[];
+  }>({
+    tipo_tarjeta: 'roja',
+    maquina: '',
+    planta: 'Mármol Sintético',
+    detectada_por: '',
+    descripcion_que: '',
+    prioridad: 'Alta',
+    accion_inmediata: '',
+    fotos: []
+  });
+  const [isTpmListening, setIsTpmListening] = useState(false);
+  const tpmRecognitionRef = useRef<any>(null);
+  const [annotatingTpmImage, setAnnotatingTpmImage] = useState<{ src: string; index?: number } | null>(null);
+  const [showTpmLiveCamera, setShowTpmLiveCamera] = useState(false);
+  const tpmFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [tpmValidationMsg, setTpmValidationMsg] = useState<string | null>(null);
+  const [submittingTpm, setSubmittingTpm] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [viewingCorrectivo, setViewingCorrectivo] = useState<CorrectiveRecord | null>(null);
@@ -4329,17 +4362,216 @@ export default function GestionMantenimientoPage() {
   };
 
   const handleOpenNewTpm = () => {
-    setNewCorrectivoForm({
+    const defaultUser = userEmail ? userEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+    setTpmFormData({
+      tipo_tarjeta: 'roja',
       maquina: '',
       planta: 'Mármol Sintético',
-      sintoma: '[Tarjeta TPM] ',
+      detectada_por: defaultUser || 'Hector José Chinchilla Trigos',
+      descripcion_que: '',
       prioridad: 'Alta',
-      tecnico_asignado: '',
-      fecha_limite: '',
-      accion_tomada: '',
+      accion_inmediata: '',
       fotos: []
     });
-    setShowCorrectivoModal(true);
+    setTpmValidationMsg(null);
+    setShowCreateTpmModal(true);
+  };
+
+  const handleToggleTpmVoice = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('El reconocimiento de voz no está soportado en este navegador. Usa Chrome o Edge.');
+      return;
+    }
+    if (isTpmListening) {
+      if (tpmRecognitionRef.current) tpmRecognitionRef.current.stop();
+      setIsTpmListening(false);
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'es-CO';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      let initialText = tpmFormData.descripcion_que;
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        const newText = initialText ? `${initialText} ${transcript}` : transcript;
+        setTpmFormData(prev => ({ ...prev, descripcion_que: newText }));
+      };
+
+      recognition.onerror = (e: any) => {
+        console.warn('Speech recognition error:', e);
+        setIsTpmListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsTpmListening(false);
+      };
+
+      recognition.start();
+      tpmRecognitionRef.current = recognition;
+      setIsTpmListening(true);
+    } catch (err) {
+      console.error('Error starting speech recognition:', err);
+      setIsTpmListening(false);
+    }
+  };
+
+  const handleTpmFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const currentCount = tpmFormData.fotos?.length || 0;
+    if (currentCount >= 2) {
+      alert('Máximo 2 fotos por reporte de anomalía.');
+      return;
+    }
+    const remaining = 2 - currentCount;
+    const filesToProcess = Array.from(files).slice(0, remaining);
+
+    filesToProcess.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setTpmFormData(prev => ({
+            ...prev,
+            fotos: [...(prev.fotos || []), dataUrl].slice(0, 2)
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const handleCreateTpmSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tpmFormData.maquina || !tpmFormData.maquina.trim()) {
+      setTpmValidationMsg('Por favor selecciona o escribe la máquina o equipo.');
+      return;
+    }
+    if (!tpmFormData.descripcion_que || !tpmFormData.descripcion_que.trim()) {
+      setTpmValidationMsg('Por favor describe la anomalía o síntoma.');
+      return;
+    }
+
+    setSubmittingTpm(true);
+    setTpmValidationMsg(null);
+
+    const generatedCode = `TPM-${Date.now().toString().slice(-6)}`;
+    const fechaApertura = new Date().toISOString();
+    const cleanMaquina = tpmFormData.maquina.trim();
+    const cleanDescripcion = tpmFormData.descripcion_que.trim();
+
+    try {
+      const colorTitleMap = {
+        roja: '🔴 Tarjeta Roja (Mantenimiento)',
+        azul: '🔵 Tarjeta Azul (Autónomo)',
+        amarilla: '🟡 Tarjeta Amarilla (Seguridad/5S)',
+        verde: '🟢 Tarjeta Verde (Mejora Kaizen)'
+      };
+
+      // 1. Insert into Supabase tarjetas_falla_anomalia
+      try {
+        await supabase.from('tarjetas_falla_anomalia').insert([{
+          codigo: generatedCode,
+          tipo_tarjeta: tpmFormData.tipo_tarjeta,
+          tipo_aviso: tpmFormData.tipo_tarjeta === 'roja' ? 'Mantenimiento' : tpmFormData.tipo_tarjeta === 'azul' ? 'Autónomo' : tpmFormData.tipo_tarjeta === 'amarilla' ? 'Seguridad/5S' : 'Mejora Kaizen',
+          maquina: cleanMaquina,
+          planta: tpmFormData.planta,
+          detectada_por: tpmFormData.detectada_por || 'Empleado FIRPLAK',
+          descripcion_que: cleanDescripcion,
+          prioridad: tpmFormData.prioridad,
+          accion_inmediata: tpmFormData.accion_inmediata || null,
+          estado: 'abierta',
+          fecha_apertura: fechaApertura,
+          fotos: tpmFormData.fotos || []
+        }]);
+      } catch (e) {
+        console.warn('Sync tarjetas_falla_anomalia notice:', e);
+      }
+
+      // 2. Insert into Supabase mantenimiento_ordenes
+      try {
+        await supabase.from('mantenimiento_ordenes').insert([{
+          origen: 'TARJETA_TPM',
+          tipo_orden: 'CORRECTIVO',
+          codigo: generatedCode,
+          titulo: `[${colorTitleMap[tpmFormData.tipo_tarjeta]}] ${cleanDescripcion}`,
+          maquina: cleanMaquina,
+          planta: tpmFormData.planta,
+          tecnico_nombre: 'Sin asignar',
+          turno: 'General',
+          prioridad: tpmFormData.prioridad,
+          estado: 'Abierta',
+          fecha_programada: fechaApertura,
+          duracion_estimada_min: 60,
+          sintoma_falla: cleanDescripcion,
+          reportado_por: tpmFormData.detectada_por,
+          fotos_antes: tpmFormData.fotos || []
+        }]);
+      } catch (e) {
+        console.warn('Sync mantenimiento_ordenes notice:', e);
+      }
+
+      // 3. Add to historyRows
+      const newHistoryItem: HistoryRecord = {
+        id: generatedCode,
+        codigo: generatedCode,
+        'Título': cleanDescripcion,
+        titulo: cleanDescripcion,
+        'TECNICO': 'Sin asignar',
+        tecnico: 'Sin asignar',
+        'TIPO': 'TPM',
+        tipo: 'TPM',
+        'ESTADO': 'Abierta',
+        estado: 'Abierta',
+        'FECHA DE APERTURA': fechaApertura,
+        fecha_apertura: fechaApertura,
+        'FECHA DE CIERRE': '—',
+        fecha_cierre: '—',
+        planta: tpmFormData.planta,
+        'Planta': tpmFormData.planta,
+        maquina: cleanMaquina,
+        'Máquina / Equipo': cleanMaquina,
+        sintoma: cleanDescripcion
+      };
+
+      setHistoryRows(prev => [newHistoryItem, ...prev]);
+
+      // 4. Add to correctiveRecords
+      const newCorrectivoItem: CorrectiveRecord = {
+        id: Date.now(),
+        codigo: generatedCode,
+        maquina: cleanMaquina,
+        planta: tpmFormData.planta,
+        sintoma: cleanDescripcion,
+        prioridad: tpmFormData.prioridad,
+        tecnico_asignado: '',
+        estado: 'Abierta',
+        fecha_reporte: fechaApertura,
+        fotos: tpmFormData.fotos || []
+      };
+      setCorrectiveRecords(prev => [newCorrectivoItem, ...prev]);
+
+      if (isTpmListening && tpmRecognitionRef.current) {
+        tpmRecognitionRef.current.stop();
+        setIsTpmListening(false);
+      }
+
+      setShowCreateTpmModal(false);
+    } catch (err) {
+      console.error('Error al crear tarjeta TPM:', err);
+      alert('Error al guardar la tarjeta TPM.');
+    } finally {
+      setSubmittingTpm(false);
+    }
   };
 
   // Helper to strip brackets [...] from Description cell
@@ -8824,6 +9056,449 @@ export default function GestionMantenimientoPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Reporte de Tarjeta de Anomalía (TPM) - Mismo diseño que /mantenimiento/tarjetas-falla */}
+      {showCreateTpmModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
+          <div 
+            className="bg-white rounded-3xl p-5 sm:p-7 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[92vh] overflow-y-auto my-auto relative"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#e2ded5] mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold shrink-0">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-[#324354] leading-tight">
+                    REPORTE DE TARJETA DE ANOMALÍA (TPM)
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Se vinculará automáticamente a Mantenimiento Correctivo (Sin Asignar).
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (isTpmListening && tpmRecognitionRef.current) {
+                    tpmRecognitionRef.current.stop();
+                    setIsTpmListening(false);
+                  }
+                  setShowCreateTpmModal(false);
+                }}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTpmSubmit} noValidate className="flex flex-col gap-4">
+              
+              {/* Tipo de Tarjeta / Clasificación TPM */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1.5">
+                  TIPO DE TARJETA / CLASIFICACIÓN TPM <span className="text-rose-600">*</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* Roja */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'roja' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'roja' 
+                        ? 'bg-rose-50 border-rose-400 text-rose-900 ring-2 ring-rose-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs flex items-center gap-1 font-bold text-rose-700">
+                      🔴 Tarjeta Roja
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Mantenimiento Técnico</span>
+                  </button>
+
+                  {/* Azul */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'azul' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'azul' 
+                        ? 'bg-blue-50 border-blue-400 text-blue-900 ring-2 ring-blue-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs flex items-center gap-1 font-bold text-blue-700">
+                      🔵 Tarjeta Azul
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Mantenimiento Autónomo</span>
+                  </button>
+
+                  {/* Amarilla */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'amarilla' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'amarilla' 
+                        ? 'bg-amber-50 border-amber-400 text-amber-900 ring-2 ring-amber-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs flex items-center gap-1 font-bold text-amber-700">
+                      🟡 Tarjeta Amarilla
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Seguridad, 5S y Fugas</span>
+                  </button>
+
+                  {/* Verde */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'verde' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'verde' 
+                        ? 'bg-emerald-50 border-emerald-400 text-emerald-900 ring-2 ring-emerald-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs flex items-center gap-1 font-bold text-emerald-700">
+                      🟢 Tarjeta Verde
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Mejora Kaizen / Ideas</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Máquinas y Equipos Autocomplete */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  MÁQUINAS Y EQUIPOS <span className="text-rose-600">*</span>
+                </label>
+                <MachineSearchAutocomplete
+                  id="tpm-modal-maquina"
+                  value={tpmFormData.maquina}
+                  maquinasCatalogo={maquinasCatalogo}
+                  onChange={(selectedMaquina, matchedPlanta) => {
+                    if (tpmValidationMsg) setTpmValidationMsg(null);
+                    setTpmFormData(prev => ({
+                      ...prev,
+                      maquina: selectedMaquina,
+                      planta: matchedPlanta || prev.planta
+                    }));
+                  }}
+                  placeholder="Buscar o escribir máquina / equipo (ej. Enchapadora, Kaeser, Laser...)"
+                  required
+                />
+              </div>
+
+              {/* Planta */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  PLANTA <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={tpmFormData.planta}
+                  onChange={(e) => setTpmFormData(prev => ({ ...prev, planta: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  {plantasNomenclatura.length > 0 ? (
+                    plantasNomenclatura.map(p => (
+                      <option key={p.codigo} value={p.nombre_oficial}>
+                        {p.codigo} - {p.nombre_oficial}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Mármol Sintético">MS - Mármol Sintético</option>
+                      <option value="Muebles">MB - Muebles</option>
+                      <option value="Bañeras">BA - Bañeras</option>
+                      <option value="Ensamble">EN - Ensamble</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Persona que Reporta */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">
+                    PERSONA QUE REPORTA (EMPLEADO) <span className="text-rose-600">*</span>
+                  </label>
+                </div>
+                <input
+                  list="empleados-options-tpm-modal"
+                  type="text"
+                  value={tpmFormData.detectada_por}
+                  onChange={(e) => setTpmFormData(prev => ({ ...prev, detectada_por: e.target.value }))}
+                  placeholder="Escribe o selecciona el nombre del operario / empleado..."
+                  required
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                />
+                <datalist id="empleados-options-tpm-modal">
+                  {empleadosList.map(emp => (
+                    <option key={emp.id} value={emp.nombreCompleto}>
+                      {emp.cargo ? `Cargo: ${emp.cargo}` : ''} {emp.planta ? `· Planta: ${emp.planta}` : ''}
+                    </option>
+                  ))}
+                </datalist>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Por defecto tu usuario de sesión, pero puedes editarlo o seleccionar a otro empleado para reportar a su nombre.
+                </p>
+              </div>
+
+              {/* Descripción de la Avería / Síntoma con Dictado por Voz */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">
+                    DESCRIPCIÓN DE LA AVERÍA / SÍNTOMA <span className="text-rose-600">*</span>
+                  </label>
+                  
+                  {isTpmListening ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (tpmRecognitionRef.current) tpmRecognitionRef.current.stop();
+                        setIsTpmListening(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-md transition-all cursor-pointer animate-pulse active:scale-95"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span>Parar Micrófono</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleToggleTpmVoice}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Mic className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Dictar por Voz</span>
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={tpmFormData.descripcion_que}
+                  onChange={(e) => {
+                    if (tpmValidationMsg) setTpmValidationMsg(null);
+                    setTpmFormData(prev => ({ ...prev, descripcion_que: e.target.value }));
+                  }}
+                  placeholder="Describe la anomalía detectada, o presiona 'Dictar por Voz' para hablar..."
+                  required
+                  rows={3}
+                  className={`w-full p-3 bg-[#F6F3EE] rounded-xl border text-sm focus:outline-none transition-all ${
+                    isTpmListening 
+                      ? 'border-rose-500 ring-2 ring-rose-300' 
+                      : tpmValidationMsg 
+                        ? 'border-rose-500 ring-2 ring-rose-200 bg-rose-50/30' 
+                        : 'border-gray-300 focus:ring-2 focus:ring-[#324354]'
+                  }`}
+                />
+                
+                {isTpmListening && (
+                  <div className="flex items-center justify-between p-2.5 mt-2 bg-rose-50 border border-rose-300 rounded-xl shadow-2xs animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping shrink-0"></span>
+                      <span className="text-xs text-rose-800 font-bold">
+                        🎙️ Micrófono activado · Hable ahora
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Nivel de Prioridad */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  NIVEL DE PRIORIDAD <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={tpmFormData.prioridad}
+                  onChange={(e) => setTpmFormData(prev => ({ ...prev, prioridad: e.target.value as any }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  <option value="Alta">🚨 Alta (Crítica)</option>
+                  <option value="Media">⚠️ Media</option>
+                  <option value="Baja">ℹ️ Baja</option>
+                </select>
+              </div>
+
+              {/* Destino en Gestor */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">DESTINO EN GESTOR</label>
+                <div className="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 flex items-center justify-between">
+                  <span>Mantenimiento Correctivo</span>
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-semibold text-[11px]">Sin Asignar</span>
+                </div>
+              </div>
+
+              {/* Sección Fotos de Evidencia */}
+              <div className="p-4 bg-[#F6F3EE] rounded-2xl border border-gray-200 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-[#7B8E90]" />
+                    <span>Fotos de Evidencia (Máximo 2)</span>
+                  </label>
+                  <span className="text-[11px] text-gray-500 font-bold bg-white px-2 py-0.5 rounded-md border border-gray-200">
+                    {tpmFormData.fotos?.length || 0}/2 adjuntadas
+                  </span>
+                </div>
+
+                {(tpmFormData.fotos?.length || 0) < 2 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowTpmLiveCamera(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#324354] hover:bg-[#253341] text-white font-bold rounded-xl text-xs sm:text-sm shadow-xs cursor-pointer transition-all active:scale-95"
+                    >
+                      <Camera className="w-4 h-4 text-amber-300 shrink-0" />
+                      <span>Tomar Foto</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => tpmFileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white hover:bg-slate-100 text-[#324354] font-bold rounded-xl text-xs sm:text-sm border border-gray-300 shadow-xs cursor-pointer transition-all active:scale-95"
+                    >
+                      <ImageIcon className="w-4 h-4 text-[#7B8E90] shrink-0" />
+                      <span>Adjuntar Archivo</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Límite de 2 fotos alcanzado (2/2).</span>
+                  </div>
+                )}
+
+                <input
+                  ref={tpmFileInputRef}
+                  type="file"
+                  accept="image/*,.png,.jpg,.jpeg,.webp"
+                  multiple
+                  onChange={handleTpmFileAttach}
+                  style={{ display: 'none' }}
+                />
+
+                {/* Miniaturas de fotos */}
+                {tpmFormData.fotos && tpmFormData.fotos.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                    {tpmFormData.fotos.map((foto, index) => (
+                      <div key={index} className="relative bg-white p-2 rounded-xl border border-gray-200 flex flex-col gap-2 shadow-2xs">
+                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-gray-200">
+                          <img src={foto} alt={`Evidencia ${index + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTpmFormData(prev => ({
+                                ...prev,
+                                fotos: prev.fotos.filter((_, i) => i !== index)
+                              }));
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full transition-all cursor-pointer shadow-2xs"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAnnotatingTpmImage({ src: foto, index })}
+                          className="flex items-center justify-center gap-1.5 py-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs border border-rose-200 cursor-pointer transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Señalar en Rojo</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Validation Banner */}
+              {tpmValidationMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{tpmValidationMsg}</span>
+                  </div>
+                  <button type="button" onClick={() => setTpmValidationMsg(null)} className="text-rose-600 hover:text-rose-900 p-1">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Modal Actions */}
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isTpmListening && tpmRecognitionRef.current) {
+                      tpmRecognitionRef.current.stop();
+                      setIsTpmListening(false);
+                    }
+                    setShowCreateTpmModal(false);
+                  }}
+                  className="py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all active:scale-95"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submittingTpm}
+                  className="py-3 px-4 bg-[#324354] hover:bg-[#25323f] text-white font-bold rounded-xl text-xs sm:text-sm shadow-md cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {submittingTpm ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>Creando Tarjeta...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 text-amber-300" />
+                      <span>+ Crear Tarjeta de Anomalía</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
+
+            {/* Sub-modals inside TPM Modal: Live Camera Modal & Photo Annotation Editor */}
+            {showTpmLiveCamera && (
+              <LiveCameraModal
+                isOpen={showTpmLiveCamera}
+                onCapture={(dataUrl) => {
+                  setTpmFormData(prev => ({
+                    ...prev,
+                    fotos: [...(prev.fotos || []), dataUrl].slice(0, 2)
+                  }));
+                  setShowTpmLiveCamera(false);
+                }}
+                onClose={() => setShowTpmLiveCamera(false)}
+              />
+            )}
+
+            {annotatingTpmImage && (
+              <PhotoAnnotationEditor
+                imageSrc={annotatingTpmImage.src}
+                onSave={(annotatedUrl) => {
+                  if (annotatingTpmImage) {
+                    setTpmFormData(prev => {
+                      const newFotos = [...(prev.fotos || [])];
+                      if (typeof annotatingTpmImage.index === 'number') {
+                        newFotos[annotatingTpmImage.index] = annotatedUrl;
+                      }
+                      return { ...prev, fotos: newFotos };
+                    });
+                  }
+                  setAnnotatingTpmImage(null);
+                }}
+                onCancel={() => setAnnotatingTpmImage(null)}
+              />
+            )}
+
           </div>
         </div>
       )}
