@@ -1772,16 +1772,15 @@ export default function GestionMantenimientoPage() {
       const rawParam = (params.get('tab') || '').toLowerCase();
       const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas'];
       if (rawParam && validTabs.includes(rawParam as TabType)) {
-        setActiveTab(rawParam as TabType);
+        setActiveTab(rawParam === 'correctivo' ? 'historial' : (rawParam as TabType));
       }
     }
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'correctivo') {
-      fetchCorrectivoRecords();
-    } else if (activeTab === 'historial') {
+    if (activeTab === 'historial') {
       fetchHistoryRecords();
+      fetchCorrectivoRecords();
     }
   }, [activeTab]);
 
@@ -4688,7 +4687,6 @@ export default function GestionMantenimientoPage() {
     { id: 'planificador', label: 'Planificador', icon: <Layers size={14} /> },
     { id: 'tecnico', label: 'Portal Técnicos', icon: <User size={14} /> },
     { id: 'preventivo', label: 'Preventivo (PMP)', icon: <FileSpreadsheet size={14} /> },
-    { id: 'correctivo', label: 'Correctivo', icon: <AlertTriangle size={14} /> },
     { id: 'historial', label: 'Historial OT', icon: <History size={14} /> },
     { id: 'indicadores', label: 'Indicadores', icon: <BarChart3 size={14} /> },
     { id: 'maquinas', label: 'Máquinas y Equipos', icon: <Cpu size={14} /> },
@@ -6124,6 +6122,13 @@ export default function GestionMantenimientoPage() {
                 </h3>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowCorrectivoModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#324354] text-white font-bold rounded-xl text-xs hover:bg-[#253342] transition-all shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Reportar Correctivo</span>
+                  </button>
                   <button
                     onClick={fetchHistoryRecords}
                     disabled={historyLoading}
