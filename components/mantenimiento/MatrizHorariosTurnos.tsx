@@ -24,6 +24,7 @@ import {
   Eye
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 
 export interface TurnoItem {
   id?: number;
@@ -824,7 +825,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
                         </span>
                         <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium mt-0.5">
                           {tech.documento && <span>CC: {tech.documento}</span>}
-                          {tech.planta && <span className="bg-gray-100 px-1 rounded text-gray-700 font-semibold">{tech.planta}</span>}
+                          {tech.planta && <span className="bg-gray-100 px-1.5 py-0.2 rounded text-gray-800 font-bold font-mono border border-gray-200">{obtenerCodigoPlanta(tech.planta)}</span>}
                         </div>
                       </div>
 

@@ -27,6 +27,7 @@ import { getNextConsecutiveCode } from '@/lib/consecutivos';
 import { supabase } from '@/lib/supabase';
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import * as XLSX from 'xlsx';
+import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 
 export type TpmColor = 'roja' | 'azul' | 'amarilla' | 'verde';
 
@@ -998,8 +999,10 @@ export default function TarjetasTpmTab({
                     </td>
 
                     {/* Planta */}
-                    <td className="py-3 px-3 font-medium text-gray-600">
-                      {item.planta}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold font-mono bg-[#F6F3EE] text-[#324354] border border-[#e2ded5]">
+                        {obtenerCodigoPlanta(item.planta, plantasNomenclatura)}
+                      </span>
                     </td>
 
                     {/* Descripción de la Anomalía */}

@@ -5582,7 +5582,7 @@ export default function GestionMantenimientoPage() {
                             <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-gray-100 mt-0.5">
                               <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium min-w-0 flex-1 truncate">
                                 <span className="shrink-0">🏭</span>
-                                <span className="font-semibold text-gray-700 shrink-0">{item.planta || 'FIRPLAK'}</span>
+                                <span className="font-bold text-[#324354] font-mono shrink-0">{obtenerCodigoPlanta(item.planta, plantasNomenclatura)}</span>
                                 {item.maquina && (
                                   <>
                                     <span className="text-gray-300">•</span>
@@ -6820,8 +6820,8 @@ export default function GestionMantenimientoPage() {
 
                             {/* Planta */}
                             <td className="py-3 px-2 text-center whitespace-nowrap">
-                              <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] inline-block">
-                                {row.planta || row['Planta'] || '—'}
+                              <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold font-mono bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] inline-block">
+                                {obtenerCodigoPlanta(row.planta || row['Planta'], plantasNomenclatura)}
                               </span>
                             </td>
 
@@ -7670,8 +7670,8 @@ export default function GestionMantenimientoPage() {
 
                             {/* Planta / Proceso */}
                             <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">
-                                {m.planta || 'No asignada'}
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-md text-xs font-bold font-mono border border-gray-200">
+                                {obtenerCodigoPlanta(m.planta, plantasNomenclatura)}
                               </span>
                               {m.proceso && (
                                 <div className="text-[11px] text-gray-400 mt-0.5">{m.proceso}</div>
