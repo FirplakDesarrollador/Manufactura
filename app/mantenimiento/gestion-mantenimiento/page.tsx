@@ -3943,9 +3943,13 @@ export default function GestionMantenimientoPage() {
       }
 
       if (preventivoPlanta !== 'Todas') {
-        const tPlantas = task.plantas || parseTechPlantas(task.planta, plantasNomenclatura);
+        const tPlantas = (task.plantas && task.plantas.length > 0)
+          ? task.plantas
+          : parseTechPlantas(task.planta, plantasNomenclatura);
         const selCode = obtenerCodigoPlanta(preventivoPlanta, plantasNomenclatura);
-        const matchesSel = tPlantas.includes(selCode) || tPlantas.includes(preventivoPlanta) || normalize(task.planta).includes(normalize(preventivoPlanta));
+        const taskPlantCodes = tPlantas.map(tp => obtenerCodigoPlanta(tp, plantasNomenclatura));
+        const singlePlantCode = obtenerCodigoPlanta(task.planta, plantasNomenclatura);
+        const matchesSel = taskPlantCodes.includes(selCode) || singlePlantCode === selCode;
         if (!matchesSel) {
           return false;
         }
@@ -5753,8 +5757,9 @@ export default function GestionMantenimientoPage() {
                     onChange={(e) => setPreventivoPlanta(e.target.value)}
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
                   >
-                    {plantOptions.map(p => (
-                      <option key={p} value={p}>Planta: {p}</option>
+                    <option value="Todas">Planta: Todas</option>
+                    {plantOptions.filter(p => p !== 'Todas').map(p => (
+                      <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
                 </div>
