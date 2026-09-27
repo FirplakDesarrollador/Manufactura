@@ -1852,7 +1852,7 @@ export default function GestionMantenimientoPage() {
         id: t.id,
         name: t.nombre,
         capacity: parseFloat(t.capacidad_horas) || systemSettings.baseCapacity || DAILY_CAPACITY_LIMIT,
-        turno: t.activo === false ? 'INACTIVO' : (t.turno || 'General'),
+        turno: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'),
         documento: t.documento || '',
         planta: pStr,
         plantas: pList,
@@ -2551,14 +2551,23 @@ export default function GestionMantenimientoPage() {
     const pStr = pList.join(', ');
 
     try {
-      const { data, error } = await supabase.from('mantenimiento_tecnicos').insert([{
+      const payload: any = {
         nombre: name,
         documento: newTechForm.documento.trim() || undefined,
+        modalidad_operativa: newTechForm.turno,
         turno: newTechForm.turno,
         especialidad: pStr,
         capacidad_horas: parseFloat(newTechForm.capacity) || systemSettings.baseCapacity,
         activo: !isInactive
-      }]).select().single();
+      };
+
+      let { data, error } = await supabase.from('mantenimiento_tecnicos').insert([payload]).select().single();
+      if (error && error.message.includes('modalidad_operativa')) {
+        delete payload.modalidad_operativa;
+        const fallbackRes = await supabase.from('mantenimiento_tecnicos').insert([payload]).select().single();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
 
       if (error) {
         console.error('Error guardando técnico en Supabase:', error);
@@ -3527,14 +3536,22 @@ export default function GestionMantenimientoPage() {
     setShowEditTechModal(false);
 
     try {
-      const { data, error } = await supabase.from('mantenimiento_tecnicos').update({
+      const updatePayload: any = {
         nombre: updatedTech.name,
         documento: updatedTech.documento,
+        modalidad_operativa: updatedTech.turno,
         turno: updatedTech.turno,
         especialidad: plantasStr,
         capacidad_horas: updatedTech.capacity,
         activo: !isInactive
-      }).eq('id', editingTech.id).select();
+      };
+
+      let { error } = await supabase.from('mantenimiento_tecnicos').update(updatePayload).eq('id', editingTech.id);
+      if (error && error.message.includes('modalidad_operativa')) {
+        delete updatePayload.modalidad_operativa;
+        const fallbackRes = await supabase.from('mantenimiento_tecnicos').update(updatePayload).eq('id', editingTech.id);
+        error = fallbackRes.error;
+      }
 
       if (error) {
         console.error('Error actualizando técnico en Supabase:', error);
