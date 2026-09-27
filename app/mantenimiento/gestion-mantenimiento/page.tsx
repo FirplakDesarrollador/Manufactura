@@ -73,6 +73,7 @@ import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosC
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
+import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
 import * as XLSX from 'xlsx';
 import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
 import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
@@ -7131,12 +7132,17 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* ========================================================================= */}
-            {/* SECCIÓN 2: TIPO DE INTERVENCIÓN */}
+            {/* SECCIÓN 2: HORARIOS Y TURNOS DE MANTENIMIENTO */}
+            {/* ========================================================================= */}
+            <MatrizHorariosTurnos technicians={technicians} />
+
+            {/* ========================================================================= */}
+            {/* SECCIÓN 3: TIPO DE INTERVENCIÓN */}
             {/* ========================================================================= */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#e2ded5] shadow-xs flex flex-col gap-5">
               <div className="border-b border-[#e2ded5] pb-4">
                 <h3 className="text-lg font-bold text-[#324354] flex items-center gap-2">
-                  <span className="w-7 h-7 rounded-xl bg-[#324354] text-white flex items-center justify-center text-xs font-black">2</span>
+                  <span className="w-7 h-7 rounded-xl bg-[#324354] text-white flex items-center justify-center text-xs font-black">3</span>
                   <Wrench className="w-5 h-5 text-[#7B8E90]" />
                   <span>Tipo de Intervención</span>
                 </h3>
