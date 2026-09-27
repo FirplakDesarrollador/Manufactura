@@ -316,8 +316,9 @@ export default function GestionMantenimientoPage() {
   const [historyEstado, setHistoryEstado] = useState('Todos');
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
+  const [historyMaquina, setHistoryMaquina] = useState('Todas');
   const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
-  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
+  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'plazo' | 'apertura' | 'cierre';
   const [historySortField, setHistorySortField] = useState<HistorySortField>('apertura');
   const [historySortAsc, setHistorySortAsc] = useState<boolean>(false);
 
@@ -4001,6 +4002,15 @@ export default function GestionMantenimientoPage() {
         if (historyTipo !== category) return false;
       }
 
+      // Global Machine Filter
+      if (historyMaquina !== 'Todas') {
+        const resolvedMaq = resolveHistoryRowMachine(row, maquinasCatalogo);
+        const rMaqName = (resolvedMaq.name || row.maquina || '').toLowerCase();
+        const rMaqCode = (resolvedMaq.code || '').toLowerCase();
+        const filterMaq = historyMaquina.toLowerCase();
+        if (!rMaqName.includes(filterMaq) && !rMaqCode.includes(filterMaq)) return false;
+      }
+
       // Global status / tech filters
       if (historyEstado !== 'Todos') {
         if ((row['ESTADO'] || 'Pendiente') !== historyEstado) return false;
@@ -4046,6 +4056,15 @@ export default function GestionMantenimientoPage() {
           valA = (a['ESTADO'] || 'Pendiente').toLowerCase();
           valB = (b['ESTADO'] || 'Pendiente').toLowerCase();
           break;
+        case 'plazo': {
+          const rawA = a.fecha_limite || a.fecha_plazo || a.fecha_programada || a.fecha_compromiso || a.plazo || '';
+          const rawB = b.fecha_limite || b.fecha_plazo || b.fecha_programada || b.fecha_compromiso || b.plazo || '';
+          const tA = rawA ? new Date(rawA).getTime() : 0;
+          const tB = rawB ? new Date(rawB).getTime() : 0;
+          valA = isNaN(tA) ? 0 : tA;
+          valB = isNaN(tB) ? 0 : tB;
+          break;
+        }
         case 'apertura': {
           const rawA = a['FECHA DE APERTURA'] || a['fecha_reporte'] || a.created_at || '';
           const rawB = b['FECHA DE APERTURA'] || b['fecha_reporte'] || b.created_at || '';
@@ -4064,10 +4083,6 @@ export default function GestionMantenimientoPage() {
           valB = isNaN(tB) ? 0 : tB;
           break;
         }
-        case 'observaciones':
-          valA = (a['COMENTARIO DE EJECUCION'] || '').toLowerCase();
-          valB = (b['COMENTARIO DE EJECUCION'] || '').toLowerCase();
-          break;
         default:
           valA = a.id || 0;
           valB = b.id || 0;
@@ -4077,7 +4092,7 @@ export default function GestionMantenimientoPage() {
       if (valA > valB) return historySortAsc ? 1 : -1;
       return 0;
     });
-  }, [historyRows, historySearch, historyTipo, historyEstado, historyTecnico, historySortField, historySortAsc, maquinasCatalogo]);
+  }, [historyRows, historySearch, historyTipo, historyMaquina, historyEstado, historyTecnico, historySortField, historySortAsc, maquinasCatalogo]);
 
   // Correctivo Filtered Records
   const filteredCorrectivos = useMemo(() => {
@@ -6173,7 +6188,7 @@ export default function GestionMantenimientoPage() {
                     title="Reportar y generar nueva orden de mantenimiento correctivo"
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>+ Correctivo</span>
+                    <span>Correctivo</span>
                   </button>
 
                   {/* + TPM Button */}
@@ -6184,7 +6199,7 @@ export default function GestionMantenimientoPage() {
                     title="Crear nueva tarjeta TPM / Mantenimiento Autónomo"
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>+ TPM</span>
+                    <span>TPM</span>
                   </button>
 
                   {/* Exportar Excel */}
@@ -6203,6 +6218,7 @@ export default function GestionMantenimientoPage() {
                       setHistoryTipo('Todos');
                       setHistoryEstado('Todos');
                       setHistoryTecnico('Todos');
+                      setHistoryMaquina('Todas');
                       setHistorySortField('apertura');
                       setHistorySortAsc(false);
                     }}
@@ -6216,7 +6232,7 @@ export default function GestionMantenimientoPage() {
               {/* Enhanced Wider Search & Filter Bar */}
               <div className="flex flex-col md:flex-row items-center gap-3 w-full">
                 {/* Wider Search Input */}
-                <div className="flex-[2.5] min-w-[280px] w-full relative">
+                <div className="flex-[2.5] min-w-[260px] w-full relative">
                   <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
@@ -6228,7 +6244,7 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* Origen / Tipo */}
-                <div className="flex-1 min-w-[150px] w-full">
+                <div className="flex-1 min-w-[130px] w-full">
                   <select
                     value={historyTipo}
                     onChange={(e) => setHistoryTipo(e.target.value)}
@@ -6242,7 +6258,7 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* Estado */}
-                <div className="flex-1 min-w-[150px] w-full">
+                <div className="flex-1 min-w-[130px] w-full">
                   <select
                     value={historyEstado}
                     onChange={(e) => setHistoryEstado(e.target.value)}
@@ -6256,7 +6272,7 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* Técnico */}
-                <div className="flex-1 min-w-[160px] w-full">
+                <div className="flex-1 min-w-[150px] w-full">
                   <select
                     value={historyTecnico}
                     onChange={(e) => setHistoryTecnico(e.target.value)}
@@ -6268,6 +6284,25 @@ export default function GestionMantenimientoPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* Máquina Dropdown Filter */}
+                <div className="flex-1 min-w-[160px] w-full">
+                  <select
+                    value={historyMaquina}
+                    onChange={(e) => setHistoryMaquina(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
+                  >
+                    <option value="Todas">Máquina: Todas</option>
+                    {maquinasCatalogo.map((m, idx) => {
+                      const mName = m.name || m.nombre || `Máquina ${m.code || idx}`;
+                      return (
+                        <option key={m.id || m.code || idx} value={mName}>
+                          {m.code ? `[${m.code}] ${mName}` : mName}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -6277,10 +6312,15 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full text-left text-xs border-collapse table-fixed">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
+                      {/* Foto Miniatura */}
+                      <th className="py-3 px-2 font-bold text-center w-[5%] select-none">
+                        <span>Foto</span>
+                      </th>
+
                       {/* Número OT */}
                       <th
                         onClick={() => handleHistorySort('codigo')}
-                        className="py-3 px-2 font-bold text-center w-[12%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold text-center w-[11%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Número OT"
                       >
                         <div className="flex items-center justify-center gap-1">
@@ -6293,14 +6333,30 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Título de Mantenimiento */}
+                      {/* Origen (TPM, Correctivo, Preventivo) */}
+                      <th 
+                        onClick={() => handleHistorySort('tipo')}
+                        className="py-3 px-2 font-bold text-center w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Origen"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Origen</span>
+                          {historySortField === 'tipo' ? (
+                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
+                          )}
+                        </div>
+                      </th>
+
+                      {/* Descripción (Antes Título de Mantenimiento) */}
                       <th 
                         onClick={() => handleHistorySort('titulo')}
-                        className="py-3 px-3 font-bold w-[18%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Título"
+                        className="py-3 px-3 font-bold w-[20%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Descripción"
                       >
                         <div className="flex items-center gap-1.5">
-                          <span>Título de Mantenimiento</span>
+                          <span>Descripción</span>
                           {historySortField === 'titulo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
@@ -6328,7 +6384,7 @@ export default function GestionMantenimientoPage() {
                       {/* Técnico Responsable */}
                       <th 
                         onClick={() => handleHistorySort('tecnico')}
-                        className="py-3 px-3 font-bold w-[15%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[14%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Técnico"
                       >
                         <div className="flex items-center gap-1.5">
@@ -6341,15 +6397,15 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Origen (TPM, Correctivo, Preventivo) */}
+                      {/* Estado */}
                       <th 
-                        onClick={() => handleHistorySort('tipo')}
-                        className="py-3 px-2 font-bold text-center w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Origen"
+                        onClick={() => handleHistorySort('estado')}
+                        className="py-3 px-2 font-bold text-center w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Estado"
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>Origen</span>
-                          {historySortField === 'tipo' ? (
+                          <span>Estado</span>
+                          {historySortField === 'estado' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
@@ -6357,15 +6413,15 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Estado */}
+                      {/* Plazo */}
                       <th 
-                        onClick={() => handleHistorySort('estado')}
-                        className="py-3 px-2 font-bold text-center w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Estado"
+                        onClick={() => handleHistorySort('plazo')}
+                        className="py-3 px-2 font-bold w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Plazo"
                       >
-                        <div className="flex items-center justify-center gap-1">
-                          <span>Estado</span>
-                          {historySortField === 'estado' ? (
+                        <div className="flex items-center gap-1">
+                          <span>Plazo</span>
+                          {historySortField === 'plazo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
@@ -6404,29 +6460,13 @@ export default function GestionMantenimientoPage() {
                           )}
                         </div>
                       </th>
-
-                      {/* Observaciones */}
-                      <th 
-                        onClick={() => handleHistorySort('observaciones')}
-                        className="py-3 px-3 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Observaciones"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span>Observaciones</span>
-                          {historySortField === 'observaciones' ? (
-                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
-                          ) : (
-                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
-                          )}
-                        </div>
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredHistoryRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-gray-400">
-                          {historyLoading ? 'Cargando registros históricos...' : 'No se encontraron registros en el historial con los filtros aplicados.'}
+                        <td colSpan={10} className="py-12 text-center text-gray-400">
+                          {historyLoading ? 'Cargando registros...' : 'No se encontraron órdenes de trabajo con los filtros aplicados.'}
                         </td>
                       </tr>
                     ) : (
@@ -6440,6 +6480,22 @@ export default function GestionMantenimientoPage() {
                         const isCorrectivo = category === 'Correctivo';
                         const codigoDisplay = getHistoryRecordCode(row, idx);
 
+                        let photoUrl: string | null = null;
+                        if (Array.isArray(row.fotos) && row.fotos.length > 0 && typeof row.fotos[0] === 'string' && row.fotos[0].trim()) {
+                          photoUrl = row.fotos[0];
+                        } else if (typeof row.fotos === 'string' && row.fotos.trim().startsWith('http')) {
+                          photoUrl = row.fotos;
+                        } else if (row.foto_url && typeof row.foto_url === 'string' && row.foto_url.trim()) {
+                          photoUrl = row.foto_url;
+                        } else if (row.foto && typeof row.foto === 'string' && row.foto.trim()) {
+                          photoUrl = row.foto;
+                        }
+
+                        const techName = row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || 'Sin asignar';
+                        const isUnassignedTech = !techName || techName.toLowerCase().includes('sin asignar') || techName.toLowerCase().includes('por asignar');
+
+                        const rawPlazo = row.fecha_limite || row.fecha_plazo || row.fecha_programada || row.fecha_compromiso || row.plazo || null;
+
                         return (
                           <tr 
                             key={row.id || idx} 
@@ -6447,6 +6503,21 @@ export default function GestionMantenimientoPage() {
                             className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
                             title="Haz clic para ver la información completa de esta orden de trabajo"
                           >
+                            {/* Mini Foto Thumbnail */}
+                            <td className="py-2.5 px-2 text-center">
+                              {photoUrl ? (
+                                <img
+                                  src={photoUrl}
+                                  alt="Foto OT"
+                                  className="w-8 h-8 rounded-full object-cover border border-[#e2ded5] shadow-2xs mx-auto"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-[#F6F3EE] flex items-center justify-center text-[#7B8E90] border border-[#e2ded5] mx-auto text-[10px]" title="Sin foto">
+                                  <Camera className="w-4 h-4 text-[#7B8E90]" />
+                                </div>
+                              )}
+                            </td>
+
                             {/* Número OT Badge */}
                             <td className="py-3 px-2 text-center font-bold">
                               <span className={`px-2 py-1 rounded-lg font-mono text-[10.5px] border inline-block whitespace-nowrap shadow-2xs ${
@@ -6457,8 +6528,29 @@ export default function GestionMantenimientoPage() {
                               </span>
                             </td>
 
+                            {/* Origen Badge */}
+                            <td className="py-3 px-2 text-center whitespace-nowrap">
+                              {isTpm ? (
+                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                                  TPM
+                                </span>
+                              ) : isCorrectivo ? (
+                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  Correctivo
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                  Preventivo
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Descripción */}
                             <td className="py-3 px-3 font-bold text-[#324354] break-words">
-                              {row['Título'] || 'Mantenimiento General'}
+                              {row['Título'] || row.sintoma || 'Mantenimiento General'}
                             </td>
 
                             {/* Máquinas / Equipos */}
@@ -6480,30 +6572,21 @@ export default function GestionMantenimientoPage() {
                               })()}
                             </td>
 
-                            <td className="py-3 px-3 font-semibold text-[#324354] break-words">
-                              👤 {row['TECNICO'] || 'Sin asignar'}
-                            </td>
-                            
-                            {/* Origen Badge */}
-                            <td className="py-3 px-2 text-center whitespace-nowrap">
-                              {isTpm ? (
-                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
-                                  TPM
-                                </span>
-                              ) : isCorrectivo ? (
-                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                  Correctivo
+                            {/* Técnico Responsable (Alert Red Badge if Unassigned) */}
+                            <td className="py-3 px-3">
+                              {isUnassignedTech ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10.5px] font-bold inline-flex items-center gap-1.5 bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs">
+                                  <AlertTriangle className="w-3 h-3 text-rose-600 animate-pulse" />
+                                  Sin asignar
                                 </span>
                               ) : (
-                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-bold inline-flex items-center gap-1 bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-                                  Preventivo
+                                <span className="font-semibold text-xs text-[#324354] break-words">
+                                  👤 {techName}
                                 </span>
                               )}
                             </td>
 
+                            {/* Estado */}
                             <td className="py-3 px-2 text-center">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-block ${
                                 isComplete ? 'bg-emerald-100 text-emerald-800' :
@@ -6512,20 +6595,20 @@ export default function GestionMantenimientoPage() {
                                 {isComplete ? '✅ ' : isIncomplete ? '⚠️ ' : '⏳ '}{estado}
                               </span>
                             </td>
+
+                            {/* Plazo */}
+                            <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
+                              {rawPlazo ? formatFechaDDMMAAAA(rawPlazo) : '—'}
+                            </td>
+
+                            {/* Fecha Apertura */}
                             <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
                               {formatFechaDDMMAAAA(row['FECHA DE APERTURA'] || row.fecha_apertura)}
                             </td>
+
+                            {/* Fecha Cierre */}
                             <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
                               {formatFechaDDMMAAAA(row['FECHA DE CIERRE'] || row.fecha_cierre)}
-                            </td>
-                            <td className="py-3 px-3 text-gray-700">
-                              {row['COMENTARIO DE EJECUCION'] ? (
-                                <div className="bg-slate-50 p-2 rounded-xl border border-gray-200 text-xs max-h-24 overflow-y-auto break-words" title={row['COMENTARIO DE EJECUCION']}>
-                                  {row['COMENTARIO DE EJECUCION']}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic text-[11px]">Sin observaciones</span>
-                              )}
                             </td>
                           </tr>
                         );
