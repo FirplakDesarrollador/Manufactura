@@ -64,3 +64,16 @@ export const getNextConsecutiveCode = async (prefix: 'PREV' | 'CORR' | 'TPM'): P
     return `${prefix}-1`;
   }
 };
+
+/**
+ * Valida si un código cumple estrictamente la regla de consecutivo:
+ * PREV-N, CORR-N, TPM-N (donde N es un entero de 1 a 6 dígitos max).
+ */
+export const isCleanConsecutiveCode = (code?: string | null): boolean => {
+  if (!code) return false;
+  const clean = String(code).trim();
+  const match = clean.match(/^(PREV|CORR|TPM)-\d+$/);
+  if (!match) return false;
+  const numPart = clean.split('-')[1];
+  return numPart.length <= 6;
+};

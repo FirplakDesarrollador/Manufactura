@@ -74,7 +74,7 @@ import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEdi
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import * as XLSX from 'xlsx';
-import { getNextConsecutiveCode } from '@/lib/consecutivos';
+import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
 import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
@@ -1131,7 +1131,8 @@ export default function GestionMantenimientoPage() {
       // B. Populate / Merge from tarjetas_falla_anomalia
       if (tarjetasData && tarjetasData.length > 0) {
         tarjetasData.forEach((d: any, idx: number) => {
-          const cod = d.codigo || d.codigo_tarjeta || `TPM-${d.id || idx + 1}`;
+          const cod = d.codigo_tarjeta || d.codigo || `TPM-${idx + 1}`;
+          if (!isCleanConsecutiveCode(cod)) return;
           const existing = historyMap.get(cod);
 
           const rawEstado = (d.estado || '').toLowerCase();
@@ -1172,8 +1173,8 @@ export default function GestionMantenimientoPage() {
             const parsed = JSON.parse(localSaved);
             if (Array.isArray(parsed)) {
               parsed.forEach((item: any, idx: number) => {
-                const cod = item.codigo || `TPM-${item.id || idx + 1}`;
-                if (!historyMap.has(cod)) {
+                const cod = item.codigo || item.codigo_tarjeta;
+                if (cod && isCleanConsecutiveCode(cod) && !historyMap.has(cod)) {
                   const rawTitle = item.sintoma || item.descripcion_que || item.titulo || 'Anomalía local';
                   historyMap.set(cod, {
                     id: item.id || idx + 9000,
@@ -1355,7 +1356,7 @@ export default function GestionMantenimientoPage() {
             const parsed = JSON.parse(localSaved);
             if (Array.isArray(parsed)) {
               parsed.forEach((t: any) => {
-                if (t && t.codigo) {
+                if (t && t.codigo && isCleanConsecutiveCode(t.codigo)) {
                   if (!recordsMap.has(t.codigo)) {
                     recordsMap.set(t.codigo, {
                       id: t.id || Date.now(),
