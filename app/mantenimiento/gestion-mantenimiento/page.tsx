@@ -1749,12 +1749,21 @@ export default function GestionMantenimientoPage() {
       let hasMoreMaq = true;
 
       while (hasMoreMaq) {
-        let mRes = await supabase.from('mantenimiento_maquinas_equipos').select('*').range(fromMaq, fromMaq + stepMaq - 1).order('nombre_equipo', { ascending: true });
-        if (mRes.error) mRes = await supabase.from('maquinas_equipos').select('*').range(fromMaq, fromMaq + stepMaq - 1).order('nombre_equipo', { ascending: true });
-        const mData = mRes.data;
+        let mRes = await supabase
+          .from('mantenimiento_maquinas_equipos')
           .select('*')
           .range(fromMaq, fromMaq + stepMaq - 1)
           .order('nombre_equipo', { ascending: true });
+
+        if (mRes.error) {
+          mRes = await supabase
+            .from('maquinas_equipos')
+            .select('*')
+            .range(fromMaq, fromMaq + stepMaq - 1)
+            .order('nombre_equipo', { ascending: true });
+        }
+
+        const mData = mRes.data;
 
         if (mData && mData.length > 0) {
           allMaquinas = allMaquinas.concat(mData);
