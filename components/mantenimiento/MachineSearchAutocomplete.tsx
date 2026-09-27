@@ -8,6 +8,9 @@ export interface MachineItem {
   nombre_equipo: string;
   codigo_equipo?: string;
   planta?: string;
+  normName?: string;
+  normCode?: string;
+  normPlant?: string;
 }
 
 interface MachineSearchAutocompleteProps {
@@ -84,7 +87,7 @@ export default function MachineSearchAutocomplete({
     setInputValue(value || '');
   }, [value]);
 
-  // Consolidate all machine options (Supabase DB + existing cards + defaults)
+  // Consolidate and pre-normalize all machine options once per catalog update
   const allMachineOptions = useMemo(() => {
     const list: MachineItem[] = [];
     const seen = new Set<string>();
@@ -92,14 +95,21 @@ export default function MachineSearchAutocomplete({
     const addMachine = (nombre?: string, codigo?: string, planta?: string, id?: any) => {
       if (!nombre || !nombre.trim()) return;
       const cleanName = nombre.trim();
-      const normKey = normalizeStr(cleanName);
-      if (seen.has(normKey)) return;
-      seen.add(normKey);
+      const normName = normalizeStr(cleanName);
+      if (seen.has(normName)) return;
+      seen.add(normName);
+
+      const normCode = codigo ? normalizeStr(codigo) : '';
+      const normPlant = planta ? normalizeStr(planta) : '';
+
       list.push({
         id,
         nombre_equipo: cleanName,
         codigo_equipo: codigo?.trim() || undefined,
-        planta: planta?.trim() || undefined
+        planta: planta?.trim() || undefined,
+        normName,
+        normCode,
+        normPlant
       });
     };
 
@@ -125,17 +135,24 @@ export default function MachineSearchAutocomplete({
     return list;
   }, [maquinasCatalogo, existingTarjetas]);
 
-  // Filter options based on user input
+  // Ultra-fast filtering capped at max 50 items for instant 60fps rendering
   const filteredOptions = useMemo(() => {
     const query = normalizeStr(inputValue);
-    if (!query) return allMachineOptions;
+    if (!query) return allMachineOptions.slice(0, 50);
 
-    return allMachineOptions.filter(m => {
-      const nameMatch = normalizeStr(m.nombre_equipo).includes(query);
-      const codeMatch = m.codigo_equipo ? normalizeStr(m.codigo_equipo).includes(query) : false;
-      const plantMatch = m.planta ? normalizeStr(m.planta).includes(query) : false;
-      return nameMatch || codeMatch || plantMatch;
-    });
+    const matches: MachineItem[] = [];
+    for (let i = 0; i < allMachineOptions.length; i++) {
+      const item = allMachineOptions[i];
+      if (
+        (item.normName && item.normName.includes(query)) ||
+        (item.normCode && item.normCode.includes(query)) ||
+        (item.normPlant && item.normPlant.includes(query))
+      ) {
+        matches.push(item);
+        if (matches.length >= 50) break;
+      }
+    }
+    return matches;
   }, [inputValue, allMachineOptions]);
 
   // Close dropdown when clicking outside
@@ -155,11 +172,8 @@ export default function MachineSearchAutocomplete({
     setInputValue(val);
     setIsOpen(true);
 
-    // Find direct match if any
-    const matched = allMachineOptions.find(
-      m => normalizeStr(m.nombre_equipo) === normalizeStr(val)
-    );
-
+    const normVal = normalizeStr(val);
+    const matched = allMachineOptions.find(m => m.normName === normVal);
     onChange(val, matched?.planta);
   };
 
@@ -213,7 +227,7 @@ export default function MachineSearchAutocomplete({
         <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-64 overflow-y-auto scrollbar-thin divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-150">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((item, idx) => {
-              const isSelected = normalizeStr(item.nombre_equipo) === normalizeStr(inputValue);
+              const isSelected = item.normName === normalizeStr(inputValue);
               return (
                 <div
                   key={item.id || `${item.nombre_equipo}-${idx}`}
