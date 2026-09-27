@@ -6297,14 +6297,14 @@ export default function GestionMantenimientoPage() {
                         <span>Foto</span>
                       </th>
 
-                      {/* Número OT */}
+                      {/* Orden de Trabajo */}
                       <th
                         onClick={() => handleHistorySort('codigo')}
                         className="py-3 px-2 font-bold text-center w-[11%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Número OT"
+                        title="Clic para ordenar por Orden de Trabajo"
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>Número OT</span>
+                          <span>Orden de Trabajo</span>
                           {historySortField === 'codigo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
