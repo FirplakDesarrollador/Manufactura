@@ -316,7 +316,6 @@ export default function GestionMantenimientoPage() {
   const [historyEstado, setHistoryEstado] = useState('Todos');
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
-  const [historyMaquina, setHistoryMaquina] = useState('Todas');
   const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
   type HistorySortField = 'id' | 'codigo' | 'titulo' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'plazo' | 'apertura' | 'cierre';
   const [historySortField, setHistorySortField] = useState<HistorySortField>('apertura');
@@ -4092,7 +4091,7 @@ export default function GestionMantenimientoPage() {
       if (valA > valB) return historySortAsc ? 1 : -1;
       return 0;
     });
-  }, [historyRows, historySearch, historyTipo, historyMaquina, historyEstado, historyTecnico, historySortField, historySortAsc, maquinasCatalogo]);
+  }, [historyRows, historySearch, historyTipo, historyEstado, historyTecnico, historySortField, historySortAsc, maquinasCatalogo]);
 
   // Correctivo Filtered Records
   const filteredCorrectivos = useMemo(() => {
@@ -4345,6 +4344,16 @@ export default function GestionMantenimientoPage() {
       fotos: []
     });
     setShowCorrectivoModal(true);
+  };
+
+  // Helper to strip brackets [...] from Description cell
+  const cleanDescriptionText = (raw?: string | null): string => {
+    if (!raw) return 'Mantenimiento General';
+    let cleaned = String(raw).replace(/\[[^\]]*\]/g, '').trim();
+    if (!cleaned) {
+      cleaned = String(raw).replace(/[\[\]]/g, '').trim() || 'Mantenimiento General';
+    }
+    return cleaned;
   };
 
   // Excel Export for Historial
@@ -6218,7 +6227,6 @@ export default function GestionMantenimientoPage() {
                       setHistoryTipo('Todos');
                       setHistoryEstado('Todos');
                       setHistoryTecnico('Todos');
-                      setHistoryMaquina('Todas');
                       setHistorySortField('apertura');
                       setHistorySortAsc(false);
                     }}
@@ -6282,25 +6290,6 @@ export default function GestionMantenimientoPage() {
                     {technicians.map(t => (
                       <option key={t.id} value={t.name}>{t.name}</option>
                     ))}
-                  </select>
-                </div>
-
-                {/* Máquina Dropdown Filter */}
-                <div className="flex-1 min-w-[160px] w-full">
-                  <select
-                    value={historyMaquina}
-                    onChange={(e) => setHistoryMaquina(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
-                  >
-                    <option value="Todas">Máquina: Todas</option>
-                    {maquinasCatalogo.map((m, idx) => {
-                      const mName = m.name || m.nombre || `Máquina ${m.code || idx}`;
-                      return (
-                        <option key={m.id || m.code || idx} value={mName}>
-                          {m.code ? `[${m.code}] ${mName}` : mName}
-                        </option>
-                      );
-                    })}
                   </select>
                 </div>
               </div>
@@ -6548,9 +6537,9 @@ export default function GestionMantenimientoPage() {
                               )}
                             </td>
 
-                            {/* Descripción */}
+                            {/* Descripción sin corchetes [...] */}
                             <td className="py-3 px-3 font-bold text-[#324354] break-words">
-                              {row['Título'] || row.sintoma || 'Mantenimiento General'}
+                              {cleanDescriptionText(row['Título'] || row.sintoma || row.titulo)}
                             </td>
 
                             {/* Máquinas / Equipos */}
