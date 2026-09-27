@@ -76,7 +76,7 @@ import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
 import * as XLSX from 'xlsx';
 import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
-import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
   id: number | string;
@@ -3916,14 +3916,8 @@ export default function GestionMantenimientoPage() {
 
   // Preventivo (PMP) Memoized Calculations & Filtered Data
   const plantOptions = useMemo(() => {
-    const set = new Set<string>();
-    plantasNomenclatura.filter(p => p.activo !== false).forEach(p => {
-      set.add(p.codigo);
-      set.add(p.nombre_oficial);
-    });
-    tasks.forEach(t => { if (t.planta && t.planta.trim() !== '' && t.planta !== 'Todas') set.add(t.planta); });
-    return ['Todas', ...Array.from(set)];
-  }, [tasks, plantasNomenclatura]);
+    return ['Todas', ...obtenerCodigosOficialesPlantas(plantasNomenclatura)];
+  }, [plantasNomenclatura]);
 
   const frecuenciaOptions = useMemo(() => {
     const set = new Set<number>();
@@ -4181,15 +4175,8 @@ export default function GestionMantenimientoPage() {
 
   // Máquinas y Equipos Memoized Filtered & Sorted Records
   const uniqueMaquinasPlantas = useMemo(() => {
-    const set = new Set<string>();
-    plantasNomenclatura.filter(p => p.activo !== false).forEach(p => {
-      set.add(p.nombre_oficial);
-    });
-    maquinasCatalogo.forEach(m => {
-      if (m.planta && m.planta.trim() !== '') set.add(m.planta.trim());
-    });
-    return Array.from(set).sort();
-  }, [maquinasCatalogo, plantasNomenclatura]);
+    return obtenerCodigosOficialesPlantas(plantasNomenclatura);
+  }, [plantasNomenclatura]);
 
   // Pre-indexed PMP counts per machine (O(1) Instant Lookup - Eliminates all search lag)
   const machinePmpCountsMap = useMemo(() => {
@@ -4262,8 +4249,11 @@ export default function GestionMantenimientoPage() {
         }
       }
 
-      if (maquinasPlanta !== 'Todas' && m.planta !== maquinasPlanta) {
-        return false;
+      if (maquinasPlanta !== 'Todas') {
+        const mPlantaCode = obtenerCodigoPlanta(m.planta, plantasNomenclatura);
+        if (mPlantaCode !== maquinasPlanta) {
+          return false;
+        }
       }
 
       if (maquinasCriticidad !== 'Todas' && m.criticidad !== maquinasCriticidad) {
