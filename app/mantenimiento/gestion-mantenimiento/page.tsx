@@ -1749,8 +1749,9 @@ export default function GestionMantenimientoPage() {
       let hasMoreMaq = true;
 
       while (hasMoreMaq) {
-        const { data: mData } = await supabase
-          .from('maquinas_equipos')
+        let mRes = await supabase.from('mantenimiento_maquinas_equipos').select('*').range(fromMaq, fromMaq + stepMaq - 1).order('nombre_equipo', { ascending: true });
+        if (mRes.error) mRes = await supabase.from('maquinas_equipos').select('*').range(fromMaq, fromMaq + stepMaq - 1).order('nombre_equipo', { ascending: true });
+        const mData = mRes.data;
           .select('*')
           .range(fromMaq, fromMaq + stepMaq - 1)
           .order('nombre_equipo', { ascending: true });
@@ -3745,7 +3746,7 @@ export default function GestionMantenimientoPage() {
 
       if (machineFormMode === 'create') {
         const { data, error } = await supabase
-          .from('maquinas_equipos')
+          .from('mantenimiento_maquinas_equipos')
           .insert(payload)
           .select()
           .single();
@@ -3758,7 +3759,7 @@ export default function GestionMantenimientoPage() {
         }
       } else if (machineFormMode === 'edit' && editingMachineId) {
         const { data, error } = await supabase
-          .from('maquinas_equipos')
+          .from('mantenimiento_maquinas_equipos')
           .update(payload)
           .eq('id', editingMachineId)
           .select()
@@ -3801,7 +3802,7 @@ export default function GestionMantenimientoPage() {
     setDeletingMachine(true);
     try {
       const { error } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .delete()
         .eq('id', id);
 

@@ -121,7 +121,7 @@ export default function MantenimientoAutonomoPage() {
     try {
       // 1. Fetch machines
       const { data: machData, error: machErr } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .select('id, nombre_equipo, nombre_alterno, planta, proceso, codigo_equipo')
         .order('nombre_equipo', { ascending: true });
 

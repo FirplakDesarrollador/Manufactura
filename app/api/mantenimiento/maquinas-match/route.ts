@@ -29,7 +29,7 @@ export async function GET() {
 
     while (hasMore) {
       const { data, error } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .select('*')
         .range(from, from + step - 1)
         .order('id', { ascending: true });

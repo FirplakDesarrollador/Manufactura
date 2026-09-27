@@ -170,7 +170,7 @@ export default function TarjetasTpmTab({
   const fetchMaquinas = async () => {
     try {
       const { data } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .select('*')
         .order('nombre_equipo', { ascending: true });
       if (data && data.length > 0) {
