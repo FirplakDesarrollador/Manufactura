@@ -15,11 +15,13 @@ import {
   X,
   AlertCircle,
   Users,
-  LayoutGrid,
-  List,
-  CalendarDays,
-  Sparkles,
-  UserCheck
+  Search,
+  UserCheck,
+  UserX,
+  Shield,
+  Layers,
+  Filter,
+  Eye
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -37,7 +39,7 @@ export interface HorarioAsignacion {
   id?: number;
   tecnico_id?: number | string;
   tecnico_nombre: string;
-  dia_semana: string; // 'DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'
+  dia_semana: string;
   turno_codigo: string;
   fecha?: string;
   semana_codigo?: string;
@@ -48,12 +50,14 @@ export interface TechnicianObj {
   name: string;
   documento?: string;
   planta?: string;
-  turno?: string;
+  modalidad_operativa?: string; // 'PR', 'NP', 'PRNP', 'INACTIVO'
+  capacidad_horas?: number;
   activo?: boolean;
 }
 
 interface Props {
-  technicians?: TechnicianObj[];
+  technicians?: any[];
+  onTechsUpdated?: () => void;
 }
 
 // Clean any double dashes (--), multiple hyphens, or unformatted spaces
@@ -86,7 +90,6 @@ const DIAS_SEMANA = [
   { key: 'SABADO', label: 'SÁBADO', short: 'Sáb' },
 ];
 
-// Reference map from spreadsheet short aliases to initial turnos
 const INITIAL_ALIAS_ASSIGNMENTS: Record<string, Record<string, string>> = {
   'jhan carlos': { LUNES: 'T3', MARTES: 'T3', MIERCOLES: 'T3', JUEVES: 'T3', VIERNES: 'T3', SABADO: 'T2' },
   'carlos giraldo': { LUNES: 'T4', MARTES: 'T4', MIERCOLES: 'T4', JUEVES: 'T4', VIERNES: 'T4', SABADO: 'T4' },
@@ -103,7 +106,6 @@ const INITIAL_ALIAS_ASSIGNMENTS: Record<string, Record<string, string>> = {
   'jampier josa': { LUNES: 'T6+2', MARTES: 'T6+2', MIERCOLES: 'T6+2', JUEVES: 'T6+2', VIERNES: 'T6+2' },
 };
 
-// Normalized name helper for matching
 const normalizeStr = (text: string = '') =>
   text
     .toLowerCase()
@@ -111,7 +113,7 @@ const normalizeStr = (text: string = '') =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
-export default function MatrizHorariosTurnos({ technicians: propTechnicians }: Props) {
+export default function MatrizHorariosTurnos({ technicians: propTechnicians, onTechsUpdated }: Props) {
   const [dbTechnicians, setDbTechnicians] = useState<TechnicianObj[]>([]);
   const [turnos, setTurnos] = useState<TurnoItem[]>(DEFAULT_TURNOS);
   const [assignments, setAssignments] = useState<Record<string, Record<string, string>>>({});
@@ -119,8 +121,26 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
   const [saving, setSaving] = useState<boolean>(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  // View Mode: 'planner' (Outlook style by hours) vs 'matrix' (compact table)
-  const [viewMode, setViewMode] = useState<'planner' | 'matrix'>('planner');
+  // Search & Filter state for Sidebar
+  const [techSearch, setTechSearch] = useState<string>('');
+  const [modalidadFilter, setModalidadFilter] = useState<'TODOS' | 'PR' | 'NP' | 'PRNP' | 'INACTIVO'>('TODOS');
+
+  // Technician modal (Create / Edit)
+  const [showTechModal, setShowTechModal] = useState<boolean>(false);
+  const [editingTech, setEditingTech] = useState<TechnicianObj | null>(null);
+  const [techFormData, setTechFormData] = useState<{
+    nombre: string;
+    documento: string;
+    modalidad_operativa: string;
+    planta: string;
+    capacidad_horas: string;
+  }>({
+    nombre: '',
+    documento: '',
+    modalidad_operativa: 'PR',
+    planta: 'Mármol Sintético',
+    capacidad_horas: '7.2',
+  });
 
   // Turno creation/editing modal state
   const [showTurnoModal, setShowTurnoModal] = useState<boolean>(false);
@@ -141,7 +161,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
   // Calculate week dates (Sunday to Saturday)
   const weekDaysInfo = useMemo(() => {
     const curr = new Date(currentDate);
-    const first = curr.getDate() - curr.getDay(); // Sunday as first day
+    const first = curr.getDate() - curr.getDay();
     const sunday = new Date(curr.setDate(first));
 
     return DIAS_SEMANA.map((diaObj, index) => {
@@ -156,116 +176,118 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
   }, [currentDate]);
 
   // Load Technicians, Turnos & Horarios from Supabase
-  useEffect(() => {
-    async function loadMasterData() {
-      setLoading(true);
-      try {
-        // 1. Fetch Official Technicians directly from mantenimiento_tecnicos
-        let officialTechs: TechnicianObj[] = [];
-        const { data: techsData, error: techErr } = await supabase
-          .from('mantenimiento_tecnicos')
-          .select('*')
-          .order('id', { ascending: true });
+  const loadMasterData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch Official Technicians directly from mantenimiento_tecnicos
+      let officialTechs: TechnicianObj[] = [];
+      const { data: techsData, error: techErr } = await supabase
+        .from('mantenimiento_tecnicos')
+        .select('*')
+        .order('id', { ascending: true });
 
-        if (!techErr && techsData && techsData.length > 0) {
-          officialTechs = techsData
-            .filter((t: any) => t.id !== 9999 && t.activo !== false)
-            .map((t: any) => ({
+      if (!techErr && techsData && techsData.length > 0) {
+        officialTechs = techsData
+          .filter((t: any) => t.id !== 9999)
+          .map((t: any) => {
+            const rawMod = t.modalidad_operativa || t.turno || 'PR';
+            const isInactive = t.activo === false || rawMod === 'INACTIVO';
+            return {
               id: t.id,
               name: t.nombre_completo || t.nombre || `Técnico #${t.id}`,
               documento: t.documento,
-              planta: t.planta || t.especialidad,
-              turno: t.turno,
-              activo: t.activo !== false,
-            }));
-        } else if (propTechnicians && propTechnicians.length > 0) {
-          officialTechs = propTechnicians.filter(t => t.id !== 9999);
-        }
-
-        setDbTechnicians(officialTechs);
-
-        // 2. Fetch Turnos
-        let activeTurnos = DEFAULT_TURNOS;
-        const { data: dbTurnos, error: turnosErr } = await supabase
-          .from('mantenimiento_turnos')
-          .select('*')
-          .order('codigo', { ascending: true });
-
-        if (!turnosErr && dbTurnos && dbTurnos.length > 0) {
-          // Normalize double dashes
-          activeTurnos = dbTurnos.map((t: any) => ({
-            ...t,
-            horario: cleanHorarioText(t.horario),
+              planta: t.planta || t.especialidad || 'MS',
+              modalidad_operativa: isInactive ? 'INACTIVO' : rawMod,
+              capacidad_horas: parseFloat(t.capacidad_horas) || 7.2,
+              activo: !isInactive,
+            };
+          });
+      } else if (propTechnicians && propTechnicians.length > 0) {
+        officialTechs = propTechnicians
+          .filter(t => t.id !== 9999)
+          .map(t => ({
+            id: t.id,
+            name: t.name || t.nombre,
+            documento: t.documento,
+            planta: t.planta,
+            modalidad_operativa: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'),
+            capacidad_horas: t.capacity || 7.2,
+            activo: t.activo !== false,
           }));
-          setTurnos(activeTurnos);
-        }
-
-        // 3. Fetch Horarios from DB
-        const { data: dbHorarios } = await supabase
-          .from('mantenimiento_horarios')
-          .select('*');
-
-        const loadedAssignments: Record<string, Record<string, string>> = {};
-
-        // Pre-populate with initial assignments matching official full names
-        officialTechs.forEach(tech => {
-          const normFullName = normalizeStr(tech.name);
-          loadedAssignments[tech.name] = {};
-
-          // Look for matching alias in default seed data
-          Object.entries(INITIAL_ALIAS_ASSIGNMENTS).forEach(([alias, diasMap]) => {
-            const normAlias = normalizeStr(alias);
-            if (normFullName.includes(normAlias) || normAlias.includes(normFullName)) {
-              loadedAssignments[tech.name] = { ...diasMap };
-            }
-          });
-        });
-
-        // Overlay with database records if available
-        if (dbHorarios && dbHorarios.length > 0) {
-          dbHorarios.forEach((item: any) => {
-            // Find corresponding official technician name
-            const matchingTech = officialTechs.find(
-              t =>
-                normalizeStr(t.name) === normalizeStr(item.tecnico_nombre) ||
-                normalizeStr(t.name).includes(normalizeStr(item.tecnico_nombre)) ||
-                normalizeStr(item.tecnico_nombre).includes(normalizeStr(t.name))
-            );
-
-            const targetName = matchingTech ? matchingTech.name : item.tecnico_nombre;
-            if (!loadedAssignments[targetName]) loadedAssignments[targetName] = {};
-            if (item.turno_codigo) {
-              loadedAssignments[targetName][item.dia_semana] = item.turno_codigo;
-            }
-          });
-        }
-
-        setAssignments(loadedAssignments);
-      } catch (err) {
-        console.error('Error cargando datos de horarios:', err);
-      } finally {
-        setLoading(false);
       }
-    }
 
+      setDbTechnicians(officialTechs);
+
+      // 2. Fetch Turnos
+      let activeTurnos = DEFAULT_TURNOS;
+      const { data: dbTurnos, error: turnosErr } = await supabase
+        .from('mantenimiento_turnos')
+        .select('*')
+        .order('codigo', { ascending: true });
+
+      if (!turnosErr && dbTurnos && dbTurnos.length > 0) {
+        activeTurnos = dbTurnos.map((t: any) => ({
+          ...t,
+          horario: cleanHorarioText(t.horario),
+        }));
+        setTurnos(activeTurnos);
+      }
+
+      // 3. Fetch Horarios from DB
+      const { data: dbHorarios } = await supabase
+        .from('mantenimiento_horarios')
+        .select('*');
+
+      const loadedAssignments: Record<string, Record<string, string>> = {};
+
+      officialTechs.forEach(tech => {
+        const normFullName = normalizeStr(tech.name);
+        loadedAssignments[tech.name] = {};
+
+        Object.entries(INITIAL_ALIAS_ASSIGNMENTS).forEach(([alias, diasMap]) => {
+          const normAlias = normalizeStr(alias);
+          if (normFullName.includes(normAlias) || normAlias.includes(normFullName)) {
+            loadedAssignments[tech.name] = { ...diasMap };
+          }
+        });
+      });
+
+      if (dbHorarios && dbHorarios.length > 0) {
+        dbHorarios.forEach((item: any) => {
+          const matchingTech = officialTechs.find(
+            t =>
+              normalizeStr(t.name) === normalizeStr(item.tecnico_nombre) ||
+              normalizeStr(t.name).includes(normalizeStr(item.tecnico_nombre)) ||
+              normalizeStr(item.tecnico_nombre).includes(normalizeStr(t.name))
+          );
+
+          const targetName = matchingTech ? matchingTech.name : item.tecnico_nombre;
+          if (!loadedAssignments[targetName]) loadedAssignments[targetName] = {};
+          if (item.turno_codigo) {
+            loadedAssignments[targetName][item.dia_semana] = item.turno_codigo;
+          }
+        });
+      }
+
+      setAssignments(loadedAssignments);
+    } catch (err) {
+      console.error('Error cargando datos:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadMasterData();
   }, [propTechnicians]);
 
-  // List of technician full names to display (ONLY from mantenimiento_tecnicos)
-  const officialTechList = useMemo(() => {
-    if (dbTechnicians.length > 0) return dbTechnicians;
-    if (propTechnicians && propTechnicians.length > 0) return propTechnicians;
-    return [];
-  }, [dbTechnicians, propTechnicians]);
-
-  // Helper to find color for a turno code
+  // Color helper for Turnos
   const getTurnoInfo = (codigo: string) => {
     if (!codigo) return null;
     const cleanCode = codigo.trim().toUpperCase();
     const found = turnos.find(t => t.codigo.toUpperCase() === cleanCode);
     if (found) return found;
 
-    // Handle combined codes like T1+2, T6+2
     const baseCode = cleanCode.split('+')[0];
     const baseFound = turnos.find(t => t.codigo.toUpperCase() === baseCode);
     if (baseFound) {
@@ -282,25 +304,196 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
     };
   };
 
-  // Turno modal triggers
-  const handleOpenNewTurno = () => {
-    setEditingTurno(null);
-    setTurnoForm({
-      codigo: `T${turnos.length + 1}`,
-      horario: '08:00 - 16:00',
-      color: '#cbd5e1',
-    });
-    setShowTurnoModal(true);
+  // Color & Badge helper for Modalidad Operativa
+  const getModalidadBadge = (mod?: string) => {
+    const cleanMod = (mod || 'PR').toUpperCase();
+    if (cleanMod === 'INACTIVO') {
+      return {
+        label: 'Inactivo',
+        bg: 'bg-slate-100',
+        text: 'text-slate-600',
+        border: 'border-slate-300',
+        dot: 'bg-slate-400',
+      };
+    }
+    if (cleanMod === 'PR') {
+      return {
+        label: 'PR · Producción',
+        bg: 'bg-emerald-50',
+        text: 'text-emerald-800',
+        border: 'border-emerald-200',
+        dot: 'bg-emerald-500',
+      };
+    }
+    if (cleanMod === 'NP') {
+      return {
+        label: 'NP · No Producción',
+        bg: 'bg-sky-50',
+        text: 'text-sky-800',
+        border: 'border-sky-200',
+        dot: 'bg-sky-500',
+      };
+    }
+    return {
+      label: 'PRNP · Mixto',
+      bg: 'bg-amber-50',
+      text: 'text-amber-800',
+      border: 'border-amber-200',
+      dot: 'bg-amber-500',
+    };
   };
 
-  const handleOpenEditTurno = (t: TurnoItem) => {
-    setEditingTurno(t);
-    setTurnoForm({
-      codigo: t.codigo,
-      horario: cleanHorarioText(t.horario),
-      color: t.color || '#bae6fd',
+  // Filtered Technicians for Sidebar
+  const filteredTechnicians = useMemo(() => {
+    const q = normalizeStr(techSearch);
+    return dbTechnicians.filter(t => {
+      const matchSearch =
+        !q ||
+        normalizeStr(t.name).includes(q) ||
+        (t.documento && normalizeStr(t.documento).includes(q)) ||
+        (t.modalidad_operativa && normalizeStr(t.modalidad_operativa).includes(q));
+
+      const matchMod =
+        modalidadFilter === 'TODOS' ||
+        t.modalidad_operativa === modalidadFilter ||
+        (modalidadFilter === 'INACTIVO' && t.activo === false);
+
+      return matchSearch && matchMod;
     });
-    setShowTurnoModal(true);
+  }, [dbTechnicians, techSearch, modalidadFilter]);
+
+  // Counts by modality
+  const counts = useMemo(() => {
+    let pr = 0;
+    let np = 0;
+    let prnp = 0;
+    let inact = 0;
+
+    dbTechnicians.forEach(t => {
+      if (t.modalidad_operativa === 'INACTIVO' || t.activo === false) inact++;
+      else if (t.modalidad_operativa === 'NP') np++;
+      else if (t.modalidad_operativa === 'PRNP') prnp++;
+      else pr++;
+    });
+
+    return { pr, np, prnp, inact, total: dbTechnicians.length };
+  }, [dbTechnicians]);
+
+  // Grouping for Weekly Calendar: Day -> Turno -> Technicians
+  const plannerScheduleByDay = useMemo(() => {
+    const result: Record<string, Record<string, TechnicianObj[]>> = {};
+
+    DIAS_SEMANA.forEach(dia => {
+      result[dia.key] = {};
+    });
+
+    dbTechnicians.forEach(tech => {
+      const techAssignments = assignments[tech.name] || {};
+      DIAS_SEMANA.forEach(dia => {
+        const turno = techAssignments[dia.key];
+        if (turno) {
+          if (!result[dia.key][turno]) {
+            result[dia.key][turno] = [];
+          }
+          result[dia.key][turno].push(tech);
+        }
+      });
+    });
+
+    return result;
+  }, [dbTechnicians, assignments]);
+
+  // Handle Technician Create / Edit Modal
+  const handleOpenNewTech = () => {
+    setEditingTech(null);
+    setTechFormData({
+      nombre: '',
+      documento: '',
+      modalidad_operativa: 'PR',
+      planta: 'Mármol Sintético',
+      capacidad_horas: '7.2',
+    });
+    setShowTechModal(true);
+  };
+
+  const handleOpenEditTech = (tech: TechnicianObj) => {
+    setEditingTech(tech);
+    setTechFormData({
+      nombre: tech.name,
+      documento: tech.documento || '',
+      modalidad_operativa: tech.modalidad_operativa || 'PR',
+      planta: tech.planta || 'Mármol Sintético',
+      capacidad_horas: tech.capacidad_horas?.toString() || '7.2',
+    });
+    setShowTechModal(true);
+  };
+
+  const handleSaveTechSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!techFormData.nombre.trim()) {
+      alert('Ingresa el nombre del técnico.');
+      return;
+    }
+
+    const isInactive = techFormData.modalidad_operativa === 'INACTIVO';
+    const payload: any = {
+      nombre: techFormData.nombre.trim(),
+      documento: techFormData.documento.trim() || null,
+      modalidad_operativa: techFormData.modalidad_operativa,
+      turno: techFormData.modalidad_operativa, // backwards compatibility
+      especialidad: techFormData.planta,
+      capacidad_horas: parseFloat(techFormData.capacidad_horas) || 7.2,
+      activo: !isInactive,
+    };
+
+    setSaving(true);
+    try {
+      if (editingTech && editingTech.id) {
+        // Update DB
+        let { error } = await supabase.from('mantenimiento_tecnicos').update(payload).eq('id', editingTech.id);
+        if (error && error.message.includes('modalidad_operativa')) {
+          delete payload.modalidad_operativa;
+          await supabase.from('mantenimiento_tecnicos').update(payload).eq('id', editingTech.id);
+        }
+        setStatusMsg({ type: 'success', text: `Técnico ${payload.nombre} actualizado correctamente.` });
+      } else {
+        // Insert DB
+        let { error } = await supabase.from('mantenimiento_tecnicos').insert([payload]);
+        if (error && error.message.includes('modalidad_operativa')) {
+          delete payload.modalidad_operativa;
+          await supabase.from('mantenimiento_tecnicos').insert([payload]);
+        }
+        setStatusMsg({ type: 'success', text: `Técnico ${payload.nombre} creado correctamente.` });
+      }
+
+      setShowTechModal(false);
+      await loadMasterData();
+      if (onTechsUpdated) onTechsUpdated();
+      setTimeout(() => setStatusMsg(null), 3500);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete / Inactivate Tech
+  const handleDeleteTech = async (tech: TechnicianObj) => {
+    if (!confirm(`¿Deseas marcar como inactivo al técnico ${tech.name}?`)) return;
+
+    try {
+      await supabase
+        .from('mantenimiento_tecnicos')
+        .update({ activo: false, modalidad_operativa: 'INACTIVO', turno: 'INACTIVO' })
+        .eq('id', tech.id);
+
+      await loadMasterData();
+      if (onTechsUpdated) onTechsUpdated();
+      setStatusMsg({ type: 'info', text: `Técnico ${tech.name} marcado como inactivo.` });
+      setTimeout(() => setStatusMsg(null), 3000);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Save Turno (Create or Edit)
@@ -320,26 +513,14 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
     setSaving(true);
     try {
       if (editingTurno && editingTurno.id) {
-        // Update DB
-        const { error } = await supabase
-          .from('mantenimiento_turnos')
-          .update(payload)
-          .eq('id', editingTurno.id);
-
-        if (error) console.warn('No se pudo actualizar en DB (mantenimiento_turnos):', error.message);
-
+        await supabase.from('mantenimiento_turnos').update(payload).eq('id', editingTurno.id);
         setTurnos(prev => prev.map(t => (t.id === editingTurno.id ? { ...t, ...payload } : t)));
       } else {
-        const existingIdx = turnos.findIndex(t => t.codigo.toUpperCase() === payload.codigo);
-        if (existingIdx >= 0) {
-          setTurnos(prev => prev.map((t, idx) => (idx === existingIdx ? { ...t, ...payload } : t)));
+        const { data, error } = await supabase.from('mantenimiento_turnos').insert([payload]).select();
+        if (!error && data && data[0]) {
+          setTurnos(prev => [...prev, { ...data[0], horario: cleanHorarioText(data[0].horario) }]);
         } else {
-          const { data, error } = await supabase.from('mantenimiento_turnos').insert([payload]).select();
-          if (!error && data && data[0]) {
-            setTurnos(prev => [...prev, { ...data[0], horario: cleanHorarioText(data[0].horario) }]);
-          } else {
-            setTurnos(prev => [...prev, payload]);
-          }
+          setTurnos(prev => [...prev, payload]);
         }
       }
 
@@ -379,9 +560,9 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
     setAssignments(updatedAssignments);
     setCellEdit(null);
 
-    // Save to DB
+    // Save to Supabase
     try {
-      const techObj = officialTechList.find(t => t.name === tecnico);
+      const techObj = dbTechnicians.find(t => t.name === tecnico);
       await supabase.from('mantenimiento_horarios').upsert(
         [
           {
@@ -398,7 +579,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
     }
   };
 
-  // Save all schedules to DB
+  // Save all schedules to Supabase
   const handleSaveAllAssignments = async () => {
     setSaving(true);
     setStatusMsg(null);
@@ -406,7 +587,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
       const recordsToUpsert: HorarioAsignacion[] = [];
 
       Object.entries(assignments).forEach(([tecnico, diasMap]) => {
-        const techObj = officialTechList.find(t => t.name === tecnico);
+        const techObj = dbTechnicians.find(t => t.name === tecnico);
         Object.entries(diasMap).forEach(([dia, turno]) => {
           if (turno) {
             recordsToUpsert.push({
@@ -427,119 +608,53 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
         if (error) throw error;
       }
 
-      setStatusMsg({ type: 'success', text: '¡Matriz de horarios y turnos guardada con éxito en Supabase!' });
+      setStatusMsg({ type: 'success', text: '¡Planificación semanal guardada con éxito en Supabase!' });
       setTimeout(() => setStatusMsg(null), 4000);
     } catch (err: any) {
       console.error('Error guardando en Supabase:', err);
       setStatusMsg({
         type: 'info',
-        text: 'Datos guardados en memoria de la sesión activa.',
+        text: 'Datos actualizados en la sesión.',
       });
     } finally {
       setSaving(false);
     }
   };
 
-  // Planner Grouping: For each Day -> group by Turno -> list of assigned Technicians
-  const plannerScheduleByDay = useMemo(() => {
-    const result: Record<string, Record<string, string[]>> = {};
-
-    DIAS_SEMANA.forEach(dia => {
-      result[dia.key] = {};
-    });
-
-    officialTechList.forEach(tech => {
-      const techAssignments = assignments[tech.name] || {};
-      DIAS_SEMANA.forEach(dia => {
-        const turno = techAssignments[dia.key];
-        if (turno) {
-          if (!result[dia.key][turno]) {
-            result[dia.key][turno] = [];
-          }
-          result[dia.key][turno].push(tech.name);
-        }
-      });
-    });
-
-    return result;
-  }, [officialTechList, assignments]);
-
-  // Hourly slots for Planner View (Covering full plant operational hours)
-  const hourlySlots = [
-    { label: '05:00', hourNum: 5 },
-    { label: '06:00', hourNum: 6 },
-    { label: '07:00', hourNum: 7 },
-    { label: '08:00', hourNum: 8 },
-    { label: '09:00', hourNum: 9 },
-    { label: '10:00', hourNum: 10 },
-    { label: '11:00', hourNum: 11 },
-    { label: '12:00', hourNum: 12 },
-    { label: '13:00', hourNum: 13 },
-    { label: '14:00', hourNum: 14 },
-    { label: '15:00', hourNum: 15 },
-    { label: '16:00', hourNum: 16 },
-    { label: '17:00', hourNum: 17 },
-    { label: '18:00', hourNum: 18 },
-    { label: '19:00', hourNum: 19 },
-    { label: '20:00', hourNum: 20 },
-    { label: '21:00', hourNum: 21 },
-    { label: '22:00', hourNum: 22 },
-  ];
-
   return (
-    <div className="bg-white rounded-3xl p-5 sm:p-7 border border-[#e2ded5] shadow-xs flex flex-col gap-6">
+    <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#e2ded5] shadow-xs flex flex-col gap-5">
       
-      {/* Header Numeral 2 */}
+      {/* ========================================================================= */}
+      {/* 1. CABECERA UNIFICADA DE PLANIFICACIÓN                                    */}
+      {/* ========================================================================= */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#e2ded5] pb-4">
         <div>
-          <h3 className="text-lg font-bold text-[#324354] flex items-center gap-2">
+          <h3 className="text-lg font-black text-[#324354] flex items-center gap-2">
             <span className="w-7 h-7 rounded-xl bg-[#324354] text-white flex items-center justify-center text-xs font-black">
-              2
+              1
             </span>
-            <Clock className="w-5 h-5 text-[#7B8E90]" />
-            <span>Matriz de Horarios y Programación de Turnos</span>
+            <Calendar className="w-5 h-5 text-[#7B8E90]" />
+            <span>Planificación de Cuadrilla, Horarios y Turnos de Mantenimiento</span>
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Planificación semanal de cuadrilla conectada a <span className="font-bold text-[#324354]">mantenimiento_tecnicos</span> ({officialTechList.length} técnicos oficiales).
+            Gestión centralizada de técnicos, modalidad operativa (PR/NP) y calendario semanal de turnos (T1-T7).
           </p>
         </div>
 
-        {/* Action Controls & View Switcher */}
+        {/* Action Controls */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          
-          {/* Switch View Buttons */}
-          <div className="flex items-center bg-[#F6F3EE] p-1 rounded-xl border border-gray-300">
-            <button
-              onClick={() => setViewMode('planner')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'planner'
-                  ? 'bg-[#324354] text-white shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-              }`}
-              title="Vista de Calendario y Cronograma por Horas (Estilo Planner)"
-            >
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>Vista Planificador (Horas)</span>
-            </button>
-
-            <button
-              onClick={() => setViewMode('matrix')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'matrix'
-                  ? 'bg-[#324354] text-white shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-              }`}
-              title="Vista Matriz de Asignación por Técnico"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Vista Matriz</span>
-            </button>
-          </div>
+          <button
+            onClick={handleOpenNewTech}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#324354] text-white text-xs font-bold rounded-xl hover:bg-[#324354]/90 transition-all cursor-pointer shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Nuevo Técnico</span>
+          </button>
 
           <button
             onClick={handleSaveAllAssignments}
             disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#324354] text-white text-xs font-bold rounded-xl hover:bg-[#324354]/90 transition-all cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 text-white text-xs font-bold rounded-xl hover:bg-emerald-800 transition-all cursor-pointer shadow-xs"
           >
             {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             <span>{saving ? 'Guardando...' : 'Guardar Cambios'}</span>
@@ -549,7 +664,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
 
       {statusMsg && (
         <div
-          className={`p-3.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
+          className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 animate-in fade-in duration-200 ${
             statusMsg.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
               : statusMsg.type === 'error'
@@ -562,8 +677,12 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
         </div>
       )}
 
-      {/* Week Selector Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#F6F3EE] p-3 rounded-2xl border border-gray-200">
+      {/* ========================================================================= */}
+      {/* 2. BARRA DE NAVEGACIÓN SEMANAL Y CONTADORES                               */}
+      {/* ========================================================================= */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-[#F6F3EE] p-3 rounded-2xl border border-gray-200">
+        
+        {/* Week Date Label */}
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-[#7B8E90]" />
           <span className="text-xs font-bold text-[#324354] uppercase tracking-wider">
@@ -571,6 +690,23 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
           </span>
         </div>
 
+        {/* Modality KPI Badges */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-emerald-100/90 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+            PR (Producción): {counts.pr}
+          </span>
+          <span className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-sky-100/90 text-sky-800 border border-sky-300 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-sky-600"></span>
+            NP (Paro): {counts.np}
+          </span>
+          <span className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+            Inactivos: {counts.inact}
+          </span>
+        </div>
+
+        {/* Week Buttons */}
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => {
@@ -604,17 +740,144 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
       </div>
 
       {/* ========================================================================= */}
-      {/* VISTA 1: PLANNER POR HORAS (Estilo Teams / Outlook / Planner con Horas)  */}
+      {/* 3. VISTA UNIFICADA: SIDEBAR DE TÉCNICOS + CALENDARIO SEMANAL             */}
       {/* ========================================================================= */}
-      {viewMode === 'planner' && (
-        <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        
+        {/* ======================================================================= */}
+        {/* PANEL IZQUIERDO: CUADRILLA DE TÉCNICOS (Modalidad + Ficha)            */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-4 bg-[#F6F3EE] p-3.5 rounded-2xl border border-gray-300/80 flex flex-col gap-3">
+          
+          {/* Header & Search */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-[#7B8E90]" />
+                Cuadrilla ({filteredTechnicians.length})
+              </span>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={techSearch}
+                onChange={e => setTechSearch(e.target.value)}
+                placeholder="Buscar por nombre o CC..."
+                className="w-full pl-8 pr-7 py-1.5 bg-white rounded-xl border border-gray-300 text-xs font-medium text-[#324354] focus:outline-none focus:border-[#324354]"
+              />
+              {techSearch && (
+                <button
+                  onClick={() => setTechSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[10px]">
+              {(['TODOS', 'PR', 'NP', 'INACTIVO'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setModalidadFilter(f)}
+                  className={`px-2 py-0.5 rounded-md font-bold transition-all shrink-0 ${
+                    modalidadFilter === f
+                      ? 'bg-[#324354] text-white shadow-2xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {f === 'TODOS' ? 'Todos' : f === 'INACTIVO' ? 'Inactivos' : f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Technicians List (Single-view scrollable) */}
+          <div className="flex flex-col gap-2 max-h-[500px] overflow-y-auto pr-1">
+            {filteredTechnicians.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-xs italic">
+                No se encontraron técnicos
+              </div>
+            ) : (
+              filteredTechnicians.map(tech => {
+                const modBadge = getModalidadBadge(tech.modalidad_operativa);
+                const isInactive = tech.modalidad_operativa === 'INACTIVO' || tech.activo === false;
+
+                return (
+                  <div
+                    key={tech.id}
+                    className={`p-2.5 rounded-xl border transition-all flex flex-col gap-1.5 shadow-2xs ${
+                      isInactive
+                        ? 'bg-slate-100/90 border-slate-300/80 text-slate-600 opacity-80'
+                        : 'bg-white border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    {/* Top Row: Name + Action Buttons */}
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="flex flex-col">
+                        <span className={`text-xs font-black leading-tight ${isInactive ? 'text-slate-700' : 'text-[#324354]'}`}>
+                          {tech.name}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium mt-0.5">
+                          {tech.documento && <span>CC: {tech.documento}</span>}
+                          {tech.planta && <span className="bg-gray-100 px-1 rounded text-gray-700 font-semibold">{tech.planta}</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={() => handleOpenEditTech(tech)}
+                          className="p-1 text-gray-400 hover:text-[#324354] rounded hover:bg-gray-100"
+                          title="Editar Técnico"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        {!isInactive && (
+                          <button
+                            onClick={() => handleDeleteTech(tech)}
+                            className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50"
+                            title="Marcar Inactivo"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: Modality Badge */}
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border flex items-center gap-1.5 ${modBadge.bg} ${modBadge.text} ${modBadge.border}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${modBadge.dot}`}></span>
+                        {modBadge.label}
+                      </span>
+
+                      <span className="text-[10px] font-bold text-gray-400">
+                        {tech.capacidad_horas}h/día
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ======================================================================= */}
+        {/* PANEL DERECHO: CALENDARIO SEMANAL DE TURNOS POR DÍA                      */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-8 flex flex-col gap-2">
+          
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-              <CalendarDays className="w-3.5 h-3.5 text-[#7B8E90]" />
-              Cronograma Semanal de Turnos por Bloque Horario
+            <span className="text-xs font-black text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-[#7B8E90]" />
+              Calendario Semanal de Turnos
             </span>
-            <span className="text-[11px] text-gray-400 italic">
-              Haz clic en cualquier celda de la cuadrilla para ajustar asignaciones
+            <span className="text-[10px] text-gray-400 italic">
+              Haz clic en cualquier ficha para reasignar
             </span>
           </div>
 
@@ -626,7 +889,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
                 return (
                   <div key={dia.key} className={`py-2 px-1 ${isWeekend ? 'bg-gray-100/70' : ''}`}>
                     <div className="text-[11px] font-extrabold text-gray-700 tracking-wider uppercase">
-                      {dia.label}
+                      {dia.short}
                     </div>
                     <div className="text-sm font-black text-[#324354]">{dia.dateNumber}</div>
                   </div>
@@ -634,17 +897,17 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
               })}
             </div>
 
-            {/* Content Column Grid - Single view compact layout */}
-            <div className="grid grid-cols-7 divide-x divide-gray-300 min-h-[460px] bg-slate-50/30">
+            {/* Content Column Grid */}
+            <div className="grid grid-cols-7 divide-x divide-gray-300 min-h-[460px] max-h-[500px] overflow-y-auto bg-slate-50/20">
               {weekDaysInfo.map(dia => {
                 const dayTurnosMap = plannerScheduleByDay[dia.key] || {};
                 const activeTurnoKeys = Object.keys(dayTurnosMap);
 
                 return (
-                  <div key={dia.key} className="p-1.5 flex flex-col gap-2 min-h-full">
+                  <div key={dia.key} className="p-1 flex flex-col gap-1.5 min-h-full">
                     {activeTurnoKeys.length === 0 ? (
-                      <div className="h-full flex items-center justify-center p-3 text-center text-gray-300 text-[11px] italic">
-                        Sin turnos asignados
+                      <div className="h-full flex items-center justify-center p-2 text-center text-gray-300 text-[10px] italic">
+                        Sin turnos
                       </div>
                     ) : (
                       activeTurnoKeys.map(turnoKey => {
@@ -656,38 +919,47 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
                           <div
                             key={turnoKey}
                             style={{ backgroundColor: tInfo?.color || '#fff' }}
-                            className="rounded-xl p-2 border border-gray-400/40 shadow-2xs flex flex-col gap-1.5 transition-transform hover:scale-[1.01]"
+                            className="rounded-xl p-1.5 border border-gray-400/40 shadow-2xs flex flex-col gap-1 transition-transform hover:scale-[1.01]"
                           >
-                            {/* Card Header: Turno Badge + Clean Hours */}
-                            <div className="flex items-center justify-between border-b border-black/10 pb-1">
-                              <span className="font-black font-mono text-xs text-gray-900 bg-white/70 px-1.5 py-0.5 rounded shadow-2xs">
+                            {/* Turno Header Badge + Hours */}
+                            <div className="flex items-center justify-between border-b border-black/10 pb-0.5">
+                              <span className="font-black font-mono text-[11px] text-gray-900 bg-white/70 px-1 rounded shadow-2xs">
                                 {turnoKey}
                               </span>
-                              <span className="text-[10px] font-bold font-mono text-gray-800 tracking-tight">
+                              <span className="text-[9px] font-bold font-mono text-gray-800 tracking-tight">
                                 {cleanHorario}
                               </span>
                             </div>
 
-                            {/* Assigned Technicians (Full Names) */}
+                            {/* Assigned Technicians */}
                             <div className="flex flex-col gap-1 pt-0.5">
-                              {assignedTechs.map(techName => (
-                                <div
-                                  key={techName}
-                                  onClick={() => {
-                                    setCellEdit({
-                                      tecnico: techName,
-                                      dia: dia.key,
-                                      currentTurno: turnoKey,
-                                    });
-                                    setCustomTurnoInput(turnoKey);
-                                  }}
-                                  className="text-[10.5px] font-bold text-gray-900 bg-white/80 hover:bg-white px-1.5 py-1 rounded-md shadow-2xs cursor-pointer truncate flex items-center gap-1 border border-black/5"
-                                  title={`Clic para reasignar a ${techName}`}
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#324354] shrink-0"></span>
-                                  <span className="truncate">{techName}</span>
-                                </div>
-                              ))}
+                              {assignedTechs.map(tech => {
+                                const modBadge = getModalidadBadge(tech.modalidad_operativa);
+                                const isInactive = tech.modalidad_operativa === 'INACTIVO' || tech.activo === false;
+
+                                return (
+                                  <div
+                                    key={tech.id}
+                                    onClick={() => {
+                                      setCellEdit({
+                                        tecnico: tech.name,
+                                        dia: dia.key,
+                                        currentTurno: turnoKey,
+                                      });
+                                      setCustomTurnoInput(turnoKey);
+                                    }}
+                                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-2xs cursor-pointer truncate flex items-center gap-1 border border-black/5 ${
+                                      isInactive
+                                        ? 'bg-slate-200 text-slate-600'
+                                        : 'bg-white/85 hover:bg-white text-gray-900'
+                                    }`}
+                                    title={`Clic para reasignar: ${tech.name} (${modBadge.label})`}
+                                  >
+                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${modBadge.dot}`}></span>
+                                    <span className="truncate">{tech.name}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -699,103 +971,31 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
             </div>
           </div>
         </div>
-      )}
+
+      </div>
 
       {/* ========================================================================= */}
-      {/* VISTA 2: MATRIZ COMPACTA DE CUADRILLA (Técnicos Oficiales de la BD)      */}
+      {/* 4. CATÁLOGO Y EDICIÓN DE TURNOS (T1 - T7)                                 */}
       {/* ========================================================================= */}
-      {viewMode === 'matrix' && (
-        <div className="overflow-x-auto border border-gray-300 rounded-2xl shadow-xs">
-          <table className="w-full text-xs text-left border-collapse min-w-[760px]">
-            <thead>
-              <tr className="bg-[#F6F3EE] text-[#324354] font-black uppercase text-center border-b-2 border-gray-300">
-                <th className="py-3 px-4 border-r border-gray-300 w-64 text-left">
-                  TÉCNICO (OFICIAL)
-                </th>
-                {weekDaysInfo.map(dia => (
-                  <th key={dia.key} className="py-2.5 px-2 border-r border-gray-300">
-                    <div className="text-[11px] font-bold text-gray-700">{dia.label}</div>
-                    <div className="text-sm font-black text-[#324354]">{dia.dateNumber}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 font-medium">
-              {officialTechList.map((tech) => {
-                const techAssignments = assignments[tech.name] || {};
-
-                return (
-                  <tr key={tech.id} className="hover:bg-gray-50 transition-colors">
-                    {/* Official Full Name + Document/Plant */}
-                    <td className="py-2.5 px-4 font-bold text-[#324354] border-r border-gray-300 bg-white">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-black text-gray-900 leading-snug">{tech.name}</span>
-                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
-                          {tech.documento && <span>CC: {tech.documento}</span>}
-                          {tech.planta && <span className="bg-gray-100 px-1 rounded text-gray-700 font-semibold">{tech.planta}</span>}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Day Cells */}
-                    {weekDaysInfo.map(dia => {
-                      const assignedTurno = techAssignments[dia.key] || '';
-                      const tInfo = getTurnoInfo(assignedTurno);
-                      const cleanHorario = cleanHorarioText(tInfo?.horario);
-
-                      return (
-                        <td
-                          key={dia.key}
-                          onClick={() => {
-                            setCellEdit({
-                              tecnico: tech.name,
-                              dia: dia.key,
-                              currentTurno: assignedTurno,
-                            });
-                            setCustomTurnoInput(assignedTurno);
-                          }}
-                          style={{ backgroundColor: assignedTurno ? tInfo?.color : 'transparent' }}
-                          className="py-1.5 px-1.5 text-center border-r border-gray-300 cursor-pointer hover:opacity-85 transition-all select-none font-black text-gray-900"
-                        >
-                          {assignedTurno ? (
-                            <div className="flex flex-col items-center justify-center">
-                              <span className="px-1.5 py-0.5 rounded font-mono text-xs font-black tracking-wide bg-white/70 shadow-2xs">
-                                {assignedTurno}
-                              </span>
-                              {cleanHorario && (
-                                <span className="text-[9px] font-mono text-gray-700 font-bold leading-tight mt-0.5">
-                                  {cleanHorario}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-300 text-[10px] italic hover:text-gray-500">+ Asignar</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* CATÁLOGO Y EDICIÓN DE TURNOS (Horarios Limpios sin Doble Guion)          */}
-      {/* ========================================================================= */}
-      <div className="bg-[#F6F3EE] p-5 rounded-2xl border border-gray-300/80 flex flex-col gap-4">
-        <div className="flex items-center justify-between border-b border-gray-300 pb-3">
+      <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-gray-300/80 flex flex-col gap-3">
+        <div className="flex items-center justify-between border-b border-gray-300 pb-2">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-[#324354]" />
             <h4 className="font-bold text-xs uppercase tracking-wider text-[#324354]">
-              Catálogo de Turnos y Convenciones
+              Catálogo Maestro de Turnos Horarios
             </h4>
           </div>
 
           <button
-            onClick={handleOpenNewTurno}
+            onClick={() => {
+              setEditingTurno(null);
+              setTurnoForm({
+                codigo: `T${turnos.length + 1}`,
+                horario: '08:00 - 16:00',
+                color: '#cbd5e1',
+              });
+              setShowTurnoModal(true);
+            }}
             className="flex items-center gap-1 px-3 py-1.5 bg-[#324354] text-white text-xs font-bold rounded-xl hover:bg-[#324354]/90 transition-all cursor-pointer shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -803,37 +1003,45 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
           </button>
         </div>
 
-        {/* Turnos Grid with Clean Single-Hyphen Hours */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+        {/* Turnos Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
           {turnos.map(t => {
             const cleanHours = cleanHorarioText(t.horario);
             return (
               <div
                 key={t.codigo}
                 style={{ backgroundColor: t.color || '#fff' }}
-                className="p-2.5 rounded-xl border border-gray-400/50 flex flex-col justify-between gap-1.5 shadow-2xs group relative"
+                className="p-2 rounded-xl border border-gray-400/50 flex flex-col justify-between gap-1 shadow-2xs group relative"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-black text-sm text-gray-900 font-mono tracking-wider">{t.codigo}</span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="font-black text-xs text-gray-900 font-mono tracking-wider">{t.codigo}</span>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => handleOpenEditTurno(t)}
+                      onClick={() => {
+                        setEditingTurno(t);
+                        setTurnoForm({
+                          codigo: t.codigo,
+                          horario: cleanHorarioText(t.horario),
+                          color: t.color || '#bae6fd',
+                        });
+                        setShowTurnoModal(true);
+                      }}
                       className="p-1 text-gray-700 hover:text-black hover:bg-white/60 rounded"
                       title="Editar Turno"
                     >
-                      <Pencil className="w-3 h-3" />
+                      <Pencil className="w-2.5 h-2.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteTurno(t)}
                       className="p-1 text-rose-700 hover:text-rose-900 hover:bg-white/60 rounded"
                       title="Eliminar Turno"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-2.5 h-2.5" />
                     </button>
                   </div>
                 </div>
 
-                <div className="text-[11px] font-bold text-gray-900 font-mono">
+                <div className="text-[10px] font-bold text-gray-900 font-mono">
                   {cleanHours}
                 </div>
               </div>
@@ -842,17 +1050,121 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
         </div>
       </div>
 
-      {/* MODAL 1: MODAL ASIGNAR TURNO A CELDA */}
+      {/* ========================================================================= */}
+      {/* MODAL 1: NUEVO / EDITAR TÉCNICO                                           */}
+      {/* ========================================================================= */}
+      {showTechModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+              <h4 className="font-bold text-sm text-[#324354]">
+                {editingTech ? `Editar Técnico: ${editingTech.name}` : 'Nuevo Técnico de Mantenimiento'}
+              </h4>
+              <button
+                onClick={() => setShowTechModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTechSubmit} className="flex flex-col gap-3">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Nombre Completo Oficial:</label>
+                <input
+                  type="text"
+                  required
+                  value={techFormData.nombre}
+                  onChange={e => setTechFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder="Ej: Anderson David Plata Peña"
+                  className="w-full px-3.5 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-bold text-[#324354] focus:outline-none focus:border-[#324354]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Cédula de Ciudadanía (CC):</label>
+                <input
+                  type="text"
+                  value={techFormData.documento}
+                  onChange={e => setTechFormData(prev => ({ ...prev, documento: e.target.value }))}
+                  placeholder="Ej: 1010232658"
+                  className="w-full px-3.5 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-bold text-[#324354] focus:outline-none focus:border-[#324354]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Modalidad Operativa (Condición de Planta):</label>
+                <select
+                  value={techFormData.modalidad_operativa}
+                  onChange={e => setTechFormData(prev => ({ ...prev, modalidad_operativa: e.target.value }))}
+                  className="w-full px-3.5 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-bold text-[#324354] focus:outline-none focus:border-[#324354]"
+                >
+                  <option value="PR">🟢 PR · En Producción (Línea Activa)</option>
+                  <option value="NP">🔵 NP · No Producción (Paro de Planta)</option>
+                  <option value="PRNP">🟡 PRNP · Producción y Paro (Flexible)</option>
+                  <option value="INACTIVO">⚪ Inactivo (Fuera de cuadrilla / Retirado)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Planta Principal:</label>
+                  <input
+                    type="text"
+                    value={techFormData.planta}
+                    onChange={e => setTechFormData(prev => ({ ...prev, planta: e.target.value }))}
+                    placeholder="Mármol Sintético"
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-medium text-[#324354]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Capacidad Diaria (Horas):</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={techFormData.capacidad_horas}
+                    onChange={e => setTechFormData(prev => ({ ...prev, capacidad_horas: e.target.value }))}
+                    placeholder="7.2"
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-medium text-[#324354]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowTechModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 bg-[#324354] text-white font-bold text-xs rounded-xl hover:bg-[#324354]/90 flex items-center gap-1.5"
+                >
+                  {saving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{editingTech ? 'Actualizar Técnico' : 'Guardar Técnico'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: ASIGNAR TURNO A TÉCNICO EN UN DÍA                                */}
+      {/* ========================================================================= */}
       {cellEdit && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-gray-200 pb-3">
               <div>
-                <h4 className="font-bold text-sm text-[#324354]">Asignar Turno</h4>
-                <p className="text-xs text-gray-600 font-bold truncate max-w-[220px]">
+                <h4 className="font-bold text-sm text-[#324354]">Asignar Turno Horario</h4>
+                <p className="text-xs text-gray-700 font-bold truncate max-w-[220px]">
                   {cellEdit.tecnico}
                 </p>
-                <p className="text-[11px] text-gray-400 font-medium">
+                <p className="text-[11px] text-gray-500 font-medium">
                   Día: <span className="font-bold text-[#324354]">{cellEdit.dia}</span>
                 </p>
               </div>
@@ -884,7 +1196,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
               </div>
             </div>
 
-            {/* Custom turno input (e.g. T1+2, T6+2) */}
+            {/* Custom turno input */}
             <div className="flex flex-col gap-1.5 pt-2 border-t border-gray-200">
               <label className="text-xs font-bold text-gray-700">O ingresar combinado (ej: T1+2, T6+2):</label>
               <div className="flex gap-2">
@@ -905,7 +1217,6 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
               </div>
             </div>
 
-            {/* Clear assignment button */}
             <button
               type="button"
               onClick={() => handleSelectCellTurno(cellEdit.tecnico, cellEdit.dia, '')}
@@ -917,13 +1228,15 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians }: P
         </div>
       )}
 
-      {/* MODAL 2: CREAR / EDITAR TURNO */}
+      {/* ========================================================================= */}
+      {/* MODAL 3: CREAR / EDITAR TURNO HORARIO                                     */}
+      {/* ========================================================================= */}
       {showTurnoModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-gray-200 pb-3">
               <h4 className="font-bold text-sm text-[#324354]">
-                {editingTurno ? `Editar Turno ${editingTurno.codigo}` : 'Crear Nuevo Turno'}
+                {editingTurno ? `Editar Turno ${editingTurno.codigo}` : 'Crear Nuevo Turno Horario'}
               </h4>
               <button
                 onClick={() => setShowTurnoModal(false)}
