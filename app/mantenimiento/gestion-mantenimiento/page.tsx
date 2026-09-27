@@ -317,7 +317,7 @@ export default function GestionMantenimientoPage() {
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
   const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
-  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'plazo' | 'apertura' | 'cierre';
+  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'planta' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'plazo' | 'apertura' | 'cierre';
   const [historySortField, setHistorySortField] = useState<HistorySortField>('apertura');
   const [historySortAsc, setHistorySortAsc] = useState<boolean>(false);
 
@@ -3983,6 +3983,7 @@ export default function GestionMantenimientoPage() {
         const q = normalize(historySearch);
         const matchCodigo = normalize(row.codigo || row['CODIGO'] || '').includes(q);
         const matchTitle = normalize(row['Título'] || row.titulo || row.sintoma || '').includes(q);
+        const matchPlanta = normalize(row.planta || row['Planta'] || '').includes(q);
         const resolvedMaq = resolveHistoryRowMachine(row, maquinasCatalogo);
         const matchMaquina = normalize(resolvedMaq.name + ' ' + (resolvedMaq.code || '') + ' ' + (row.maquina || '')).includes(q);
         const matchTech = normalize(row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || '').includes(q);
@@ -3992,7 +3993,7 @@ export default function GestionMantenimientoPage() {
         const matchCierre = normalize(row['FECHA DE CIERRE'] || row.fecha_cierre || '').includes(q);
         const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || row.accion_tomada || row.observaciones || '').includes(q);
         
-        if (!matchCodigo && !matchTitle && !matchMaquina && !matchTech && !matchTipo && !matchEstado && !matchApertura && !matchCierre && !matchObs) return false;
+        if (!matchCodigo && !matchTitle && !matchPlanta && !matchMaquina && !matchTech && !matchTipo && !matchEstado && !matchApertura && !matchCierre && !matchObs) return false;
       }
 
       // Global Origen filter (TPM, Correctivo, Preventivo)
@@ -4029,6 +4030,10 @@ export default function GestionMantenimientoPage() {
         case 'titulo':
           valA = (a['Título'] || a.titulo || '').toLowerCase();
           valB = (b['Título'] || b.titulo || '').toLowerCase();
+          break;
+        case 'planta':
+          valA = (a.planta || a['Planta'] || '').toLowerCase();
+          valB = (b.planta || b['Planta'] || '').toLowerCase();
           break;
         case 'maquina':
           valA = resolveHistoryRowMachine(a, maquinasCatalogo).name.toLowerCase();
@@ -6332,7 +6337,7 @@ export default function GestionMantenimientoPage() {
                       {/* Descripción (Antes Título de Mantenimiento) */}
                       <th 
                         onClick={() => handleHistorySort('titulo')}
-                        className="py-3 px-3 font-bold w-[20%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[18%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Descripción"
                       >
                         <div className="flex items-center gap-1.5">
@@ -6345,10 +6350,26 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
+                      {/* Planta */}
+                      <th 
+                        onClick={() => handleHistorySort('planta')}
+                        className="py-3 px-2 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors text-center"
+                        title="Clic para ordenar por Planta"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Planta</span>
+                          {historySortField === 'planta' ? (
+                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
+                          )}
+                        </div>
+                      </th>
+
                       {/* Máquinas / Equipos */}
                       <th 
                         onClick={() => handleHistorySort('maquina')}
-                        className="py-3 px-3 font-bold w-[16%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[14%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Máquina / Equipo"
                       >
                         <div className="flex items-center gap-1.5">
@@ -6364,7 +6385,7 @@ export default function GestionMantenimientoPage() {
                       {/* Técnico Responsable */}
                       <th 
                         onClick={() => handleHistorySort('tecnico')}
-                        className="py-3 px-3 font-bold w-[14%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[13%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Técnico"
                       >
                         <div className="flex items-center gap-1.5">
@@ -6380,12 +6401,28 @@ export default function GestionMantenimientoPage() {
                       {/* Estado */}
                       <th 
                         onClick={() => handleHistorySort('estado')}
-                        className="py-3 px-2 font-bold text-center w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold text-center w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Estado"
                       >
                         <div className="flex items-center justify-center gap-1">
                           <span>Estado</span>
                           {historySortField === 'estado' ? (
+                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
+                          )}
+                        </div>
+                      </th>
+
+                      {/* Fecha Apertura */}
+                      <th 
+                        onClick={() => handleHistorySort('apertura')}
+                        className="py-3 px-2 font-bold w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Fecha Apertura"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Fecha Apertura</span>
+                          {historySortField === 'apertura' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
@@ -6409,26 +6446,10 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Fecha Apertura */}
-                      <th 
-                        onClick={() => handleHistorySort('apertura')}
-                        className="py-3 px-2 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Fecha Apertura"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Fecha Apertura</span>
-                          {historySortField === 'apertura' ? (
-                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
-                          ) : (
-                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
-                          )}
-                        </div>
-                      </th>
-
                       {/* Fecha Cierre */}
                       <th 
                         onClick={() => handleHistorySort('cierre')}
-                        className="py-3 px-2 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Fecha Cierre"
                       >
                         <div className="flex items-center gap-1">
@@ -6445,7 +6466,7 @@ export default function GestionMantenimientoPage() {
                   <tbody className="divide-y divide-gray-200">
                     {filteredHistoryRows.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-gray-400">
+                        <td colSpan={11} className="py-12 text-center text-gray-400">
                           {historyLoading ? 'Cargando registros...' : 'No se encontraron órdenes de trabajo con los filtros aplicados.'}
                         </td>
                       </tr>
@@ -6533,6 +6554,13 @@ export default function GestionMantenimientoPage() {
                               {cleanDescriptionText(row['Título'] || row.sintoma || row.titulo)}
                             </td>
 
+                            {/* Planta */}
+                            <td className="py-3 px-2 text-center whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] inline-block">
+                                {row.planta || row['Planta'] || '—'}
+                              </span>
+                            </td>
+
                             {/* Máquinas / Equipos */}
                             <td className="py-3 px-3">
                               {(() => {
@@ -6576,14 +6604,14 @@ export default function GestionMantenimientoPage() {
                               </span>
                             </td>
 
-                            {/* Plazo */}
-                            <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
-                              {rawPlazo ? formatFechaDDMMAAAA(rawPlazo) : '—'}
-                            </td>
-
                             {/* Fecha Apertura */}
                             <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
                               {formatFechaDDMMAAAA(row['FECHA DE APERTURA'] || row.fecha_apertura)}
+                            </td>
+
+                            {/* Plazo */}
+                            <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
+                              {rawPlazo ? formatFechaDDMMAAAA(rawPlazo) : '—'}
                             </td>
 
                             {/* Fecha Cierre */}
