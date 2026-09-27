@@ -4001,15 +4001,6 @@ export default function GestionMantenimientoPage() {
         if (historyTipo !== category) return false;
       }
 
-      // Global Machine Filter
-      if (historyMaquina !== 'Todas') {
-        const resolvedMaq = resolveHistoryRowMachine(row, maquinasCatalogo);
-        const rMaqName = (resolvedMaq.name || row.maquina || '').toLowerCase();
-        const rMaqCode = (resolvedMaq.code || '').toLowerCase();
-        const filterMaq = historyMaquina.toLowerCase();
-        if (!rMaqName.includes(filterMaq) && !rMaqCode.includes(filterMaq)) return false;
-      }
-
       // Global status / tech filters
       if (historyEstado !== 'Todos') {
         if ((row['ESTADO'] || 'Pendiente') !== historyEstado) return false;
