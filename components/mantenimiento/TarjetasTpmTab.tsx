@@ -522,7 +522,7 @@ export default function TarjetasTpmTab({
           codigo: newCode,
           titulo: `[${colorTitleMap[formData.tipo_tarjeta]}] ${formData.descripcion_que.trim()}`,
           maquina: formData.maquina,
-          planta: formData.planta,
+          planta: obtenerCodigoPlanta(formData.planta),
           id_tecnico: null, // Queda Sin Asignar
           tecnico_nombre: 'Sin asignar',
           turno: 'General',
@@ -547,7 +547,7 @@ export default function TarjetasTpmTab({
         tipo_tarjeta: formData.tipo_tarjeta,
         tipo_aviso: formData.tipo_tarjeta === 'roja' ? 'Mantenimiento' : formData.tipo_tarjeta === 'azul' ? 'Autónomo' : formData.tipo_tarjeta === 'amarilla' ? 'Seguridad/5S' : 'Mejora Kaizen',
         maquina: formData.maquina,
-        planta: formData.planta,
+        planta: obtenerCodigoPlanta(formData.planta),
         detectada_por: formData.detectada_por || 'Operador',
         descripcion_que: formData.descripcion_que.trim(),
         prioridad: formData.prioridad,

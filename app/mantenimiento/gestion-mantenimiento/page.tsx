@@ -2103,7 +2103,7 @@ export default function GestionMantenimientoPage() {
           codigo: task.code,
           titulo: task.title,
           maquina: task.maquina,
-          planta: task.planta,
+          planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
           id_tecnico: tech?.id !== 9999 ? tech?.id : null,
           tecnico_nombre: techName,
           turno: tech?.turno || 'General',
@@ -2161,7 +2161,7 @@ export default function GestionMantenimientoPage() {
           codigo: task.code,
           titulo: task.title,
           maquina: task.maquina,
-          planta: task.planta,
+          planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
           id_tecnico: tech?.id !== 9999 ? tech?.id : null,
           tecnico_nombre: techName,
           turno: tech?.turno || 'General',
@@ -2203,7 +2203,7 @@ export default function GestionMantenimientoPage() {
       if (updates.fechaCierre !== undefined) payload.fecha_cierre = updates.fechaCierre || null;
       if (updates.idtecs !== undefined) payload.idtecs = updates.idtecs === 9999 ? null : updates.idtecs;
       if (updates.maquina !== undefined) payload.maquina = updates.maquina;
-      if (updates.planta !== undefined) payload.planta = updates.planta;
+      if (updates.planta !== undefined) payload.planta = obtenerCodigoPlanta(updates.planta, plantasNomenclatura);
 
       const { error } = await supabase
         .from('mantenimiento_ordenes')
@@ -2245,7 +2245,7 @@ export default function GestionMantenimientoPage() {
       const payload: Record<string, unknown> = {};
       if (updates.sintoma !== undefined) payload.sintoma = updates.sintoma;
       if (updates.maquina !== undefined) payload.maquina = updates.maquina;
-      if (updates.planta !== undefined) payload.planta = updates.planta;
+      if (updates.planta !== undefined) payload.planta = obtenerCodigoPlanta(updates.planta, plantasNomenclatura);
       if (updates.prioridad !== undefined) payload.prioridad = updates.prioridad;
       if (updates.estado !== undefined) payload.estado = updates.estado;
       if (updates.tecnico_asignado !== undefined) payload.tecnico_asignado = updates.tecnico_asignado;
@@ -2335,7 +2335,7 @@ export default function GestionMantenimientoPage() {
           codigo: task.code,
           titulo: task.title,
           maquina: task.maquina,
-          planta: task.planta,
+          planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
           id_tecnico: assignedTech.id,
           tecnico_nombre: assignedTech.name,
           turno: assignedTech.turno,
@@ -2464,7 +2464,7 @@ export default function GestionMantenimientoPage() {
         codigo: taskToForce.code || `MP-${taskToForce.id}`,
         titulo: taskToForce.title,
         maquina: taskToForce.maquina,
-        planta: taskToForce.planta,
+        planta: obtenerCodigoPlanta(taskToForce.planta, plantasNomenclatura),
         id_tecnico: assignedTechId !== 9999 ? assignedTechId : null,
         tecnico_nombre: assignedTechName,
         turno: assignedTechTurno,
@@ -2916,7 +2916,7 @@ export default function GestionMantenimientoPage() {
         codigo: generatedCode,
         titulo: `[Correctivo Directo] ${newRecord.sintoma}`,
         maquina: newRecord.maquina,
-        planta: newRecord.planta,
+        planta: obtenerCodigoPlanta(newRecord.planta, plantasNomenclatura),
         tecnico_nombre: newRecord.tecnico_asignado || 'Sin asignar',
         turno: 'General',
         prioridad: newRecord.prioridad,
@@ -2934,7 +2934,7 @@ export default function GestionMantenimientoPage() {
         codigo_tarjeta: generatedCode,
         equipo: newRecord.maquina,
         maquina: newRecord.maquina,
-        planta: newRecord.planta,
+        planta: obtenerCodigoPlanta(newRecord.planta, plantasNomenclatura),
         descripcion_anomalia: newRecord.sintoma,
         descripcion_que: newRecord.sintoma,
         prioridad: newRecord.prioridad,
