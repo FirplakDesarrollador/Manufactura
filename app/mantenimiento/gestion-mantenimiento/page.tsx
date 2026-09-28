@@ -62,6 +62,9 @@ import {
   Image as ImageIcon,
   Mic,
   Square,
+  Star,
+  Paperclip,
+  File,
   X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -520,7 +523,9 @@ export default function GestionMantenimientoPage() {
   const [editingMachineId, setEditingMachineId] = useState<number | null>(null);
   const [savingMachine, setSavingMachine] = useState(false);
   const [uploadingMachinePhoto, setUploadingMachinePhoto] = useState(false);
+  const [showMachineLiveCamera, setShowMachineLiveCamera] = useState(false);
   const machineFileInputRef = useRef<HTMLInputElement>(null);
+  const machineCameraInputRef = useRef<HTMLInputElement>(null);
   const [machineFormTab, setMachineFormTab] = useState<'general' | 'specs' | 'financial' | 'media'>('general');
   const [machineFormData, setMachineFormData] = useState({
     nombre_equipo: '',
@@ -3621,70 +3626,167 @@ export default function GestionMantenimientoPage() {
     if (machineFileInputRef.current) {
       machineFileInputRef.current.value = '';
     }
+    if (machineCameraInputRef.current) {
+      machineCameraInputRef.current.value = '';
+    }
   };
 
-  const handleMachinePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const getMachinePhotosList = (fotosStr?: string): string[] => {
+    if (!fotosStr) return [];
+    if (fotosStr.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(fotosStr);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch {}
+    }
+    return fotosStr.split(',').map(s => s.trim()).filter(Boolean);
+  };
 
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WEBP, GIF).');
+  const currentMachinePhotos = useMemo(() => getMachinePhotosList(machineFormData.fotos), [machineFormData.fotos]);
+
+  const handleMachinePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentPhotos = getMachinePhotosList(machineFormData.fotos);
+    if (currentPhotos.length >= 5) {
+      alert('Ya has alcanzado el límite máximo de 5 fotos o archivos adjuntos.');
+      if (e.target) e.target.value = '';
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert('La imagen no debe superar los 10MB.');
-      return;
+    const availableSlots = 5 - currentPhotos.length;
+    const filesToUpload = Array.from(files).slice(0, availableSlots);
+
+    if (files.length > availableSlots) {
+      alert(`Solo se procesarán ${availableSlots} archivo(s) para no exceder el límite máximo de 5.`);
     }
 
     setUploadingMachinePhoto(true);
     try {
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileName = `maquinas/${Date.now()}_${cleanFileName}`;
+      const newUrls: string[] = [];
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('fichas-media')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
+      for (const file of filesToUpload) {
+        if (file.size > 15 * 1024 * 1024) {
+          alert(`El archivo "${file.name}" supera el tamaño máximo permitido de 15MB.`);
+          continue;
+        }
 
-      if (uploadError) {
-        console.warn('Error subiendo a Supabase Storage (fichas-media), usando base64:', uploadError);
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64data = reader.result as string;
-          setMachineFormData(prev => ({ ...prev, fotos: base64data }));
-        };
-        reader.readAsDataURL(file);
-      } else {
-        const { data: urlData } = supabase.storage.from('fichas-media').getPublicUrl(fileName);
-        if (urlData?.publicUrl) {
-          setMachineFormData(prev => ({ ...prev, fotos: urlData.publicUrl }));
+        const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const randomSuffix = Math.random().toString(36).substring(2, 7);
+        const fileName = `maquinas/${Date.now()}_${randomSuffix}_${cleanFileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('fichas-media')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.warn('Error subiendo a Supabase Storage (fichas-media), usando base64 fallback:', uploadError);
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+          if (base64) newUrls.push(base64);
+        } else {
+          const { data: urlData } = supabase.storage.from('fichas-media').getPublicUrl(fileName);
+          if (urlData?.publicUrl) {
+            newUrls.push(urlData.publicUrl);
+          }
         }
       }
+
+      if (newUrls.length > 0) {
+        const updatedPhotos = [...currentPhotos, ...newUrls].slice(0, 5);
+        setMachineFormData(prev => ({
+          ...prev,
+          fotos: updatedPhotos.join(', ')
+        }));
+      }
     } catch (err: any) {
-      console.error('Error procesando fotografía de máquina:', err);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        setMachineFormData(prev => ({ ...prev, fotos: base64data }));
-      };
-      reader.readAsDataURL(file);
+      console.error('Error procesando archivos adjuntos de máquina:', err);
+      alert('Ocurrió un error al procesar las fotos o archivos adjuntos.');
     } finally {
       setUploadingMachinePhoto(false);
       if (machineFileInputRef.current) {
         machineFileInputRef.current.value = '';
       }
+      if (machineCameraInputRef.current) {
+        machineCameraInputRef.current.value = '';
+      }
     }
   };
 
-  const handleRemoveMachinePhoto = () => {
-    setMachineFormData(prev => ({ ...prev, fotos: '' }));
-    if (machineFileInputRef.current) {
-      machineFileInputRef.current.value = '';
+  const handleCaptureMachineCamera = async (dataUrl: string) => {
+    const currentPhotos = getMachinePhotosList(machineFormData.fotos);
+    if (currentPhotos.length >= 5) {
+      alert('Ya has alcanzado el límite máximo de 5 fotos o archivos adjuntos.');
+      setShowMachineLiveCamera(false);
+      return;
     }
+
+    setUploadingMachinePhoto(true);
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const fileName = `maquinas/cam_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('fichas-media')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      let finalUrl = dataUrl;
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('fichas-media').getPublicUrl(fileName);
+        if (urlData?.publicUrl) {
+          finalUrl = urlData.publicUrl;
+        }
+      }
+
+      const updatedPhotos = [...currentPhotos, finalUrl].slice(0, 5);
+      setMachineFormData(prev => ({
+        ...prev,
+        fotos: updatedPhotos.join(', ')
+      }));
+    } catch (err) {
+      console.error('Error guardando foto de cámara:', err);
+      const updatedPhotos = [...currentPhotos, dataUrl].slice(0, 5);
+      setMachineFormData(prev => ({
+        ...prev,
+        fotos: updatedPhotos.join(', ')
+      }));
+    } finally {
+      setUploadingMachinePhoto(false);
+      setShowMachineLiveCamera(false);
+    }
+  };
+
+  const handleRemoveMachinePhoto = (indexToRemove: number) => {
+    const currentPhotos = getMachinePhotosList(machineFormData.fotos);
+    const updatedPhotos = currentPhotos.filter((_, idx) => idx !== indexToRemove);
+    setMachineFormData(prev => ({
+      ...prev,
+      fotos: updatedPhotos.join(', ')
+    }));
+  };
+
+  const handleSetPrimaryMachinePhoto = (indexToPrimary: number) => {
+    const currentPhotos = getMachinePhotosList(machineFormData.fotos);
+    if (indexToPrimary <= 0 || indexToPrimary >= currentPhotos.length) return;
+    const target = currentPhotos[indexToPrimary];
+    const rest = currentPhotos.filter((_, idx) => idx !== indexToPrimary);
+    const updatedPhotos = [target, ...rest];
+    setMachineFormData(prev => ({
+      ...prev,
+      fotos: updatedPhotos.join(', ')
+    }));
   };
 
   const handleOpenCreateMachine = () => {
@@ -10920,25 +11022,58 @@ export default function GestionMantenimientoPage() {
               {/* Photo + General Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Photo Box */}
-                <div className="md:col-span-1 bg-[#F6F3EE] rounded-2xl border border-gray-200 p-3 flex flex-col items-center justify-center min-h-[160px]">
-                  {selectedMachineModal.fotos ? (
-                    <div className="relative group cursor-zoom-in w-full h-full flex items-center justify-center">
-                      <img 
-                        src={selectedMachineModal.fotos.split(',')[0].trim()} 
-                        alt={selectedMachineModal.nombre_equipo}
-                        onClick={() => setZoomMachineImage(selectedMachineModal.fotos.split(',')[0].trim())}
-                        className="max-h-48 w-full object-contain rounded-xl shadow-xs group-hover:scale-105 transition-transform"
-                      />
-                      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-xs">
-                        Clic para ampliar
+                <div className="md:col-span-1 bg-[#F6F3EE] rounded-2xl border border-gray-200 p-3 flex flex-col items-center justify-center min-h-[160px] gap-2">
+                  {(() => {
+                    const photos = getMachinePhotosList(selectedMachineModal.fotos);
+                    if (photos.length === 0) {
+                      return (
+                        <div className="text-center text-gray-400 py-6">
+                          <Cpu className="w-12 h-12 mx-auto mb-1 opacity-30" />
+                          <span className="text-xs">Sin fotografía registrada</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="w-full flex flex-col items-center gap-2">
+                        <div className="relative group cursor-zoom-in w-full flex items-center justify-center">
+                          <img 
+                            src={photos[0]} 
+                            alt={selectedMachineModal.nombre_equipo}
+                            onClick={() => setZoomMachineImage(photos[0])}
+                            className="max-h-48 w-full object-contain rounded-xl shadow-xs group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-xs">
+                            Clic para ampliar
+                          </div>
+                        </div>
+
+                        {/* Additional Thumbnails Strip if > 1 photo/file */}
+                        {photos.length > 1 && (
+                          <div className="flex items-center gap-1.5 overflow-x-auto w-full pt-1 pb-0.5 justify-center">
+                            {photos.map((pUrl, pIdx) => {
+                              const isPdf = pUrl.toLowerCase().includes('.pdf');
+                              const isDoc = pUrl.toLowerCase().includes('.doc');
+                              return (
+                                <button
+                                  key={pIdx}
+                                  type="button"
+                                  onClick={() => setZoomMachineImage(pUrl)}
+                                  className="w-10 h-10 rounded-lg overflow-hidden border border-gray-300 hover:border-[#324354] shrink-0 bg-white flex items-center justify-center shadow-2xs transition-all hover:scale-105 cursor-pointer"
+                                  title={`Ver adjunto ${pIdx + 1}`}
+                                >
+                                  {isPdf || isDoc ? (
+                                    <File className="w-4 h-4 text-[#7B8E90]" />
+                                  ) : (
+                                    <img src={pUrl} alt={`Foto ${pIdx + 1}`} className="w-full h-full object-cover" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-400 py-6">
-                      <Cpu className="w-12 h-12 mx-auto mb-1 opacity-30" />
-                      <span className="text-xs">Sin fotografía registrada</span>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 {/* General Info */}
@@ -11427,11 +11562,20 @@ export default function GestionMantenimientoPage() {
               }}
               className="flex flex-col flex-1 overflow-hidden"
             >
-              {/* Hidden File Input for Machine Primary Photo */}
+              {/* Hidden File Inputs for Machine Photos & Camera */}
               <input
                 type="file"
                 ref={machineFileInputRef}
+                accept="image/*,.pdf,.doc,.docx"
+                multiple
+                onChange={handleMachinePhotoUpload}
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={machineCameraInputRef}
                 accept="image/*"
+                capture="environment"
                 onChange={handleMachinePhotoUpload}
                 className="hidden"
               />
@@ -11439,79 +11583,178 @@ export default function GestionMantenimientoPage() {
                 {/* TAB 1: IDENTIFICACIÓN Y ESTADO */}
                 {machineFormTab === 'general' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in">
-                    {/* Primary Photo Banner / Avatar in Tab 1 */}
-                    <div className="sm:col-span-2 flex flex-col sm:flex-row items-center gap-4 p-4 bg-[#F6F3EE] rounded-2xl border border-gray-200">
-                      <div className="relative group shrink-0">
-                        {machineFormData.fotos ? (
-                          <img
-                            src={machineFormData.fotos.split(',')[0].trim()}
-                            alt="Foto equipo"
-                            className="w-20 h-20 rounded-2xl object-cover border-2 border-[#324354]/20 shadow-xs cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => setZoomMachineImage(machineFormData.fotos.split(',')[0].trim())}
-                            title="Clic para ampliar"
-                          />
-                        ) : (
-                          <div 
-                            onClick={() => machineFileInputRef.current?.click()}
-                            className="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-gray-300 hover:border-[#324354] flex flex-col items-center justify-center text-gray-400 hover:text-[#324354] cursor-pointer transition-colors shadow-2xs"
-                          >
-                            <Camera className="w-7 h-7 mb-0.5 opacity-60" />
-                            <span className="text-[10px] font-bold">+ Foto</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-1 flex-1 text-center sm:text-left min-w-0">
-                        <div className="flex items-center justify-center sm:justify-start gap-2">
-                          <span className="text-xs font-bold text-[#324354] uppercase tracking-wider">
-                            Fotografía Principal del Equipo
-                          </span>
-                          {machineFormData.fotos && (
-                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full border border-emerald-200">
-                              ✓ Asignada
+                      {/* Photo & Attachments Section in Tab 1 (2 Buttons & Multi-file up to 5) */}
+                      <div className="sm:col-span-2 p-4 sm:p-4.5 bg-[#F6F3EE] rounded-2xl border border-gray-200 flex flex-col gap-3.5 shadow-2xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/80 pb-3">
+                          <div className="flex items-center gap-2">
+                            <Camera className="w-4 h-4 text-[#324354]" />
+                            <span className="text-xs font-bold text-[#324354] uppercase tracking-wider">
+                              Fotografías y Archivos Adjuntos del Equipo
                             </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          Foto principal del equipo para las tablas, tarjetas de catálogo y fichas técnicas.
-                        </p>
-                        <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => machineFileInputRef.current?.click()}
-                            disabled={uploadingMachinePhoto}
-                            className="px-3 py-1.5 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                          >
-                            {uploadingMachinePhoto ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>Subiendo...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span>{machineFormData.fotos ? 'Cambiar Foto' : 'Cargar Foto Adjunta'}</span>
-                              </>
-                            )}
-                          </button>
-                          {machineFormData.fotos && (
-                            <button
-                              type="button"
-                              onClick={handleRemoveMachinePhoto}
-                              className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-rose-200"
-                            >
-                              Quitar
-                            </button>
-                          )}
+                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                              currentMachinePhotos.length >= 5
+                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                : currentMachinePhotos.length > 0
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                : 'bg-gray-100 text-gray-600 border-gray-200'
+                            }`}>
+                              {currentMachinePhotos.length}/5 {currentMachinePhotos.length === 1 ? 'adjunto' : 'adjuntos'}
+                            </span>
+                          </div>
                           <button
                             type="button"
                             onClick={() => setMachineFormTab('media')}
-                            className="text-xs text-blue-700 hover:underline font-semibold ml-auto"
+                            className="text-xs text-blue-700 hover:underline font-semibold self-start sm:self-auto"
                           >
                             Opciones Multimedia →
                           </button>
                         </div>
+
+                        <p className="text-xs text-gray-500 -mt-1">
+                          Adjunta o toma hasta 5 fotografías o archivos. La primera fotografía será utilizada automáticamente como la <strong>foto principal</strong> en catálogos y tablas.
+                        </p>
+
+                        {/* Action Buttons: 1. Adjuntar Archivo / Foto, 2. Tomar Foto */}
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => machineFileInputRef.current?.click()}
+                            disabled={uploadingMachinePhoto || currentMachinePhotos.length >= 5}
+                            className="px-3.5 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Seleccionar fotos o archivos desde tu dispositivo"
+                          >
+                            {uploadingMachinePhoto ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Subiendo archivo...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Adjuntar Foto / Archivo</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (currentMachinePhotos.length >= 5) {
+                                alert('Ya has alcanzado el límite máximo de 5 fotos o archivos adjuntos.');
+                                return;
+                              }
+                              setShowMachineLiveCamera(true);
+                            }}
+                            disabled={uploadingMachinePhoto || currentMachinePhotos.length >= 5}
+                            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Abrir cámara en vivo o tomar foto directamente"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Tomar Foto</span>
+                          </button>
+
+                          {currentMachinePhotos.length > 0 && (
+                            <span className="text-[11px] text-gray-500 ml-auto hidden md:inline">
+                              ★ Haz clic en una imagen para ampliarla o usa las opciones para reordenar
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Thumbnails Gallery (1 to 5 items) */}
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+                          {currentMachinePhotos.map((photoUrl, idx) => {
+                            const isPdf = photoUrl.toLowerCase().includes('.pdf');
+                            const isDoc = photoUrl.toLowerCase().includes('.doc');
+                            return (
+                              <div
+                                key={idx}
+                                className={`relative group rounded-xl overflow-hidden border-2 transition-all bg-white flex flex-col items-center justify-center h-24 ${
+                                  idx === 0
+                                    ? 'border-[#324354] shadow-xs'
+                                    : 'border-gray-200 hover:border-gray-400'
+                                }`}
+                              >
+                                {isPdf || isDoc ? (
+                                  <a
+                                    href={photoUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="w-full h-full flex flex-col items-center justify-center p-2 text-[#324354] hover:bg-gray-50"
+                                    title="Abrir archivo adjunto"
+                                  >
+                                    <File className="w-7 h-7 text-[#7B8E90] mb-1" />
+                                    <span className="text-[10px] font-bold truncate max-w-full px-1">
+                                      {isPdf ? 'Documento PDF' : 'Archivo Doc'}
+                                    </span>
+                                  </a>
+                                ) : (
+                                  <img
+                                    src={photoUrl}
+                                    alt={`Foto adjunta ${idx + 1}`}
+                                    className="w-full h-full object-cover cursor-zoom-in group-hover:scale-105 transition-transform"
+                                    onClick={() => setZoomMachineImage(photoUrl)}
+                                    title="Clic para ampliar foto"
+                                  />
+                                )}
+
+                                {/* Primary Badge for index 0 */}
+                                {idx === 0 && (
+                                  <div className="absolute top-1 left-1 bg-[#324354] text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-0.5">
+                                    <Star className="w-2.5 h-2.5 fill-amber-300 text-amber-300" />
+                                    <span>Principal</span>
+                                  </div>
+                                )}
+
+                                {/* Overlay action buttons */}
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1 backdrop-blur-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => setZoomMachineImage(photoUrl)}
+                                    className="p-1.5 bg-white/90 hover:bg-white text-gray-800 rounded-lg shadow-xs transition-transform transform active:scale-95 cursor-pointer"
+                                    title="Ver / Ampliar"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {idx > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetPrimaryMachinePhoto(idx)}
+                                      className="p-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg shadow-xs transition-transform transform active:scale-95 cursor-pointer"
+                                      title="Definir como foto principal"
+                                    >
+                                      <Star className="w-3.5 h-3.5 fill-slate-950" />
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveMachinePhoto(idx)}
+                                    className="p-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg shadow-xs transition-transform transform active:scale-95 cursor-pointer"
+                                    title="Eliminar este archivo adjunto"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Empty slots placeholders if less than 5 */}
+                          {currentMachinePhotos.length < 5 && (
+                            <div
+                              onClick={() => machineFileInputRef.current?.click()}
+                              className="h-24 rounded-xl bg-white/60 hover:bg-white border-2 border-dashed border-gray-300 hover:border-[#324354] flex flex-col items-center justify-center text-gray-400 hover:text-[#324354] cursor-pointer transition-all shadow-2xs group"
+                              title="Adjuntar otra foto o archivo"
+                            >
+                              <Plus className="w-5 h-5 mb-0.5 group-hover:scale-110 transition-transform" />
+                              <span className="text-[10px] font-bold text-center leading-tight">
+                                + Adjuntar<br />({5 - currentMachinePhotos.length} disp.)
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
                     <div className="sm:col-span-2">
                       <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
@@ -11797,118 +12040,202 @@ export default function GestionMantenimientoPage() {
                 {/* TAB 4: MULTIMEDIA Y ENLACES */}
                 {machineFormTab === 'media' && (
                   <div className="flex flex-col gap-5 animate-in fade-in">
-                    {/* Primary Image Upload Card */}
-                    <div className="p-4.5 bg-[#F6F3EE] rounded-2xl border border-gray-200 flex flex-col gap-3.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
-                          <Camera className="w-4 h-4 text-[#7B8E90]" />
-                          <span>Fotografía Principal del Equipo (Adjunto / Supabase Storage)</span>
-                        </label>
-                        {machineFormData.fotos && (
-                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200">
-                            ✓ Foto Principal Activa
+                      {/* Primary Image & Attachments Upload Card */}
+                      <div className="p-4.5 bg-[#F6F3EE] rounded-2xl border border-gray-200 flex flex-col gap-3.5 shadow-2xs">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <label className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                            <Camera className="w-4 h-4 text-[#7B8E90]" />
+                            <span>Fotografías y Archivos Adjuntos (Hasta 5 fotos/archivos)</span>
+                          </label>
+                          <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full border ${
+                            currentMachinePhotos.length >= 5
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : currentMachinePhotos.length > 0
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                              : 'bg-gray-100 text-gray-600 border-gray-200'
+                          }`}>
+                            {currentMachinePhotos.length}/5 Adjuntos {currentMachinePhotos.length > 0 && '✓'}
                           </span>
-                        )}
-                      </div>
-
-                      {uploadingMachinePhoto ? (
-                        <div className="py-10 px-4 bg-white rounded-2xl border-2 border-dashed border-[#324354]/40 flex flex-col items-center justify-center text-center gap-3 shadow-2xs">
-                          <Loader2 className="w-9 h-9 animate-spin text-[#324354]" />
-                          <div>
-                            <p className="text-sm font-bold text-[#324354]">Subiendo fotografía a Supabase Storage...</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Por favor espera mientras se procesa el archivo.</p>
-                          </div>
                         </div>
-                      ) : machineFormData.fotos ? (
-                        <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-2xs">
-                          <div className="relative group w-32 h-32 shrink-0 bg-[#F6F3EE] rounded-xl overflow-hidden border border-gray-300 shadow-2xs flex items-center justify-center">
-                            <img 
-                              src={machineFormData.fotos.split(',')[0].trim()} 
-                              alt="Foto Principal" 
-                              className="w-full h-full object-contain cursor-zoom-in group-hover:scale-105 transition-transform"
-                              onClick={() => setZoomMachineImage(machineFormData.fotos.split(',')[0].trim())}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-2 flex-1 w-full min-w-0">
-                            <div className="text-xs text-gray-600">
-                              <strong className="text-[#324354] block mb-1">Imagen principal vinculada a la máquina:</strong>
-                              <div className="font-mono text-[11px] bg-[#F6F3EE] p-2 rounded-lg border border-gray-200 break-all max-h-16 overflow-y-auto text-gray-600">
-                                {machineFormData.fotos}
-                              </div>
+
+                        {uploadingMachinePhoto ? (
+                          <div className="py-10 px-4 bg-white rounded-2xl border-2 border-dashed border-[#324354]/40 flex flex-col items-center justify-center text-center gap-3 shadow-2xs">
+                            <Loader2 className="w-9 h-9 animate-spin text-[#324354]" />
+                            <div>
+                              <p className="text-sm font-bold text-[#324354]">Subiendo archivo a Supabase Storage...</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Por favor espera mientras se procesa y almacena el archivo.</p>
                             </div>
-                            <div className="flex items-center gap-2 pt-1 flex-wrap">
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3">
+                            {/* Actions bar: 2 Buttons */}
+                            <div className="flex items-center gap-2.5 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => machineFileInputRef.current?.click()}
-                                className="px-3.5 py-1.5 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                disabled={uploadingMachinePhoto || currentMachinePhotos.length >= 5}
+                                className="px-3.5 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <Upload className="w-3.5 h-3.5" />
-                                <span>Reemplazar Fotografía</span>
+                                <span>Adjuntar Foto / Archivo</span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => setZoomMachineImage(machineFormData.fotos.split(',')[0].trim())}
-                                className="px-3 py-1.5 bg-[#F6F3EE] hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all border border-gray-300 flex items-center gap-1.5 cursor-pointer"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span>Ver / Ampliar</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleRemoveMachinePhoto}
-                                className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-600 rounded-xl text-xs font-bold transition-all border border-rose-200 flex items-center gap-1.5 cursor-pointer sm:ml-auto"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Eliminar Foto</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div 
-                          onClick={() => machineFileInputRef.current?.click()}
-                          className="py-8 px-4 bg-white hover:bg-gray-50 transition-colors rounded-2xl border-2 border-dashed border-gray-300 hover:border-[#324354] flex flex-col items-center justify-center text-center cursor-pointer group shadow-2xs"
-                        >
-                          <div className="p-3 bg-[#F6F3EE] rounded-full border border-gray-200 group-hover:scale-110 transition-transform mb-2 text-[#324354]">
-                            <Upload className="w-6 h-6" />
-                          </div>
-                          <p className="text-sm font-bold text-[#324354]">
-                            Haz clic aquí para cargar la fotografía del equipo
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                            Sube un archivo de imagen desde tu computador (JPG, PNG, WEBP, GIF — hasta 10MB)
-                          </p>
-                          <button
-                            type="button"
-                            className="mt-3 px-4 py-1.5 bg-[#324354] text-white rounded-xl text-xs font-bold group-hover:bg-[#324354]/90 transition-all pointer-events-none shadow-xs"
-                          >
-                            Seleccionar Archivo de Imagen
-                          </button>
-                        </div>
-                      )}
 
-                      {/* Manual URL input fallback & SharePoint Notice */}
-                      <div className="pt-2 border-t border-gray-200/80">
-                        <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">
-                          O ingresa / edita la URL directamente (Opcional):
-                        </label>
-                        <input
-                          type="text"
-                          value={machineFormData.fotos}
-                          onChange={(e) => setMachineFormData(prev => ({ ...prev, fotos: e.target.value }))}
-                          placeholder="https://... o ruta pública de imagen"
-                          className="w-full px-3 py-2 bg-white rounded-xl border border-gray-300 text-xs text-[#324354] focus:outline-none focus:border-[#324354]"
-                        />
-                        {machineFormData.fotos && (machineFormData.fotos.includes('sharepoint.com') || machineFormData.fotos.includes('AllItems.aspx')) && (
-                          <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div>
-                              <strong>Aviso sobre enlace de SharePoint:</strong> El enlace actual pertenece al explorador web de SharePoint y requiere inicio de sesión, por lo que no se muestra como imagen directa. Te recomendamos utilizar el botón superior <strong>"Cargar Fotografía Principal"</strong> para subir el archivo directamente a la base de datos de Manufactura.
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (currentMachinePhotos.length >= 5) {
+                                    alert('Ya has alcanzado el límite máximo de 5 fotos o archivos adjuntos.');
+                                    return;
+                                  }
+                                  setShowMachineLiveCamera(true);
+                                }}
+                                disabled={uploadingMachinePhoto || currentMachinePhotos.length >= 5}
+                                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <span>Tomar Foto con Cámara</span>
+                              </button>
+
+                              {currentMachinePhotos.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMachineFormData(prev => ({ ...prev, fotos: '' }))}
+                                  className="px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-rose-200 ml-auto"
+                                >
+                                  Quitar Todos ({currentMachinePhotos.length})
+                                </button>
+                              )}
                             </div>
+
+                            {/* Attachments List / Grid */}
+                            {currentMachinePhotos.length > 0 ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                {currentMachinePhotos.map((photoUrl, idx) => {
+                                  const isPdf = photoUrl.toLowerCase().includes('.pdf');
+                                  const isDoc = photoUrl.toLowerCase().includes('.doc');
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`p-3 bg-white rounded-2xl border flex items-center gap-3 shadow-2xs ${
+                                        idx === 0 ? 'border-[#324354] ring-1 ring-[#324354]/20' : 'border-gray-200'
+                                      }`}
+                                    >
+                                      <div className="relative w-20 h-20 shrink-0 bg-[#F6F3EE] rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+                                        {isPdf || isDoc ? (
+                                          <a
+                                            href={photoUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex flex-col items-center justify-center p-1 text-center"
+                                            title="Abrir documento"
+                                          >
+                                            <File className="w-6 h-6 text-[#7B8E90] mb-0.5" />
+                                            <span className="text-[9px] font-bold text-[#324354]">
+                                              {isPdf ? 'PDF' : 'DOC'}
+                                            </span>
+                                          </a>
+                                        ) : (
+                                          <img
+                                            src={photoUrl}
+                                            alt={`Adjunto ${idx + 1}`}
+                                            className="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform"
+                                            onClick={() => setZoomMachineImage(photoUrl)}
+                                          />
+                                        )}
+                                        {idx === 0 && (
+                                          <span className="absolute bottom-1 left-1 bg-[#324354] text-white text-[8px] font-bold px-1 rounded shadow-2xs">
+                                            Principal
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-xs font-bold text-[#324354] truncate">
+                                            {idx === 0 ? '★ Foto Principal del Equipo' : `Adjunto #${idx + 1}`}
+                                          </span>
+                                        </div>
+
+                                        <div className="font-mono text-[10px] bg-[#F6F3EE] px-2 py-1 rounded border border-gray-200 truncate text-gray-500">
+                                          {photoUrl}
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                                          <button
+                                            type="button"
+                                            onClick={() => setZoomMachineImage(photoUrl)}
+                                            className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                                          >
+                                            <Eye className="w-3 h-3" />
+                                            <span>Ver</span>
+                                          </button>
+
+                                          {idx > 0 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSetPrimaryMachinePhoto(idx)}
+                                              className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer border border-amber-300"
+                                            >
+                                              <Star className="w-3 h-3 fill-amber-700 text-amber-700" />
+                                              <span>Definir Principal</span>
+                                            </button>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveMachinePhoto(idx)}
+                                            className="px-2 py-1 text-rose-600 hover:bg-rose-50 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer ml-auto border border-rose-200"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                            <span>Eliminar</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => machineFileInputRef.current?.click()}
+                                className="py-8 px-4 bg-white hover:bg-gray-50 transition-colors rounded-2xl border-2 border-dashed border-gray-300 hover:border-[#324354] flex flex-col items-center justify-center text-center cursor-pointer group shadow-2xs"
+                              >
+                                <div className="p-3 bg-[#F6F3EE] rounded-full border border-gray-200 group-hover:scale-110 transition-transform mb-2 text-[#324354]">
+                                  <Upload className="w-6 h-6" />
+                                </div>
+                                <p className="text-sm font-bold text-[#324354]">
+                                  Haz clic para adjuntar fotografías o documentos del equipo
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                                  Puedes adjuntar hasta 5 fotos o archivos (JPG, PNG, WEBP, PDF — hasta 15MB)
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
+
+                        {/* Manual URL input fallback & SharePoint Notice */}
+                        <div className="pt-2 border-t border-gray-200/80">
+                          <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">
+                            O ingresa / edita las URLs separadas por coma directamente (Opcional):
+                          </label>
+                          <input
+                            type="text"
+                            value={machineFormData.fotos}
+                            onChange={(e) => setMachineFormData(prev => ({ ...prev, fotos: e.target.value }))}
+                            placeholder="https://... , https://... (URLs públicas separadas por coma)"
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-gray-300 text-xs text-[#324354] focus:outline-none focus:border-[#324354]"
+                          />
+                          {machineFormData.fotos && (machineFormData.fotos.includes('sharepoint.com') || machineFormData.fotos.includes('AllItems.aspx')) && (
+                            <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                              <div>
+                                <strong>Aviso sobre enlace de SharePoint:</strong> El enlace actual pertenece al explorador web de SharePoint y requiere inicio de sesión, por lo que no se muestra como imagen directa. Te recomendamos utilizar los botones <strong>"Adjuntar Foto / Archivo"</strong> o <strong>"Tomar Foto"</strong> para subir los archivos directamente.
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
                     {/* Planos Técnicos */}
                     <div>
@@ -11980,6 +12307,17 @@ export default function GestionMantenimientoPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Machine Live Camera Modal */}
+      {showMachineLiveCamera && (
+        <LiveCameraModal
+          isOpen={showMachineLiveCamera}
+          onCapture={(dataUrl) => {
+            handleCaptureMachineCamera(dataUrl);
+          }}
+          onClose={() => setShowMachineLiveCamera(false)}
+        />
       )}
 
       {/* Lightbox: Zoom Machine Image */}
