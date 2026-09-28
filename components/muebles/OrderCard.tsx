@@ -3,7 +3,7 @@
 import React from 'react'
 import { OrdenMueble } from '@/types/muebles'
 import { FileText, Calendar, Package, User, AlertCircle, TrendingUp, Truck, CheckCircle, Info, AlertTriangle } from 'lucide-react'
-import { format, isBefore, isToday, parseISO } from 'date-fns'
+import { format, isBefore, isToday, parseISO, isValid } from 'date-fns'
 
 interface OrderCardProps {
     orden: OrdenMueble
@@ -14,14 +14,37 @@ interface OrderCardProps {
 }
 
 export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte', onReportDefect }: OrderCardProps) {
-    const deliveryDate = orden.fecha_entrega_estimada ? parseISO(orden.fecha_entrega_estimada) : null
-    const creationDate = orden.created_at ? parseISO(orden.created_at) : null
+    const parseSafeDate = (dateStr?: string | null) => {
+        if (!dateStr) return null
+        try {
+            const parsed = parseISO(dateStr)
+            return isValid(parsed) ? parsed : null
+        } catch {
+            return null
+        }
+    }
+
+    const deliveryDate = parseSafeDate(orden.fecha_entrega_estimada)
+    const creationDate = parseSafeDate(orden.created_at)
     
     const getDeliveryColor = () => {
         if (!deliveryDate) return 'bg-gray-100 text-gray-500'
-        if (isToday(deliveryDate)) return 'bg-amber-100 text-amber-700 border-amber-200'
-        if (isBefore(deliveryDate, new Date())) return 'bg-red-100 text-red-700 border-red-200'
+        try {
+            if (isToday(deliveryDate)) return 'bg-amber-100 text-amber-700 border-amber-200'
+            if (isBefore(deliveryDate, new Date())) return 'bg-red-100 text-red-700 border-red-200'
+        } catch {
+            return 'bg-gray-100 text-gray-500'
+        }
         return 'bg-blue-50 text-blue-600 border-blue-100'
+    }
+
+    const formatDateSafe = (d: Date | null, fallback = 'N/A') => {
+        if (!d) return fallback
+        try {
+            return format(d, 'dd/MM/yyyy')
+        } catch {
+            return fallback
+        }
     }
 
     const reposicionCount = () => {
@@ -75,7 +98,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                     <div className="text-xs flex flex-col gap-1">
                         <div className="flex justify-between items-center bg-gray-50 px-2 py-1 rounded">
                             <span className="text-gray-500 font-medium uppercase text-[10px]">Liberación:</span>
-                            <span className="text-gray-900 font-semibold">{creationDate ? format(creationDate, 'dd/MM/yyyy') : 'N/A'}</span>
+                            <span className="text-gray-900 font-semibold">{formatDateSafe(creationDate, 'N/A')}</span>
                         </div>
                         <div className="flex items-center gap-1 mt-1">
                             <span className="text-blue-600 font-bold">Pedido:</span>
@@ -122,7 +145,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                     </div>
                     <div className={`flex items-center justify-center gap-2 py-1.5 rounded-lg border px-3 mt-1 ${getDeliveryColor()}`}>
                         <Calendar size={14} />
-                        <span className="text-[11px] font-bold">ENTREGA: {deliveryDate ? format(deliveryDate, 'dd/MM/yyyy') : 'PENDIENTE'}</span>
+                        <span className="text-[11px] font-bold">ENTREGA: {formatDateSafe(deliveryDate, 'PENDIENTE')}</span>
                     </div>
                 </div>
 
