@@ -100,6 +100,19 @@ export default function ModalReportarDefectoMueble({
 
     // Submission
     const [submitting, setSubmitting] = useState<boolean>(false)
+    const [elapsedTime, setElapsedTime] = useState<string>('0m 00s')
+
+    useEffect(() => {
+        if (!isOpen) return
+        const start = Date.now()
+        const interval = setInterval(() => {
+            const diff = Date.now() - start
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+            setElapsedTime(`${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`)
+        }, 1000)
+        return () => clearInterval(interval)
+    }, [isOpen])
 
     // Machine options
     const taladroOptions = plantaMuebles === 'Muebles' 
@@ -135,24 +148,36 @@ export default function ModalReportarDefectoMueble({
         loadInitialData()
     }, [isOpen, turno, plantaMuebles])
 
-    // Update OF data when initialOF or ordenData changes
+    // Update OF data ONLY when modal is first opened or OF actually changes
+    const prevOpenRef = useRef(false)
+    const prevOfRef = useRef('')
+
     useEffect(() => {
         if (isOpen) {
             const currentOF = initialOF || ordenData?.orden_fabricacion || ''
-            setOf(currentOF)
-            if (ordenData?.producto_descripcion) setProductoDesc(ordenData.producto_descripcion)
-            if (ordenData?.producto_sku) setProductoSku(ordenData.producto_sku)
-            if (initialTaladro) setTaladro(initialTaladro)
-            if (initialTurno) setTurno(initialTurno)
-            setCantidad(1)
-            setReparable(true)
-            setSelectedDefectoId(null)
-            setFotoFile(null)
-            setFotoPreview(null)
-            setIsCustomComp(false)
-            setCustomComponente('')
+            const isFirstOpen = !prevOpenRef.current
+            const isDifferentOF = prevOfRef.current !== currentOF
+
+            if (isFirstOpen || isDifferentOF) {
+                setOf(currentOF)
+                if (ordenData?.producto_descripcion) setProductoDesc(ordenData.producto_descripcion)
+                if (ordenData?.producto_sku) setProductoSku(ordenData.producto_sku)
+                if (initialTaladro) setTaladro(initialTaladro)
+                if (initialTurno) setTurno(initialTurno)
+                setCantidad(1)
+                setReparable(true)
+                setSelectedDefectoId(null)
+                setFotoFile(null)
+                setFotoPreview(null)
+                setIsCustomComp(false)
+                setCustomComponente('')
+                prevOfRef.current = currentOF
+            }
+        } else {
+            prevOfRef.current = ''
         }
-    }, [isOpen, initialOF, ordenData, initialTaladro, initialTurno])
+        prevOpenRef.current = isOpen
+    }, [isOpen, initialOF, ordenData?.orden_fabricacion, ordenData?.producto_descripcion, ordenData?.producto_sku, initialTaladro, initialTurno])
 
     // Load components when OF is set
     useEffect(() => {
@@ -316,12 +341,18 @@ export default function ModalReportarDefectoMueble({
                             <p className="text-xs text-gray-300 font-medium">Inspección de calidad y reposiciones en Muebles</p>
                         </div>
                     </div>
-                    <button 
-                        onClick={onClose} 
-                        className="p-1.5 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-                    >
-                        <X size={22} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-xs font-mono font-bold text-amber-300">
+                            <Clock size={14} className="animate-pulse" />
+                            <span>{elapsedTime}</span>
+                        </div>
+                        <button 
+                            onClick={onClose} 
+                            className="p-1.5 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                        >
+                            <X size={22} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Modal Body */}
@@ -598,52 +629,6 @@ export default function ModalReportarDefectoMueble({
                             </div>
                         )}
                     </div>
-
-                    {/* Section 6: Context (Turno, Taladro, Supervisor) */}
-                    <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
-                                <Clock size={11} /> Turno
-                            </label>
-                            <select
-                                value={turno}
-                                onChange={(e) => setTurno(e.target.value)}
-                                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
-                            >
-                                <option value="1">Turno 1</option>
-                                <option value="2">Turno 2</option>
-                                <option value="3">Turno 3</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
-                                <Wrench size={11} /> Taladro / Centro
-                            </label>
-                            <select
-                                value={taladro}
-                                onChange={(e) => setTaladro(e.target.value)}
-                                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
-                            >
-                                {taladroOptions.map(t => (
-                                    <option key={t} value={t}>{t}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
-                                <User size={11} /> Supervisor
-                            </label>
-                            <input 
-                                type="text"
-                                value={supervisor}
-                                onChange={(e) => setSupervisor(e.target.value)}
-                                placeholder="Supervisor de turno"
-                                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
-                            />
-                        </div>
-                    </div>
                 </div>
 
                 {/* Modal Footer */}
@@ -660,39 +645,58 @@ export default function ModalReportarDefectoMueble({
                     <div className="flex items-center gap-2">
                         {onFinishInspectionTask ? (
                             <>
-                                <button
-                                    type="button"
-                                    onClick={() => handleSubmit(false)}
-                                    disabled={submitting || !selectedDefectoId || !of}
-                                    className={`px-4 py-2.5 rounded-xl font-bold text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-all ${
-                                        submitting || !selectedDefectoId || !of ? 'opacity-50 cursor-not-allowed' : ''
-                                    }`}
-                                >
-                                    <CheckCircle2 size={16} />
-                                    <span>GUARDAR DEFECTO</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleSubmit(true)}
-                                    disabled={submitting || !selectedDefectoId || !of}
-                                    className={`px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow-lg flex items-center gap-2 transition-all active:scale-[0.98] ${
-                                        submitting || !selectedDefectoId || !of
-                                            ? 'bg-gray-300 shadow-none cursor-not-allowed'
-                                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
-                                    }`}
-                                >
-                                    {submitting ? (
-                                        <>
-                                            <Loader2 size={16} className="animate-spin" />
-                                            <span>GUARDANDO...</span>
-                                        </>
-                                    ) : (
-                                        <>
+                                {!selectedDefectoId ? (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (onFinishInspectionTask) {
+                                                await onFinishInspectionTask()
+                                            }
+                                            onClose()
+                                        }}
+                                        disabled={submitting}
+                                        className="px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all active:scale-[0.98]"
+                                    >
+                                        <CheckCircle2 size={16} />
+                                        <span>FINALIZAR INSPECCIÓN (SIN DEFECTOS)</span>
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSubmit(false)}
+                                            disabled={submitting || !selectedDefectoId || !of}
+                                            className={`px-4 py-2.5 rounded-xl font-bold text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-all ${
+                                                submitting || !selectedDefectoId || !of ? 'opacity-50 cursor-not-allowed' : ''
+                                            }`}
+                                        >
                                             <CheckCircle2 size={16} />
-                                            <span>GUARDAR Y FINALIZAR INSPECCIÓN</span>
-                                        </>
-                                    )}
-                                </button>
+                                            <span>GUARDAR DEFECTO</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSubmit(true)}
+                                            disabled={submitting || !selectedDefectoId || !of}
+                                            className={`px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow-lg flex items-center gap-2 transition-all active:scale-[0.98] ${
+                                                submitting || !selectedDefectoId || !of
+                                                    ? 'bg-gray-300 shadow-none cursor-not-allowed'
+                                                    : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                                            }`}
+                                        >
+                                            {submitting ? (
+                                                <>
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                    <span>GUARDANDO...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle2 size={16} />
+                                                    <span>GUARDAR Y FINALIZAR INSPECCIÓN</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </>
+                                )}
                             </>
                         ) : (
                             <button

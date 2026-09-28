@@ -30,6 +30,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isDefectoModalOpen, setIsDefectoModalOpen] = useState(false)
     const [defectoSelectedOrden, setDefectoSelectedOrden] = useState<OrdenMueble | null>(null)
+    const [operarioInfo, setOperarioInfo] = useState<{ cedula: string, nombre: string } | null>(null)
     const [taladro, setTaladro] = useState<string>('')
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -305,9 +306,12 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                         clearSelection()
                         onStartTask?.(tarea)
                     }}
-                    onReportDefect={(ord) => {
+                    onReportDefect={(ord, operario) => {
                         clearSelection()
                         setDefectoSelectedOrden(ord)
+                        if (operario) {
+                            setOperarioInfo(operario)
+                        }
                         setIsDefectoModalOpen(true)
                     }}
                     onSuccess={() => {
@@ -324,10 +328,13 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                     onClose={() => {
                         setIsDefectoModalOpen(false)
                         setDefectoSelectedOrden(null)
+                        setOperarioInfo(null)
                     }}
                     ordenFabricacion={defectoSelectedOrden?.orden_fabricacion || ''}
                     ordenData={defectoSelectedOrden || undefined}
                     usuarioNombre={usuarioNombre}
+                    operarioCedula={operarioInfo?.cedula}
+                    operarioNombre={operarioInfo?.nombre}
                     turno={turno}
                     taladro={taladro}
                     plantaMuebles={plantaMuebles}

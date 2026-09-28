@@ -113,6 +113,31 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
         }
     }
 
+    const ordenDataMemo = React.useMemo(() => ({
+        orden_fabricacion: taskOrders[0]?.of || tarea.of,
+        producto_descripcion: taskOrders[0]?.producto_descripcion || tarea.producto_descripcion
+    }), [taskOrders, tarea.of, tarea.producto_descripcion])
+
+    if (tarea.proceso === 'Inspeccion' || tarea.proceso === 'Inspección') {
+        return (
+            <ModalReportarDefectoMueble
+                isOpen={true}
+                onClose={async () => {
+                    await setTareaActiva(userEmail, null)
+                    onFinished()
+                }}
+                ordenFabricacion={taskOrders[0]?.of || tarea.of}
+                ordenData={ordenDataMemo}
+                usuarioNombre={usuarioNombre}
+                operarioCedula={tarea.operario_cedula}
+                operarioNombre={tarea.operario_nombre}
+                taladro={tarea.taladro}
+                onSuccess={() => onFinished()}
+                onFinishInspectionTask={handleFinalizar}
+            />
+        )
+    }
+
     return (
         <div className="fixed inset-0 z-[200] bg-[#254153] flex items-center justify-center p-4 md:p-8 overflow-hidden">
             <div className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-500">
