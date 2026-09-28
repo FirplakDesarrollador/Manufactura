@@ -56,7 +56,7 @@ export async function GET() {
 
     while (hasMore) {
       const { data, error } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .select('*')
         .range(from, from + step - 1)
         .order('id', { ascending: true });
@@ -127,7 +127,7 @@ export async function POST() {
 
     while (hasMore) {
       const { data, error } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .select('*')
         .range(from, from + step - 1)
         .order('id', { ascending: true });
@@ -210,7 +210,7 @@ export async function POST() {
     // Apply merges to masters
     for (const update of updatesToPerform) {
       await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .update(update.data)
         .eq('id', update.id);
     }
@@ -222,7 +222,7 @@ export async function POST() {
     for (let i = 0; i < idsToDelete.length; i += batchSize) {
       const batchIds = idsToDelete.slice(i, i + batchSize);
       const { error: deleteError } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .delete()
         .in('id', batchIds);
 

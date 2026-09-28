@@ -43,6 +43,7 @@ import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEdi
 import TarjetaDetailModal from '@/components/mantenimiento/TarjetaDetailModal';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
+import { getNextConsecutiveCode } from '@/lib/consecutivos';
 import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 import * as XLSX from 'xlsx';
 
@@ -754,7 +755,7 @@ export default function TarjetasAnomaliasPage() {
 
     try {
       setSubmitting(true);
-      const newCode = `TPM-${Math.floor(100 + Math.random() * 900)}`;
+      const newCode = await getNextConsecutiveCode('TPM');
       const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
       const fechaApertura = new Date().toISOString().split('T')[0];
       const tempId = Date.now();

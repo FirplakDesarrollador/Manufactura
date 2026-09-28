@@ -45,10 +45,19 @@ export default function UnifiedInventoryTable({ externalPlantFilter, onClearPlan
     useEffect(() => {
         async function fetchAllParts() {
             setLoading(true)
-            const { data, error } = await supabase
-                .from('REPUESTOS_MANTENIMIENTO')
+            let { data, error } = await supabase
+                .from('mantenimiento_repuestos')
                 .select('*')
                 .order('Maquina', { ascending: true })
+
+            if (error) {
+                const res = await supabase
+                    .from('REPUESTOS_MANTENIMIENTO')
+                    .select('*')
+                    .order('Maquina', { ascending: true })
+                data = res.data
+                error = res.error
+            }
 
             if (!error && data) {
                 console.log('Primer elemento de los datos:', data[0])
@@ -102,10 +111,18 @@ export default function UnifiedInventoryTable({ externalPlantFilter, onClearPlan
     const handleStockUpdate = async (modified: number, newStock: string) => {
         setUpdatingId(modified.toString())
 
-        const { error } = await supabase
-            .from('REPUESTOS_MANTENIMIENTO')
+        let { error } = await supabase
+            .from('mantenimiento_repuestos')
             .update({ 'Stock actual': newStock })
             .eq('Modified', modified)
+
+        if (error) {
+            const res = await supabase
+                .from('REPUESTOS_MANTENIMIENTO')
+                .update({ 'Stock actual': newStock })
+                .eq('Modified', modified)
+            error = res.error
+        }
 
         if (error) {
             console.error('Error updating stock:', error)

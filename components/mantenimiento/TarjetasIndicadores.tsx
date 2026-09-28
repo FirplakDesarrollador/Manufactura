@@ -29,6 +29,7 @@ import {
   Legend, 
   CartesianGrid 
 } from 'recharts';
+import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 
 interface TarjetaTpm {
   id: number | string;
@@ -54,11 +55,11 @@ interface TarjetasIndicadoresProps {
 export default function TarjetasIndicadores({ tarjetas }: TarjetasIndicadoresProps) {
   const [filterPlanta, setFilterPlanta] = useState<string>('todas');
 
-  // Available plantas
+  // Available plantas (Codigos)
   const plantasList = useMemo(() => {
     const setP = new Set<string>();
     tarjetas.forEach(t => {
-      if (t.planta) setP.add(t.planta);
+      if (t.planta) setP.add(obtenerCodigoPlanta(t.planta));
     });
     return Array.from(setP);
   }, [tarjetas]);
@@ -66,7 +67,7 @@ export default function TarjetasIndicadores({ tarjetas }: TarjetasIndicadoresPro
   // Filtered dataset
   const data = useMemo(() => {
     if (filterPlanta === 'todas') return tarjetas;
-    return tarjetas.filter(t => t.planta === filterPlanta);
+    return tarjetas.filter(t => obtenerCodigoPlanta(t.planta) === filterPlanta);
   }, [tarjetas, filterPlanta]);
 
   // Overall KPIs
@@ -121,12 +122,12 @@ export default function TarjetasIndicadores({ tarjetas }: TarjetasIndicadoresPro
     ];
   }, [data]);
 
-  // Breakdown by Planta
+  // Breakdown by Planta (Codigos)
   const plantaData = useMemo(() => {
     const map: { [p: string]: { planta: string; rojas: number; azules: number; amarillas: number; verdes: number; total: number } } = {};
 
     data.forEach(t => {
-      const p = t.planta || 'Sin Planta';
+      const p = obtenerCodigoPlanta(t.planta);
       if (!map[p]) {
         map[p] = { planta: p, rojas: 0, azules: 0, amarillas: 0, verdes: 0, total: 0 };
       }

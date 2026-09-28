@@ -1,5 +1,6 @@
 // lib/nomenclaturaPlantas.ts
-// Estandarización unificada de plantas de producción FIRPLAK S.A.
+// Estandarización unificada de códigos de plantas de producción FIRPLAK S.A.
+// Basado en la tabla oficial public.nomenclatura_plantas
 
 export interface NomenclaturaPlanta {
   id?: number | string;
@@ -12,7 +13,7 @@ export interface NomenclaturaPlanta {
 }
 
 /**
- * Catálogo maestro estático predeterminado (fallback y acceso síncrono rápido)
+ * Catálogo maestro estático predeterminado con los códigos oficiales de public.nomenclatura_plantas
  */
 export const NOMENCLATURA_PLANTAS_DEFAULT: NomenclaturaPlanta[] = [
   {
@@ -35,40 +36,33 @@ export const NOMENCLATURA_PLANTAS_DEFAULT: NomenclaturaPlanta[] = [
     activo: true
   },
   {
-    codigo: 'CEFI',
-    nombre_oficial: 'Muebles (CEFI)',
+    codigo: 'MBL',
+    nombre_oficial: 'Muebles',
     alias: [
-      'CEFI',
-      'MUEBLES',
       'MBL',
+      'MUEBLES',
       'PLANTA DE MUEBLES',
       'PLANTA MUEBLES',
       'CARPINTERIA',
       'MADERA',
-      'CEFI MUEBLES',
       'MUEBLE',
       'MP-20'
     ],
-    descripcion: 'Centro de Fabricación Integrado de Mobiliario y Madera',
+    descripcion: 'Planta de Fabricación de Mobiliario y Madera',
     color_hex: '#7B8E90',
     activo: true
   },
   {
-    codigo: 'ACR',
-    nombre_oficial: 'Acrílicos',
+    codigo: 'CEFI',
+    nombre_oficial: 'CEFI',
     alias: [
-      'ACR',
-      'ACRILICOS',
-      'ACRÍLICOS',
-      'PLANTA ACRÍLICOS',
-      'PLANTA ACRILICOS',
-      'BAÑERAS',
-      'BANERAS',
-      'TERMOFORMADO',
-      'MP-30'
+      'CEFI',
+      'CEMA',
+      'PLANTA CEFI',
+      'CEFI MUEBLES'
     ],
-    descripcion: 'Línea de termoformado y procesamiento de láminas acrílicas',
-    color_hex: '#deb841',
+    descripcion: 'Centro de Fabricación Integrado (CEFI)',
+    color_hex: '#7B8E90',
     activo: true
   },
   {
@@ -106,23 +100,168 @@ export const NOMENCLATURA_PLANTAS_DEFAULT: NomenclaturaPlanta[] = [
     nombre_oficial: 'Servicios Generales',
     alias: [
       'SG',
-      'MTTO',
-      'MANTENIMIENTO',
       'SERVICIOS GENERALES',
       'PLANTA GENERAL',
       'PLANTA SERVICIOS GENERALES',
       'SERVICIOS',
-      'TALLER MTTO'
+      'TALLER MTTO',
+      'INFRAESTRUCTURA'
     ],
-    descripcion: 'Área de soporte transversal, mantenimiento e infraestructura general',
+    descripcion: 'Área de soporte transversal y servicios generales',
     color_hex: '#64748b',
+    activo: true
+  },
+  {
+    codigo: 'MANUF',
+    nombre_oficial: 'Manufactura',
+    alias: [
+      'MANUF',
+      'MANUFACTURA',
+      'PRODUCCION GENERAL',
+      'PRODUCCIÓN'
+    ],
+    descripcion: 'Área central de Manufactura',
+    color_hex: '#324354',
+    activo: true
+  },
+  {
+    codigo: 'MTTO',
+    nombre_oficial: 'Mantenimiento',
+    alias: [
+      'MTTO',
+      'MANTENIMIENTO',
+      'TALLER DE MANTENIMIENTO'
+    ],
+    descripcion: 'Área técnica de Mantenimiento',
+    color_hex: '#f59e0b',
+    activo: true
+  },
+  {
+    codigo: 'LOGI',
+    nombre_oficial: 'Logística',
+    alias: [
+      'LOGI',
+      'LOG',
+      'LOGISTICA',
+      'LOGÍSTICA'
+    ],
+    descripcion: 'Área de Logística y Despachos',
+    color_hex: '#8b5cf6',
+    activo: true
+  },
+  {
+    codigo: 'ALM',
+    nombre_oficial: 'Almacén',
+    alias: [
+      'ALM',
+      'ALMACEN',
+      'ALMACÉN',
+      'ALMACEN REPUESTOS',
+      'BODEGA'
+    ],
+    descripcion: 'Almacén central y repuestos',
+    color_hex: '#06b6d4',
+    activo: true
+  },
+  {
+    codigo: 'CEDI',
+    nombre_oficial: 'Centro de Distribución',
+    alias: [
+      'CEDI',
+      'CENTRO DE DISTRIBUCION',
+      'CENTRO DE DISTRIBUCIÓN'
+    ],
+    descripcion: 'Centro de Distribución (CEDI)',
+    color_hex: '#10b981',
+    activo: true
+  },
+  {
+    codigo: 'EXPO',
+    nombre_oficial: 'Exportaciones',
+    alias: [
+      'EXPO',
+      'EXPORTACIONES',
+      'INTERNACIONAL'
+    ],
+    descripcion: 'Área de Exportaciones',
+    color_hex: '#ec4899',
+    activo: true
+  },
+  {
+    codigo: 'FPK-HOME-MED',
+    nombre_oficial: 'FIRPLAK HOME MEDELLÍN',
+    alias: [
+      'FPK-HOME-MED',
+      'FIRPLAK HOME MEDELLIN',
+      'FIRPLAK HOME MEDELLÍN',
+      'HOME MEDELLIN',
+      'SHOWROOM'
+    ],
+    descripcion: 'Tienda FIRPLAK Home Medellín',
+    color_hex: '#6366f1',
+    activo: true
+  },
+  {
+    codigo: 'ACR',
+    nombre_oficial: 'Acrílicos',
+    alias: [
+      'ACR',
+      'ACRILICOS',
+      'ACRÍLICOS',
+      'PLANTA ACRÍLICOS',
+      'BAÑERAS',
+      'BANERAS',
+      'TERMOFORMADO',
+      'MP-30'
+    ],
+    descripcion: 'Línea de termoformado y procesamiento de láminas acrílicas',
+    color_hex: '#deb841',
+    activo: true
+  },
+  {
+    codigo: 'MOL',
+    nombre_oficial: 'Moldes',
+    alias: [
+      'MOL',
+      'MOLDES',
+      'TALLER DE MOLDES'
+    ],
+    descripcion: 'Taller de fabricación y mantenimiento de moldes',
+    color_hex: '#d97706',
+    activo: true
+  },
+  {
+    codigo: 'EX',
+    nombre_oficial: 'Proveedor Externo',
+    alias: [
+      'EX',
+      'EXTERNO',
+      'PROVEEDOR EXTERNO',
+      'TERCEROS'
+    ],
+    descripcion: 'Servicios con proveedores externos',
+    color_hex: '#64748b',
+    activo: true
+  },
+  {
+    codigo: 'OTROS',
+    nombre_oficial: 'Otros',
+    alias: [
+      'OTROS',
+      'OTRO',
+      'VARIOS',
+      'CUARTO 5 S',
+      'HUACALES',
+      'GENERAL'
+    ],
+    descripcion: 'Otras áreas operativas',
+    color_hex: '#94a3b8',
     activo: true
   }
 ];
 
 /**
  * Normaliza un nombre o código de planta recibido a su Nombre Oficial canónico.
- * Soporta insensibilidad a mayúsculas/minúsculas, tildes y espacios extras.
  */
 export function normalizarPlanta(
   input: string | null | undefined,
@@ -134,56 +273,110 @@ export function normalizarPlanta(
     .trim()
     .toUpperCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, ''); // Remover tildes para comparación robusta
+    .replace(/[\u0300-\u036f]/g, '');
 
-  // 1. Coincidencia exacta con nombre oficial o código
+  // 1. Coincidencia exacta con código o nombre oficial
   for (const item of catalogo) {
-    const cleanOficial = item.nombre_oficial
-      .toUpperCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    const cleanCodigo = item.codigo
-      .toUpperCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+    const cleanCodigo = item.codigo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const cleanOficial = item.nombre_oficial.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    if (clean === cleanOficial || clean === cleanCodigo) {
+    if (clean === cleanCodigo || clean === cleanOficial) {
       return item.nombre_oficial;
     }
 
-    // 2. Coincidencia dentro de la lista de alias
-    for (const al of item.alias) {
-      const cleanAlias = al
-        .toUpperCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
-      if (clean === cleanAlias) {
-        return item.nombre_oficial;
+    if (item.alias && Array.isArray(item.alias)) {
+      for (const al of item.alias) {
+        const cleanAlias = al.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (clean === cleanAlias) {
+          return item.nombre_oficial;
+        }
       }
     }
   }
 
-  // 3. Coincidencias por palabras clave (heurística para textos largos)
+  // 2. Heurística
   if (clean.includes('MARMOL') || clean === 'MS') return 'Mármol Sintético';
-  if (clean.includes('MUEBLE') || clean.includes('CEFI') || clean.includes('MADERA') || clean.includes('CARPINT')) return 'Muebles (CEFI)';
-  if (clean.includes('ACRILIC') || clean.includes('TERMOFORM')) return 'Acrílicos';
+  if (clean.includes('CEFI')) return 'CEFI';
+  if (clean.includes('MUEBLE') || clean === 'MBL' || clean.includes('MADERA') || clean.includes('CARPINT')) return 'Muebles';
+  if (clean.includes('ACRILIC') || clean.includes('TERMOFORM') || clean === 'ACR') return 'Acrílicos';
   if (clean.includes('FIBRA') || clean === 'FV') return 'Fibra de Vidrio';
   if (clean.includes('RTM')) return 'RTM';
-  if (clean.includes('SERVICIO') || clean.includes('MTTO') || clean.includes('MANTENIMIENTO')) return 'Servicios Generales';
+  if (clean.includes('CEDI') || clean.includes('DISTRIB')) return 'Centro de Distribución';
+  if (clean.includes('ALMACEN') || clean === 'ALM') return 'Almacén';
+  if (clean.includes('LOGIST') || clean === 'LOGI') return 'Logística';
+  if (clean.includes('SERVICIO') || clean === 'SG') return 'Servicios Generales';
+  if (clean.includes('MTTO') || clean.includes('MANTENIMIENTO')) return 'Mantenimiento';
 
   return input.trim();
 }
 
 /**
- * Devuelve el código estándar (ej: 'MS', 'CEFI', 'FV') a partir de cualquier alias o nombre oficial
+ * Devuelve SIEMPRE el CÓDIGO oficial de planta (ej: 'MS', 'MBL', 'CEFI', 'FV', 'RTM', 'SG', 'ALM', 'CEDI', 'OTROS')
  */
 export function obtenerCodigoPlanta(
   input: string | null | undefined,
   catalogo: NomenclaturaPlanta[] = NOMENCLATURA_PLANTAS_DEFAULT
 ): string {
-  const oficial = normalizarPlanta(input, catalogo);
-  const found = catalogo.find(p => p.nombre_oficial === oficial);
-  return found ? found.codigo : (input || 'MS').trim().toUpperCase();
+  if (!input || typeof input !== 'string') return 'MS';
+
+  const clean = input
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Si ya es un código directo
+  const directMatch = catalogo.find(
+    p => p.codigo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === clean
+  );
+  if (directMatch) return directMatch.codigo;
+
+  // 2. Buscar por alias
+  for (const item of catalogo) {
+    if (item.alias && Array.isArray(item.alias)) {
+      for (const al of item.alias) {
+        const cleanAlias = al.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (clean === cleanAlias) {
+          return item.codigo;
+        }
+      }
+    }
+  }
+
+  // 3. Buscar por nombre oficial
+  const officialMatch = catalogo.find(
+    p => p.nombre_oficial.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === clean
+  );
+  if (officialMatch) return officialMatch.codigo;
+
+  // 4. Heurísticas rápidas
+  if (clean.includes('MARMOL') || clean.includes('SINTETICO')) return 'MS';
+  if (clean.includes('CEFI')) return 'CEFI';
+  if (clean.includes('MUEBLE') || clean.includes('MADERA') || clean.includes('CARPINT')) return 'MBL';
+  if (clean.includes('ACRILIC') || clean.includes('TERMOFORM')) return 'ACR';
+  if (clean.includes('FIBRA')) return 'FV';
+  if (clean.includes('RTM')) return 'RTM';
+  if (clean.includes('CEDI') || clean.includes('DISTRIB')) return 'CEDI';
+  if (clean.includes('ALMACEN')) return 'ALM';
+  if (clean.includes('LOGIST')) return 'LOGI';
+  if (clean.includes('SERVICIO')) return 'SG';
+  if (clean.includes('MTTO') || clean.includes('MANTENIMIENTO')) return 'MTTO';
+  if (clean.includes('EXPO')) return 'EXPO';
+  if (clean.includes('HOME')) return 'FPK-HOME-MED';
+  if (clean.includes('MOLDE')) return 'MOL';
+  if (clean.includes('EXTERNO') || clean.includes('TERCERO')) return 'EX';
+  if (clean.includes('CUARTO') || clean.includes('HUACAL') || clean.includes('OTRO')) return 'OTROS';
+
+  return clean.length <= 6 ? clean : 'OTROS';
+}
+
+/**
+ * Lista de todos los códigos oficiales para usar en Dropdowns / Selects
+ */
+export function obtenerCodigosOficialesPlantas(
+  catalogo: NomenclaturaPlanta[] = NOMENCLATURA_PLANTAS_DEFAULT
+): string[] {
+  return catalogo.filter(p => p.activo !== false).map(p => p.codigo);
 }
 
 /**
@@ -196,8 +389,7 @@ export function obtenerNombresOficialesPlantas(
 }
 
 /**
- * Extrae la nomenclatura existente entre corchetes (ej: [S04RTMNPT60]) o calcula
- * la nomenclatura estándar FIRPLAK según la regla: [S{seccion}{plantaCode}{tipoCode}{duracion}]
+ * Extrae la nomenclatura existente entre corchetes o la calcula
  */
 export function computeNomenclatura(
   planta?: string | null,
@@ -213,16 +405,7 @@ export function computeNomenclatura(
   }
 
   const seccion = '04';
-  let pCode = 'MS';
-  if (planta) {
-    const cleanPlanta = String(planta).toUpperCase();
-    if (cleanPlanta.includes('RTM')) pCode = 'RTM';
-    else if (cleanPlanta.includes('CEFI') || cleanPlanta.includes('MUEBLE') || cleanPlanta.includes('MBL')) pCode = 'MBL';
-    else if (cleanPlanta.includes('ACR')) pCode = 'ACR';
-    else if (cleanPlanta.includes('FIBRA') || cleanPlanta.includes('FV')) pCode = 'FV';
-    else if (cleanPlanta.includes('SERV') || cleanPlanta.includes('SG')) pCode = 'SG';
-    else pCode = 'MS';
-  }
+  const pCode = obtenerCodigoPlanta(planta);
 
   let tCode = 'NPT';
   if (tipoIntervencion) {
@@ -251,4 +434,3 @@ export function cleanTaskTitle(title: string, nomenclature?: string): string {
   clean = clean.replace(/\[\s*\]/g, '').replace(/\s{2,}/g, ' ').trim();
   return clean || String(title).trim();
 }
-

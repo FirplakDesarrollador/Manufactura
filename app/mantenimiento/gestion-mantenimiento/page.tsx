@@ -60,6 +60,8 @@ import {
   Lock,
   Edit3,
   Image as ImageIcon,
+  Mic,
+  Square,
   X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -69,8 +71,12 @@ import TarjetasTpmTab from '@/components/mantenimiento/TarjetasTpmTab';
 import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSemanalPlanner';
 import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosColumnas';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
+import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
+import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
+import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
 import * as XLSX from 'xlsx';
-import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle } from '@/lib/nomenclaturaPlantas';
+import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
+import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
   id: number | string;
@@ -155,16 +161,18 @@ export const getHistoryRecordCategory = (row: any): 'TPM' | 'Correctivo' | 'Prev
 };
 
 export const getHistoryRecordCode = (row: any, idx?: number): string => {
-  if (!row) return 'PREV-0001';
+  if (!row) return 'PREV-1';
+  const rawCode = (row.codigo || row['CODIGO'] || row.codigo_tarjeta || '').toString().trim();
+  if (rawCode && (rawCode.startsWith('PREV-') || rawCode.startsWith('CORR-') || rawCode.startsWith('TPM-'))) {
+    return rawCode;
+  }
   const category = getHistoryRecordCategory(row);
-  const rawCode = (row['CODIGO'] || row.codigo || '').toString().trim();
   const numDigits = rawCode.replace(/[^0-9]/g, '');
   const numVal = numDigits ? parseInt(numDigits, 10) : (row.id || (idx !== undefined ? idx + 1 : 1));
-  const numPadded = String(numVal).padStart(4, '0');
 
-  if (category === 'TPM') return `TPM-${numPadded}`;
-  if (category === 'Correctivo') return `CORR-${numPadded}`;
-  return `PREV-${numPadded}`;
+  if (category === 'TPM') return `TPM-${numVal}`;
+  if (category === 'Correctivo') return `CORR-${numVal}`;
+  return `PREV-${numVal}`;
 };
 
 // Interfaces
@@ -317,9 +325,9 @@ export default function GestionMantenimientoPage() {
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
   const [historyTipo, setHistoryTipo] = useState('Todos');
   const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
-  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'apertura' | 'cierre' | 'observaciones';
-  const [historySortField, setHistorySortField] = useState<HistorySortField>('id');
-  const [historySortAsc, setHistorySortAsc] = useState<boolean>(true);
+  type HistorySortField = 'id' | 'codigo' | 'titulo' | 'planta' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'plazo' | 'apertura' | 'cierre';
+  const [historySortField, setHistorySortField] = useState<HistorySortField>('apertura');
+  const [historySortAsc, setHistorySortAsc] = useState<boolean>(false);
 
   const handleHistorySort = (field: HistorySortField) => {
     if (historySortField === field) {
@@ -335,6 +343,35 @@ export default function GestionMantenimientoPage() {
   const [correctivoPrioridad, setCorrectivoPrioridad] = useState('Todas');
   const [correctivoEstado, setCorrectivoEstado] = useState('Todos');
   const [showCorrectivoModal, setShowCorrectivoModal] = useState(false);
+
+  // TPM Card Form Modal State (Matching /mantenimiento/tarjetas-falla)
+  const [showCreateTpmModal, setShowCreateTpmModal] = useState(false);
+  const [tpmFormData, setTpmFormData] = useState<{
+    tipo_tarjeta: 'roja' | 'azul' | 'amarilla' | 'verde';
+    maquina: string;
+    planta: string;
+    detectada_por: string;
+    descripcion_que: string;
+    prioridad: 'Alta' | 'Media' | 'Baja';
+    accion_inmediata: string;
+    fotos: string[];
+  }>({
+    tipo_tarjeta: 'roja',
+    maquina: '',
+    planta: 'Mármol Sintético',
+    detectada_por: '',
+    descripcion_que: '',
+    prioridad: 'Alta',
+    accion_inmediata: '',
+    fotos: []
+  });
+  const [isTpmListening, setIsTpmListening] = useState(false);
+  const tpmRecognitionRef = useRef<any>(null);
+  const [annotatingTpmImage, setAnnotatingTpmImage] = useState<{ src: string; index?: number } | null>(null);
+  const [showTpmLiveCamera, setShowTpmLiveCamera] = useState(false);
+  const tpmFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [tpmValidationMsg, setTpmValidationMsg] = useState<string | null>(null);
+  const [submittingTpm, setSubmittingTpm] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [viewingCorrectivo, setViewingCorrectivo] = useState<CorrectiveRecord | null>(null);
@@ -470,6 +507,9 @@ export default function GestionMantenimientoPage() {
   const [maquinasPage, setMaquinasPage] = useState<number>(1);
   const [maquinasPageSize, setMaquinasPageSize] = useState<number>(50);
   const [selectedMachineModal, setSelectedMachineModal] = useState<any | null>(null);
+  const [machineInterventionSearch, setMachineInterventionSearch] = useState('');
+  const [machineInterventionCategory, setMachineInterventionCategory] = useState('Todos');
+  const [machineInterventionSortAsc, setMachineInterventionSortAsc] = useState(false);
   const [zoomMachineImage, setZoomMachineImage] = useState<string | null>(null);
   const [machineToDelete, setMachineToDelete] = useState<{ id: number; nombre: string; codigo?: string; planta?: string } | null>(null);
   const [deletingMachine, setDeletingMachine] = useState<boolean>(false);
@@ -600,6 +640,212 @@ export default function GestionMantenimientoPage() {
 
       return false;
     });
+  };
+
+  // Helper to fetch all work orders created from/linked to a specific PMP Preventive Plan
+  const getOrdersForPmp = (pmpTask: any) => {
+    if (!pmpTask) return [];
+
+    const pmpId = pmpTask.id;
+    const pmpCode = (pmpTask.code || pmpTask.csvId || '').toString().toUpperCase().trim();
+    const pmpCsvId = (pmpTask.csvId || '').toString().toUpperCase().trim();
+    const pmpTitleNorm = normalize(pmpTask.title || pmpTask.titulo || '');
+
+    const combined: any[] = [];
+    const seenKeys = new Set<string>();
+
+    const checkTitleMatch = (rawTitle: string) => {
+      const norm = normalize(rawTitle || '');
+      if (!norm || !pmpTitleNorm) return false;
+      return norm === pmpTitleNorm || norm.includes(pmpTitleNorm) || pmpTitleNorm.includes(norm);
+    };
+
+    const checkCodeMatch = (rawCode: string) => {
+      const c = (rawCode || '').toUpperCase().trim();
+      if (!c) return false;
+      if (pmpCode && pmpCode.length >= 2 && (c === pmpCode || c.includes(pmpCode) || pmpCode.includes(c))) return true;
+      if (pmpCsvId && pmpCsvId.length >= 2 && (c === pmpCsvId || c.includes(pmpCsvId))) return true;
+      return false;
+    };
+
+    // 1. Check historyRows (records from DB)
+    historyRows.forEach((row: any, idx: number) => {
+      let isMatch = false;
+
+      if (row.id_plan_preventivo && (row.id_plan_preventivo === pmpId || String(row.id_plan_preventivo) === String(pmpId))) {
+        isMatch = true;
+      } else if (row.plan_id && (row.plan_id === pmpId || String(row.plan_id) === String(pmpId))) {
+        isMatch = true;
+      } else if (checkCodeMatch(row.codigo || row['CODIGO'] || '')) {
+        isMatch = true;
+      } else if (checkTitleMatch(row['Título'] || row.titulo || '')) {
+        isMatch = true;
+      }
+
+      if (isMatch) {
+        const key = row.codigo || `HIST-${row.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const category = getHistoryRecordCategory(row);
+          const codigoDisplay = row.codigoDisplay || getHistoryRecordCode(row, idx);
+          combined.push({
+            ...row,
+            codigoDisplay,
+            category,
+            fechaCreada: row['FECHA DE APERTURA'] || row.fecha_apertura || (row.created_at ? row.created_at.slice(0, 10) : 'Sin fecha'),
+            tecnicoNombre: row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || 'Sin asignar',
+            estadoDisplay: row['ESTADO'] || row.estado || 'Pendiente'
+          });
+        }
+      }
+    });
+
+    // 2. Check active tasks from Planner state (assigned or scheduled OTs)
+    tasks.forEach((t: any, idx: number) => {
+      const hasAssignment = (t.idtecs && t.idtecs !== 9999) || t.assignedDate || t.adelantada || t.fecha || t.isCompleted;
+      
+      let isMatch = false;
+      if (t.id_plan_preventivo && (t.id_plan_preventivo === pmpId || String(t.id_plan_preventivo) === String(pmpId))) {
+        isMatch = true;
+      } else if (checkCodeMatch(t.code || t.csvId || '')) {
+        isMatch = true;
+      } else if (checkTitleMatch(t.title || t.titulo || '')) {
+        isMatch = true;
+      }
+
+      if (isMatch && hasAssignment) {
+        const key = t.code ? (t.code.startsWith('PMP-') || t.code.startsWith('PREV-') ? t.code : `PMP-${t.code}`) : `TASK-${t.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+
+          const techObj = technicians.find(tc => tc.id === (t.idtecs || t.assignedTechId));
+          const techName = techObj ? techObj.name : (t.tecnico_nombre || t.tecnico_asignado || 'Técnico asignado');
+
+          const fechaTask = t.assignedDate || t.fecha || (t.created_at ? t.created_at.slice(0, 10) : '23 sept');
+          const isComp = t.isCompleted || (t.estado && t.estado.toLowerCase().includes('completad'));
+          const isAtrasada = t.refFrecuencia >= t.frecuencia;
+          const estadoDisp = isComp ? 'Completado' : isAtrasada ? 'Atrasada' : (t.estado || 'Pendiente');
+
+          const cleanCode = t.code ? (t.code.startsWith('PMP-') || t.code.startsWith('PREV-') ? t.code : `PMP-${t.code}`) : `PMP-${pmpCsvId || pmpId}`;
+
+          combined.push({
+            ...t,
+            codigoDisplay: cleanCode,
+            category: 'Preventivo',
+            'Título': t.title || pmpTask.title,
+            fechaCreada: fechaTask,
+            tecnicoNombre: techName,
+            estadoDisplay: estadoDisp
+          });
+        }
+      }
+    });
+
+    return combined.sort((a: any, b: any) => {
+      const dateA = new Date(a.fechaCreada || a['FECHA DE APERTURA'] || a.created_at || '1970-01-01').getTime();
+      const dateB = new Date(b.fechaCreada || b['FECHA DE APERTURA'] || b.created_at || '1970-01-01').getTime();
+      return dateB - dateA;
+    });
+  };
+
+  // Helper to fetch all intervention records (Correctivos, Preventivos, TPM, Autónomo) related to a specific Machine
+  const getInterventionsForMachine = (m: any) => {
+    if (!m) return [];
+
+    const mId = m.id;
+    const code = (m.codigo_equipo || m.codigo_maquina || m.codigo || '').trim().toUpperCase();
+    const name = normalize(m.nombre_equipo || m.maquina || m.nombre || '');
+    const alt = normalize(m.nombre_alterno || '');
+    const af = (m.activo_fijo || '').trim().toLowerCase();
+
+    const combined: any[] = [];
+    const seenKeys = new Set<string>();
+
+    const checkMatch = (rec: any) => {
+      if (!rec) return false;
+
+      // 1. Direct machine ID match
+      if (rec.id_maquina && rec.id_maquina === mId) return true;
+      if (rec.maquina_id && rec.maquina_id === mId) return true;
+      if (rec.equipo_id && rec.equipo_id === mId) return true;
+      if (rec.id_equipo && rec.id_equipo === mId) return true;
+      if (rec.maquinaId && rec.maquinaId === mId) return true;
+
+      // 2. Machine Code regex boundary match
+      if (code && code !== '-' && code !== 'N/A' && code !== '0' && code.length >= 2) {
+        const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
+        const recCodMaq = (rec.codigo_maquina || rec.codigoMaquina || '').toUpperCase();
+        const recMaq = (rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '').toUpperCase();
+        const recTit = (rec['Título'] || rec.titulo || rec.sintoma || rec.descripcion_que || rec.falla || '').toUpperCase();
+        const recCod = (rec.codigo || rec.codigo_tarjeta || '').toUpperCase();
+
+        if (regex.test(recCodMaq) || regex.test(recMaq) || regex.test(recTit) || regex.test(recCod)) {
+          return true;
+        }
+      }
+
+      // 3. Activo Fijo match
+      if (af && af.length >= 3) {
+        const recAf = (rec.activo_fijo || rec.af || rec.activoFijo || '').trim().toLowerCase();
+        if (recAf && recAf.includes(af)) return true;
+      }
+
+      // 4. Exact or sub-name match
+      const recMaqNorm = normalize(rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '');
+      if (recMaqNorm && (recMaqNorm === name || (alt && recMaqNorm === alt))) return true;
+
+      if (recMaqNorm && recMaqNorm.length >= 8 && name.length >= 8) {
+        if (recMaqNorm.includes(name) || name.includes(recMaqNorm)) return true;
+      }
+
+      return false;
+    };
+
+    // Filter from historyRows
+    historyRows.forEach((row, idx) => {
+      if (checkMatch(row)) {
+        const key = row.codigo || `HIST-${row.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const category = getHistoryRecordCategory(row);
+          const codigoDisplay = getHistoryRecordCode(row, idx);
+          combined.push({
+            ...row,
+            codigoDisplay,
+            category,
+            sourceDate: row['FECHA DE APERTURA'] || row.fecha_apertura || row.created_at || row.fecha || ''
+          });
+        }
+      }
+    });
+
+    // Filter from correctiveRecords state
+    correctiveRecords.forEach((c: any, idx: number) => {
+      if (checkMatch(c)) {
+        const key = c.codigo || c.codigo_tarjeta || `CORR-${c.id || idx}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const isTpm = c.origen === 'TARJETA_TPM' || (c.codigo && c.codigo.startsWith('TPM-')) || c.id_tarjeta_falla != null;
+          const category = isTpm ? 'TPM' : 'Correctivo';
+          const codigoDisplay = c.codigo || c.codigo_tarjeta || (isTpm ? `TPM-${String(c.id || idx + 1).padStart(4, '0')}` : `CORR-${String(c.id || idx + 1).padStart(4, '0')}`);
+          combined.push({
+            ...c,
+            codigoDisplay,
+            category,
+            'Título': c.titulo || c.sintoma || c.descripcion_que || c.descripcion_anomalia || 'Mantenimiento Correctivo',
+            'ESTADO': c.estado || 'Pendiente',
+            'TECNICO': c.tecnico_asignado || c.tecnico_nombre || 'Sin asignar',
+            'FECHA DE APERTURA': c.fecha_apertura || (c.created_at ? c.created_at.slice(0, 10) : ''),
+            'FECHA DE CIERRE': c.fecha_cierre || '',
+            'COMENTARIO DE EJECUCION': c.accion_realizada || c.accion_correctiva || c.comentarios_ejecucion || '',
+            sourceDate: c.fecha_apertura || c.created_at || ''
+          });
+        }
+      }
+    });
+
+    return combined;
   };
 
   // Helper to compute effective capacity with overload margin
@@ -822,6 +1068,21 @@ export default function GestionMantenimientoPage() {
     }
   }, [activeTab]);
 
+  // Auto-fetch intervention history when a machine modal is selected
+  useEffect(() => {
+    if (selectedMachineModal) {
+      if (historyRows.length === 0) fetchHistoryRecords();
+      if (correctiveRecords.length === 0) fetchCorrectivoRecords();
+    }
+  }, [selectedMachineModal]);
+
+  // Auto-fetch history records when viewing a PMP task modal
+  useEffect(() => {
+    if (viewingTask) {
+      if (historyRows.length === 0) fetchHistoryRecords();
+    }
+  }, [viewingTask]);
+
   // Fetch Supabase History Records from mantenimiento_ordenes + tarjetas_falla_anomalia
   const fetchHistoryRecords = async () => {
     setHistoryLoading(true);
@@ -871,7 +1132,8 @@ export default function GestionMantenimientoPage() {
       // B. Populate / Merge from tarjetas_falla_anomalia
       if (tarjetasData && tarjetasData.length > 0) {
         tarjetasData.forEach((d: any, idx: number) => {
-          const cod = d.codigo || d.codigo_tarjeta || `TPM-${d.id || idx + 1}`;
+          const cod = d.codigo_tarjeta || d.codigo || `TPM-${idx + 1}`;
+          if (!isCleanConsecutiveCode(cod)) return;
           const existing = historyMap.get(cod);
 
           const rawEstado = (d.estado || '').toLowerCase();
@@ -912,8 +1174,8 @@ export default function GestionMantenimientoPage() {
             const parsed = JSON.parse(localSaved);
             if (Array.isArray(parsed)) {
               parsed.forEach((item: any, idx: number) => {
-                const cod = item.codigo || `TPM-${item.id || idx + 1}`;
-                if (!historyMap.has(cod)) {
+                const cod = item.codigo || item.codigo_tarjeta;
+                if (cod && isCleanConsecutiveCode(cod) && !historyMap.has(cod)) {
                   const rawTitle = item.sintoma || item.descripcion_que || item.titulo || 'Anomalía local';
                   historyMap.set(cod, {
                     id: item.id || idx + 9000,
@@ -1095,7 +1357,7 @@ export default function GestionMantenimientoPage() {
             const parsed = JSON.parse(localSaved);
             if (Array.isArray(parsed)) {
               parsed.forEach((t: any) => {
-                if (t && t.codigo) {
+                if (t && t.codigo && isCleanConsecutiveCode(t.codigo)) {
                   if (!recordsMap.has(t.codigo)) {
                     recordsMap.set(t.codigo, {
                       id: t.id || Date.now(),
@@ -1380,6 +1642,68 @@ export default function GestionMantenimientoPage() {
     };
   };
 
+  // Helper to resolve clean machine code and name for any history or intervention record
+  const resolveHistoryRowMachine = (row: any, catalog: any[]) => {
+    if (!row) return { code: null, name: 'General' };
+
+    let code = row.codigo_maquina || row.codigoMaquina || row.codigo_equipo || null;
+    let name = row.maquina || row.equipo || row.maquina_nombre || row.maquinas || '';
+
+    const isGenericName = !name || name === 'Planta' || name === 'General' || name === 'undefined' || name === 'null';
+
+    // 1. Check match against official machines catalog
+    if (catalog && catalog.length > 0) {
+      const match = matchPlanWithMaquina(row, catalog);
+      if (match && match.matched) {
+        return {
+          code: match.codigo || code || match.matched.codigo_equipo || null,
+          name: match.nombre || (isGenericName ? match.matched.nombre_equipo : name)
+        };
+      }
+    }
+
+    const title = row['Título'] || row.titulo || '';
+
+    // 2. Extract code in brackets like [S01MBLNPT240] or [S02MBLPRT120]
+    if (!code) {
+      const bracketMatch = title.match(/\[([A-Z0-9_-]+)\]/i);
+      if (bracketMatch && bracketMatch[1]) {
+        code = bracketMatch[1].toUpperCase();
+      }
+    }
+
+    // 3. Extract machine code like C-0139 or C-0243
+    if (!code) {
+      const cCodeMatch = title.match(/\b(C-\d{3,4})\b/i);
+      if (cCodeMatch && cCodeMatch[1]) {
+        code = cCodeMatch[1].toUpperCase();
+      }
+    }
+
+    // 4. Derive machine name from title if original name is generic ("Planta")
+    if (isGenericName) {
+      if (title) {
+        let cleanTitle = title
+          .replace(/^Mantenimiento\s+de\s+/i, '')
+          .replace(/^Mantenimiento\s+/i, '')
+          .replace(/^Inspeccion,\s*limpieza\s*y\s*lubricacion\s*de\s*/i, '')
+          .replace(/^Limpieza\s*e\s*inspección\s*/i, '')
+          .replace(/\s*\[.*?\]/g, '')
+          .trim();
+
+        if (cleanTitle.length > 0) {
+          name = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+        } else {
+          name = row.planta || row.especialidad || 'Equipo General';
+        }
+      } else {
+        name = row.planta || row.especialidad || 'Equipo General';
+      }
+    }
+
+    return { code, name };
+  };
+
   // 2. Fetch Data 100% from Supabase Native Tables
   const fetchData = async (showNotification = false) => {
     setSyncing(true);
@@ -1426,11 +1750,21 @@ export default function GestionMantenimientoPage() {
       let hasMoreMaq = true;
 
       while (hasMoreMaq) {
-        const { data: mData } = await supabase
-          .from('maquinas_equipos')
+        let mRes = await supabase
+          .from('mantenimiento_maquinas_equipos')
           .select('*')
           .range(fromMaq, fromMaq + stepMaq - 1)
           .order('nombre_equipo', { ascending: true });
+
+        if (mRes.error) {
+          mRes = await supabase
+            .from('maquinas_equipos')
+            .select('*')
+            .range(fromMaq, fromMaq + stepMaq - 1)
+            .order('nombre_equipo', { ascending: true });
+        }
+
+        const mData = mRes.data;
 
         if (mData && mData.length > 0) {
           allMaquinas = allMaquinas.concat(mData);
@@ -1486,16 +1820,15 @@ export default function GestionMantenimientoPage() {
       const rawParam = (params.get('tab') || '').toLowerCase();
       const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas'];
       if (rawParam && validTabs.includes(rawParam as TabType)) {
-        setActiveTab(rawParam as TabType);
+        setActiveTab(rawParam === 'correctivo' ? 'historial' : (rawParam as TabType));
       }
     }
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'correctivo') {
-      fetchCorrectivoRecords();
-    } else if (activeTab === 'historial') {
+    if (activeTab === 'historial') {
       fetchHistoryRecords();
+      fetchCorrectivoRecords();
     }
   }, [activeTab]);
 
@@ -1519,7 +1852,7 @@ export default function GestionMantenimientoPage() {
         id: t.id,
         name: t.nombre,
         capacity: parseFloat(t.capacidad_horas) || systemSettings.baseCapacity || DAILY_CAPACITY_LIMIT,
-        turno: t.activo === false ? 'INACTIVO' : (t.turno || 'General'),
+        turno: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'),
         documento: t.documento || '',
         planta: pStr,
         plantas: pList,
@@ -1770,7 +2103,7 @@ export default function GestionMantenimientoPage() {
           codigo: task.code,
           titulo: task.title,
           maquina: task.maquina,
-          planta: task.planta,
+          planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
           id_tecnico: tech?.id !== 9999 ? tech?.id : null,
           tecnico_nombre: techName,
           turno: tech?.turno || 'General',
@@ -1828,7 +2161,7 @@ export default function GestionMantenimientoPage() {
           codigo: task.code,
           titulo: task.title,
           maquina: task.maquina,
-          planta: task.planta,
+          planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
           id_tecnico: tech?.id !== 9999 ? tech?.id : null,
           tecnico_nombre: techName,
           turno: tech?.turno || 'General',
@@ -1870,7 +2203,7 @@ export default function GestionMantenimientoPage() {
       if (updates.fechaCierre !== undefined) payload.fecha_cierre = updates.fechaCierre || null;
       if (updates.idtecs !== undefined) payload.idtecs = updates.idtecs === 9999 ? null : updates.idtecs;
       if (updates.maquina !== undefined) payload.maquina = updates.maquina;
-      if (updates.planta !== undefined) payload.planta = updates.planta;
+      if (updates.planta !== undefined) payload.planta = obtenerCodigoPlanta(updates.planta, plantasNomenclatura);
 
       const { error } = await supabase
         .from('mantenimiento_ordenes')
@@ -1912,7 +2245,7 @@ export default function GestionMantenimientoPage() {
       const payload: Record<string, unknown> = {};
       if (updates.sintoma !== undefined) payload.sintoma = updates.sintoma;
       if (updates.maquina !== undefined) payload.maquina = updates.maquina;
-      if (updates.planta !== undefined) payload.planta = updates.planta;
+      if (updates.planta !== undefined) payload.planta = obtenerCodigoPlanta(updates.planta, plantasNomenclatura);
       if (updates.prioridad !== undefined) payload.prioridad = updates.prioridad;
       if (updates.estado !== undefined) payload.estado = updates.estado;
       if (updates.tecnico_asignado !== undefined) payload.tecnico_asignado = updates.tecnico_asignado;
@@ -2002,7 +2335,7 @@ export default function GestionMantenimientoPage() {
           codigo: task.code,
           titulo: task.title,
           maquina: task.maquina,
-          planta: task.planta,
+          planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
           id_tecnico: assignedTech.id,
           tecnico_nombre: assignedTech.name,
           turno: assignedTech.turno,
@@ -2131,7 +2464,7 @@ export default function GestionMantenimientoPage() {
         codigo: taskToForce.code || `MP-${taskToForce.id}`,
         titulo: taskToForce.title,
         maquina: taskToForce.maquina,
-        planta: taskToForce.planta,
+        planta: obtenerCodigoPlanta(taskToForce.planta, plantasNomenclatura),
         id_tecnico: assignedTechId !== 9999 ? assignedTechId : null,
         tecnico_nombre: assignedTechName,
         turno: assignedTechTurno,
@@ -2218,14 +2551,23 @@ export default function GestionMantenimientoPage() {
     const pStr = pList.join(', ');
 
     try {
-      const { data, error } = await supabase.from('mantenimiento_tecnicos').insert([{
+      const payload: any = {
         nombre: name,
         documento: newTechForm.documento.trim() || undefined,
+        modalidad_operativa: newTechForm.turno,
         turno: newTechForm.turno,
         especialidad: pStr,
         capacidad_horas: parseFloat(newTechForm.capacity) || systemSettings.baseCapacity,
         activo: !isInactive
-      }]).select().single();
+      };
+
+      let { data, error } = await supabase.from('mantenimiento_tecnicos').insert([payload]).select().single();
+      if (error && error.message.includes('modalidad_operativa')) {
+        delete payload.modalidad_operativa;
+        const fallbackRes = await supabase.from('mantenimiento_tecnicos').insert([payload]).select().single();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
 
       if (error) {
         console.error('Error guardando técnico en Supabase:', error);
@@ -2537,7 +2879,7 @@ export default function GestionMantenimientoPage() {
     e.preventDefault();
     if (!newCorrectivoForm.maquina.trim() || !newCorrectivoForm.sintoma.trim()) return;
 
-    const generatedCode = `CORR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const generatedCode = await getNextConsecutiveCode('CORR');
     const newRecord: CorrectiveRecord = {
       id: Date.now(),
       codigo: generatedCode,
@@ -2574,7 +2916,7 @@ export default function GestionMantenimientoPage() {
         codigo: generatedCode,
         titulo: `[Correctivo Directo] ${newRecord.sintoma}`,
         maquina: newRecord.maquina,
-        planta: newRecord.planta,
+        planta: obtenerCodigoPlanta(newRecord.planta, plantasNomenclatura),
         tecnico_nombre: newRecord.tecnico_asignado || 'Sin asignar',
         turno: 'General',
         prioridad: newRecord.prioridad,
@@ -2592,7 +2934,7 @@ export default function GestionMantenimientoPage() {
         codigo_tarjeta: generatedCode,
         equipo: newRecord.maquina,
         maquina: newRecord.maquina,
-        planta: newRecord.planta,
+        planta: obtenerCodigoPlanta(newRecord.planta, plantasNomenclatura),
         descripcion_anomalia: newRecord.sintoma,
         descripcion_que: newRecord.sintoma,
         prioridad: newRecord.prioridad,
@@ -3194,14 +3536,22 @@ export default function GestionMantenimientoPage() {
     setShowEditTechModal(false);
 
     try {
-      const { data, error } = await supabase.from('mantenimiento_tecnicos').update({
+      const updatePayload: any = {
         nombre: updatedTech.name,
         documento: updatedTech.documento,
+        modalidad_operativa: updatedTech.turno,
         turno: updatedTech.turno,
         especialidad: plantasStr,
         capacidad_horas: updatedTech.capacity,
         activo: !isInactive
-      }).eq('id', editingTech.id).select();
+      };
+
+      let { error } = await supabase.from('mantenimiento_tecnicos').update(updatePayload).eq('id', editingTech.id);
+      if (error && error.message.includes('modalidad_operativa')) {
+        delete updatePayload.modalidad_operativa;
+        const fallbackRes = await supabase.from('mantenimiento_tecnicos').update(updatePayload).eq('id', editingTech.id);
+        error = fallbackRes.error;
+      }
 
       if (error) {
         console.error('Error actualizando técnico en Supabase:', error);
@@ -3423,7 +3773,7 @@ export default function GestionMantenimientoPage() {
 
       if (machineFormMode === 'create') {
         const { data, error } = await supabase
-          .from('maquinas_equipos')
+          .from('mantenimiento_maquinas_equipos')
           .insert(payload)
           .select()
           .single();
@@ -3436,7 +3786,7 @@ export default function GestionMantenimientoPage() {
         }
       } else if (machineFormMode === 'edit' && editingMachineId) {
         const { data, error } = await supabase
-          .from('maquinas_equipos')
+          .from('mantenimiento_maquinas_equipos')
           .update(payload)
           .eq('id', editingMachineId)
           .select()
@@ -3479,7 +3829,7 @@ export default function GestionMantenimientoPage() {
     setDeletingMachine(true);
     try {
       const { error } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .delete()
         .eq('id', id);
 
@@ -3566,14 +3916,8 @@ export default function GestionMantenimientoPage() {
 
   // Preventivo (PMP) Memoized Calculations & Filtered Data
   const plantOptions = useMemo(() => {
-    const set = new Set<string>();
-    plantasNomenclatura.filter(p => p.activo !== false).forEach(p => {
-      set.add(p.codigo);
-      set.add(p.nombre_oficial);
-    });
-    tasks.forEach(t => { if (t.planta && t.planta.trim() !== '' && t.planta !== 'Todas') set.add(t.planta); });
-    return ['Todas', ...Array.from(set)];
-  }, [tasks, plantasNomenclatura]);
+    return ['Todas', ...obtenerCodigosOficialesPlantas(plantasNomenclatura)];
+  }, [plantasNomenclatura]);
 
   const frecuenciaOptions = useMemo(() => {
     const set = new Set<number>();
@@ -3599,9 +3943,13 @@ export default function GestionMantenimientoPage() {
       }
 
       if (preventivoPlanta !== 'Todas') {
-        const tPlantas = task.plantas || parseTechPlantas(task.planta, plantasNomenclatura);
+        const tPlantas = (task.plantas && task.plantas.length > 0)
+          ? task.plantas
+          : parseTechPlantas(task.planta, plantasNomenclatura);
         const selCode = obtenerCodigoPlanta(preventivoPlanta, plantasNomenclatura);
-        const matchesSel = tPlantas.includes(selCode) || tPlantas.includes(preventivoPlanta) || normalize(task.planta).includes(normalize(preventivoPlanta));
+        const taskPlantCodes = tPlantas.map(tp => obtenerCodigoPlanta(tp, plantasNomenclatura));
+        const singlePlantCode = obtenerCodigoPlanta(task.planta, plantasNomenclatura);
+        const matchesSel = taskPlantCodes.includes(selCode) || singlePlantCode === selCode;
         if (!matchesSel) {
           return false;
         }
@@ -3693,16 +4041,22 @@ export default function GestionMantenimientoPage() {
   // Historial Memoized Filtered & Sorted Records
   const filteredHistoryRows = useMemo(() => {
     const list = historyRows.filter(row => {
-      // Global search
+      // Global multi-column search
       if (historySearch.trim()) {
         const q = normalize(historySearch);
         const matchCodigo = normalize(row.codigo || row['CODIGO'] || '').includes(q);
-        const matchTitle = normalize(row['Título'] || row.titulo || '').includes(q);
-        const matchMaquina = normalize(row.maquina || row.equipo || row.maquina_nombre || row.codigo_maquina || '').includes(q);
-        const matchTech = normalize(row['TECNICO'] || row.tecnico_asignado || '').includes(q);
-        const matchTipo = normalize(row['TIPO'] || row.tipo || '').includes(q);
-        const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || '').includes(q);
-        if (!matchCodigo && !matchTitle && !matchMaquina && !matchTech && !matchTipo && !matchObs) return false;
+        const matchTitle = normalize(row['Título'] || row.titulo || row.sintoma || '').includes(q);
+        const matchPlanta = normalize(row.planta || row['Planta'] || '').includes(q);
+        const resolvedMaq = resolveHistoryRowMachine(row, maquinasCatalogo);
+        const matchMaquina = normalize(resolvedMaq.name + ' ' + (resolvedMaq.code || '') + ' ' + (row.maquina || '')).includes(q);
+        const matchTech = normalize(row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || '').includes(q);
+        const matchTipo = normalize(row['TIPO'] || row.tipo || row.origen || getHistoryRecordCategory(row)).includes(q);
+        const matchEstado = normalize(row['ESTADO'] || row.estado || '').includes(q);
+        const matchApertura = normalize(row['FECHA DE APERTURA'] || row.fecha_reporte || row.created_at || '').includes(q);
+        const matchCierre = normalize(row['FECHA DE CIERRE'] || row.fecha_cierre || '').includes(q);
+        const matchObs = normalize(row['COMENTARIO DE EJECUCION'] || row.accion_tomada || row.observaciones || '').includes(q);
+        
+        if (!matchCodigo && !matchTitle && !matchPlanta && !matchMaquina && !matchTech && !matchTipo && !matchEstado && !matchApertura && !matchCierre && !matchObs) return false;
       }
 
       // Global Origen filter (TPM, Correctivo, Preventivo)
@@ -3740,9 +4094,13 @@ export default function GestionMantenimientoPage() {
           valA = (a['Título'] || a.titulo || '').toLowerCase();
           valB = (b['Título'] || b.titulo || '').toLowerCase();
           break;
+        case 'planta':
+          valA = (a.planta || a['Planta'] || '').toLowerCase();
+          valB = (b.planta || b['Planta'] || '').toLowerCase();
+          break;
         case 'maquina':
-          valA = (a.maquina || a.equipo || a.maquina_nombre || '').toLowerCase();
-          valB = (b.maquina || b.equipo || b.maquina_nombre || '').toLowerCase();
+          valA = resolveHistoryRowMachine(a, maquinasCatalogo).name.toLowerCase();
+          valB = resolveHistoryRowMachine(b, maquinasCatalogo).name.toLowerCase();
           break;
         case 'tecnico':
           valA = (a['TECNICO'] || '').toLowerCase();
@@ -3756,18 +4114,33 @@ export default function GestionMantenimientoPage() {
           valA = (a['ESTADO'] || 'Pendiente').toLowerCase();
           valB = (b['ESTADO'] || 'Pendiente').toLowerCase();
           break;
-        case 'apertura':
-          valA = a['FECHA DE APERTURA'] || '';
-          valB = b['FECHA DE APERTURA'] || '';
+        case 'plazo': {
+          const rawA = a.fecha_limite || a.fecha_plazo || a.fecha_programada || a.fecha_compromiso || a.plazo || '';
+          const rawB = b.fecha_limite || b.fecha_plazo || b.fecha_programada || b.fecha_compromiso || b.plazo || '';
+          const tA = rawA ? new Date(rawA).getTime() : 0;
+          const tB = rawB ? new Date(rawB).getTime() : 0;
+          valA = isNaN(tA) ? 0 : tA;
+          valB = isNaN(tB) ? 0 : tB;
           break;
-        case 'cierre':
-          valA = a['FECHA DE CIERRE'] || '';
-          valB = b['FECHA DE CIERRE'] || '';
+        }
+        case 'apertura': {
+          const rawA = a['FECHA DE APERTURA'] || a['fecha_reporte'] || a.created_at || '';
+          const rawB = b['FECHA DE APERTURA'] || b['fecha_reporte'] || b.created_at || '';
+          const tA = rawA ? new Date(rawA).getTime() : 0;
+          const tB = rawB ? new Date(rawB).getTime() : 0;
+          valA = isNaN(tA) ? 0 : tA;
+          valB = isNaN(tB) ? 0 : tB;
           break;
-        case 'observaciones':
-          valA = (a['COMENTARIO DE EJECUCION'] || '').toLowerCase();
-          valB = (b['COMENTARIO DE EJECUCION'] || '').toLowerCase();
+        }
+        case 'cierre': {
+          const rawA = a['FECHA DE CIERRE'] || a.fecha_cierre || '';
+          const rawB = b['FECHA DE CIERRE'] || b.fecha_cierre || '';
+          const tA = rawA ? new Date(rawA).getTime() : 0;
+          const tB = rawB ? new Date(rawB).getTime() : 0;
+          valA = isNaN(tA) ? 0 : tA;
+          valB = isNaN(tB) ? 0 : tB;
           break;
+        }
         default:
           valA = a.id || 0;
           valB = b.id || 0;
@@ -3777,7 +4150,7 @@ export default function GestionMantenimientoPage() {
       if (valA > valB) return historySortAsc ? 1 : -1;
       return 0;
     });
-  }, [historyRows, historySearch, historyTipo, historyEstado, historyTecnico, historySortField, historySortAsc]);
+  }, [historyRows, historySearch, historyTipo, historyEstado, historyTecnico, historySortField, historySortAsc, maquinasCatalogo]);
 
   // Correctivo Filtered Records
   const filteredCorrectivos = useMemo(() => {
@@ -3806,15 +4179,8 @@ export default function GestionMantenimientoPage() {
 
   // Máquinas y Equipos Memoized Filtered & Sorted Records
   const uniqueMaquinasPlantas = useMemo(() => {
-    const set = new Set<string>();
-    plantasNomenclatura.filter(p => p.activo !== false).forEach(p => {
-      set.add(p.nombre_oficial);
-    });
-    maquinasCatalogo.forEach(m => {
-      if (m.planta && m.planta.trim() !== '') set.add(m.planta.trim());
-    });
-    return Array.from(set).sort();
-  }, [maquinasCatalogo, plantasNomenclatura]);
+    return obtenerCodigosOficialesPlantas(plantasNomenclatura);
+  }, [plantasNomenclatura]);
 
   // Pre-indexed PMP counts per machine (O(1) Instant Lookup - Eliminates all search lag)
   const machinePmpCountsMap = useMemo(() => {
@@ -3887,8 +4253,11 @@ export default function GestionMantenimientoPage() {
         }
       }
 
-      if (maquinasPlanta !== 'Todas' && m.planta !== maquinasPlanta) {
-        return false;
+      if (maquinasPlanta !== 'Todas') {
+        const mPlantaCode = obtenerCodigoPlanta(m.planta, plantasNomenclatura);
+        if (mPlantaCode !== maquinasPlanta) {
+          return false;
+        }
       }
 
       if (maquinasCriticidad !== 'Todas' && m.criticidad !== maquinasCriticidad) {
@@ -4001,6 +4370,244 @@ export default function GestionMantenimientoPage() {
       console.error('Error exportando preventivo a Excel:', err);
       alert('Hubo un error al generar el archivo Excel.');
     }
+  };
+
+  // Modal Trigger Handlers for + Correctivo & + TPM
+  const handleOpenNewCorrectivo = () => {
+    setNewCorrectivoForm({
+      maquina: '',
+      planta: 'Mármol Sintético',
+      sintoma: '',
+      prioridad: 'Alta',
+      tecnico_asignado: '',
+      fecha_limite: '',
+      accion_tomada: '',
+      fotos: []
+    });
+    setShowCorrectivoModal(true);
+  };
+
+  const handleOpenNewTpm = () => {
+    const defaultUser = userEmail ? userEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+    setTpmFormData({
+      tipo_tarjeta: 'roja',
+      maquina: '',
+      planta: 'Mármol Sintético',
+      detectada_por: defaultUser || 'Hector José Chinchilla Trigos',
+      descripcion_que: '',
+      prioridad: 'Alta',
+      accion_inmediata: '',
+      fotos: []
+    });
+    setTpmValidationMsg(null);
+    setShowCreateTpmModal(true);
+  };
+
+  const handleToggleTpmVoice = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('El reconocimiento de voz no está soportado en este navegador. Usa Chrome o Edge.');
+      return;
+    }
+    if (isTpmListening) {
+      if (tpmRecognitionRef.current) tpmRecognitionRef.current.stop();
+      setIsTpmListening(false);
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'es-CO';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      let initialText = tpmFormData.descripcion_que;
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        const newText = initialText ? `${initialText} ${transcript}` : transcript;
+        setTpmFormData(prev => ({ ...prev, descripcion_que: newText }));
+      };
+
+      recognition.onerror = (e: any) => {
+        console.warn('Speech recognition error:', e);
+        setIsTpmListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsTpmListening(false);
+      };
+
+      recognition.start();
+      tpmRecognitionRef.current = recognition;
+      setIsTpmListening(true);
+    } catch (err) {
+      console.error('Error starting speech recognition:', err);
+      setIsTpmListening(false);
+    }
+  };
+
+  const handleTpmFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const currentCount = tpmFormData.fotos?.length || 0;
+    if (currentCount >= 2) {
+      alert('Máximo 2 fotos por reporte de anomalía.');
+      return;
+    }
+    const remaining = 2 - currentCount;
+    const filesToProcess = Array.from(files).slice(0, remaining);
+
+    filesToProcess.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setTpmFormData(prev => ({
+            ...prev,
+            fotos: [...(prev.fotos || []), dataUrl].slice(0, 2)
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const handleCreateTpmSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tpmFormData.maquina || !tpmFormData.maquina.trim()) {
+      setTpmValidationMsg('Por favor selecciona o escribe la máquina o equipo.');
+      return;
+    }
+    if (!tpmFormData.descripcion_que || !tpmFormData.descripcion_que.trim()) {
+      setTpmValidationMsg('Por favor describe la anomalía o síntoma.');
+      return;
+    }
+
+    setSubmittingTpm(true);
+    setTpmValidationMsg(null);
+
+    const generatedCode = await getNextConsecutiveCode('TPM');
+    const fechaApertura = new Date().toISOString();
+    const cleanMaquina = tpmFormData.maquina.trim();
+    const cleanDescripcion = tpmFormData.descripcion_que.trim();
+
+    try {
+      const colorTitleMap = {
+        roja: '🔴 Tarjeta Roja (Mantenimiento)',
+        azul: '🔵 Tarjeta Azul (Autónomo)',
+        amarilla: '🟡 Tarjeta Amarilla (Seguridad/5S)',
+        verde: '🟢 Tarjeta Verde (Mejora Kaizen)'
+      };
+
+      // 1. Insert into Supabase tarjetas_falla_anomalia
+      try {
+        await supabase.from('tarjetas_falla_anomalia').insert([{
+          codigo: generatedCode,
+          tipo_tarjeta: tpmFormData.tipo_tarjeta,
+          tipo_aviso: tpmFormData.tipo_tarjeta === 'roja' ? 'Mantenimiento' : tpmFormData.tipo_tarjeta === 'azul' ? 'Autónomo' : tpmFormData.tipo_tarjeta === 'amarilla' ? 'Seguridad/5S' : 'Mejora Kaizen',
+          maquina: cleanMaquina,
+          planta: tpmFormData.planta,
+          detectada_por: tpmFormData.detectada_por || 'Empleado FIRPLAK',
+          descripcion_que: cleanDescripcion,
+          prioridad: tpmFormData.prioridad,
+          accion_inmediata: tpmFormData.accion_inmediata || null,
+          estado: 'abierta',
+          fecha_apertura: fechaApertura,
+          fotos: tpmFormData.fotos || []
+        }]);
+      } catch (e) {
+        console.warn('Sync tarjetas_falla_anomalia notice:', e);
+      }
+
+      // 2. Insert into Supabase mantenimiento_ordenes
+      try {
+        await supabase.from('mantenimiento_ordenes').insert([{
+          origen: 'TARJETA_TPM',
+          tipo_orden: 'CORRECTIVO',
+          codigo: generatedCode,
+          titulo: `[${colorTitleMap[tpmFormData.tipo_tarjeta]}] ${cleanDescripcion}`,
+          maquina: cleanMaquina,
+          planta: tpmFormData.planta,
+          tecnico_nombre: 'Sin asignar',
+          turno: 'General',
+          prioridad: tpmFormData.prioridad,
+          estado: 'Abierta',
+          fecha_programada: fechaApertura,
+          duracion_estimada_min: 60,
+          sintoma_falla: cleanDescripcion,
+          reportado_por: tpmFormData.detectada_por,
+          fotos_antes: tpmFormData.fotos || []
+        }]);
+      } catch (e) {
+        console.warn('Sync mantenimiento_ordenes notice:', e);
+      }
+
+      // 3. Add to historyRows
+      const newHistoryItem: HistoryRecord = {
+        id: generatedCode,
+        codigo: generatedCode,
+        'Título': cleanDescripcion,
+        titulo: cleanDescripcion,
+        'TECNICO': 'Sin asignar',
+        tecnico: 'Sin asignar',
+        'TIPO': 'TPM',
+        tipo: 'TPM',
+        'ESTADO': 'Abierta',
+        estado: 'Abierta',
+        'FECHA DE APERTURA': fechaApertura,
+        fecha_apertura: fechaApertura,
+        'FECHA DE CIERRE': '—',
+        fecha_cierre: '—',
+        planta: tpmFormData.planta,
+        'Planta': tpmFormData.planta,
+        maquina: cleanMaquina,
+        'Máquina / Equipo': cleanMaquina,
+        sintoma: cleanDescripcion
+      };
+
+      setHistoryRows(prev => [newHistoryItem, ...prev]);
+
+      // 4. Add to correctiveRecords
+      const newCorrectivoItem: CorrectiveRecord = {
+        id: Date.now(),
+        codigo: generatedCode,
+        maquina: cleanMaquina,
+        planta: tpmFormData.planta,
+        sintoma: cleanDescripcion,
+        prioridad: tpmFormData.prioridad,
+        tecnico_asignado: '',
+        estado: 'Abierta',
+        fecha_reporte: fechaApertura,
+        fotos: tpmFormData.fotos || []
+      };
+      setCorrectiveRecords(prev => [newCorrectivoItem, ...prev]);
+
+      if (isTpmListening && tpmRecognitionRef.current) {
+        tpmRecognitionRef.current.stop();
+        setIsTpmListening(false);
+      }
+
+      setShowCreateTpmModal(false);
+    } catch (err) {
+      console.error('Error al crear tarjeta TPM:', err);
+      alert('Error al guardar la tarjeta TPM.');
+    } finally {
+      setSubmittingTpm(false);
+    }
+  };
+
+  // Helper to strip brackets [...] from Description cell
+  const cleanDescriptionText = (raw?: string | null): string => {
+    if (!raw) return 'Mantenimiento General';
+    let cleaned = String(raw).replace(/\[[^\]]*\]/g, '').trim();
+    if (!cleaned) {
+      cleaned = String(raw).replace(/[\[\]]/g, '').trim() || 'Mantenimiento General';
+    }
+    return cleaned;
   };
 
   // Excel Export for Historial
@@ -4401,8 +5008,7 @@ export default function GestionMantenimientoPage() {
     { id: 'planificador', label: 'Planificador', icon: <Layers size={14} /> },
     { id: 'tecnico', label: 'Portal Técnicos', icon: <User size={14} /> },
     { id: 'preventivo', label: 'Preventivo (PMP)', icon: <FileSpreadsheet size={14} /> },
-    { id: 'correctivo', label: 'Correctivo', icon: <AlertTriangle size={14} /> },
-    { id: 'historial', label: 'Historial OT', icon: <History size={14} /> },
+    { id: 'historial', label: 'Órdenes de Trabajo', icon: <History size={14} /> },
     { id: 'indicadores', label: 'Indicadores', icon: <BarChart3 size={14} /> },
     { id: 'maquinas', label: 'Máquinas y Equipos', icon: <Cpu size={14} /> },
     { id: 'configuracion', label: 'Configuración', icon: <Settings size={14} /> },
@@ -4970,7 +5576,7 @@ export default function GestionMantenimientoPage() {
                             <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-gray-100 mt-0.5">
                               <div className="flex items-center gap-1 text-[9px] text-gray-500 font-medium min-w-0 flex-1 truncate">
                                 <span className="shrink-0">🏭</span>
-                                <span className="font-semibold text-gray-700 shrink-0">{item.planta || 'FIRPLAK'}</span>
+                                <span className="font-bold text-[#324354] font-mono shrink-0">{obtenerCodigoPlanta(item.planta, plantasNomenclatura)}</span>
                                 {item.maquina && (
                                   <>
                                     <span className="text-gray-300">•</span>
@@ -5151,8 +5757,9 @@ export default function GestionMantenimientoPage() {
                     onChange={(e) => setPreventivoPlanta(e.target.value)}
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none cursor-pointer"
                   >
-                    {plantOptions.map(p => (
-                      <option key={p} value={p}>Planta: {p}</option>
+                    <option value="Todas">Planta: Todas</option>
+                    {plantOptions.filter(p => p !== 'Todas').map(p => (
+                      <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
                 </div>
@@ -5828,23 +6435,38 @@ export default function GestionMantenimientoPage() {
         {activeTab === 'historial' && (
           <div className="flex flex-col gap-6 animate-in fade-in duration-300">
             
-            {/* Filter Bar for Historial */}
+            {/* Filter Bar for Órdenes de Trabajo */}
             <div className="bg-white rounded-3xl p-5 border border-[#e2ded5] shadow-xs flex flex-col gap-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="font-bold text-[#324354] text-sm sm:text-base flex items-center gap-2">
                   <Filter className="w-4 h-4 text-[#7B8E90]" />
-                  <span>Historial Órdenes de Trabajo ({filteredHistoryRows.length} registros)</span>
+                  <span>Órdenes de Trabajo ({filteredHistoryRows.length} registros)</span>
                 </h3>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  {/* + Correctivo Button */}
                   <button
-                    onClick={fetchHistoryRecords}
-                    disabled={historyLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F6F3EE] text-[#324354] hover:bg-gray-200 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                    type="button"
+                    onClick={handleOpenNewCorrectivo}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap border border-rose-700"
+                    title="Reportar y generar nueva orden de mantenimiento correctivo"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${historyLoading ? 'animate-spin' : ''}`} />
-                    <span>Actualizar</span>
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Correctivo</span>
                   </button>
+
+                  {/* + TPM Button */}
+                  <button
+                    type="button"
+                    onClick={handleOpenNewTpm}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap border border-[#25323f]"
+                    title="Crear nueva tarjeta TPM / Mantenimiento Autónomo"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>TPM</span>
+                  </button>
+
+                  {/* Exportar Excel */}
                   <button
                     onClick={handleDownloadHistorialExcel}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white font-bold rounded-xl text-xs hover:bg-emerald-800 transition-all shadow-xs cursor-pointer"
@@ -5852,12 +6474,16 @@ export default function GestionMantenimientoPage() {
                     <Download className="w-3.5 h-3.5" />
                     <span>Exportar Excel</span>
                   </button>
+
+                  {/* Limpiar Filtros */}
                   <button
                     onClick={() => {
                       setHistorySearch('');
                       setHistoryTipo('Todos');
                       setHistoryEstado('Todos');
                       setHistoryTecnico('Todos');
+                      setHistorySortField('apertura');
+                      setHistorySortAsc(false);
                     }}
                     className="text-xs text-[#7B8E90] hover:text-[#324354] font-semibold underline cursor-pointer ml-1"
                   >
@@ -5866,21 +6492,22 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                {/* Search */}
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              {/* Enhanced Wider Search & Filter Bar */}
+              <div className="flex flex-col md:flex-row items-center gap-3 w-full">
+                {/* Wider Search Input */}
+                <div className="flex-[2.5] min-w-[260px] w-full relative">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Búsqueda global..."
-                    className="w-full pl-9 pr-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs focus:outline-none focus:border-[#324354]"
+                    placeholder="Búsqueda global (OT, máquina, técnico, síntoma, estado, fecha...)"
+                    className="w-full pl-10 pr-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-medium focus:outline-none focus:border-[#324354] transition-all"
                   />
                 </div>
 
                 {/* Origen / Tipo */}
-                <div>
+                <div className="flex-1 min-w-[130px] w-full">
                   <select
                     value={historyTipo}
                     onChange={(e) => setHistoryTipo(e.target.value)}
@@ -5894,7 +6521,7 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* Estado */}
-                <div>
+                <div className="flex-1 min-w-[130px] w-full">
                   <select
                     value={historyEstado}
                     onChange={(e) => setHistoryEstado(e.target.value)}
@@ -5908,7 +6535,7 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* Técnico */}
-                <div>
+                <div className="flex-1 min-w-[150px] w-full">
                   <select
                     value={historyTecnico}
                     onChange={(e) => setHistoryTecnico(e.target.value)}
@@ -5929,14 +6556,19 @@ export default function GestionMantenimientoPage() {
                 <table className="w-full text-left text-xs border-collapse table-fixed">
                   <thead className="bg-[#324354] text-white sticky top-0 z-20 shadow-xs">
                     <tr>
-                      {/* Número OT */}
+                      {/* Foto Miniatura */}
+                      <th className="py-3 px-2 font-bold text-center w-[5%] select-none">
+                        <span>Foto</span>
+                      </th>
+
+                      {/* Orden de Trabajo */}
                       <th
                         onClick={() => handleHistorySort('codigo')}
-                        className="py-3 px-2 font-bold text-center w-[12%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Número OT"
+                        className="py-3 px-2 font-bold text-center w-[11%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Orden de Trabajo"
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>Número OT</span>
+                          <span>Orden de Trabajo</span>
                           {historySortField === 'codigo' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
@@ -5945,15 +6577,47 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Título de Mantenimiento */}
+                      {/* Origen (TPM, Correctivo, Preventivo) */}
+                      <th 
+                        onClick={() => handleHistorySort('tipo')}
+                        className="py-3 px-2 font-bold text-center w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Origen"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Origen</span>
+                          {historySortField === 'tipo' ? (
+                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
+                          )}
+                        </div>
+                      </th>
+
+                      {/* Descripción (Antes Título de Mantenimiento) */}
                       <th 
                         onClick={() => handleHistorySort('titulo')}
                         className="py-3 px-3 font-bold w-[18%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Título"
+                        title="Clic para ordenar por Descripción"
                       >
                         <div className="flex items-center gap-1.5">
-                          <span>Título de Mantenimiento</span>
+                          <span>Descripción</span>
                           {historySortField === 'titulo' ? (
+                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
+                          )}
+                        </div>
+                      </th>
+
+                      {/* Planta */}
+                      <th 
+                        onClick={() => handleHistorySort('planta')}
+                        className="py-3 px-2 font-bold w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors text-center"
+                        title="Clic para ordenar por Planta"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Planta</span>
+                          {historySortField === 'planta' ? (
                             historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
                           ) : (
                             <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
@@ -5964,7 +6628,7 @@ export default function GestionMantenimientoPage() {
                       {/* Máquinas / Equipos */}
                       <th 
                         onClick={() => handleHistorySort('maquina')}
-                        className="py-3 px-3 font-bold w-[16%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[14%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Máquina / Equipo"
                       >
                         <div className="flex items-center gap-1.5">
@@ -5980,7 +6644,7 @@ export default function GestionMantenimientoPage() {
                       {/* Técnico Responsable */}
                       <th 
                         onClick={() => handleHistorySort('tecnico')}
-                        className="py-3 px-3 font-bold w-[15%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-3 font-bold w-[13%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Técnico"
                       >
                         <div className="flex items-center gap-1.5">
@@ -5993,26 +6657,10 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
-                      {/* Origen (TPM, Correctivo, Preventivo) */}
-                      <th 
-                        onClick={() => handleHistorySort('tipo')}
-                        className="py-3 px-2 font-bold text-center w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Origen"
-                      >
-                        <div className="flex items-center justify-center gap-1">
-                          <span>Origen</span>
-                          {historySortField === 'tipo' ? (
-                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
-                          ) : (
-                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
-                          )}
-                        </div>
-                      </th>
-
                       {/* Estado */}
                       <th 
                         onClick={() => handleHistorySort('estado')}
-                        className="py-3 px-2 font-bold text-center w-[10%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold text-center w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Estado"
                       >
                         <div className="flex items-center justify-center gap-1">
@@ -6028,7 +6676,7 @@ export default function GestionMantenimientoPage() {
                       {/* Fecha Apertura */}
                       <th 
                         onClick={() => handleHistorySort('apertura')}
-                        className="py-3 px-2 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Fecha Apertura"
                       >
                         <div className="flex items-center gap-1">
@@ -6041,10 +6689,26 @@ export default function GestionMantenimientoPage() {
                         </div>
                       </th>
 
+                      {/* Plazo */}
+                      <th 
+                        onClick={() => handleHistorySort('plazo')}
+                        className="py-3 px-2 font-bold w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        title="Clic para ordenar por Plazo"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Plazo</span>
+                          {historySortField === 'plazo' ? (
+                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
+                          ) : (
+                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
+                          )}
+                        </div>
+                      </th>
+
                       {/* Fecha Cierre */}
                       <th 
                         onClick={() => handleHistorySort('cierre')}
-                        className="py-3 px-2 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
+                        className="py-3 px-2 font-bold w-[8%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
                         title="Clic para ordenar por Fecha Cierre"
                       >
                         <div className="flex items-center gap-1">
@@ -6056,29 +6720,13 @@ export default function GestionMantenimientoPage() {
                           )}
                         </div>
                       </th>
-
-                      {/* Observaciones */}
-                      <th 
-                        onClick={() => handleHistorySort('observaciones')}
-                        className="py-3 px-3 font-bold w-[9%] cursor-pointer select-none hover:bg-[#3d5166] transition-colors"
-                        title="Clic para ordenar por Observaciones"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span>Observaciones</span>
-                          {historySortField === 'observaciones' ? (
-                            historySortAsc ? <ArrowUp className="w-3 h-3 text-amber-300" /> : <ArrowDown className="w-3 h-3 text-amber-300" />
-                          ) : (
-                            <ArrowUpDown className="w-2.5 h-2.5 text-white/40" />
-                          )}
-                        </div>
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredHistoryRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-gray-400">
-                          {historyLoading ? 'Cargando registros históricos...' : 'No se encontraron registros en el historial con los filtros aplicados.'}
+                        <td colSpan={11} className="py-12 text-center text-gray-400">
+                          {historyLoading ? 'Cargando registros...' : 'No se encontraron órdenes de trabajo con los filtros aplicados.'}
                         </td>
                       </tr>
                     ) : (
@@ -6092,6 +6740,22 @@ export default function GestionMantenimientoPage() {
                         const isCorrectivo = category === 'Correctivo';
                         const codigoDisplay = getHistoryRecordCode(row, idx);
 
+                        let photoUrl: string | null = null;
+                        if (Array.isArray(row.fotos) && row.fotos.length > 0 && typeof row.fotos[0] === 'string' && row.fotos[0].trim()) {
+                          photoUrl = row.fotos[0];
+                        } else if (typeof row.fotos === 'string' && row.fotos.trim().startsWith('http')) {
+                          photoUrl = row.fotos;
+                        } else if (row.foto_url && typeof row.foto_url === 'string' && row.foto_url.trim()) {
+                          photoUrl = row.foto_url;
+                        } else if (row.foto && typeof row.foto === 'string' && row.foto.trim()) {
+                          photoUrl = row.foto;
+                        }
+
+                        const techName = row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || 'Sin asignar';
+                        const isUnassignedTech = !techName || techName.toLowerCase().includes('sin asignar') || techName.toLowerCase().includes('por asignar');
+
+                        const rawPlazo = row.fecha_limite || row.fecha_plazo || row.fecha_programada || row.fecha_compromiso || row.plazo || null;
+
                         return (
                           <tr 
                             key={row.id || idx} 
@@ -6099,6 +6763,21 @@ export default function GestionMantenimientoPage() {
                             className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
                             title="Haz clic para ver la información completa de esta orden de trabajo"
                           >
+                            {/* Mini Foto Thumbnail */}
+                            <td className="py-2.5 px-2 text-center">
+                              {photoUrl ? (
+                                <img
+                                  src={photoUrl}
+                                  alt="Foto OT"
+                                  className="w-8 h-8 rounded-full object-cover border border-[#e2ded5] shadow-2xs mx-auto"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-[#F6F3EE] flex items-center justify-center text-[#7B8E90] border border-[#e2ded5] mx-auto text-[10px]" title="Sin foto">
+                                  <Camera className="w-4 h-4 text-[#7B8E90]" />
+                                </div>
+                              )}
+                            </td>
+
                             {/* Número OT Badge */}
                             <td className="py-3 px-2 text-center font-bold">
                               <span className={`px-2 py-1 rounded-lg font-mono text-[10.5px] border inline-block whitespace-nowrap shadow-2xs ${
@@ -6109,28 +6788,6 @@ export default function GestionMantenimientoPage() {
                               </span>
                             </td>
 
-                            <td className="py-3 px-3 font-bold text-[#324354] break-words">
-                              {row['Título'] || 'Mantenimiento General'}
-                            </td>
-
-                            {/* Máquinas / Equipos */}
-                            <td className="py-3 px-3">
-                              <div className="flex flex-col gap-0.5 max-w-[220px]">
-                                {(row.codigo_maquina || row.codigoMaquina) && (
-                                  <span className="w-fit px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9.5px] font-mono font-bold leading-none">
-                                    {row.codigo_maquina || row.codigoMaquina}
-                                  </span>
-                                )}
-                                <span className="font-semibold text-xs text-[#324354] leading-snug break-words">
-                                  {row.maquina || row.equipo || row.maquina_nombre || row.maquinas || 'General'}
-                                </span>
-                              </div>
-                            </td>
-
-                            <td className="py-3 px-3 font-semibold text-[#324354] break-words">
-                              👤 {row['TECNICO'] || 'Sin asignar'}
-                            </td>
-                            
                             {/* Origen Badge */}
                             <td className="py-3 px-2 text-center whitespace-nowrap">
                               {isTpm ? (
@@ -6151,6 +6808,52 @@ export default function GestionMantenimientoPage() {
                               )}
                             </td>
 
+                            {/* Descripción sin corchetes [...] */}
+                            <td className="py-3 px-3 font-bold text-[#324354] break-words">
+                              {cleanDescriptionText(row['Título'] || row.sintoma || row.titulo)}
+                            </td>
+
+                            {/* Planta */}
+                            <td className="py-3 px-2 text-center whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold font-mono bg-[#F6F3EE] text-[#324354] border border-[#e2ded5] inline-block">
+                                {obtenerCodigoPlanta(row.planta || row['Planta'], plantasNomenclatura)}
+                              </span>
+                            </td>
+
+                            {/* Máquinas / Equipos */}
+                            <td className="py-3 px-3">
+                              {(() => {
+                                const { code, name } = resolveHistoryRowMachine(row, maquinasCatalogo);
+                                return (
+                                  <div className="flex flex-col gap-0.5 max-w-[220px]">
+                                    {code && (
+                                      <span className="w-fit px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9.5px] font-mono font-bold leading-none">
+                                        {code}
+                                      </span>
+                                    )}
+                                    <span className="font-semibold text-xs text-[#324354] leading-snug break-words">
+                                      {name}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
+                            {/* Técnico Responsable (Alert Red Badge if Unassigned) */}
+                            <td className="py-3 px-3">
+                              {isUnassignedTech ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10.5px] font-bold inline-flex items-center gap-1.5 bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs">
+                                  <AlertTriangle className="w-3 h-3 text-rose-600 animate-pulse" />
+                                  Sin asignar
+                                </span>
+                              ) : (
+                                <span className="font-semibold text-xs text-[#324354] break-words">
+                                  👤 {techName}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Estado */}
                             <td className="py-3 px-2 text-center">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-block ${
                                 isComplete ? 'bg-emerald-100 text-emerald-800' :
@@ -6159,20 +6862,20 @@ export default function GestionMantenimientoPage() {
                                 {isComplete ? '✅ ' : isIncomplete ? '⚠️ ' : '⏳ '}{estado}
                               </span>
                             </td>
+
+                            {/* Fecha Apertura */}
                             <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
                               {formatFechaDDMMAAAA(row['FECHA DE APERTURA'] || row.fecha_apertura)}
                             </td>
+
+                            {/* Plazo */}
+                            <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
+                              {rawPlazo ? formatFechaDDMMAAAA(rawPlazo) : '—'}
+                            </td>
+
+                            {/* Fecha Cierre */}
                             <td className="py-3 px-2 text-gray-700 font-semibold text-[11px] whitespace-nowrap">
                               {formatFechaDDMMAAAA(row['FECHA DE CIERRE'] || row.fecha_cierre)}
-                            </td>
-                            <td className="py-3 px-3 text-gray-700">
-                              {row['COMENTARIO DE EJECUCION'] ? (
-                                <div className="bg-slate-50 p-2 rounded-xl border border-gray-200 text-xs max-h-24 overflow-y-auto break-words" title={row['COMENTARIO DE EJECUCION']}>
-                                  {row['COMENTARIO DE EJECUCION']}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic text-[11px]">Sin observaciones</span>
-                              )}
                             </td>
                           </tr>
                         );
@@ -6192,253 +6895,9 @@ export default function GestionMantenimientoPage() {
           <div className="max-w-5xl mx-auto w-full flex flex-col gap-7 animate-in fade-in duration-300">
             
             {/* ========================================================================= */}
-            {/* SECCIÓN 1: TÉCNICOS (Gestión de Técnicos y Capacidad) */}
+            {/* SECCIÓN 1: PLANIFICACIÓN DE CUADRILLA, HORARIOS Y TURNOS (FUSIÓN TOTAL)   */}
             {/* ========================================================================= */}
-            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#e2ded5] shadow-xs flex flex-col gap-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2ded5] pb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-[#324354] flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-xl bg-[#324354] text-white flex items-center justify-center text-xs font-black">1</span>
-                    <Users className="w-5 h-5 text-[#7B8E90]" />
-                    <span>Gestión de Técnicos y Capacidad</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Gestión de cuadrilla en 3 columnas operativas: PR (Producción), NP (No Producción) e Inactivos.</p>
-                </div>
-
-                <button
-                  onClick={() => setShowTechModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#324354] text-white text-xs font-bold rounded-xl hover:bg-[#324354]/90 transition-all cursor-pointer shadow-xs self-start sm:self-auto shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Nuevo Técnico</span>
-                </button>
-              </div>
-
-              {/* Buscador de Técnicos, Cédulas y Turnos */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={techConfigSearch}
-                  onChange={(e) => setTechConfigSearch(e.target.value)}
-                  placeholder="Buscar técnico por nombre, cédula (CC), ID o turno..."
-                  className="w-full pl-10 pr-10 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs sm:text-sm font-medium text-[#324354] focus:outline-none focus:border-[#324354] transition-all"
-                />
-                {techConfigSearch && (
-                  <button
-                    onClick={() => setTechConfigSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* 3 Columnas: PR - Producción | NP - No Producción | Inactivos */}
-              {(() => {
-                const query = normalize(techConfigSearch);
-                const allValidTechs = technicians.filter(t => t.id !== 9999);
-                const filtered = allValidTechs.filter(t => {
-                  if (!query) return true;
-                  return (
-                    normalize(t.name).includes(query) ||
-                    (t.documento && normalize(t.documento).includes(query)) ||
-                    t.id.toString().includes(query) ||
-                    normalize(t.turno).includes(query) ||
-                    (t.planta && normalize(t.planta).includes(query)) ||
-                    normalize(getTurnoLabel(t.turno)).includes(query)
-                  );
-                });
-
-                const colPR = filtered.filter(t => {
-                  const tr = (t.turno || '').toUpperCase();
-                  return tr !== 'INACTIVO' && (tr === 'PR' || tr.includes('PRODUCCION'));
-                });
-
-                const colNP = filtered.filter(t => {
-                  const tr = (t.turno || '').toUpperCase();
-                  return tr !== 'INACTIVO' && (tr === 'NP' || tr === 'PRNP' || tr === 'GENERAL' || tr.includes('PARO') || (!tr.includes('PRODUCCION') && tr !== 'PR'));
-                });
-
-                const colInactivos = filtered.filter(t => {
-                  const tr = (t.turno || '').toUpperCase();
-                  return tr === 'INACTIVO' || tr === 'INACTIVOS' || (t as any).activo === false;
-                });
-
-                const renderTechCard = (tech: Technician, badgeColor: string) => {
-                  const effCap = getTechEffectiveCapacity(tech);
-                  const margin = tech.overloadMarginPercent !== undefined ? tech.overloadMarginPercent : systemSettings.defaultOverloadMargin;
-                  const baseCap = tech.capacity || systemSettings.baseCapacity;
-                  const isInactive = (tech.turno || '').toUpperCase() === 'INACTIVO';
-                  const techPlantas = parseTechPlantas(tech.planta || tech.especialidad, plantasNomenclatura);
-                  const activePlantasCount = plantasNomenclatura.filter(p => p.activo !== false).length;
-                  const isAllPlants = activePlantasCount > 0 && (techPlantas.length >= activePlantasCount || (tech.planta || '').trim().toLowerCase() === 'todas');
-
-                  return (
-                    <div
-                      key={tech.id}
-                      className={`p-2.5 bg-white rounded-xl border transition-all flex flex-col gap-1.5 shadow-2xs ${
-                        isInactive
-                          ? 'border-gray-200 opacity-75 hover:opacity-100'
-                          : 'border-[#e2ded5] hover:border-[#324354]/40 hover:shadow-xs'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-1.5">
-                        <div className="flex-1 min-w-0">
-                          {/* Nombre Completo y ID */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[9.5px] px-1 py-0.2 bg-slate-100 border border-slate-200 rounded text-slate-700 font-mono font-bold shrink-0">
-                              #{tech.id}
-                            </span>
-                            <span className="font-bold text-xs text-[#324354] leading-tight break-words" title={tech.name}>
-                              {tech.name}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-1 flex-wrap mt-1">
-                            {tech.documento && (
-                              <span className="text-[9.5px] px-1.5 py-0.2 bg-slate-50 border border-slate-200 rounded text-slate-500 font-mono">
-                                CC: {tech.documento}
-                              </span>
-                            )}
-                            {isAllPlants ? (
-                              <span
-                                className="text-[9.5px] px-1.5 py-0.2 bg-sky-100 border border-sky-300 rounded text-sky-900 font-bold flex items-center gap-1 shadow-2xs"
-                                title="Planta / Especialidad: Todas las Plantas"
-                              >
-                                <span>🏭 Todas</span>
-                              </span>
-                            ) : (
-                              techPlantas.map(cod => (
-                                <span
-                                  key={cod}
-                                  className="text-[9.5px] px-1.5 py-0.2 bg-sky-50 border border-sky-200 rounded text-sky-800 font-bold flex items-center gap-1"
-                                  title={`Planta / Especialidad: ${cod}`}
-                                >
-                                  <span>🏭 {cod}</span>
-                                </span>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <button
-                            onClick={() => handleOpenEditTech(tech)}
-                            className="p-1 text-[#324354] hover:bg-slate-100 hover:text-blue-600 rounded transition-all cursor-pointer"
-                            title="Modificar técnico"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTech(tech.id)}
-                            className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all cursor-pointer"
-                            title="Desactivar técnico"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[10px]">
-                        <span className={`px-1.5 py-0.2 rounded font-bold text-[9.5px] ${badgeColor}`}>
-                          {getTurnoLabel(tech.turno)}
-                        </span>
-                        {!isInactive ? (
-                          <div className="text-right">
-                            <span className="font-bold text-[#324354] text-[10.5px]">{effCap.toFixed(1)}h</span>
-                            <span className="text-gray-400 text-[9px] ml-1">({baseCap.toFixed(1)}h +{margin}%)</span>
-                          </div>
-                        ) : (
-                          <span className="text-[9.5px] text-gray-400 font-semibold italic">Inactivo</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                };
-
-                return (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-                    
-                    {/* Columna 1: PR - Producción */}
-                    <div className="p-3.5 bg-[#F6F3EE] rounded-2xl border border-emerald-200/80 flex flex-col gap-2.5 min-h-[250px]">
-                      <div className="flex items-center justify-between pb-2 border-b border-emerald-200/70">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                          <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
-                            PR · Producción
-                          </h4>
-                        </div>
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full border border-emerald-200">
-                          {colPR.length}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1">
-                        {colPR.length === 0 ? (
-                          <div className="text-center py-8 text-gray-400 text-xs italic">
-                            No hay técnicos asignados a Producción (PR)
-                          </div>
-                        ) : (
-                          colPR.map(tech => renderTechCard(tech, 'bg-emerald-50 text-emerald-700 border border-emerald-200'))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Columna 2: NP - No Producción */}
-                    <div className="p-3.5 bg-[#F6F3EE] rounded-2xl border border-sky-200/80 flex flex-col gap-2.5 min-h-[250px]">
-                      <div className="flex items-center justify-between pb-2 border-b border-sky-200/70">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
-                          <h4 className="font-bold text-xs uppercase tracking-wider text-sky-950">
-                            NP · No Producción
-                          </h4>
-                        </div>
-                        <span className="px-2 py-0.5 bg-sky-100 text-sky-800 font-bold text-xs rounded-full border border-sky-200">
-                          {colNP.length}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1">
-                        {colNP.length === 0 ? (
-                          <div className="text-center py-8 text-gray-400 text-xs italic">
-                            No hay técnicos asignados a No Producción (NP)
-                          </div>
-                        ) : (
-                          colNP.map(tech => renderTechCard(tech, 'bg-sky-50 text-sky-700 border border-sky-200'))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Columna 3: Inactivos */}
-                    <div className="p-3.5 bg-[#F6F3EE] rounded-2xl border border-gray-300/80 flex flex-col gap-2.5 min-h-[250px]">
-                      <div className="flex items-center justify-between pb-2 border-b border-gray-300/70">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
-                          <h4 className="font-bold text-xs uppercase tracking-wider text-gray-700">
-                            Inactivos
-                          </h4>
-                        </div>
-                        <span className="px-2 py-0.5 bg-gray-200 text-gray-700 font-bold text-xs rounded-full border border-gray-300">
-                          {colInactivos.length}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1">
-                        {colInactivos.length === 0 ? (
-                          <div className="text-center py-8 text-gray-400 text-xs italic">
-                            No hay técnicos inactivos
-                          </div>
-                        ) : (
-                          colInactivos.map(tech => renderTechCard(tech, 'bg-gray-100 text-gray-600 border border-gray-200'))
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
-                );
-              })()}
-            </div>
+            <MatrizHorariosTurnos technicians={technicians} onTechsUpdated={fetchData} />
 
             {/* ========================================================================= */}
             {/* SECCIÓN 2: TIPO DE INTERVENCIÓN */}
@@ -7206,8 +7665,8 @@ export default function GestionMantenimientoPage() {
 
                             {/* Planta / Proceso */}
                             <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">
-                                {m.planta || 'No asignada'}
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-md text-xs font-bold font-mono border border-gray-200">
+                                {obtenerCodigoPlanta(m.planta, plantasNomenclatura)}
                               </span>
                               {m.proceso && (
                                 <div className="text-[11px] text-gray-400 mt-0.5">{m.proceso}</div>
@@ -8384,131 +8843,605 @@ export default function GestionMantenimientoPage() {
         </div>
       )}
 
-      {/* Modal: Report Corrective Maintenance */}
-      {showCorrectivoModal && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-24 pb-8 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
+      {/* Modal: Reporte de Tarjeta de Anomalía (TPM) - Mismo diseño que /mantenimiento/tarjetas-falla */}
+      {showCreateTpmModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
           <div 
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-[#e2ded5] max-h-[85vh] overflow-y-auto my-auto"
+            className="bg-white rounded-3xl p-5 sm:p-7 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[92vh] overflow-y-auto my-auto relative"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-bold text-[#324354] mb-4">Reportar Mantenimiento Correctivo / Anomalía</h3>
-            <form onSubmit={handleAddCorrectivoSubmit} className="flex flex-col gap-3.5">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos</label>
-                  <input
-                    list="maquinas-catalogo-options"
-                    type="text"
-                    value={newCorrectivoForm.maquina}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const matched = maquinasCatalogo.find(m => 
-                        `${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`.toLowerCase() === val.toLowerCase() ||
-                        m.nombre_equipo?.toLowerCase() === val.toLowerCase() ||
-                        (m.codigo_equipo && m.codigo_equipo.toLowerCase() === val.toLowerCase())
-                      );
-                      if (matched) {
-                        setNewCorrectivoForm(prev => ({
-                          ...prev,
-                          maquina: matched.nombre_equipo,
-                          planta: obtenerCodigoPlanta(matched.planta || prev.planta)
-                        }));
-                      } else {
-                        setNewCorrectivoForm(prev => ({ ...prev, maquina: val }));
-                      }
-                    }}
-                    placeholder="Buscar o seleccionar equipo..."
-                    required
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
-                  />
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#e2ded5] mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold shrink-0">
+                  <ShieldAlert className="w-6 h-6" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Planta (Código Corto)</label>
-                  <select
-                    value={obtenerCodigoPlanta(newCorrectivoForm.planta, plantasNomenclatura)}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, planta: e.target.value }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354]"
+                  <h3 className="text-base sm:text-lg font-bold text-[#324354] leading-tight">
+                    REPORTE DE TARJETA DE ANOMALÍA (TPM)
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Se vinculará automáticamente a Mantenimiento Correctivo (Sin Asignar).
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (isTpmListening && tpmRecognitionRef.current) {
+                    tpmRecognitionRef.current.stop();
+                    setIsTpmListening(false);
+                  }
+                  setShowCreateTpmModal(false);
+                }}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTpmSubmit} noValidate className="flex flex-col gap-4">
+              
+              {/* Tipo de Tarjeta / Clasificación TPM */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1.5">
+                  TIPO DE TARJETA / CLASIFICACIÓN TPM <span className="text-rose-600">*</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* Roja */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'roja' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'roja' 
+                        ? 'bg-rose-50 border-rose-400 text-rose-900 ring-2 ring-rose-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
                   >
-                    {plantasNomenclatura.filter(p => p.activo !== false).map(p => (
-                      <option key={p.codigo} value={p.codigo}>
-                        {p.codigo} - {p.nombre_oficial}
-                      </option>
-                    ))}
-                  </select>
+                    <span className="text-xs flex items-center gap-1 font-bold text-rose-700">
+                      🔴 Tarjeta Roja
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Mantenimiento Técnico</span>
+                  </button>
+
+                  {/* Azul */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'azul' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'azul' 
+                        ? 'bg-blue-50 border-blue-400 text-blue-900 ring-2 ring-blue-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs flex items-center gap-1 font-bold text-blue-700">
+                      🔵 Tarjeta Azul
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Mantenimiento Autónomo</span>
+                  </button>
+
+                  {/* Amarilla */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'amarilla' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'amarilla' 
+                        ? 'bg-amber-50 border-amber-400 text-amber-900 ring-2 ring-amber-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs flex items-center gap-1 font-bold text-amber-700">
+                      🟡 Tarjeta Amarilla
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Seguridad, 5S y Fugas</span>
+                  </button>
+
+                  {/* Verde */}
+                  <button
+                    type="button"
+                    onClick={() => setTpmFormData(prev => ({ ...prev, tipo_tarjeta: 'verde' }))}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                      tpmFormData.tipo_tarjeta === 'verde' 
+                        ? 'bg-emerald-50 border-emerald-400 text-emerald-900 ring-2 ring-emerald-400 font-bold' 
+                        : 'bg-[#F6F3EE] border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs flex items-center gap-1 font-bold text-emerald-700">
+                      🟢 Tarjeta Verde
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-normal">Mejora Kaizen / Ideas</span>
+                  </button>
                 </div>
               </div>
 
+              {/* Máquinas y Equipos Autocomplete */}
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Descripción de la Avería / Síntoma</label>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  MÁQUINAS Y EQUIPOS <span className="text-rose-600">*</span>
+                </label>
+                <MachineSearchAutocomplete
+                  id="tpm-modal-maquina"
+                  value={tpmFormData.maquina}
+                  maquinasCatalogo={maquinasCatalogo}
+                  onChange={(selectedMaquina, matchedPlanta) => {
+                    if (tpmValidationMsg) setTpmValidationMsg(null);
+                    setTpmFormData(prev => ({
+                      ...prev,
+                      maquina: selectedMaquina,
+                      planta: matchedPlanta || prev.planta
+                    }));
+                  }}
+                  placeholder="Buscar o escribir máquina / equipo (ej. Enchapadora, Kaeser, Laser...)"
+                  required
+                />
+              </div>
+
+              {/* Planta */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  PLANTA <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={tpmFormData.planta}
+                  onChange={(e) => setTpmFormData(prev => ({ ...prev, planta: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  {plantasNomenclatura.length > 0 ? (
+                    plantasNomenclatura.map(p => (
+                      <option key={p.codigo} value={p.nombre_oficial}>
+                        {p.codigo} - {p.nombre_oficial}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Mármol Sintético">MS - Mármol Sintético</option>
+                      <option value="Muebles">MB - Muebles</option>
+                      <option value="Bañeras">BA - Bañeras</option>
+                      <option value="Ensamble">EN - Ensamble</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Persona que Reporta */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">
+                    PERSONA QUE REPORTA (EMPLEADO) <span className="text-rose-600">*</span>
+                  </label>
+                </div>
+                <input
+                  list="empleados-options-tpm-modal"
+                  type="text"
+                  value={tpmFormData.detectada_por}
+                  onChange={(e) => setTpmFormData(prev => ({ ...prev, detectada_por: e.target.value }))}
+                  placeholder="Escribe o selecciona el nombre del operario / empleado..."
+                  required
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                />
+                <datalist id="empleados-options-tpm-modal">
+                  {empleadosList.map(emp => (
+                    <option key={emp.id} value={emp.nombreCompleto}>
+                      {emp.cargo ? `Cargo: ${emp.cargo}` : ''} {emp.planta ? `· Planta: ${emp.planta}` : ''}
+                    </option>
+                  ))}
+                </datalist>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Por defecto tu usuario de sesión, pero puedes editarlo o seleccionar a otro empleado para reportar a su nombre.
+                </p>
+              </div>
+
+              {/* Descripción de la Avería / Síntoma con Dictado por Voz */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">
+                    DESCRIPCIÓN DE LA AVERÍA / SÍNTOMA <span className="text-rose-600">*</span>
+                  </label>
+                  
+                  {isTpmListening ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (tpmRecognitionRef.current) tpmRecognitionRef.current.stop();
+                        setIsTpmListening(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-md transition-all cursor-pointer animate-pulse active:scale-95"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span>Parar Micrófono</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleToggleTpmVoice}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Mic className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Dictar por Voz</span>
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={tpmFormData.descripcion_que}
+                  onChange={(e) => {
+                    if (tpmValidationMsg) setTpmValidationMsg(null);
+                    setTpmFormData(prev => ({ ...prev, descripcion_que: e.target.value }));
+                  }}
+                  placeholder="Describe la anomalía detectada, o presiona 'Dictar por Voz' para hablar..."
+                  required
+                  rows={3}
+                  className={`w-full p-3 bg-[#F6F3EE] rounded-xl border text-sm focus:outline-none transition-all ${
+                    isTpmListening 
+                      ? 'border-rose-500 ring-2 ring-rose-300' 
+                      : tpmValidationMsg 
+                        ? 'border-rose-500 ring-2 ring-rose-200 bg-rose-50/30' 
+                        : 'border-gray-300 focus:ring-2 focus:ring-[#324354]'
+                  }`}
+                />
+                
+                {isTpmListening && (
+                  <div className="flex items-center justify-between p-2.5 mt-2 bg-rose-50 border border-rose-300 rounded-xl shadow-2xs animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping shrink-0"></span>
+                      <span className="text-xs text-rose-800 font-bold">
+                        🎙️ Micrófono activado · Hable ahora
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Nivel de Prioridad */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  NIVEL DE PRIORIDAD <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={tpmFormData.prioridad}
+                  onChange={(e) => setTpmFormData(prev => ({ ...prev, prioridad: e.target.value as any }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  <option value="Alta">🚨 Alta (Crítica)</option>
+                  <option value="Media">⚠️ Media</option>
+                  <option value="Baja">ℹ️ Baja</option>
+                </select>
+              </div>
+
+              {/* Destino en Gestor */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">DESTINO EN GESTOR</label>
+                <div className="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 flex items-center justify-between">
+                  <span>Mantenimiento Correctivo</span>
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-semibold text-[11px]">Sin Asignar</span>
+                </div>
+              </div>
+
+              {/* Sección Fotos de Evidencia */}
+              <div className="p-4 bg-[#F6F3EE] rounded-2xl border border-gray-200 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-[#7B8E90]" />
+                    <span>Fotos de Evidencia (Máximo 2)</span>
+                  </label>
+                  <span className="text-[11px] text-gray-500 font-bold bg-white px-2 py-0.5 rounded-md border border-gray-200">
+                    {tpmFormData.fotos?.length || 0}/2 adjuntadas
+                  </span>
+                </div>
+
+                {(tpmFormData.fotos?.length || 0) < 2 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowTpmLiveCamera(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#324354] hover:bg-[#253341] text-white font-bold rounded-xl text-xs sm:text-sm shadow-xs cursor-pointer transition-all active:scale-95"
+                    >
+                      <Camera className="w-4 h-4 text-amber-300 shrink-0" />
+                      <span>Tomar Foto</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => tpmFileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white hover:bg-slate-100 text-[#324354] font-bold rounded-xl text-xs sm:text-sm border border-gray-300 shadow-xs cursor-pointer transition-all active:scale-95"
+                    >
+                      <ImageIcon className="w-4 h-4 text-[#7B8E90] shrink-0" />
+                      <span>Adjuntar Archivo</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Límite de 2 fotos alcanzado (2/2).</span>
+                  </div>
+                )}
+
+                <input
+                  ref={tpmFileInputRef}
+                  type="file"
+                  accept="image/*,.png,.jpg,.jpeg,.webp"
+                  multiple
+                  onChange={handleTpmFileAttach}
+                  style={{ display: 'none' }}
+                />
+
+                {/* Miniaturas de fotos */}
+                {tpmFormData.fotos && tpmFormData.fotos.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                    {tpmFormData.fotos.map((foto, index) => (
+                      <div key={index} className="relative bg-white p-2 rounded-xl border border-gray-200 flex flex-col gap-2 shadow-2xs">
+                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-gray-200">
+                          <img src={foto} alt={`Evidencia ${index + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTpmFormData(prev => ({
+                                ...prev,
+                                fotos: prev.fotos.filter((_, i) => i !== index)
+                              }));
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full transition-all cursor-pointer shadow-2xs"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAnnotatingTpmImage({ src: foto, index })}
+                          className="flex items-center justify-center gap-1.5 py-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs border border-rose-200 cursor-pointer transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Señalar en Rojo</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Validation Banner */}
+              {tpmValidationMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{tpmValidationMsg}</span>
+                  </div>
+                  <button type="button" onClick={() => setTpmValidationMsg(null)} className="text-rose-600 hover:text-rose-900 p-1">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Modal Actions */}
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isTpmListening && tpmRecognitionRef.current) {
+                      tpmRecognitionRef.current.stop();
+                      setIsTpmListening(false);
+                    }
+                    setShowCreateTpmModal(false);
+                  }}
+                  className="py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all active:scale-95"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submittingTpm}
+                  className="py-3 px-4 bg-[#324354] hover:bg-[#25323f] text-white font-bold rounded-xl text-xs sm:text-sm shadow-md cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {submittingTpm ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>Creando Tarjeta...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 text-amber-300" />
+                      <span>+ Crear Tarjeta de Anomalía</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
+
+            {/* Sub-modals inside TPM Modal: Live Camera Modal & Photo Annotation Editor */}
+            {showTpmLiveCamera && (
+              <LiveCameraModal
+                isOpen={showTpmLiveCamera}
+                onCapture={(dataUrl) => {
+                  setTpmFormData(prev => ({
+                    ...prev,
+                    fotos: [...(prev.fotos || []), dataUrl].slice(0, 2)
+                  }));
+                  setShowTpmLiveCamera(false);
+                }}
+                onClose={() => setShowTpmLiveCamera(false)}
+              />
+            )}
+
+            {annotatingTpmImage && (
+              <PhotoAnnotationEditor
+                imageSrc={annotatingTpmImage.src}
+                onSave={(annotatedUrl) => {
+                  if (annotatingTpmImage) {
+                    setTpmFormData(prev => {
+                      const newFotos = [...(prev.fotos || [])];
+                      if (typeof annotatingTpmImage.index === 'number') {
+                        newFotos[annotatingTpmImage.index] = annotatedUrl;
+                      }
+                      return { ...prev, fotos: newFotos };
+                    });
+                  }
+                  setAnnotatingTpmImage(null);
+                }}
+                onCancel={() => setAnnotatingTpmImage(null)}
+              />
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Report Corrective Maintenance */}
+      {showCorrectivoModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
+          <div 
+            className="bg-white rounded-3xl p-5 sm:p-7 md:p-8 max-w-2xl lg:max-w-3xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] overflow-y-auto my-auto relative"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#e2ded5] mb-5">
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold text-[#324354] leading-tight">
+                  Reportar Mantenimiento Correctivo / Anomalía
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Registra una avería o falla operativa para asignación y seguimiento técnico.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCorrectivoModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCorrectivoSubmit} className="flex flex-col gap-4">
+              
+              {/* 1. Máquinas y Equipos (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Máquinas y Equipos <span className="text-rose-600">*</span>
+                </label>
+                <MachineSearchAutocomplete
+                  id="correctivo-modal-maquina"
+                  value={newCorrectivoForm.maquina}
+                  maquinasCatalogo={maquinasCatalogo}
+                  onChange={(selectedMaquina, matchedPlanta) => {
+                    setNewCorrectivoForm(prev => ({
+                      ...prev,
+                      maquina: selectedMaquina,
+                      planta: matchedPlanta ? obtenerCodigoPlanta(matchedPlanta, plantasNomenclatura) : prev.planta
+                    }));
+                  }}
+                  placeholder="Buscar o seleccionar equipo por nombre, código o proceso..."
+                  required
+                />
+              </div>
+
+              {/* 2. Planta (Código Corto) (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Planta (Código Corto) <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={obtenerCodigoPlanta(newCorrectivoForm.planta, plantasNomenclatura)}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, planta: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  {plantasNomenclatura.filter(p => p.activo !== false).map(p => (
+                    <option key={p.codigo} value={p.codigo}>
+                      {p.codigo} - {p.nombre_oficial}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Descripción de la Avería / Síntoma (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Descripción de la Avería / Síntoma <span className="text-rose-600">*</span>
+                </label>
                 <textarea
                   value={newCorrectivoForm.sintoma}
                   onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, sintoma: e.target.value }))}
-                  placeholder="Describe la anomalía detectada, ruido, fuga o falla de funcionamiento..."
+                  placeholder="Describe detalladamente la anomalía detectada, ruido, fuga o falla de funcionamiento..."
                   required
-                  className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none min-h-[60px]"
+                  rows={3}
+                  className="w-full p-3 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Nivel de Prioridad</label>
-                  <select
-                    value={newCorrectivoForm.prioridad}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, prioridad: e.target.value as any }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354]"
-                  >
-                    <option value="Alta">🚨 Alta (Crítica)</option>
-                    <option value="Media">⚠️ Media</option>
-                    <option value="Baja">ℹ️ Baja</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Técnico Asignado</label>
-                  <select
-                    value={newCorrectivoForm.tecnico_asignado}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, tecnico_asignado: e.target.value }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354]"
-                  >
-                    <option value="">Seleccionar técnico...</option>
-                    {technicians.filter(t => t.id !== 9999).map(t => (
-                      <option key={t.id} value={t.name}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Plazo / Fecha Cierre</label>
-                  <input
-                    type="date"
-                    value={newCorrectivoForm.fecha_limite}
-                    onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, fecha_limite: e.target.value }))}
-                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-semibold text-[#324354]"
-                  />
-                </div>
+              {/* 4. Nivel de Prioridad (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Nivel de Prioridad <span className="text-rose-600">*</span>
+                </label>
+                <select
+                  value={newCorrectivoForm.prioridad}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, prioridad: e.target.value as any }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  <option value="Alta">🚨 Alta (Crítica)</option>
+                  <option value="Media">⚠️ Media</option>
+                  <option value="Baja">ℹ️ Baja</option>
+                </select>
               </div>
 
+              {/* 5. Técnico Asignado (1 campo por renglón) */}
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Acción Correctiva Preliminar</label>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Técnico Asignado
+                </label>
+                <select
+                  value={newCorrectivoForm.tecnico_asignado}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, tecnico_asignado: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                >
+                  <option value="">Seleccionar técnico...</option>
+                  {technicians.filter(t => t.id !== 9999).map(t => (
+                    <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 6. Plazo / Fecha Cierre (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Plazo / Fecha Cierre
+                </label>
+                <input
+                  type="date"
+                  value={newCorrectivoForm.fecha_limite}
+                  onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, fecha_limite: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-[#324354]"
+                />
+              </div>
+
+              {/* 7. Acción Correctiva Preliminar (1 campo por renglón) */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">
+                  Acción Correctiva Preliminar
+                </label>
                 <textarea
                   value={newCorrectivoForm.accion_tomada}
                   onChange={(e) => setNewCorrectivoForm(prev => ({ ...prev, accion_tomada: e.target.value }))}
-                  placeholder="Acciones tomadas para mitigar o reparar la falla..."
-                  className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none min-h-[50px]"
+                  placeholder="Acciones tomadas para mitigar o reparar la falla (opcional)..."
+                  rows={2}
+                  className="w-full p-3 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
-              {/* Adjuntar Fotos de Evidencia (Máximo 2) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-gray-600 uppercase">
-                    Fotos de Evidencia (Máximo 2)
+              {/* 8. Adjuntar Fotos de Evidencia (Máximo 2) (1 campo por renglón) */}
+              <div className="p-4 bg-[#F6F3EE] rounded-2xl border border-gray-200 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-[#7B8E90]" />
+                    <span>Fotos de Evidencia (Máximo 2)</span>
                   </label>
-                  <span className="text-[11px] text-gray-500 font-medium">
+                  <span className="text-[11px] text-gray-500 font-bold bg-white px-2 py-0.5 rounded-md border border-gray-200">
                     {newCorrectivoForm.fotos?.length || 0}/2 adjuntadas
                   </span>
                 </div>
                 
-                <div className="p-3 bg-[#F6F3EE] rounded-2xl border border-dashed border-gray-300 flex items-center gap-3 flex-wrap">
+                <div className="p-3 bg-white rounded-2xl border border-dashed border-gray-300 flex items-center gap-3 flex-wrap">
                   {/* Thumbnails of already attached photos */}
                   {newCorrectivoForm.fotos && newCorrectivoForm.fotos.map((foto, index) => (
                     <div key={index} className="relative group w-20 h-20 rounded-xl overflow-hidden border-2 border-[#324354] shadow-xs shrink-0">
@@ -8534,13 +9467,13 @@ export default function GestionMantenimientoPage() {
 
                   {/* Upload button if less than 2 */}
                   {(newCorrectivoForm.fotos?.length || 0) < 2 && (
-                    <label className={`flex flex-col items-center justify-center w-20 h-20 bg-white hover:bg-slate-100 border-2 border-dashed border-[#7B8E90] rounded-xl cursor-pointer transition-all shrink-0 ${uploadingPhotos ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`flex flex-col items-center justify-center w-24 h-20 bg-[#F6F3EE] hover:bg-slate-200 border-2 border-dashed border-[#7B8E90] rounded-xl cursor-pointer transition-all shrink-0 ${uploadingPhotos ? 'opacity-50 pointer-events-none' : ''}`}>
                       {uploadingPhotos ? (
                         <Loader2 className="w-5 h-5 text-[#324354] animate-spin" />
                       ) : (
                         <>
                           <Camera className="w-5 h-5 text-[#324354] mb-1" />
-                          <span className="text-[10px] font-bold text-[#324354]">Adjuntar</span>
+                          <span className="text-[11px] font-bold text-[#324354]">Adjuntar</span>
                         </>
                       )}
                       <input
@@ -8561,18 +9494,19 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-3">
+              {/* Botones de Acción */}
+              <div className="flex gap-3 pt-3 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => setShowCorrectivoModal(false)}
-                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs sm:text-sm hover:bg-gray-200 cursor-pointer"
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs sm:text-sm hover:bg-gray-200 cursor-pointer transition-all"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={uploadingPhotos}
-                  className="flex-1 py-2.5 bg-[#324354] text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-[#324354]/90 cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-3 bg-[#324354] text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-[#324354]/90 cursor-pointer transition-all shadow-xs disabled:opacity-50"
                 >
                   Reportar Correctivo
                 </button>
@@ -9525,6 +10459,86 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
+              {/* Órdenes de Trabajo Generadas para este Plan */}
+              {viewingTask && (() => {
+                const orders = getOrdersForPmp(viewingTask);
+
+                return (
+                  <div className="p-4 bg-white border border-gray-200 rounded-2xl flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-[#7B8E90]" />
+                        <span>Órdenes de Trabajo Creadas de este Plan</span>
+                      </h4>
+                      <span className="px-2.5 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full text-xs font-bold">
+                        {orders.length} Orden(es)
+                      </span>
+                    </div>
+
+                    {orders.length === 0 ? (
+                      <div className="p-3 bg-[#F6F3EE] rounded-xl text-center text-xs text-gray-500">
+                        Aún no se han generado órdenes de trabajo ejecutadas para este plan preventivo.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+                        {orders.map((ord, idx) => {
+                          const category = ord.category || getHistoryRecordCategory(ord);
+                          const codigoDisplay = ord.codigoDisplay || getHistoryRecordCode(ord, idx);
+                          const estado = ord.estadoDisplay || ord['ESTADO'] || ord.estado || 'Pendiente';
+                          const isComplete = estado.toLowerCase().includes('completad') || estado.toLowerCase().includes('resuelt') || estado.toLowerCase().includes('cerrad');
+                          const isAtrasada = estado.toLowerCase().includes('atrasad');
+                          const isIncomplete = estado.toLowerCase().includes('incomplet');
+                          const fechaCreada = ord.fechaCreada || ord['FECHA DE APERTURA'] || ord.fecha_apertura || (ord.created_at ? ord.created_at.slice(0, 10) : 'Sin fecha');
+                          const tecnicoNombre = ord.tecnicoNombre || ord['TECNICO'] || ord.tecnico_asignado || 'Sin asignar';
+
+                          return (
+                            <div
+                              key={ord.id || idx}
+                              onClick={() => {
+                                setViewingHistoryRecord({ ...ord, codigoDisplay, category, 'TECNICO': tecnicoNombre, 'ESTADO': estado });
+                              }}
+                              className="p-3 bg-white hover:bg-amber-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                              title="Haz clic para ver la orden completa"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="px-2 py-1 bg-sky-50 text-sky-800 border border-sky-200 font-mono font-bold rounded text-[11px] shrink-0">
+                                  {codigoDisplay}
+                                </span>
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                  <span className="font-bold text-xs text-[#324354] group-hover:text-blue-900 truncate">
+                                    {ord['Título'] || ord.titulo || viewingTask.title}
+                                  </span>
+                                  <div className="text-[11px] text-gray-500 flex items-center gap-2 flex-wrap">
+                                    <span>📅 Creada: <strong>{fechaCreada}</strong></span>
+                                    <span>👤 Técnico: <strong>{tecnicoNombre}</strong></span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                  isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  isAtrasada ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                  isIncomplete ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {isComplete ? '✅ Completado' : isAtrasada ? '🚨 Atrasada' : isIncomplete ? '⚠️ Incompleto' : '⏳ Pendiente'}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="px-2 py-1 bg-gray-100 group-hover:bg-[#324354] group-hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                  Ver Detalle
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Feedback Toast / Alert when Force Task is triggered */}
               {forceTaskFeedback && (
                 <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
@@ -9744,16 +10758,21 @@ export default function GestionMantenimientoPage() {
                 {/* Máquinas y Equipos */}
                 <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
                   <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquina / Equipo</span>
-                  <div className="flex flex-wrap items-center gap-1.5 leading-snug">
-                    {(viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina) && (
-                      <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
-                        {viewingHistoryRecord.codigo_maquina || viewingHistoryRecord.codigoMaquina}
-                      </span>
-                    )}
-                    <strong className="text-[#324354] text-xs font-bold break-words leading-tight">
-                      {viewingHistoryRecord.maquina || viewingHistoryRecord.equipo || viewingHistoryRecord.maquina_nombre || viewingHistoryRecord.maquinas || 'General / Planta'}
-                    </strong>
-                  </div>
+                  {(() => {
+                    const { code, name } = resolveHistoryRowMachine(viewingHistoryRecord, maquinasCatalogo);
+                    return (
+                      <div className="flex flex-wrap items-center gap-1.5 leading-snug">
+                        {code && (
+                          <span className="px-1.5 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[10px] font-mono font-bold shrink-0">
+                            {code}
+                          </span>
+                        )}
+                        <strong className="text-[#324354] text-xs font-bold break-words leading-tight">
+                          {name}
+                        </strong>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Planta */}
@@ -10058,6 +11077,225 @@ export default function GestionMantenimientoPage() {
                   </div>
                 )}
               </div>
+
+              {/* Complete Intervention History for this Machine */}
+              {selectedMachineModal && (() => {
+                const allInterventions = getInterventionsForMachine(selectedMachineModal);
+                
+                const filteredInterventions = allInterventions.filter(item => {
+                  const cat = item.category || item.tipo || item['TIPO'] || 'Correctivo';
+                  if (machineInterventionCategory !== 'Todos') {
+                    if (machineInterventionCategory === 'Correctivo' && cat !== 'Correctivo') return false;
+                    if (machineInterventionCategory === 'Preventivo' && cat !== 'Preventivo') return false;
+                    if (machineInterventionCategory === 'TPM' && cat !== 'TPM' && !cat.includes('TPM') && !cat.includes('Tarjeta')) return false;
+                    if (machineInterventionCategory === 'Autónomo' && cat !== 'Autónomo' && !cat.includes('Autónomo') && !cat.includes('Autonomo')) return false;
+                  }
+
+                  if (machineInterventionSearch.trim()) {
+                    const q = normalize(machineInterventionSearch);
+                    const tit = normalize(item['Título'] || item.titulo || item.sintoma || '');
+                    const cod = normalize(item.codigoDisplay || item.codigo || '');
+                    const tec = normalize(item['TECNICO'] || item.tecnico_nombre || '');
+                    const obs = normalize(item['COMENTARIO DE EJECUCION'] || item.observaciones || item.accion_realizada || '');
+                    if (!tit.includes(q) && !cod.includes(q) && !tec.includes(q) && !obs.includes(q)) return false;
+                  }
+
+                  return true;
+                }).sort((a, b) => {
+                  const dateA = new Date(a.sourceDate || a.created_at || a['FECHA DE APERTURA'] || '1970-01-01').getTime();
+                  const dateB = new Date(b.sourceDate || b.created_at || b['FECHA DE APERTURA'] || '1970-01-01').getTime();
+                  return machineInterventionSortAsc ? dateA - dateB : dateB - dateA;
+                });
+
+                const countCorrectivos = allInterventions.filter(i => (i.category === 'Correctivo')).length;
+                const countPreventivos = allInterventions.filter(i => (i.category === 'Preventivo')).length;
+                const countTpm = allInterventions.filter(i => (i.category === 'TPM' || (i.category || '').includes('Tarjeta'))).length;
+                const countAutonomo = allInterventions.filter(i => ((i.category || '').includes('Autónomo') || (i.category || '').includes('Autonomo'))).length;
+
+                return (
+                  <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+                    {/* Header & Counters */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                          <History className="w-4 h-4 text-[#324354]" />
+                          <span>Historial de Intervenciones del Equipo</span>
+                        </h4>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Registro cronológico de órdenes de trabajo, correctivos, preventivos y tarjetas TPM
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2.5 py-0.5 bg-[#324354] text-white rounded-full text-xs font-bold shadow-2xs">
+                          {allInterventions.length} Intervención(es)
+                        </span>
+                        {countCorrectivos > 0 && (
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10.5px] font-bold">
+                            {countCorrectivos} Correctivos
+                          </span>
+                        )}
+                        {countPreventivos > 0 && (
+                          <span className="px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-full text-[10.5px] font-bold">
+                            {countPreventivos} Preventivos
+                          </span>
+                        )}
+                        {(countTpm > 0 || countAutonomo > 0) && (
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-full text-[10.5px] font-bold">
+                            {countTpm + countAutonomo} TPM / Autónomo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-[#F6F3EE] p-2.5 rounded-2xl border border-gray-200">
+                      {/* Search */}
+                      <div className="relative w-full sm:w-64">
+                        <input
+                          type="text"
+                          value={machineInterventionSearch}
+                          onChange={(e) => setMachineInterventionSearch(e.target.value)}
+                          placeholder="Buscar por título, código o técnico..."
+                          className="w-full pl-8 pr-3 py-1.5 bg-white text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#324354]/30"
+                        />
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                        {machineInterventionSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setMachineInterventionSearch('')}
+                            className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 text-xs font-bold"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Category Filter Tabs & Sort */}
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto justify-between sm:justify-end">
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200">
+                          {['Todos', 'Correctivo', 'Preventivo', 'TPM'].map(cat => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setMachineInterventionCategory(cat)}
+                              className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-colors whitespace-nowrap ${
+                                machineInterventionCategory === cat 
+                                  ? 'bg-[#324354] text-white shadow-2xs' 
+                                  : 'text-gray-600 hover:bg-gray-100'
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setMachineInterventionSortAsc(!machineInterventionSortAsc)}
+                          className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-[10.5px] font-bold text-[#324354] hover:bg-gray-50 transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                          title="Cambiar orden por fecha"
+                        >
+                          <ArrowUpDown className="w-3 h-3 text-[#7B8E90]" />
+                          <span>{machineInterventionSortAsc ? 'Más antiguo' : 'Más reciente'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Table / List */}
+                    {filteredInterventions.length === 0 ? (
+                      <div className="p-6 bg-[#F6F3EE] rounded-2xl border border-gray-200 text-center text-xs text-gray-500">
+                        {allInterventions.length === 0
+                          ? 'No hay registros de intervenciones o mantenimientos asociadas a este equipo.'
+                          : 'No se encontraron intervenciones con los filtros aplicados.'}
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-72 overflow-y-auto bg-white shadow-2xs">
+                        {filteredInterventions.map((item, idx) => {
+                          const category = item.category || item.tipo || 'Correctivo';
+                          const isTpm = category === 'TPM' || (category || '').includes('Tarjeta') || (category || '').includes('Autónomo');
+                          const isCorrectivo = category === 'Correctivo';
+                          const isPreventivo = category === 'Preventivo';
+
+                          const estado = item['ESTADO'] || item.estado || 'Pendiente';
+                          const isComplete = estado.toLowerCase().includes('completad') || estado.toLowerCase().includes('resuelt') || estado.toLowerCase().includes('cerrad');
+                          const isIncomplete = estado.toLowerCase().includes('incomplet');
+
+                          const codigoDisplay = item.codigoDisplay || item.codigo || `OT-${idx + 1}`;
+                          const fechaStr = item['FECHA DE APERTURA'] || item.fecha_apertura || (item.created_at ? item.created_at.slice(0, 10) : 'Sin fecha');
+                          const fechaCierreStr = item['FECHA DE CIERRE'] || item.fecha_cierre || '';
+
+                          return (
+                            <div
+                              key={item.id || idx}
+                              onClick={() => {
+                                setViewingHistoryRecord({ ...item, codigoDisplay, category });
+                              }}
+                              className="p-3 hover:bg-amber-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                              title="Haz clic para ver el detalle completo de esta intervención"
+                            >
+                              <div className="flex items-start sm:items-center gap-3 min-w-0">
+                                {/* Code Badge */}
+                                <span className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold border shrink-0 shadow-2xs ${
+                                  isTpm ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                                  isCorrectivo ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-sky-50 text-sky-800 border-sky-200'
+                                }`}>
+                                  {codigoDisplay}
+                                </span>
+
+                                {/* Info */}
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-xs text-[#324354] group-hover:text-blue-900 truncate">
+                                      {item['Título'] || item.titulo || item.sintoma || 'Mantenimiento General'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border ${
+                                      isTpm ? 'bg-purple-100/70 text-purple-800 border-purple-200' :
+                                      isCorrectivo ? 'bg-amber-100/70 text-amber-800 border-amber-200' : 'bg-sky-100/70 text-sky-800 border-sky-200'
+                                    }`}>
+                                      {category}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="text-[11px] text-gray-500 flex items-center gap-3 flex-wrap">
+                                    <span>📅 Apertura: <strong>{fechaStr}</strong></span>
+                                    {fechaCierreStr && (
+                                      <span>🏁 Cierre: <strong>{fechaCierreStr}</strong></span>
+                                    )}
+                                    <span>👤 Técnico: <strong>{item['TECNICO'] || item.tecnico_asignado || 'Sin asignar'}</strong></span>
+                                  </div>
+
+                                  {(item['COMENTARIO DE EJECUCION'] || item.accion_realizada || item.observaciones) && (
+                                    <p className="text-[10.5px] text-gray-600 italic line-clamp-1 mt-0.5">
+                                      "{item['COMENTARIO DE EJECUCION'] || item.accion_realizada || item.observaciones}"
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right Badge & Action */}
+                              <div className="flex items-center gap-2 shrink-0 justify-between sm:justify-end">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                  isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  isIncomplete ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {isComplete ? '✅ Completado' : isIncomplete ? '⚠️ Incompleto' : '⏳ Pendiente'}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  className="px-2.5 py-1 bg-gray-100 group-hover:bg-[#324354] group-hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                  Ver Detalle
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Fixed Footer */}

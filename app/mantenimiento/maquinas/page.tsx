@@ -235,7 +235,7 @@ export default function MaquinasPage() {
 
       while (hasMore) {
         const { data, error } = await supabase
-          .from("maquinas_equipos")
+          .from("mantenimiento_maquinas_equipos")
           .select("*")
           .range(from, from + step - 1)
           .order("id", { ascending: true });
@@ -334,7 +334,7 @@ export default function MaquinasPage() {
       for (let i = 0; i < duplicateIdsToDelete.length; i += batchSize) {
         const batch = duplicateIdsToDelete.slice(i, i + batchSize);
         const { error } = await supabase
-          .from("maquinas_equipos")
+          .from("mantenimiento_maquinas_equipos")
           .delete()
           .in("id", batch);
 
@@ -523,7 +523,7 @@ export default function MaquinasPage() {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from("maquinas_equipos")
+        .from("mantenimiento_maquinas_equipos")
         .delete()
         .eq("id", selectedEditMachineId);
 
@@ -583,13 +583,13 @@ export default function MaquinasPage() {
 
       if (adminAction === "nuevo") {
         const { error } = await supabase
-          .from("maquinas_equipos")
+          .from("mantenimiento_maquinas_equipos")
           .insert([recordToSave]);
         if (error) throw error;
         alert("Equipo registrado exitosamente.");
       } else if (adminAction === "editar" && selectedEditMachineId) {
         const { error } = await supabase
-          .from("maquinas_equipos")
+          .from("mantenimiento_maquinas_equipos")
           .update(recordToSave)
           .eq("id", selectedEditMachineId);
         if (error) throw error;
@@ -648,7 +648,7 @@ export default function MaquinasPage() {
 
       // 1. Update primary machine
       const { error: updateError } = await supabase
-        .from("maquinas_equipos")
+        .from("mantenimiento_maquinas_equipos")
         .update(merged)
         .eq("id", primaryMergeMachineId);
 
@@ -656,7 +656,7 @@ export default function MaquinasPage() {
 
       // 2. Delete secondary machine
       const { error: deleteError } = await supabase
-        .from("maquinas_equipos")
+        .from("mantenimiento_maquinas_equipos")
         .delete()
         .eq("id", secondaryMergeMachineId);
 

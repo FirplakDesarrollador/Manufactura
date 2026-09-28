@@ -29,6 +29,7 @@ import {
 import PhotoAnnotationEditor from './PhotoAnnotationEditor';
 import MachineSearchAutocomplete from './MachineSearchAutocomplete';
 import LiveCameraModal from './LiveCameraModal';
+import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 
 type TpmColor = 'roja' | 'azul' | 'amarilla' | 'verde';
 
@@ -448,7 +449,9 @@ export default function TarjetaDetailModal({
                   ))}
                 </select>
               ) : (
-                <span className="text-xs font-bold text-[#324354]">{tarjeta.planta}</span>
+                <span className="text-xs font-bold font-mono text-[#324354] px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200 w-fit">
+                  {obtenerCodigoPlanta(tarjeta.planta, plantasNomenclatura)}
+                </span>
               )}
             </div>
 

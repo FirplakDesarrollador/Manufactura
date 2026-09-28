@@ -23,9 +23,11 @@ import {
   ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
+import { getNextConsecutiveCode } from '@/lib/consecutivos';
 import { supabase } from '@/lib/supabase';
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import * as XLSX from 'xlsx';
+import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
 
 export type TpmColor = 'roja' | 'azul' | 'amarilla' | 'verde';
 
@@ -169,7 +171,7 @@ export default function TarjetasTpmTab({
   const fetchMaquinas = async () => {
     try {
       const { data } = await supabase
-        .from('maquinas_equipos')
+        .from('mantenimiento_maquinas_equipos')
         .select('*')
         .order('nombre_equipo', { ascending: true });
       if (data && data.length > 0) {
@@ -468,7 +470,7 @@ export default function TarjetasTpmTab({
     }
 
     setSubmitting(true);
-    const newCode = `TPM-${Math.floor(100 + Math.random() * 900)}`;
+    const newCode = await getNextConsecutiveCode('TPM');
     const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
     try {
@@ -520,7 +522,7 @@ export default function TarjetasTpmTab({
           codigo: newCode,
           titulo: `[${colorTitleMap[formData.tipo_tarjeta]}] ${formData.descripcion_que.trim()}`,
           maquina: formData.maquina,
-          planta: formData.planta,
+          planta: obtenerCodigoPlanta(formData.planta),
           id_tecnico: null, // Queda Sin Asignar
           tecnico_nombre: 'Sin asignar',
           turno: 'General',
@@ -545,7 +547,7 @@ export default function TarjetasTpmTab({
         tipo_tarjeta: formData.tipo_tarjeta,
         tipo_aviso: formData.tipo_tarjeta === 'roja' ? 'Mantenimiento' : formData.tipo_tarjeta === 'azul' ? 'Autónomo' : formData.tipo_tarjeta === 'amarilla' ? 'Seguridad/5S' : 'Mejora Kaizen',
         maquina: formData.maquina,
-        planta: formData.planta,
+        planta: obtenerCodigoPlanta(formData.planta),
         detectada_por: formData.detectada_por || 'Operador',
         descripcion_que: formData.descripcion_que.trim(),
         prioridad: formData.prioridad,
@@ -997,8 +999,10 @@ export default function TarjetasTpmTab({
                     </td>
 
                     {/* Planta */}
-                    <td className="py-3 px-3 font-medium text-gray-600">
-                      {item.planta}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold font-mono bg-[#F6F3EE] text-[#324354] border border-[#e2ded5]">
+                        {obtenerCodigoPlanta(item.planta, plantasNomenclatura)}
+                      </span>
                     </td>
 
                     {/* Descripción de la Anomalía */}
