@@ -676,7 +676,7 @@ export default function GestionMantenimientoPage() {
       return false;
     };
 
-    // 1. Check historyRows (records from DB)
+    // 1. Check historyRows (records from DB & generated work orders)
     historyRows.forEach((row: any, idx: number) => {
       let isMatch = false;
 
@@ -700,50 +700,9 @@ export default function GestionMantenimientoPage() {
             ...row,
             codigoDisplay,
             category,
-            fechaCreada: row['FECHA DE APERTURA'] || row.fecha_apertura || (row.created_at ? row.created_at.slice(0, 10) : 'Sin fecha'),
+            fechaCreada: row['FECHA DE APERTURA'] || row.fecha_apertura || (row.created_at ? row.created_at.slice(0, 16).replace('T', ' ') : 'Sin fecha'),
             tecnicoNombre: row['TECNICO'] || row.tecnico_asignado || row.tecnico_nombre || 'Sin asignar',
             estadoDisplay: row['ESTADO'] || row.estado || 'Pendiente'
-          });
-        }
-      }
-    });
-
-    // 2. Check active tasks from Planner state (assigned or scheduled OTs)
-    tasks.forEach((t: any, idx: number) => {
-      const hasAssignment = (t.idtecs && t.idtecs !== 9999) || t.assignedDate || t.adelantada || t.fecha || t.isCompleted;
-      
-      let isMatch = false;
-      if (t.id_plan_preventivo && (t.id_plan_preventivo === pmpId || String(t.id_plan_preventivo) === String(pmpId))) {
-        isMatch = true;
-      } else if (checkCodeMatch(t.code || t.csvId || '')) {
-        isMatch = true;
-      } else if (checkTitleMatch(t.title || t.titulo || '')) {
-        isMatch = true;
-      }
-
-      if (isMatch && hasAssignment) {
-        const key = t.code ? (t.code.startsWith('PMP-') || t.code.startsWith('PREV-') ? t.code : `PMP-${t.code}`) : `TASK-${t.id || idx}`;
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-
-          const techObj = technicians.find(tc => tc.id === (t.idtecs || t.assignedTechId));
-          const techName = techObj ? techObj.name : (t.tecnico_nombre || t.tecnico_asignado || 'Técnico asignado');
-
-          const fechaTask = t.assignedDate || t.fecha || (t.created_at ? t.created_at.slice(0, 10) : '23 sept');
-          const isComp = t.isCompleted || (t.estado && t.estado.toLowerCase().includes('completad'));
-          const isAtrasada = t.refFrecuencia >= t.frecuencia;
-          const estadoDisp = isComp ? 'Completado' : isAtrasada ? 'Atrasada' : (t.estado || 'Pendiente');
-
-          const cleanCode = t.code ? (t.code.startsWith('PMP-') || t.code.startsWith('PREV-') ? t.code : `PMP-${t.code}`) : `PMP-${pmpCsvId || pmpId}`;
-
-          combined.push({
-            ...t,
-            codigoDisplay: cleanCode,
-            category: 'Preventivo',
-            'Título': t.title || pmpTask.title,
-            fechaCreada: fechaTask,
-            tecnicoNombre: techName,
-            estadoDisplay: estadoDisp
           });
         }
       }
@@ -2419,7 +2378,10 @@ export default function GestionMantenimientoPage() {
     const nowIso = getLocalDatetimeString();
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    // 2. Update local state
+    // 2. Generate clean consecutive code for the work order (e.g. PREV-362)
+    const generatedCode = await getNextConsecutiveCode('PREV');
+
+    // 3. Update local state
     const updatedTasks = tasks.map(t => {
       if (t.id === taskToForce.id) {
         return {
@@ -2438,6 +2400,27 @@ export default function GestionMantenimientoPage() {
     setTasks(updatedTasks);
     persistState(updatedTasks, technicians);
 
+    // 4. Register immediately into local History tab and PMP modal work orders
+    const newHistoryEntry: HistoryRecord = {
+      id: Date.now(),
+      id_plan_preventivo: taskToForce.id,
+      codigo: generatedCode,
+      codigoDisplay: generatedCode,
+      'Título': taskToForce.title,
+      'ESTADO': 'Pendiente',
+      'TECNICO': assignedTechName,
+      'TIPO': 'Preventivo',
+      tipo: 'Preventivo',
+      origen: 'PLAN_PREVENTIVO',
+      maquina: taskToForce.maquina,
+      planta: taskToForce.planta,
+      'FECHA DE APERTURA': nowIso,
+      'FECHA DE CIERRE': '',
+      'COMENTARIO DE EJECUCION': '⚡ Mantenimiento preventivo forzado/adelantado desde el catálogo PMP.',
+      created_at: new Date().toISOString()
+    };
+    setHistoryRows(prev => [newHistoryEntry, ...prev]);
+
     // Update viewingTask if currently open
     if (viewingTask && viewingTask.id === taskToForce.id) {
       setViewingTask({
@@ -2451,26 +2434,13 @@ export default function GestionMantenimientoPage() {
       });
     }
 
-    // 3. Register immediately into local History tab
-    const newHistoryEntry: HistoryRecord = {
-      id: Date.now(),
-      'Título': taskToForce.title,
-      'ESTADO': 'Pendiente',
-      'TECNICO': assignedTechName,
-      'TIPO': 'Preventivo',
-      tipo: 'Preventivo',
-      'FECHA DE APERTURA': nowIso,
-      'FECHA DE CIERRE': '',
-      'COMENTARIO DE EJECUCION': '⚡ Mantenimiento preventivo forzado/adelantado desde el catálogo PMP.',
-      created_at: nowIso
-    };
-    setHistoryRows(prev => [newHistoryEntry, ...prev]);
-
-    // 4. Persist to Supabase mantenimiento_ordenes
+    // 5. Persist to Supabase mantenimiento_ordenes
     try {
       const { error } = await supabase.from('mantenimiento_ordenes').insert([{
         id_plan_preventivo: taskToForce.id,
-        codigo: taskToForce.code || `MP-${taskToForce.id}`,
+        origen: 'PLAN_PREVENTIVO',
+        tipo_orden: 'PREVENTIVO',
+        codigo: generatedCode,
         titulo: taskToForce.title,
         maquina: taskToForce.maquina,
         planta: obtenerCodigoPlanta(taskToForce.planta, plantasNomenclatura),
@@ -2489,16 +2459,16 @@ export default function GestionMantenimientoPage() {
         console.warn('Advertencia insertando en mantenimiento_ordenes:', error);
       }
 
-      setForceTaskFeedback('¡Orden de trabajo generada y enviada exitosamente al Planificador e Historial!');
+      setForceTaskFeedback(`¡Orden de trabajo ${generatedCode} generada y registrada en el historial!`);
       fetchHistoryRecords();
     } catch (err: any) {
       console.warn('Error al forzar orden en Supabase:', err);
-      setForceTaskFeedback('Mantenimiento forzado localmente en el Planificador.');
+      setForceTaskFeedback(`Orden ${generatedCode} creada localmente.`);
     } finally {
       setForcingTaskId(null);
       setTimeout(() => {
         setForceTaskFeedback(null);
-      }, 3500);
+      }, 4000);
     }
   };
 
