@@ -17,7 +17,7 @@ export async function getRegistrosAcabado(estado: 'Pulido' | 'Acabado'): Promise
     return data || []
 }
 
-export async function registrarAcabado(registroId: number, usuarioEmail: string, nuevoEstado: string) {
+export async function registrarAcabado(registrer: string, usuarioEmail: string, nuevoEstado: string) {
     // Acabado = UPDATE trazabilidad_fv: acabado_fecha, acabado_user_id, estado
     const userId = await requireUserId(usuarioEmail)
 
@@ -28,7 +28,7 @@ export async function registrarAcabado(registroId: number, usuarioEmail: string,
             acabado_fecha: new Date().toISOString(),
             acabado_user_id: userId
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

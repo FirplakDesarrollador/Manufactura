@@ -292,7 +292,7 @@ export async function registrarPintura(pinturaData: {
     return data
 }
 
-export async function eliminarRegistroPintura(registroId: number, moldeSerial: string) {
+export async function eliminarRegistroPintura(registrer: string, moldeSerial: string) {
     // We assume trazabilidad_fv uses 'registrer' or we need to find id in trazabilidad_fv
     // Note: trazabilidad_fv might not have 'id'. We need to be careful.
     // If it has no 'id' but uses 'registrer' as PK:

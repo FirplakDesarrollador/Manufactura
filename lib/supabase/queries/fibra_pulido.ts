@@ -17,7 +17,7 @@ export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> 
     return data || []
 }
 
-export async function registrarPulido(registroId: number, usuarioEmail: string, nuevoEstado: string) {
+export async function registrarPulido(registrer: string, usuarioEmail: string, nuevoEstado: string) {
     // Pulido = UPDATE trazabilidad_fv: pulido_fecha, pulido_user_id, estado
     const userId = await requireUserId(usuarioEmail)
 
@@ -28,7 +28,7 @@ export async function registrarPulido(registroId: number, usuarioEmail: string, 
             pulido_fecha: new Date().toISOString(),
             pulido_user_id: userId
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

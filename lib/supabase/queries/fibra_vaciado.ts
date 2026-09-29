@@ -31,7 +31,7 @@ export async function getKilosReferencia(): Promise<KilosReferencia[]> {
     return data || []
 }
 
-export async function registrarVaciado(registroId: number, usuarioEmail: string, maquina: string) {
+export async function registrarVaciado(registrer: string, usuarioEmail: string, maquina: string) {
     // Vaciado = UPDATE trazabilidad_fv: vaciado_fecha, vaciado_user_id, estado -> 'Vaciado'
     const userId = await requireUserId(usuarioEmail)
 
@@ -43,7 +43,7 @@ export async function registrarVaciado(registroId: number, usuarioEmail: string,
             vaciado_user_id: userId,
             vaciado_maquina: maquina
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 
@@ -55,7 +55,7 @@ export async function registrarVaciado(registroId: number, usuarioEmail: string,
     return data
 }
 
-export async function registrarDesgelcado(registroId: number, usuarioEmail: string) {
+export async function registrarDesgelcado(registrer: string, usuarioEmail: string) {
     const userId = await requireUserId(usuarioEmail)
 
     const { data, error } = await supabase
@@ -63,7 +63,7 @@ export async function registrarDesgelcado(registroId: number, usuarioEmail: stri
         .update({
             estado: 'Desgelcada'
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

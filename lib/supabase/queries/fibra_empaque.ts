@@ -17,7 +17,7 @@ export async function getRegistrosParaEmpaque(): Promise<RegistroTrazabilidad[]>
     return data || []
 }
 
-export async function registrarEmpaque(registroId: number, usuarioEmail: string) {
+export async function registrarEmpaque(registrer: string, usuarioEmail: string) {
     // Empaque = UPDATE trazabilidad_fv: empaque_fecha, empaque_user_id, estado
     const userId = await requireUserId(usuarioEmail)
 
@@ -28,7 +28,7 @@ export async function registrarEmpaque(registroId: number, usuarioEmail: string)
             empaque_fecha: new Date().toISOString(),
             empaque_user_id: userId
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

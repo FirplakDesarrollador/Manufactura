@@ -18,7 +18,7 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
     const handleRegister = async () => {
         setLoading(true)
         try {
-            await registrarDesmolde(registro.id, usuarioEmail)
+            await registrarDesmolde(registro.registrer, usuarioEmail)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)

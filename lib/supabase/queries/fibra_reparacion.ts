@@ -25,7 +25,7 @@ export async function getRegistrosReparacion(tab: ReparacionTab): Promise<Regist
     return data || []
 }
 
-export async function registrarAccionReparacion(registroId: number, usuarioEmail: string, nuevoEstado: string) {
+export async function registrarAccionReparacion(registrer: string, usuarioEmail: string, nuevoEstado: string) {
     // Reparacion = UPDATE trazabilidad_fv: reparacion_fecha, reparacion_user_id, estado
     const userId = await requireUserId(usuarioEmail)
 
@@ -36,7 +36,7 @@ export async function registrarAccionReparacion(registroId: number, usuarioEmail
             reparacion_fecha: new Date().toISOString(),
             reparacion_user_id: userId
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

@@ -112,9 +112,9 @@ export default function ContramoldeFibraModule({ userEmail }: { userEmail: strin
                             <div className="text-[11px] font-bold text-[#254153]/50 uppercase tracking-widest px-1">
                                 Piezas encontradas: {filteredRegistros.length}
                             </div>
-                            {filteredRegistros.map((registro) => (
+                            {filteredRegistros.map((registro, index) => (
                                 <RegistroContramoldeCard
-                                    key={registro.id}
+                                    key={registro.registrer || index}
                                     registro={registro}
                                     usuarioEmail={userEmail}
                                     onRefresh={loadRegistros}

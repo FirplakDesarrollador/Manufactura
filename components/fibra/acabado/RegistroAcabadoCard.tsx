@@ -26,7 +26,7 @@ export default function RegistroAcabadoCard({ registro, usuarioEmail, onRefresh 
 
         setLoading(true)
         try {
-            await registrarAcabado(registro.id, usuarioEmail, selectedStatus)
+            await registrarAcabado(registro.registrer, usuarioEmail, selectedStatus)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)

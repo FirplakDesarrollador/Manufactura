@@ -24,7 +24,7 @@ export default function RegistroPulidoCard({ registro, usuarioEmail, onRefresh }
 
         setLoading(true)
         try {
-            await registrarPulido(registro.id, usuarioEmail, selectedStatus)
+            await registrarPulido(registro.registrer, usuarioEmail, selectedStatus)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)

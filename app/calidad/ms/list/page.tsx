@@ -206,8 +206,7 @@ export default function ReportedDefectsListPage() {
                 
                 const validDefects = defects.filter(d => {
                     const name = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)
-                    if (!name) return false
-                    return !isIgnoredDefect(name)
+                    return !!name && String(name).trim() !== ''
                 })
 
                 if (validDefects.length === 0) {
@@ -987,6 +986,7 @@ export default function ReportedDefectsListPage() {
                                         <input 
                                             type="file" 
                                             accept="image/*"
+                                            capture="environment"
                                             onChange={(e) => setEditPhotoFile(e.target.files?.[0] || null)}
                                             className="w-full max-w-[250px] text-xs border border-gray-200 p-2 bg-gray-50 text-[#254153] mb-2"
                                         />
@@ -1124,6 +1124,7 @@ export default function ReportedDefectsListPage() {
                                         <input 
                                             type="file" 
                                             accept="image/*" 
+                                            capture="environment"
                                             className="hidden"
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0]

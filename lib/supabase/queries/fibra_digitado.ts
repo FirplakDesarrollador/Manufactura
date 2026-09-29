@@ -17,7 +17,7 @@ export async function getRegistrosParaDigitado(): Promise<RegistroTrazabilidad[]
     return data || []
 }
 
-export async function registrarDigitado(registroId: number, usuarioEmail: string) {
+export async function registrarDigitado(registrer: string, usuarioEmail: string) {
     // Digitado = UPDATE trazabilidad_fv: digitado_fecha, digitado_user_id, estado -> 'Transito'
     const userId = await requireUserId(usuarioEmail)
 
@@ -28,7 +28,7 @@ export async function registrarDigitado(registroId: number, usuarioEmail: string
             digitado_fecha: new Date().toISOString(),
             digitado_user_id: userId
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 
@@ -39,7 +39,7 @@ export async function registrarDigitado(registroId: number, usuarioEmail: string
     return data
 }
 
-export async function registrarDigitadoMasivo(registroIds: number[], usuarioEmail: string) {
+export async function registrarDigitadoMasivo(registrers: string[], usuarioEmail: string) {
     const userId = await requireUserId(usuarioEmail)
 
     const { data, error } = await supabase
@@ -49,7 +49,7 @@ export async function registrarDigitadoMasivo(registroIds: number[], usuarioEmai
             digitado_fecha: new Date().toISOString(),
             digitado_user_id: userId
         })
-        .in('id', registroIds)
+        .in('registrer', registrers)
         .select()
 
     if (error) {
@@ -59,7 +59,7 @@ export async function registrarDigitadoMasivo(registroIds: number[], usuarioEmai
     return data
 }
 
-export async function reversarDigitado(registroId: number) {
+export async function reversarDigitado(registrer: string) {
     // Reversar = Volver a Empaque
     const { data, error } = await supabase
         .from('trazabilidad_fv')
@@ -68,7 +68,7 @@ export async function reversarDigitado(registroId: number) {
             digitado_fecha: null,
             digitado_user_id: null
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

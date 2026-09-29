@@ -18,7 +18,7 @@ export async function getRegistrosParaDesmolde(): Promise<RegistroTrazabilidad[]
     return data || []
 }
 
-export async function registrarDesmolde(registroId: number, usuarioEmail: string) {
+export async function registrarDesmolde(registrer: string, usuarioEmail: string) {
     // Desmolde = UPDATE trazabilidad_fv: estado -> 'Desgelcada'
     // + Liberar el molde (estado -> 'Disponible')
 
@@ -26,7 +26,7 @@ export async function registrarDesmolde(registroId: number, usuarioEmail: string
     const { data: registro, error: fetchError } = await supabase
         .from('trazabilidad_fv')
         .select('molde_id')
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .single()
 
     if (fetchError || !registro) {
@@ -39,7 +39,7 @@ export async function registrarDesmolde(registroId: number, usuarioEmail: string
         .update({
             estado: 'Pulido',
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

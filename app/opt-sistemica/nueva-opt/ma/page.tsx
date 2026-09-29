@@ -670,7 +670,7 @@ export default function MantenimientoAutonomoPage() {
                     
                     <label className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer bg-[#7B8E90]/10 px-3 py-1.5 rounded-full">
                       <Upload size={14} /> {uploadedFileName ? "Foto Adjunta" : "Adjuntar Foto"}
-                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                      <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} className="hidden" />
                     </label>
                   </div>
                   {uploadedFileName && (

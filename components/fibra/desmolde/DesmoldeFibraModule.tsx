@@ -122,9 +122,9 @@ export default function DesmoldeFibraModule({ userEmail }: { userEmail: string }
                                 Lista de Piezas: {filteredRegistros.length}
                             </div>
                             <div className="grid grid-cols-1 gap-8">
-                                {filteredRegistros.map((registro) => (
+                                {filteredRegistros.map((registro, index) => (
                                     <RegistroDesmoldeCard
-                                        key={registro.id}
+                                        key={registro.registrer || index}
                                         registro={registro}
                                         usuarioEmail={userEmail}
                                         onRefresh={loadRegistros}

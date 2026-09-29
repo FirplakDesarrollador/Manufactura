@@ -123,9 +123,9 @@ export default function PulidoFibraModule({ userEmail }: { userEmail: string }) 
                                 Lista: {filteredRegistros.length}
                             </div>
                             <div className="grid grid-cols-1 gap-2">
-                                {filteredRegistros.map((registro) => (
+                                {filteredRegistros.map((registro, index) => (
                                     <RegistroPulidoCard
-                                        key={registro.id}
+                                        key={registro.registrer || index}
                                         registro={registro}
                                         usuarioEmail={userEmail}
                                         onRefresh={loadRegistros}

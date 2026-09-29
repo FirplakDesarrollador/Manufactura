@@ -206,7 +206,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         setSaving(true)
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await updateRegistroTrazabilidad(registro.id, { orden_fabricacion_id: targetOrden.id } as any)
+            await updateRegistroTrazabilidad(registro.registrer, { orden_fabricacion_id: targetOrden.id } as any)
             toast.success(`Pieza transferida a la orden ${targetOrden.orden_fabricacion}`)
             setTransferModal(null)
             loadData()
@@ -237,13 +237,13 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     }
 
     const allRegistrosExpanded = filteredRegistros.length > 0 &&
-        filteredRegistros.every(registro => expandedRegistros.has(registro.id))
+        filteredRegistros.every(registro => expandedRegistros.has(registro.registrer))
     const allOrdenesExpanded = filteredOrdenes.length > 0 &&
         filteredOrdenes.every(orden => expandedOrdenes.has(orden.id))
 
     const toggleAllVisible = () => {
         if (activeTab === 'trazabilidad') {
-            setExpandedRegistros(allRegistrosExpanded ? new Set() : new Set(filteredRegistros.map(registro => registro.id)))
+            setExpandedRegistros(allRegistrosExpanded ? new Set() : new Set(filteredRegistros.map(registro => registro.registrer)))
             return
         }
 
@@ -444,7 +444,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                         orden={item}
                                         registros={getRegistrosByOrden(registros, item.orden_fabricacion)}
                                         onEdit={(registro) => setEditModal({ type: 'registro', item: registro })}
-                                        onDelete={(registro) => handleDelete('registro', registro.id)}
+                                        onDelete={(registro) => handleDelete('registro', registro.registrer)}
                                         onTransfer={(registro) => setTransferModal(registro)}
                                     />
                                 )}
@@ -775,10 +775,10 @@ function OrderProcessesPanel({
             ) : (
                 <div className="space-y-2">
                     {registros.map(registro => (
-                        <div key={registro.id} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                        <div key={registro.registrer || index} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 text-[12px]">
                                 <div className="flex flex-wrap gap-4">
-                                    <InfoPill label="ID" value={registro.id} />
+                                    <InfoPill label="ID" value={registro.registrer} />
                                     <InfoPill label="Estado" value={registro.estado || '-'} />
                                     <InfoPill label="Pedido" value={registro.numero_pedido || registro.pedido || '-'} />
                                     <InfoPill label="Molde" value={registro.molde_serial || '-'} />

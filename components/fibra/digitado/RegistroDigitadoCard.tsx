@@ -18,7 +18,7 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
     const handleRegister = async () => {
         setLoading(true)
         try {
-            await registrarDigitado(registro.id, usuarioEmail)
+            await registrarDigitado(registro.registrer, usuarioEmail)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -34,9 +34,9 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
         try {
             if (registro.estado === 'Cedi') {
                 const { reversarCedi } = await import('@/lib/supabase/queries/fibra_cedi')
-                await reversarCedi(registro.id)
+                await reversarCedi(registro.registrer)
             } else {
-                await reversarDigitado(registro.id)
+                await reversarDigitado(registro.registrer)
             }
             onRefresh()
         } catch (error) {

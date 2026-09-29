@@ -31,7 +31,7 @@ export default function RegistroReparacionCard({ registro, usuarioEmail, onRefre
 
         setLoading(true)
         try {
-            await registrarAccionReparacion(registro.id, usuarioEmail, selectedStatus)
+            await registrarAccionReparacion(registro.registrer, usuarioEmail, selectedStatus)
             alert('¡Pieza movida exitosamente!')
             onRefresh()
         } catch (error) {

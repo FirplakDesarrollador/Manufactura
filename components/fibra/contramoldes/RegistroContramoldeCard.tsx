@@ -18,7 +18,7 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
     const handleRegister = async () => {
         setLoading(true)
         try {
-            await registrarContramolde(registro.id, usuarioEmail)
+            await registrarContramolde(registro.registrer, usuarioEmail)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)

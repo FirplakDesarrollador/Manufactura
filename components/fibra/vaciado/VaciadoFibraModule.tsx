@@ -172,9 +172,9 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
                                         <div className="h-1 w-10 bg-amber-200 rounded-full" />
                                         Piezas para Vaciado: {filteredRegistros.length}
                                     </div>
-                                    {filteredRegistros.map((registro) => (
+                                    {filteredRegistros.map((registro, index) => (
                                         <RegistroVaciadoCard
-                                            key={registro.id}
+                                            key={registro.registrer || index}
                                             registro={registro}
                                             usuarioEmail={userEmail}
                                             onRefresh={loadRegistros}

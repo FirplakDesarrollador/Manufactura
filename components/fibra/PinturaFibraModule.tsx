@@ -272,10 +272,6 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             alert('Error: Debe seleccionar una Orden de Fabricación.')
             return
         }
-        if (!selectedLinea) {
-            alert('Error: Debe seleccionar una Línea.')
-            return
-        }
         if (!selectedMolde) {
             alert('Error: Debe seleccionar un Molde.')
             return
@@ -305,7 +301,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             await registrarPintura({
                 orden_fabricacion_id: selectedOrden.id,
                 molde_id: selectedMolde.id,
-                linea: selectedLinea,
+                linea: 'Linea 1', // Valor por defecto válido para la DB, ya que en Fibra no aplica.
                 usuario_email: userEmail
             })
 
@@ -423,29 +419,16 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             <div className="bg-gray-50 p-4 border-t border-gray-200">
                 <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-end w-full">
                     <div className="flex flex-col sm:flex-row gap-4 flex-1">
-                        {/* Line Selector */}
-                        <div className="w-full sm:w-1/2">
-                            <label className="md:hidden text-xs font-bold text-cyan-600 uppercase mb-1">Línea</label>
-                            <select
-                                value={selectedLinea}
-                                onChange={(e) => setSelectedLinea(e.target.value)}
-                                className="w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none shadow-sm"
-                            >
-                                <option value="">Elija linea</option>
-                                <option value="Linea 1">Línea 1</option>
-                                <option value="Linea 2">Línea 2</option>
-                                <option value="Linea 3">Línea 3</option>
-                            </select>
-                        </div>
+                        {/* Line Selector Removed for Fibra */}
 
                         {/* Mold Selector with Search */}
                         <div className="w-full sm:w-1/2">
                             <label className="md:hidden text-xs font-bold text-cyan-600 uppercase mb-1">Molde</label>
                             <div className="relative">
                                 <div 
-                                    onClick={() => !(!selectedOrden || !selectedLinea) && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
+                                    onClick={() => !!selectedOrden && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
                                     className={`w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
-                                        ${!selectedOrden || !selectedLinea ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
+                                        ${!selectedOrden ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
                                     `}
                                 >
                                     <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
@@ -508,7 +491,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                         {/* Submit Button */}
                         <button
                             onClick={handleSubmit}
-                            disabled={!selectedOrden || !selectedLinea || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
+                            disabled={!selectedOrden || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
                             className="flex-1 lg:min-w-[150px] py-3 bg-cyan-600 text-white rounded-lg font-bold text-lg hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

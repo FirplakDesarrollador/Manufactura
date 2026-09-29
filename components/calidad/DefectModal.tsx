@@ -210,6 +210,7 @@ export default function DefectModal({
                 <input
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   onChange={handleFileUpload}
                   className="hidden"
                 />

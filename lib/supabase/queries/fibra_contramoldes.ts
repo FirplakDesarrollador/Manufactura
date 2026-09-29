@@ -18,7 +18,7 @@ export async function getRegistrosSinContramolde(): Promise<RegistroTrazabilidad
     return data || []
 }
 
-export async function registrarContramolde(registroId: number, usuarioEmail: string) {
+export async function registrarContramolde(registrer: string, usuarioEmail: string) {
     // Contramolde = UPDATE trazabilidad_fv: contramolde_fecha, contramolde_user_id
     const userId = await requireUserId(usuarioEmail)
 
@@ -29,7 +29,7 @@ export async function registrarContramolde(registroId: number, usuarioEmail: str
             contramolde_fecha: new Date().toISOString(),
             contramolde_user_id: userId
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
         .select()
         .single()
 

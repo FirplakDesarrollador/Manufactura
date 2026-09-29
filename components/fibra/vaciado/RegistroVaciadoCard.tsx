@@ -20,7 +20,7 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
     const handleRegister = async () => {
         setLoading(true)
         try {
-            await registrarVaciado(registro.id, usuarioEmail, selectedMaquina)
+            await registrarVaciado(registro.registrer, usuarioEmail, selectedMaquina)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -33,7 +33,7 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
     const handleDesgelcar = async () => {
         setLoading(true)
         try {
-            await registrarDesgelcado(registro.id, usuarioEmail)
+            await registrarDesgelcado(registro.registrer, usuarioEmail)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)

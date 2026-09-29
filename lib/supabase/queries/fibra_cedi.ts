@@ -39,7 +39,7 @@ export async function moverTransitoACedi(usuarioEmail: string) {
     return data
 }
 
-export async function registrarCedi(registroId: number, usuarioEmail: string) {
+export async function registrarCedi(registrer: string, usuarioEmail: string) {
     const userId = await requireUserId(usuarioEmail)
 
     const { error } = await supabase
@@ -49,7 +49,7 @@ export async function registrarCedi(registroId: number, usuarioEmail: string) {
             cedi_fecha: new Date().toISOString(),
             cedi_user_id: userId
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
 
     if (error) {
         console.error('Error registrando Cedi:', error)
@@ -57,7 +57,7 @@ export async function registrarCedi(registroId: number, usuarioEmail: string) {
     }
 }
 
-export async function reversarCedi(registroId: number) {
+export async function reversarCedi(registrer: string) {
     const { error } = await supabase
         .from('trazabilidad_fv')
         .update({
@@ -65,7 +65,7 @@ export async function reversarCedi(registroId: number) {
             cedi_fecha: null,
             cedi_user_id: null
         })
-        .eq('id', registroId)
+        .eq('registrer', registrer)
 
     if (error) {
         console.error('Error reversando Cedi:', error)
