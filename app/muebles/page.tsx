@@ -19,6 +19,7 @@ import ConfigurarTurnosModal from '@/components/muebles/ConfigurarTurnosModal'
 import ConfigurarSupervisoresModal from '@/components/muebles/ConfigurarSupervisoresModal'
 import CambiarPlantaModal from '@/components/muebles/CambiarPlantaModal'
 import ActiveTaskOverlay from '@/components/muebles/ActiveTaskOverlay'
+import ErrorBoundary from '@/components/common/ErrorBoundary'
 import { getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
 import { getTareaActiva } from '@/lib/supabase/queries/usuarios'
 
@@ -301,104 +302,106 @@ export default function MueblesPage() {
 
                 {/* Main Content */}
                 <main className="flex-1 h-[calc(100vh-4rem)] bg-white overflow-hidden relative">
-                    <div className="h-full overflow-y-auto">
-                        {activeModule === 'corte' ? (
-                            <CorteModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                onStartTask={setActiveTask}
-                            />
-                        ) : activeModule === 'enchape' ? (
-                            <EnchapeModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                onStartTask={setActiveTask}
-                            />
-                        ) : activeModule === 'inspeccion' ? (
-                            <InspeccionModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                onStartTask={setActiveTask}
-                            />
-                        ) : activeModule === 'empaque' ? (
-                            <EmpaqueModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                onStartTask={setActiveTask}
-                            />
-                        ) : activeModule === 'digitado' ? (
-                            <DigitadoModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                            />
-                        ) : activeModule === 'transito' ? (
-                            <TransitoModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                            />
-                        ) : activeModule === 'cedi' ? (
-                            <CediModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                            />
-                        ) : activeModule === 'administracion' ? (
-                            <AdministracionModule 
-                                userEmail={user?.email || ''} 
-                                turno="1" 
-                                usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                            />
-                        ) : activeModule === 'defectos' ? (
-                            <DefectosModule 
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                            />
-                        ) : activeModule === 'panel' ? (
-                            <PanelDefectosModule 
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                turno={profile?.turno || '1'}
-                            />
-                        ) : activeModule === 'dashboard' ? (
-                            <DashboardModule 
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                            />
-                        ) : activeModule === 'seguimiento' ? (
-                            <SeguimientoModule
-                                plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                            />
-                        ) : (
-                            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                                <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">
-                                    <div className="text-center">
-                                        <div className="w-32 h-32 bg-[#254153]/10 rounded-full flex items-center justify-center mx-auto mb-8">
-                                            <svg className="w-16 h-16 text-[#254153]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                            </svg>
+                    <ErrorBoundary fallbackTitle="Error al cargar el módulo de Muebles">
+                        <div className="h-full overflow-y-auto">
+                            {activeModule === 'corte' ? (
+                                <CorteModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                    onStartTask={setActiveTask}
+                                />
+                            ) : activeModule === 'enchape' ? (
+                                <EnchapeModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                    onStartTask={setActiveTask}
+                                />
+                            ) : activeModule === 'inspeccion' ? (
+                                <InspeccionModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                    onStartTask={setActiveTask}
+                                />
+                            ) : activeModule === 'empaque' ? (
+                                <EmpaqueModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                    onStartTask={setActiveTask}
+                                />
+                            ) : activeModule === 'digitado' ? (
+                                <DigitadoModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                />
+                            ) : activeModule === 'transito' ? (
+                                <TransitoModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                />
+                            ) : activeModule === 'cedi' ? (
+                                <CediModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                />
+                            ) : activeModule === 'administracion' ? (
+                                <AdministracionModule 
+                                    userEmail={user?.email || ''} 
+                                    turno="1" 
+                                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                />
+                            ) : activeModule === 'defectos' ? (
+                                <DefectosModule 
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                />
+                            ) : activeModule === 'panel' ? (
+                                <PanelDefectosModule 
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                    turno={profile?.turno || '1'}
+                                />
+                            ) : activeModule === 'dashboard' ? (
+                                <DashboardModule 
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                />
+                            ) : activeModule === 'seguimiento' ? (
+                                <SeguimientoModule
+                                    plantaMuebles={profile?.planta_muebles || 'Muebles'}
+                                />
+                            ) : (
+                                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                                    <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">
+                                        <div className="text-center">
+                                            <div className="w-32 h-32 bg-[#254153]/10 rounded-full flex items-center justify-center mx-auto mb-8">
+                                                <svg className="w-16 h-16 text-[#254153]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                </svg>
+                                            </div>
+                                            <h1 className="text-4xl font-bold text-[#254153] mb-4 capitalize">
+                                                Módulo {activeModule.replace('_', ' ')}
+                                            </h1>
+                                            <p className="text-xl text-gray-600 mb-8">
+                                                Este módulo se encuentra en desarrollo. Por favor selecciona otro del menú lateral.
+                                            </p>
                                         </div>
-                                        <h1 className="text-4xl font-bold text-[#254153] mb-4 capitalize">
-                                            Módulo {activeModule.replace('_', ' ')}
-                                        </h1>
-                                        <p className="text-xl text-gray-600 mb-8">
-                                            Este módulo se encuentra en desarrollo. Por favor selecciona otro del menú lateral.
-                                        </p>
                                     </div>
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    </ErrorBoundary>
                 </main>
             </div>
             {/* Turnos Modal */}

@@ -20,7 +20,7 @@ interface TrazabilidadModalProps {
     userEmail: string
     onSuccess: () => void
     onStartTask?: (tarea: TareaMuebleActiva) => void
-    onReportDefect?: (orden: OrdenMueble) => void
+    onReportDefect?: (orden: OrdenMueble, operario?: { cedula: string, nombre: string }) => void
 }
 
 export default function TrazabilidadModal({ 
@@ -125,17 +125,60 @@ export default function TrazabilidadModal({
         }
     }, [isOpen, proceso, available])
 
-    const handleValidarOperario = async () => {
+    const iniciarInspeccionDirecta = async (emp: { nombreCompleto: string, foto: string }, cedula: string) => {
+        setLoading(true)
+        try {
+            const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
+                of: item.orden_fabricacion,
+                producto_descripcion: item.producto_descripcion,
+                available: ((item.enchape || 0) + (item.reponer_inspeccion || 0))
+            }))
+
+            const totalAvail = available || tareasOrdenes.reduce((sum, item) => sum + (item.available || 0), 0)
+
+            const nuevaTarea: TareaMuebleActiva = {
+                of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
+                proceso: proceso,
+                inicio: startTime || new Date().toISOString(),
+                operario_nombre: emp.nombreCompleto || 'Desconocido',
+                operario_cedula: cedula,
+                producto_descripcion: tareasOrdenes.length === 1 ? (tareasOrdenes[0].producto_descripcion || '') : `${proceso} de varias ordenes`,
+                available: totalAvail,
+                ordenes: tareasOrdenes,
+                taladro: taladro
+            }
+
+            await setTareaActiva(userEmail, nuevaTarea)
+            toast.success('¡Proceso de inspección iniciado!')
+            if (onStartTask) onStartTask(nuevaTarea)
+            if (onReportDefect) onReportDefect(orden, { cedula, nombre: emp.nombreCompleto })
+            onClose()
+        } catch (error) {
+            console.error('Error starting direct inspection task:', error)
+            toast.error('Error al iniciar inspección')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleValidarOperario = async (empDataOverride?: { nombreCompleto: string, foto: string }) => {
         if (identificacion.length < 4) return
 
         setIsSearching(true)
         try {
-            const data = await getEmpleadoById(identificacion)
+            const data = empDataOverride || await getEmpleadoById(identificacion)
             if (data) {
-                setEmpleado({
+                const emp = {
                     nombreCompleto: data.nombreCompleto,
                     foto: data.foto
-                })
+                }
+                setEmpleado(emp)
+
+                if (proceso === 'Inspeccion' || proceso === 'Inspección') {
+                    await iniciarInspeccionDirecta(emp, identificacion)
+                    return
+                }
+
                 setStep('registro')
             } else {
                 toast.error('Por favor valida tu cédula')
@@ -415,21 +458,25 @@ export default function TrazabilidadModal({
                             </div>
 
                             <button
-                                onClick={() => {
+                                onClick={async () => {
                                     if (empleado) {
+                                        if (proceso === 'Inspeccion' || proceso === 'Inspección') {
+                                            await iniciarInspeccionDirecta(empleado, identificacion)
+                                            return
+                                        }
                                         setStep('registro')
                                     } else {
-                                        handleValidarOperario()
+                                        await handleValidarOperario()
                                     }
                                 }}
-                                disabled={identificacion.length < 4 || isSearching}
+                                disabled={identificacion.length < 4 || isSearching || loading}
                                 className={`w-full h-14 rounded-2xl flex items-center justify-center gap-2 font-bold text-white shadow-lg transition-all active:scale-[0.98] ${
-                                    identificacion.length < 4 || isSearching
+                                    identificacion.length < 4 || isSearching || loading
                                         ? 'bg-gray-300 shadow-none cursor-not-allowed' 
                                         : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 shadow-xl'
                                 }`}
                             >
-                                {isSearching ? (
+                                {isSearching || loading ? (
                                     <Loader2 className="animate-spin" size={20} />
                                 ) : (
                                     <>
