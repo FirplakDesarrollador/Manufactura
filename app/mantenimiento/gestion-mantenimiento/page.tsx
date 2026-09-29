@@ -1900,8 +1900,9 @@ export default function GestionMantenimientoPage() {
       const detalle = p.detalle_instrucciones || '';
       const maquina = p.maquina || 'Equipo General';
       const tipoIntervencion = p.tipo_intervencion || 'NP';
-      const frecuencia = p.frecuencia_dias || 15;
-      const refFrecuencia = p.ref_frecuencia || 15;
+      const frecuencia = Number(p.frecuencia_dias) || 15;
+      const rawRef = p.ref_frecuencia !== undefined && p.ref_frecuencia !== null ? Number(p.ref_frecuencia) : frecuencia;
+      const refFrecuencia = Math.min(rawRef, frecuencia);
 
       if (!title) return;
 
@@ -2640,7 +2641,7 @@ export default function GestionMantenimientoPage() {
         tipo_intervencion: newTaskForm.intervencion,
         turno_requerido: 'General',
         frecuencia_dias: newTaskForm.frecuencia,
-        ref_frecuencia: newTaskForm.refFrecuencia,
+        ref_frecuencia: Math.min(newTaskForm.refFrecuencia ?? newTaskForm.frecuencia, newTaskForm.frecuencia),
         id_tecnicos_autorizados: candidateTechsForTask.map(t => t.id),
         detalle_instrucciones: newTaskForm.detalle.trim(),
         maquina: newTaskForm.maquina.trim() || 'General',
@@ -2740,8 +2741,12 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
+    const clampedRef = Math.min(editingTask.refFrecuencia ?? editingTask.frecuencia, editingTask.frecuencia);
+    const isDue = clampedRef >= editingTask.frecuencia;
+
     const updatedTask: MaintenanceTask = {
       ...editingTask,
+      refFrecuencia: clampedRef,
       plantas: taskPlantas,
       planta: plantaStr,
       especialidad: plantaStr,
@@ -2763,7 +2768,7 @@ export default function GestionMantenimientoPage() {
         duracion_minutos: editingTask.durationMinutes,
         tipo_intervencion: editingTask.tipoIntervencion,
         frecuencia_dias: editingTask.frecuencia,
-        ref_frecuencia: editingTask.refFrecuencia,
+        ref_frecuencia: clampedRef,
         id_tecnicos_autorizados: candidateTechsForTask.map(t => t.id),
         detalle_instrucciones: editingTask.detalle
       };
@@ -8877,19 +8882,36 @@ export default function GestionMantenimientoPage() {
                     step="1"
                     min="1"
                     value={editingTask.frecuencia}
-                    onChange={(e) => setEditingTask(prev => prev ? { ...prev, frecuencia: parseFloat(e.target.value) || 0 } : null)}
+                    onChange={(e) => {
+                      const newFrec = Math.max(1, parseFloat(e.target.value) || 1);
+                      setEditingTask(prev => prev ? { 
+                        ...prev, 
+                        frecuencia: newFrec,
+                        refFrecuencia: Math.min(prev.refFrecuencia ?? newFrec, newFrec)
+                      } : null);
+                    }}
                     required
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Contador (Días Acumulados)</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 flex items-center justify-between">
+                    <span>Contador (Días Acum.)</span>
+                    <span className="text-[10px] text-gray-400 font-normal">Máx: {editingTask.frecuencia}d</span>
+                  </label>
                   <input
                     type="number"
                     step="1"
                     min="0"
+                    max={editingTask.frecuencia}
                     value={editingTask.refFrecuencia}
-                    onChange={(e) => setEditingTask(prev => prev ? { ...prev, refFrecuencia: parseFloat(e.target.value) || 0 } : null)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setEditingTask(prev => prev ? { 
+                        ...prev, 
+                        refFrecuencia: Math.min(Math.max(0, val), prev.frecuencia) 
+                      } : null);
+                    }}
                     required
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-amber-900"
                   />
