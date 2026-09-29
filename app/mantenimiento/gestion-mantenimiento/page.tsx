@@ -2612,10 +2612,10 @@ export default function GestionMantenimientoPage() {
         titulo: cleanTitle,
         duracion_minutos: newTaskForm.durationMinutes,
         tipo_intervencion: newTaskForm.intervencion,
-        turno_requerido: 'General',
+        turno_requerido: newTaskForm.intervencion || 'General',
         frecuencia_dias: newTaskForm.frecuencia,
         ref_frecuencia: Math.min(newTaskForm.refFrecuencia ?? newTaskForm.frecuencia, newTaskForm.frecuencia),
-        id_tecnicos_autorizados: candidateTechsForTask.map(t => t.id),
+        id_tecnicos_autorizados: [],
         detalle_instrucciones: newTaskForm.detalle.trim(),
         maquina: newTaskForm.maquina.trim() || 'General',
         planta: plantaStr,
@@ -2740,7 +2740,7 @@ export default function GestionMantenimientoPage() {
         tipo_intervencion: editingTask.tipoIntervencion,
         frecuencia_dias: editingTask.frecuencia,
         ref_frecuencia: clampedRef,
-        id_tecnicos_autorizados: candidateTechsForTask.map(t => t.id),
+        id_tecnicos_autorizados: [],
         detalle_instrucciones: editingTask.detalle
       };
 
@@ -8889,35 +8889,6 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
-              {/* Compatible Technicians Preview */}
-              <div className="p-3 bg-slate-50 border border-gray-200 rounded-2xl flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-gray-600 uppercase">
-                  Técnicos Compatibles con esta Especialidad y Turno
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {(() => {
-                    const taskPlantas = editingTask.plantas || parseTechPlantas(editingTask.planta, plantasNomenclatura);
-                    const matchingTechs = technicians.filter(t => {
-                      if (t.id === 9999 || t.activo === false) return false;
-                      const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
-                      const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
-                      const matchesTurno = areTurnosCompatible(editingTask.tipoIntervencion, t.turno);
-                      return matchesPlanta && matchesTurno;
-                    });
-
-                    if (matchingTechs.length === 0) {
-                      return <span className="text-xs text-amber-700 italic">No hay técnicos asignados a estas plantas con turno compatible. Se asignará a Super Técnico.</span>;
-                    }
-
-                    return matchingTechs.map(t => (
-                      <span key={t.id} className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg">
-                        {t.name} ({getTurnoLabel(t.turno)})
-                      </span>
-                    ));
-                  })()}
-                </div>
-              </div>
-
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -10520,37 +10491,25 @@ export default function GestionMantenimientoPage() {
                   </div>
                 </div>
 
-                <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 font-bold text-[10px] uppercase">Técnicos Compatibles</span>
-                    <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 font-bold text-[#324354] rounded">
-                      Turno: {getTurnoLabel(viewingTask.tipoIntervencion)}
+                <div className="p-3.5 bg-white border border-gray-200 rounded-2xl flex flex-col justify-between">
+                  <span className="text-gray-400 font-bold text-[10px] uppercase">Modalidad / Turno de Intervención</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="px-2.5 py-1 bg-slate-100 border border-slate-300 text-[#324354] font-bold text-xs rounded-lg font-mono">
+                      {viewingTask.tipoIntervencion || 'NP'}
+                    </span>
+                    <span className="font-semibold text-xs text-[#324354]">
+                      {getTurnoLabel(viewingTask.tipoIntervencion)}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
+                  <span className="text-[10px] text-gray-500 mt-1">
                     {(() => {
-                      const taskPlantas = viewingTask.plantas && viewingTask.plantas.length > 0 
-                        ? viewingTask.plantas 
-                        : parseTechPlantas(viewingTask.planta || viewingTask.especialidad, plantasNomenclatura);
-                      const matchingTechs = technicians.filter(t => {
-                        if (t.id === 9999 || t.activo === false) return false;
-                        const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
-                        const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
-                        const matchesTurno = areTurnosCompatible(viewingTask.tipoIntervencion, t.turno);
-                        return matchesPlanta && matchesTurno;
-                      });
-
-                      if (matchingTechs.length === 0) {
-                        return <span className="text-gray-400 italic text-xs">Sin técnicos directos con este turno y especialidad</span>;
-                      }
-
-                      return matchingTechs.map(ct => (
-                        <span key={ct.id} className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold rounded-md">
-                          {ct.name} ({getTurnoLabel(ct.turno)})
-                        </span>
-                      ));
+                      const t = (viewingTask.tipoIntervencion || '').toUpperCase();
+                      if (t === 'NP') return 'Ejecución en Paro de Planta (No Producción - NP)';
+                      if (t === 'PR') return 'Ejecución en horario habitual de Producción (PR)';
+                      if (t === 'PRNP') return 'Aplica tanto en Producción como en Paro de Planta (PRNP)';
+                      return 'Turno General';
                     })()}
-                  </div>
+                  </span>
                 </div>
               </div>
 
