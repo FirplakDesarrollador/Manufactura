@@ -2726,7 +2726,8 @@ export default function GestionMantenimientoPage() {
     if (!editingTask) return;
 
     const durHours = (editingTask.durationMinutes || 60) / 60;
-    const isDue = editingTask.adelantada || (editingTask.refFrecuencia >= editingTask.frecuencia);
+    const clampedRef = Math.min(editingTask.refFrecuencia ?? editingTask.frecuencia, editingTask.frecuencia);
+    const isDue = editingTask.adelantada || (clampedRef >= editingTask.frecuencia);
     const taskPlantas = (editingTask.plantas && editingTask.plantas.length > 0)
       ? editingTask.plantas
       : parseTechPlantas(editingTask.planta, plantasNomenclatura);
@@ -2740,9 +2741,6 @@ export default function GestionMantenimientoPage() {
       const matchesTurno = areTurnosCompatible(editingTask.tipoIntervencion, t.turno);
       return matchesPlanta && matchesTurno;
     });
-
-    const clampedRef = Math.min(editingTask.refFrecuencia ?? editingTask.frecuencia, editingTask.frecuencia);
-    const isDue = clampedRef >= editingTask.frecuencia;
 
     const updatedTask: MaintenanceTask = {
       ...editingTask,
