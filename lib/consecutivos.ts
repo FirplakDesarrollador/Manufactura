@@ -20,10 +20,10 @@ export const getNextConsecutiveCode = async (prefix: 'PREV' | 'CORR' | 'TPM'): P
       data.forEach(row => {
         if (row.codigo) {
           const clean = String(row.codigo).trim();
-          const parts = clean.split('-');
-          if (parts.length >= 2) {
-            const num = parseInt(parts[1], 10);
-            if (!isNaN(num) && num > maxNum) {
+          const match = clean.match(new RegExp(`^${prefix}-(\\d+)$`, 'i'));
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num < 100000 && num > maxNum) {
               maxNum = num;
             }
           }
@@ -36,17 +36,17 @@ export const getNextConsecutiveCode = async (prefix: 'PREV' | 'CORR' | 'TPM'): P
       try {
         const { data: tpmData } = await supabase
           .from('tarjetas_falla_anomalia')
-          .select('codigo_tarjeta')
-          .filter('codigo_tarjeta', 'ilike', 'TPM-%');
+          .select('codigo_tarjeta, codigo');
 
         if (tpmData) {
           tpmData.forEach(row => {
-            if (row.codigo_tarjeta) {
-              const clean = String(row.codigo_tarjeta).trim();
-              const parts = clean.split('-');
-              if (parts.length >= 2) {
-                const num = parseInt(parts[1], 10);
-                if (!isNaN(num) && num > maxNum) {
+            const val = row.codigo || row.codigo_tarjeta;
+            if (val) {
+              const clean = String(val).trim();
+              const match = clean.match(/^TPM-(\d+)$/i);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num) && num < 100000 && num > maxNum) {
                   maxNum = num;
                 }
               }
@@ -67,13 +67,13 @@ export const getNextConsecutiveCode = async (prefix: 'PREV' | 'CORR' | 'TPM'): P
 
 /**
  * Valida si un código cumple estrictamente la regla de consecutivo:
- * PREV-N, CORR-N, TPM-N (donde N es un entero de 1 a 6 dígitos max).
+ * PREV-N, CORR-N, TPM-N (donde N es un entero de 1 a 5 dígitos, menor a 100,000).
  */
 export const isCleanConsecutiveCode = (code?: string | null): boolean => {
   if (!code) return false;
   const clean = String(code).trim();
-  const match = clean.match(/^(PREV|CORR|TPM)-\d+$/);
+  const match = clean.match(/^(PREV|CORR|TPM)-(\d+)$/i);
   if (!match) return false;
-  const numPart = clean.split('-')[1];
-  return numPart.length <= 6;
+  const num = parseInt(match[2], 10);
+  return !isNaN(num) && num < 100000;
 };

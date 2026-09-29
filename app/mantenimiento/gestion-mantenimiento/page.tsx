@@ -166,12 +166,15 @@ export const getHistoryRecordCategory = (row: any): 'TPM' | 'Correctivo' | 'Prev
 export const getHistoryRecordCode = (row: any, idx?: number): string => {
   if (!row) return 'PREV-1';
   const rawCode = (row.codigo || row['CODIGO'] || row.codigo_tarjeta || '').toString().trim();
-  if (rawCode && (rawCode.startsWith('PREV-') || rawCode.startsWith('CORR-') || rawCode.startsWith('TPM-'))) {
+  if (rawCode && isCleanConsecutiveCode(rawCode)) {
     return rawCode;
   }
   const category = getHistoryRecordCategory(row);
   const numDigits = rawCode.replace(/[^0-9]/g, '');
-  const numVal = numDigits ? parseInt(numDigits, 10) : (row.id || (idx !== undefined ? idx + 1 : 1));
+  let numVal = numDigits ? parseInt(numDigits, 10) : (row.id || (idx !== undefined ? idx + 1 : 1));
+  if (isNaN(numVal) || numVal >= 100000) {
+    numVal = row.id ? (row.id % 1000) : (idx !== undefined ? idx + 1 : 1);
+  }
 
   if (category === 'TPM') return `TPM-${numVal}`;
   if (category === 'Correctivo') return `CORR-${numVal}`;

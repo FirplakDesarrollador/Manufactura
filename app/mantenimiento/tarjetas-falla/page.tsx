@@ -827,6 +827,8 @@ export default function TarjetasAnomaliasPage() {
         // Supabase tarjetas_falla_anomalia
         try {
           const tpmPayload = {
+            codigo: newCode,
+            codigo_tarjeta: newCode,
             planta_proceso: formData.planta || 'Mármol Sintético',
             planta: formData.planta || 'Mármol Sintético',
             maquina: cleanMaquina,
@@ -855,7 +857,7 @@ export default function TarjetasAnomaliasPage() {
             console.error('🔴 Error guardando tarjetas_falla_anomalia:', tpmErr);
           } else if (tpmData && tpmData[0]) {
             insertedTpmUuid = tpmData[0].id;
-            if (tpmData[0].codigo_tarjeta) {
+            if (tpmData[0].codigo_tarjeta && isCleanConsecutiveCode(tpmData[0].codigo_tarjeta)) {
               generatedCode = tpmData[0].codigo_tarjeta;
               // Update optimistic card code with official generated code
               setTarjetas(prev => prev.map(card => card.id === tempId ? { ...card, codigo: generatedCode } : card));
