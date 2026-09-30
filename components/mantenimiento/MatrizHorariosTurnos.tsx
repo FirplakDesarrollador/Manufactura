@@ -11,9 +11,9 @@ import {
   AlertCircle,
   Search,
   Filter,
-  Eye,
-  CheckCircle2,
-  Info
+  ChevronDown,
+  MapPin,
+  Check
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
@@ -25,6 +25,7 @@ export interface TechnicianObj {
   name: string;
   documento?: string;
   planta?: string;
+  especialidad?: string;
   modalidad_operativa?: ModalityType;
   capacidad_horas?: number;
   activo?: boolean;
@@ -60,12 +61,14 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
     documento: string;
     modalidad_operativa: ModalityType;
     planta: string;
+    especialidad: string;
     capacidad_horas: string;
   }>({
     nombre: '',
     documento: '',
     modalidad_operativa: 'PR',
     planta: 'Mármol Sintético',
+    especialidad: 'Mantenimiento General',
     capacidad_horas: '7.2',
   });
 
@@ -97,6 +100,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
               name: t.nombre_completo || t.nombre || `Técnico #${t.id}`,
               documento: t.documento,
               planta: t.planta || t.especialidad || 'Mármol Sintético',
+              especialidad: t.especialidad || t.planta || 'Mantenimiento General',
               modalidad_operativa: isInactive ? 'INACTIVO' : rawMod,
               capacidad_horas: parseFloat(t.capacidad_horas) || 7.2,
               activo: !isInactive,
@@ -118,6 +122,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
               name: t.name || t.nombre,
               documento: t.documento,
               planta: t.planta || 'Mármol Sintético',
+              especialidad: t.especialidad || t.planta || 'Mantenimiento General',
               modalidad_operativa: t.activo === false ? 'INACTIVO' : rawMod,
               capacidad_horas: t.capacity || 7.2,
               activo: t.activo !== false,
@@ -142,6 +147,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
     const set = new Set<string>();
     dbTechnicians.forEach(t => {
       if (t.planta) set.add(t.planta.trim());
+      else if (t.especialidad) set.add(t.especialidad.trim());
     });
     return Array.from(set).sort();
   }, [dbTechnicians]);
@@ -154,11 +160,13 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
         !q ||
         normalizeStr(t.name).includes(q) ||
         (t.documento && normalizeStr(t.documento).includes(q)) ||
-        (t.planta && normalizeStr(t.planta).includes(q));
+        (t.planta && normalizeStr(t.planta).includes(q)) ||
+        (t.especialidad && normalizeStr(t.especialidad).includes(q));
 
       const matchPlant =
         plantaFilter === 'TODAS' ||
-        (t.planta && normalizeStr(t.planta) === normalizeStr(plantaFilter));
+        (t.planta && normalizeStr(t.planta) === normalizeStr(plantaFilter)) ||
+        (t.especialidad && normalizeStr(t.especialidad) === normalizeStr(plantaFilter));
 
       return matchSearch && matchPlant;
     });
@@ -230,6 +238,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
       documento: '',
       modalidad_operativa: 'PR',
       planta: 'Mármol Sintético',
+      especialidad: 'Mantenimiento General',
       capacidad_horas: '7.2',
     });
     setShowTechModal(true);
@@ -243,12 +252,13 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
       documento: tech.documento || '',
       modalidad_operativa: tech.modalidad_operativa || 'PR',
       planta: tech.planta || 'Mármol Sintético',
+      especialidad: tech.especialidad || 'Mantenimiento General',
       capacidad_horas: tech.capacidad_horas?.toString() || '7.2',
     });
     setShowTechModal(true);
   };
 
-  // Direct 1-Click Fast Modality Changer
+  // Direct 1-Click Fast Modality Changer via Select
   const handleFastChangeModality = async (tech: TechnicianObj, targetModality: ModalityType) => {
     if (tech.modalidad_operativa === targetModality && (targetModality !== 'INACTIVO' ? tech.activo !== false : tech.activo === false)) {
       return;
@@ -317,7 +327,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
       documento: techFormData.documento.trim() || null,
       modalidad_operativa: techFormData.modalidad_operativa,
       turno: techFormData.modalidad_operativa,
-      especialidad: techFormData.planta,
+      especialidad: techFormData.especialidad || techFormData.planta,
       planta: techFormData.planta,
       capacidad_horas: parseFloat(techFormData.capacidad_horas) || 7.2,
       activo: !isInactive,
@@ -355,14 +365,15 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
   // Render individual compact Technician Card
   const renderTechCard = (tech: TechnicianObj, currentColumn: ModalityType) => {
     const isInactive = tech.modalidad_operativa === 'INACTIVO' || tech.activo === false;
-    const currentMod = isInactive ? 'INACTIVO' : tech.modalidad_operativa || 'PR';
+    const currentMod: ModalityType = isInactive ? 'INACTIVO' : tech.modalidad_operativa || 'PR';
+    const plantaDisplay = tech.planta || tech.especialidad || 'General';
 
     return (
       <div
         key={tech.id}
-        className={`p-2.5 rounded-xl border transition-all shadow-2xs flex flex-col gap-2 ${
+        className={`p-2.5 rounded-xl border transition-all shadow-2xs flex flex-col gap-1.5 ${
           isInactive
-            ? 'bg-slate-50 border-slate-200 text-slate-600 opacity-80 hover:opacity-100'
+            ? 'bg-slate-50 border-slate-200 text-slate-600 opacity-85 hover:opacity-100'
             : currentMod === 'PR'
             ? 'bg-white border-emerald-200 hover:border-emerald-400'
             : currentMod === 'NP'
@@ -370,97 +381,66 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             : 'bg-white border-amber-200 hover:border-amber-400'
         }`}
       >
-        {/* Top: Name + Plant Badge + Pencil for Details */}
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        {/* Top: Name (2 lines, compact) + Planta Badge + Edit Pencil */}
+        <div className="flex items-start justify-between gap-1.5">
+          <div className="flex flex-col flex-1 min-w-0">
+            {/* 2-line wrapped smaller name */}
             <span
-              className="text-xs font-black text-[#324354] truncate leading-snug cursor-pointer hover:underline"
+              className="text-[11px] font-black text-[#324354] line-clamp-2 leading-snug cursor-pointer hover:text-emerald-700 transition-colors"
               onClick={() => handleOpenEditTech(tech)}
-              title={`${tech.name} (Clic para ver detalles)`}
+              title={`${tech.name} (Clic para ver detalles completos)`}
             >
               {tech.name}
             </span>
-            {tech.planta && (
-              <span className="bg-gray-100 text-gray-700 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-gray-200 shrink-0 font-mono">
-                {obtenerCodigoPlanta(tech.planta)}
+
+            {/* Planta / Especialidad Tag */}
+            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium mt-0.5">
+              <span className="inline-flex items-center gap-0.5 text-gray-600 font-bold bg-gray-100/90 px-1.5 py-0.2 rounded text-[9.5px] border border-gray-200 truncate max-w-[180px]">
+                <MapPin className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                <span className="truncate">{plantaDisplay}</span>
               </span>
-            )}
+            </div>
           </div>
 
           <button
             onClick={() => handleOpenEditTech(tech)}
-            className="p-1 text-gray-400 hover:text-[#324354] rounded hover:bg-gray-100 transition-colors shrink-0"
+            className="p-1 text-gray-400 hover:text-[#324354] rounded hover:bg-gray-100 transition-colors shrink-0 mt-0.5"
             title="Ver detalles / Editar (Cédula, Horas, Planta)"
           >
             <Pencil className="w-3 h-3" />
           </button>
         </div>
 
-        {/* 1-Click Fast Modality Selector */}
-        <div className="grid grid-cols-4 gap-1 p-0.5 bg-gray-100/80 rounded-lg border border-gray-200">
-          {/* PR */}
-          <button
-            type="button"
-            onClick={() => handleFastChangeModality(tech, 'PR')}
-            className={`py-1 text-[10px] font-black rounded-md transition-all ${
+        {/* ONLY THE ACTIVE MODALITY BADGE & FAST CHANGE DROPDOWN */}
+        <div className="relative mt-0.5">
+          <select
+            value={currentMod}
+            onChange={e => handleFastChangeModality(tech, e.target.value as ModalityType)}
+            className={`w-full text-[10px] font-black py-1 pl-2 pr-6 rounded-lg border cursor-pointer transition-all appearance-none ${
               currentMod === 'PR'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-gray-600 hover:bg-emerald-100/70 hover:text-emerald-900'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                : currentMod === 'NP'
+                ? 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100'
+                : currentMod === 'PRNP'
+                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
             }`}
-            title="Asignar a PR (100% Producción)"
+            title="Clic para cambiar modalidad rápidamente"
           >
-            PR
-          </button>
-
-          {/* NP */}
-          <button
-            type="button"
-            onClick={() => handleFastChangeModality(tech, 'NP')}
-            className={`py-1 text-[10px] font-black rounded-md transition-all ${
-              currentMod === 'NP'
-                ? 'bg-sky-600 text-white shadow-xs'
-                : 'text-gray-600 hover:bg-sky-100/70 hover:text-sky-900'
-            }`}
-            title="Asignar a NP (100% No Producción / Paro)"
-          >
-            NP
-          </button>
-
-          {/* NPPR */}
-          <button
-            type="button"
-            onClick={() => handleFastChangeModality(tech, 'PRNP')}
-            className={`py-1 text-[10px] font-black rounded-md transition-all ${
-              currentMod === 'PRNP'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'text-gray-600 hover:bg-amber-100/70 hover:text-amber-900'
-            }`}
-            title="Asignar a NPPR (50% Producción / 50% No Producción)"
-          >
-            NPPR
-          </button>
-
-          {/* Inactivo */}
-          <button
-            type="button"
-            onClick={() => handleFastChangeModality(tech, 'INACTIVO')}
-            className={`py-1 text-[10px] font-black rounded-md transition-all ${
-              currentMod === 'INACTIVO'
-                ? 'bg-slate-600 text-white shadow-xs'
-                : 'text-gray-500 hover:bg-slate-200 hover:text-slate-800'
-            }`}
-            title="Asignar a Inactivo"
-          >
-            Off
-          </button>
+            <option value="PR">🟢 PR · Producción (100%)</option>
+            <option value="NP">🔵 NP · No Producción (100%)</option>
+            <option value="PRNP">🟡 NPPR · Mitad y Mitad (50/50)</option>
+            <option value="INACTIVO">⚪ Inactivo</option>
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-gray-500">
+            <ChevronDown className="w-3 h-3" />
+          </div>
         </div>
 
-        {/* Sub-label for NPPR 50/50 distinction */}
+        {/* Sub-label for NPPR 50/50 breakdown */}
         {currentMod === 'PRNP' && (
-          <div className="flex items-center justify-between text-[9px] font-bold text-amber-800 bg-amber-50/90 px-2 py-0.5 rounded border border-amber-200">
-            <span>50% PR ({((tech.capacidad_horas || 7.2) * 0.5).toFixed(1)}h)</span>
-            <span>·</span>
-            <span>50% NP ({((tech.capacidad_horas || 7.2) * 0.5).toFixed(1)}h)</span>
+          <div className="text-[9px] font-bold text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded border border-amber-200 text-center">
+            50% PR ({((tech.capacidad_horas || 7.2) * 0.5).toFixed(1)}h) · 50% NP ({((tech.capacidad_horas || 7.2) * 0.5).toFixed(1)}h)
           </div>
         )}
       </div>
@@ -468,10 +448,10 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
   };
 
   return (
-    <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#e2ded5] shadow-xs flex flex-col gap-4 font-sans w-full">
+    <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#e2ded5] shadow-xs flex flex-col gap-4 font-sans w-full">
       
       {/* ========================================================================= */}
-      {/* 1. CABECERA PRINCIPAL + KPI CHIPS                                         */}
+      {/* 1. CABECERA PRINCIPAL + KPI RESUMEN                                       */}
       {/* ========================================================================= */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#e2ded5] pb-3">
         <div>
@@ -483,13 +463,13 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             <span>Gestión y Distribución de Cuadrilla de Mantenimiento</span>
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            4 Columnas en paralelo. Haz clic en <strong>PR</strong>, <strong>NP</strong>, <strong>NPPR</strong> o <strong>Off</strong> para mover cualquier técnico al instante.
+            4 Columnas en paralelo. Cambia la modalidad de cualquier técnico directamente desde su recuadro.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Quick Metrics */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs font-bold bg-[#F6F3EE] px-3 py-1.5 rounded-xl border border-gray-300">
+          <div className="hidden sm:flex items-center gap-2 text-xs font-bold bg-[#F6F3EE] px-3 py-1.5 rounded-xl border border-gray-300">
             <span className="text-emerald-800">PR: {capacityStats.totalPrHours}h</span>
             <span className="text-gray-300">|</span>
             <span className="text-sky-800">NP: {capacityStats.totalNpHours}h</span>
@@ -538,9 +518,9 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           {techSearch && (
             <button
               onClick={() => setTechSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
             >
-              <X className="w-3 h-3" />
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -551,7 +531,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           </span>
           <button
             onClick={() => setPlantaFilter('TODAS')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               plantaFilter === 'TODAS'
                 ? 'bg-[#324354] text-white shadow-2xs'
                 : 'bg-[#F6F3EE] text-gray-600 hover:bg-gray-200 border border-gray-300'
@@ -560,17 +540,18 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             Todas ({dbTechnicians.length})
           </button>
           {availablePlants.map(p => {
-            const count = dbTechnicians.filter(t => t.planta === p).length;
-            const code = obtenerCodigoPlanta(p);
+            const count = dbTechnicians.filter(t => t.planta === p || t.especialidad === p).length;
+            const code = obtenerCodigoPlanta(p) !== 'OTROS' ? obtenerCodigoPlanta(p) : p;
             return (
               <button
                 key={p}
                 onClick={() => setPlantaFilter(p)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   plantaFilter === p
                     ? 'bg-[#324354] text-white shadow-2xs'
                     : 'bg-[#F6F3EE] text-gray-600 hover:bg-gray-200 border border-gray-300'
                 }`}
+                title={p}
               >
                 {code} ({count})
               </button>
@@ -772,7 +753,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Planta Principal:</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Planta:</label>
                   <input
                     type="text"
                     value={techFormData.planta}
@@ -782,16 +763,27 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Capacidad Diaria (Horas):</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Especialidad:</label>
                   <input
-                    type="number"
-                    step="0.1"
-                    value={techFormData.capacidad_horas}
-                    onChange={e => setTechFormData(prev => ({ ...prev, capacidad_horas: e.target.value }))}
-                    placeholder="7.2"
+                    type="text"
+                    value={techFormData.especialidad}
+                    onChange={e => setTechFormData(prev => ({ ...prev, especialidad: e.target.value }))}
+                    placeholder="Mecánico / Eléctrico"
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-medium text-[#324354]"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Capacidad Diaria (Horas):</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={techFormData.capacidad_horas}
+                  onChange={e => setTechFormData(prev => ({ ...prev, capacidad_horas: e.target.value }))}
+                  placeholder="7.2"
+                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-medium text-[#324354]"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
