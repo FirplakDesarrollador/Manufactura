@@ -1910,9 +1910,10 @@ export default function GestionMantenimientoPage() {
         return matchesPlanta && matchesTurno;
       });
 
-      const idtecsList: number[] = candidateTechsForTask.map(t => t.id);
-
-      const isValidFrequency = refFrecuencia >= frecuencia;
+      // Ventana constante de 3 días adelantados para planificación (sin alterar el contador real en BD)
+      const DIAS_VENTANA_ADELANTO = 3;
+      const isValidFrequency = (refFrecuencia + DIAS_VENTANA_ADELANTO) >= frecuencia || frecuencia <= 1;
+      const diasFaltantes = Math.max(0, frecuencia - refFrecuencia);
 
       let bestCandidate: number | null = null;
       let bestErrors: string[] = [];
@@ -4872,7 +4873,7 @@ export default function GestionMantenimientoPage() {
       };
     }
 
-    if (ref === freq || task.isDue) {
+    if (ref >= freq || freq <= 1) {
       return {
         category: 'hoy',
         dateLabel: 'Hoy',
@@ -4887,9 +4888,9 @@ export default function GestionMantenimientoPage() {
     const dayNum = futureDate.getDate();
     const monthStr = futureDate.toLocaleDateString('es-ES', { month: 'short' });
     return {
-      category: 'proximas',
-      dateLabel: `${dayNum} ${monthStr}`,
-      dateStatus: 'upcoming',
+      category: daysRemaining <= 3 ? 'hoy' : 'proximas',
+      dateLabel: daysRemaining === 1 ? 'Mañana (+1d)' : `En +${daysRemaining}d (${dayNum} ${monthStr})`,
+      dateStatus: daysRemaining <= 3 ? 'today' : 'upcoming',
       rawTimestamp: futureDate.getTime()
     };
   };
