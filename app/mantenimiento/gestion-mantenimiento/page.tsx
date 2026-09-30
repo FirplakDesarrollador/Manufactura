@@ -6970,7 +6970,7 @@ export default function GestionMantenimientoPage() {
         {/* VIEW 7: CONFIGURACIÓN */}
         {/* ========================================================================= */}
         {activeTab === 'configuracion' && (
-          <div className="max-w-5xl mx-auto w-full flex flex-col gap-7 animate-in fade-in duration-300">
+          <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-7 animate-in fade-in duration-300">
             
             {/* ========================================================================= */}
             {/* SECCIÓN 1: PLANIFICACIÓN DE CUADRILLA, HORARIOS Y TURNOS (FUSIÓN TOTAL)   */}
