@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Timer, CheckCircle2, AlertCircle, Loader2, Play, User, AlertTriangle } from 'lucide-react'
-import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
+import { Timer, CheckCircle2, AlertCircle, Loader2, Play, User, AlertTriangle, Layers, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { registrarTrazabilidadMueble, getComponentesByOF } from '@/lib/supabase/queries/muebles'
 import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
 import { TareaMuebleActiva, TareaMuebleActivaOrden } from '@/types/muebles'
 import ModalReportarDefectoMueble from './ModalReportarDefectoMueble'
@@ -21,6 +21,9 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
     const [isDefectoModalOpen, setIsDefectoModalOpen] = useState(false)
     const [cantidades, setCantidades] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(false)
+    const [despieceMap, setDespieceMap] = useState<Record<string, Array<{ sku: string; componente: string; cantidad: number }>>>({})
+    const [cantidadesPorPieza, setCantidadesPorPieza] = useState<Record<string, Record<string, number>>>({})
+    const [despieceVisible, setDespieceVisible] = useState<Record<string, boolean>>({})
 
     const taskOrders = React.useMemo<TareaMuebleActivaOrden[]>(() => {
         if (tarea.ordenes?.length) return tarea.ordenes
@@ -38,6 +41,66 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
         }, {})
         setCantidades(initialQuantities)
     }, [taskOrders])
+
+    // Cargar despiece de cada OF (componentes de tipo pieza CMPD09)
+    useEffect(() => {
+        let isMounted = true
+        async function loadDespieces() {
+            const newMap: Record<string, Array<{ sku: string; componente: string; cantidad: number }>> = {}
+            for (const item of taskOrders) {
+                try {
+                    const comps = await getComponentesByOF(item.of)
+                    const despiece = comps
+                        .filter((c: any) => c.sku && c.sku.toUpperCase().startsWith('CMPD09'))
+                        .map((c: any) => ({
+                            sku: c.sku,
+                            componente: c.componente || 'Pieza',
+                            cantidad: Number(c.cantidad) || 0
+                        }))
+                    if (despiece.length > 0) {
+                        newMap[item.of] = despiece
+                    }
+                } catch (err) {
+                    console.error('Error cargando despiece para OF:', item.of, err)
+                }
+            }
+            if (isMounted) {
+                setDespieceMap(newMap)
+                const initialVis: Record<string, boolean> = {}
+                Object.keys(newMap).forEach(of => { initialVis[of] = true })
+                setDespieceVisible(initialVis)
+            }
+        }
+        loadDespieces()
+        return () => { isMounted = false }
+    }, [taskOrders])
+
+    const handleUpdatePieza = (of: string, compName: string, delta: number, maxReq: number) => {
+        const currentPiezas = { ...(cantidadesPorPieza[of] || {}) }
+        const currentVal = currentPiezas[compName] || 0
+        let nextVal = currentVal + delta
+        if (nextVal < 0) nextVal = 0
+        if (nextVal > maxReq) nextVal = maxReq
+        currentPiezas[compName] = nextVal
+        
+        const totalPieces = Object.values(currentPiezas).reduce((a, b) => a + b, 0)
+        setCantidadesPorPieza(prev => ({ ...prev, [of]: currentPiezas }))
+        setCantidadForOrder(of, totalPieces, taskOrders.find(o => o.of === of)?.available)
+    }
+
+    const handleCompletarTodasPiezas = (of: string) => {
+        const piezas = despieceMap[of] || []
+        const updated: Record<string, number> = {}
+        let total = 0
+        piezas.forEach(p => {
+            updated[p.componente] = p.cantidad
+            total += p.cantidad
+        })
+        const maxAvail = taskOrders.find(o => o.of === of)?.available || total
+        const finalTotal = Math.min(total, maxAvail)
+        setCantidadesPorPieza(prev => ({ ...prev, [of]: updated }))
+        setCantidadForOrder(of, finalTotal, maxAvail)
+    }
 
     // Cronometro
     useEffect(() => {
@@ -140,8 +203,8 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
 
     return (
         <div className="fixed inset-0 z-[200] bg-[#254153] flex items-center justify-center p-4 md:p-8 overflow-hidden">
-            <div className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-500">
-                <div className="w-full md:w-5/12 bg-gray-50 p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-gray-100">
+            <div className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-500 max-h-[92vh]">
+                <div className="w-full md:w-5/12 bg-gray-50 p-6 md:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-gray-100 overflow-y-auto max-h-[92vh]">
                     <div className="space-y-6">
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
                             <span className="w-2 h-2 bg-blue-600 rounded-full animate-ping" />
@@ -177,6 +240,27 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                 </div>
                             </div>
                         </div>
+
+                        {/* Desglose de piezas informativo en el panel lateral */}
+                        {taskOrders.length === 1 && despieceMap[taskOrders[0].of] && despieceMap[taskOrders[0].of].length > 0 && (
+                            <div className="p-3.5 bg-white rounded-2xl border border-gray-100 shadow-2xs space-y-2">
+                                <div className="flex items-center justify-between text-[11px] font-bold text-gray-700">
+                                    <span className="flex items-center gap-1.5 uppercase tracking-wider text-[10px] text-gray-500">
+                                        <Layers size={13} className="text-blue-600" />
+                                        Despiece ({despieceMap[taskOrders[0].of].reduce((s, p) => s + p.cantidad, 0)} piezas)
+                                    </span>
+                                    <span className="text-[10px] text-blue-600 font-black">{despieceMap[taskOrders[0].of].length} partes</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                                    {despieceMap[taskOrders[0].of].map(p => (
+                                        <div key={p.componente} className="bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 flex items-center justify-between text-[10px]">
+                                            <span className="font-semibold text-gray-700 truncate pr-1">{p.componente}</span>
+                                            <span className="font-black text-blue-600 shrink-0">{p.cantidad}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-gray-100">
@@ -198,15 +282,15 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                     </div>
                 </div>
 
-                <div className="w-full md:w-7/12 p-8 flex flex-col justify-center items-center text-center space-y-8 bg-white">
+                <div className="w-full md:w-7/12 p-6 md:p-8 flex flex-col justify-center items-center text-center space-y-6 bg-white overflow-y-auto max-h-[92vh]">
                     {!isFinishing ? (
                         <>
-                            <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 shadow-inner">
-                                <Play size={40} className="animate-pulse" />
+                            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 shadow-inner">
+                                <Play size={36} className="animate-pulse" />
                             </div>
                             <div className="space-y-2">
                                 <h3 className="text-2xl font-bold text-gray-900">Proceso en marcha</h3>
-                                <p className="text-gray-500 text-sm max-w-[260px] mx-auto">
+                                <p className="text-gray-500 text-sm max-w-[280px] mx-auto">
                                     {taskOrders.length > 1 
                                         ? `${tarea.proceso === 'Enchape' ? 'Enchapa' : tarea.proceso === 'Corte' ? 'Corta' : tarea.proceso === 'Empaque' ? 'Empaca' : 'Procesa'} las piezas de cada orden seleccionada antes de registrar.` 
                                         : (taskOrders[0].producto_descripcion && taskOrders[0].producto_descripcion !== 'Sin descripcion' ? taskOrders[0].producto_descripcion : `ORDEN DE FABRICACIÓN #${taskOrders[0].of}`)}
@@ -231,21 +315,25 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                             </div>
                         </>
                     ) : (
-                        <div className="w-full space-y-6 animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="w-full space-y-5 animate-in slide-in-from-bottom-4 duration-300">
                             <div className="space-y-1">
                                 <h3 className="text-xl font-bold text-gray-900">Cuantas piezas terminaste?</h3>
                                 <p className="text-xs text-gray-400 uppercase font-bold tracking-widest">Registrar cantidad por orden</p>
                             </div>
 
-                            <div className="w-full max-h-[300px] overflow-y-auto pr-1 space-y-3">
+                            <div className="w-full max-h-[380px] overflow-y-auto pr-1 space-y-3">
                                 {taskOrders.map((item) => {
                                     const cantidad = cantidades[item.of] || 0
                                     const descriptionText = item.producto_descripcion && item.producto_descripcion !== 'Sin descripcion'
                                         ? item.producto_descripcion
                                         : `ORDEN DE FABRICACIÓN #${item.of}`
+                                    const piezasDespiece = despieceMap[item.of] || []
+                                    const hasDespiece = piezasDespiece.length > 0
+                                    const isExpanded = despieceVisible[item.of] ?? true
+
                                     return (
-                                        <div key={item.of} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-3">
-                                            <div className="flex items-start justify-between gap-3 mb-3 text-left">
+                                        <div key={item.of} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-3.5">
+                                            <div className="flex items-start justify-between gap-3 mb-2.5 text-left">
                                                 <div className="min-w-0">
                                                     <div className="text-blue-600 text-xs font-black">OF #{item.of}</div>
                                                     <p className="text-[10px] text-gray-500 font-bold uppercase leading-tight line-clamp-2">
@@ -254,10 +342,13 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                                 </div>
                                                 <span className="shrink-0 text-[10px] text-gray-400 font-black uppercase">{item.available || 0} disp.</span>
                                             </div>
-                                            <div className="flex items-center justify-center gap-4">
+
+                                            {/* Selector principal de cantidad total */}
+                                            <div className="flex items-center justify-center gap-4 py-1">
                                                 <button
+                                                    type="button"
                                                     onClick={() => setCantidadForOrder(item.of, cantidad - 1, item.available)}
-                                                    className={`w-11 h-11 bg-white rounded-xl flex items-center justify-center transition-colors ${cantidad <= 0 ? 'text-gray-200 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
+                                                    className={`w-11 h-11 bg-white rounded-xl flex items-center justify-center transition-colors shadow-2xs ${cantidad <= 0 ? 'text-gray-200 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
                                                     disabled={cantidad <= 0}
                                                 >
                                                     <span className="text-xl font-bold">-</span>
@@ -266,16 +357,88 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                                     type="number"
                                                     value={cantidad}
                                                     onChange={(e) => setCantidadForOrder(item.of, parseInt(e.target.value) || 0, item.available)}
-                                                    className="w-20 h-12 text-center text-2xl font-black text-gray-900 border-b-4 border-blue-500 focus:outline-none bg-white rounded-t-xl"
+                                                    className="w-20 h-12 text-center text-2xl font-black text-gray-900 border-b-4 border-blue-500 focus:outline-none bg-white rounded-t-xl shadow-2xs"
                                                 />
                                                 <button
+                                                    type="button"
                                                     onClick={() => setCantidadForOrder(item.of, cantidad + 1, item.available)}
-                                                    className={`w-11 h-11 bg-white rounded-xl flex items-center justify-center text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-colors ${item.available !== undefined && cantidad >= item.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    className={`w-11 h-11 bg-white rounded-xl flex items-center justify-center text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-colors shadow-2xs ${item.available !== undefined && cantidad >= item.available ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                     disabled={item.available !== undefined && cantidad >= item.available}
                                                 >
                                                     <span className="text-xl font-bold">+</span>
                                                 </button>
                                             </div>
+
+                                            {/* Desglose interactivo por pieza */}
+                                            {hasDespiece && (
+                                                <div className="mt-3 pt-3 border-t border-gray-200/60 text-left">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDespieceVisible(prev => ({ ...prev, [item.of]: !isExpanded }))}
+                                                            className="flex items-center gap-1.5 text-xs font-bold text-slate-800 hover:text-blue-600 transition-colors"
+                                                        >
+                                                            <Layers size={14} className="text-blue-600" />
+                                                            <span>Desglose de piezas ({piezasDespiece.length} tipos · {piezasDespiece.reduce((s, p) => s + p.cantidad, 0)} total)</span>
+                                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCompletarTodasPiezas(item.of)}
+                                                            className="text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1"
+                                                        >
+                                                            <Sparkles size={11} />
+                                                            <span>Completar todas</span>
+                                                        </button>
+                                                    </div>
+
+                                                    {isExpanded && (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                                                            {piezasDespiece.map((p) => {
+                                                                const piezaVal = cantidadesPorPieza[item.of]?.[p.componente] ?? 0
+                                                                return (
+                                                                    <div 
+                                                                        key={p.componente} 
+                                                                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl border text-xs transition-all ${
+                                                                            piezaVal >= p.cantidad 
+                                                                                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950 font-bold' 
+                                                                                : piezaVal > 0 
+                                                                                ? 'bg-blue-50/70 border-blue-200 text-blue-950' 
+                                                                                : 'bg-white border-gray-200/70 text-gray-700'
+                                                                        }`}
+                                                                    >
+                                                                        <div className="min-w-0 pr-2">
+                                                                            <p className="font-bold truncate text-[11px] uppercase tracking-tight text-gray-800">{p.componente}</p>
+                                                                            <span className="text-[9px] text-gray-400 font-semibold">{p.cantidad} req.</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 shrink-0">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleUpdatePieza(item.of, p.componente, -1, p.cantidad)}
+                                                                                disabled={piezaVal <= 0}
+                                                                                className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs"
+                                                                            >
+                                                                                -
+                                                                            </button>
+                                                                            <span className="w-5 text-center font-black text-xs text-gray-900">
+                                                                                {piezaVal}
+                                                                            </span>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleUpdatePieza(item.of, p.componente, 1, p.cantidad)}
+                                                                                disabled={piezaVal >= p.cantidad}
+                                                                                className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs"
+                                                                            >
+                                                                                +
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )
                                 })}

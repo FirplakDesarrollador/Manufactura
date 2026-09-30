@@ -365,3 +365,50 @@ export async function getTrazabilidadOperarios(proceso: string, fecha: string) {
 }
 
 
+export async function getTrazabilidadMueblesHoy(planta?: string) {
+    const today = new Date().toISOString().split('T')[0]
+    const nextDay = new Date()
+    nextDay.setDate(nextDay.getDate() + 1)
+    const nextDayStr = nextDay.toISOString().split('T')[0]
+
+    let query = supabase
+        .from('trazabilidad_muebles')
+        .select('*')
+        .gte('created_at', `${today}T00:00:00`)
+        .lt('created_at', `${nextDayStr}T00:00:00`)
+
+    const { data, error } = await query
+    if (error) throw error
+    return data as TrazabilidadRecord[]
+}
+
+export async function moverTransitoACediMuebles(usuarioNombre: string, planta: string) {
+    // Fetch all transit trazabilidad records for muebles
+    const { data: transitoOrdenes, error: fetchError } = await supabase
+        .from('query_of_muebles')
+        .select('orden_fabricacion, transito')
+        .eq('planta', planta)
+        .eq('pendiente', true)
+        .gt('transito', 0)
+
+    if (fetchError) throw fetchError
+    if (!transitoOrdenes || transitoOrdenes.length === 0) return
+
+    for (const orden of transitoOrdenes) {
+        await supabase
+            .from('trazabilidad_muebles')
+            .insert([{
+                orden_fabricacion: orden.orden_fabricacion,
+                cantidad: orden.transito,
+                creado_por: usuarioNombre,
+                proceso: 'Cedi',
+                cedula_operario: 'CEDI_BULK',
+                nombre_operario: usuarioNombre,
+                fecha_inicio: new Date().toISOString(),
+                taladro: 'NO APLICA',
+                created_at: new Date().toISOString()
+            }])
+    }
+}
+
+

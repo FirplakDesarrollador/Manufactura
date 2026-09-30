@@ -175,44 +175,77 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                         <div className="grid grid-cols-2 p-2 gap-1 text-center divide-x divide-orange-100">
                             {(() => {
                                 // Logic to define what 'Pending' means for each stage
+                                const isCefi = orden.planta === 'Cefi';
                                 let pendingMuebles = 0;
                                 let pendingPiezas = 0;
                                 const totalPiezas = Number(orden.piezas) || 0;
                                 const programmedMuebles = orden.cantidad || 1;
                                 const piezasPerMueble = totalPiezas / programmedMuebles;
 
-                                switch (proceso) {
-                                    case 'Corte':
-                                        pendingMuebles = orden.por_cortar || 0;
-                                        pendingPiezas = Number(orden.piezas_pendientes) || 0;
-                                        break;
-                                    case 'Enchape':
-                                        pendingMuebles = (orden.corte || 0) + (orden.reponer_enchape || 0);
-                                        pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                        break;
-                                    case 'Inspeccion':
-                                        pendingMuebles = (orden.enchape || 0) + (orden.reponer_inspeccion || 0);
-                                        pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                        break;
-                                    case 'Empaque':
-                                        pendingMuebles = orden.inspeccion || 0;
-                                        pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                        break;
-                                    case 'Digitado':
-                                        pendingMuebles = orden.empaque || 0;
-                                        pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                        break;
-                                    case 'Transito':
-                                        pendingMuebles = orden.digitado || 0;
-                                        pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                        break;
-                                    case 'CEDI':
-                                        pendingMuebles = orden.transito || 0;
-                                        pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                        break;
-                                    default:
-                                        pendingMuebles = orden.por_cortar || 0;
-                                        pendingPiezas = Number(orden.piezas_pendientes) || 0;
+                                if (isCefi) {
+                                    let pending = 0;
+                                    switch (proceso) {
+                                        case 'Corte':
+                                            pending = orden.por_cortar || 0;
+                                            break;
+                                        case 'Enchape':
+                                            pending = (orden.corte || 0) + (orden.reponer_enchape || 0);
+                                            break;
+                                        case 'Inspeccion':
+                                            pending = (orden.enchape || 0) + (orden.reponer_inspeccion || 0);
+                                            break;
+                                        case 'Empaque':
+                                            pending = orden.inspeccion || 0;
+                                            break;
+                                        case 'Digitado':
+                                            pending = orden.empaque || 0;
+                                            break;
+                                        case 'Transito':
+                                            pending = orden.digitado || 0;
+                                            break;
+                                        case 'CEDI':
+                                            pending = orden.transito || 0;
+                                            break;
+                                        default:
+                                            pending = orden.por_cortar || 0;
+                                    }
+                                    pendingPiezas = pending;
+                                    const ppm = (totalPiezas > 0 && programmedMuebles > 0) ? (totalPiezas / programmedMuebles) : 1;
+                                    pendingMuebles = ppm > 0 ? Math.round(pending / ppm) : pending;
+                                } else {
+                                    switch (proceso) {
+                                        case 'Corte':
+                                            pendingMuebles = orden.por_cortar || 0;
+                                            pendingPiezas = Number(orden.piezas_pendientes) || 0;
+                                            break;
+                                        case 'Enchape':
+                                            pendingMuebles = (orden.corte || 0) + (orden.reponer_enchape || 0);
+                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
+                                            break;
+                                        case 'Inspeccion':
+                                            pendingMuebles = (orden.enchape || 0) + (orden.reponer_inspeccion || 0);
+                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
+                                            break;
+                                        case 'Empaque':
+                                            pendingMuebles = orden.inspeccion || 0;
+                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
+                                            break;
+                                        case 'Digitado':
+                                            pendingMuebles = orden.empaque || 0;
+                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
+                                            break;
+                                        case 'Transito':
+                                            pendingMuebles = orden.digitado || 0;
+                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
+                                            break;
+                                        case 'CEDI':
+                                            pendingMuebles = orden.transito || 0;
+                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
+                                            break;
+                                        default:
+                                            pendingMuebles = orden.por_cortar || 0;
+                                            pendingPiezas = Number(orden.piezas_pendientes) || 0;
+                                    }
                                 }
 
                                 return (
