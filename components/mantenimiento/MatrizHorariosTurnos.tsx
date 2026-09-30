@@ -87,7 +87,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           .filter((t: any) => t.id !== 9999)
           .map((t: any) => {
             let rawMod: ModalityType = 'PR';
-            const rawVal = (t.modalidad_operativa || t.turno || 'PR').toUpperCase();
+            const rawVal = (t.modalidad_operativa || 'PR').toUpperCase();
             if (rawVal === 'NP') rawMod = 'NP';
             else if (rawVal === 'PRNP' || rawVal === 'NPPR' || rawVal === 'MIXTO') rawMod = 'PRNP';
             else if (rawVal === 'INACTIVO' || t.activo === false) rawMod = 'INACTIVO';
@@ -266,7 +266,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
 
     const isInactive = targetModality === 'INACTIVO';
 
-    // Optimistic state update for instant UI feedback
+    // Optimistic local state update
     setDbTechnicians(prev =>
       prev.map(t =>
         t.id === tech.id
@@ -276,9 +276,8 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
     );
 
     try {
-      const payload: any = {
+      const payload = {
         modalidad_operativa: targetModality,
-        turno: targetModality,
         activo: !isInactive,
       };
 
@@ -287,9 +286,9 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
         .update(payload)
         .eq('id', tech.id);
 
-      if (error && error.message.includes('modalidad_operativa')) {
-        delete payload.modalidad_operativa;
-        await supabase.from('mantenimiento_tecnicos').update(payload).eq('id', tech.id);
+      if (error) {
+        console.error('Error actualizando modalidad en Supabase:', error);
+        throw error;
       }
 
       const modLabel =
@@ -299,7 +298,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           ? 'NP (No Producción)'
           : targetModality === 'PRNP'
           ? 'NPPR (Mitad y Mitad)'
-          : 'Inactivos';
+          : 'Inactivo';
 
       setStatusMsg({
         type: 'success',
@@ -308,7 +307,8 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
       if (onTechsUpdated) onTechsUpdated();
       setTimeout(() => setStatusMsg(null), 2500);
     } catch (err) {
-      console.error(err);
+      console.error('Error guardando en Supabase:', err);
+      // Reload on error
       await loadMasterData();
     }
   };
@@ -322,13 +322,11 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
     }
 
     const isInactive = techFormData.modalidad_operativa === 'INACTIVO';
-    const payload: any = {
+    const payload = {
       nombre: techFormData.nombre.trim(),
       documento: techFormData.documento.trim() || null,
       modalidad_operativa: techFormData.modalidad_operativa,
-      turno: techFormData.modalidad_operativa,
       especialidad: techFormData.especialidad || techFormData.planta,
-      planta: techFormData.planta,
       capacidad_horas: parseFloat(techFormData.capacidad_horas) || 7.2,
       activo: !isInactive,
     };
@@ -337,17 +335,11 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
     try {
       if (editingTech && editingTech.id) {
         let { error } = await supabase.from('mantenimiento_tecnicos').update(payload).eq('id', editingTech.id);
-        if (error && error.message.includes('modalidad_operativa')) {
-          delete payload.modalidad_operativa;
-          await supabase.from('mantenimiento_tecnicos').update(payload).eq('id', editingTech.id);
-        }
+        if (error) throw error;
         setStatusMsg({ type: 'success', text: `Técnico ${payload.nombre} actualizado.` });
       } else {
         let { error } = await supabase.from('mantenimiento_tecnicos').insert([payload]);
-        if (error && error.message.includes('modalidad_operativa')) {
-          delete payload.modalidad_operativa;
-          await supabase.from('mantenimiento_tecnicos').insert([payload]);
-        }
+        if (error) throw error;
         setStatusMsg({ type: 'success', text: `Técnico ${payload.nombre} creado.` });
       }
 
@@ -753,37 +745,26 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Planta:</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Planta / Especialidad:</label>
                   <input
                     type="text"
                     value={techFormData.planta}
-                    onChange={e => setTechFormData(prev => ({ ...prev, planta: e.target.value }))}
+                    onChange={e => setTechFormData(prev => ({ ...prev, planta: e.target.value, especialidad: e.target.value }))}
                     placeholder="Mármol Sintético"
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-medium text-[#324354]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Especialidad:</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Capacidad Diaria (Horas):</label>
                   <input
-                    type="text"
-                    value={techFormData.especialidad}
-                    onChange={e => setTechFormData(prev => ({ ...prev, especialidad: e.target.value }))}
-                    placeholder="Mecánico / Eléctrico"
+                    type="number"
+                    step="0.1"
+                    value={techFormData.capacidad_horas}
+                    onChange={e => setTechFormData(prev => ({ ...prev, capacidad_horas: e.target.value }))}
+                    placeholder="7.2"
                     className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-medium text-[#324354]"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Capacidad Diaria (Horas):</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={techFormData.capacidad_horas}
-                  onChange={e => setTechFormData(prev => ({ ...prev, capacidad_horas: e.target.value }))}
-                  placeholder="7.2"
-                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-xs font-medium text-[#324354]"
-                />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">

@@ -2534,7 +2534,6 @@ export default function GestionMantenimientoPage() {
         nombre: name,
         documento: newTechForm.documento.trim() || undefined,
         modalidad_operativa: newTechForm.turno,
-        turno: newTechForm.turno,
         especialidad: pStr,
         capacidad_horas: parseFloat(newTechForm.capacity) || systemSettings.baseCapacity,
         activo: !isInactive
@@ -3521,7 +3520,6 @@ export default function GestionMantenimientoPage() {
         nombre: updatedTech.name,
         documento: updatedTech.documento,
         modalidad_operativa: updatedTech.turno,
-        turno: updatedTech.turno,
         especialidad: plantasStr,
         capacidad_horas: updatedTech.capacity,
         activo: !isInactive
