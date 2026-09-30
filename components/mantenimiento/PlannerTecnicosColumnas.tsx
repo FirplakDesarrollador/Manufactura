@@ -274,7 +274,7 @@ export default function PlannerTecnicosColumnas({
       };
     }
 
-    if (ref === freq || task.isDue) {
+    if (ref >= freq || freq <= 1) {
       return {
         category: 'hoy',
         dateLabel: 'Hoy',
@@ -289,9 +289,9 @@ export default function PlannerTecnicosColumnas({
     const dayNum = futureDate.getDate();
     const monthStr = futureDate.toLocaleDateString('es-ES', { month: 'short' });
     return {
-      category: 'proximas',
-      dateLabel: `${dayNum} ${monthStr}`,
-      dateStatus: 'upcoming',
+      category: daysRemaining <= 3 ? 'hoy' : 'proximas',
+      dateLabel: daysRemaining === 1 ? 'Mañana (+1d)' : `En +${daysRemaining}d (${dayNum} ${monthStr})`,
+      dateStatus: daysRemaining <= 3 ? 'today' : 'upcoming',
       rawTimestamp: futureDate.getTime()
     };
   };

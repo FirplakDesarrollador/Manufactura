@@ -1910,9 +1910,10 @@ export default function GestionMantenimientoPage() {
         return matchesPlanta && matchesTurno;
       });
 
-      const idtecsList: number[] = candidateTechsForTask.map(t => t.id);
-
-      const isValidFrequency = refFrecuencia >= frecuencia;
+      // Ventana constante de 3 días adelantados para planificación (sin alterar el contador real en BD)
+      const DIAS_VENTANA_ADELANTO = 3;
+      const isValidFrequency = (refFrecuencia + DIAS_VENTANA_ADELANTO) >= frecuencia || frecuencia <= 1;
+      const diasFaltantes = Math.max(0, frecuencia - refFrecuencia);
 
       let bestCandidate: number | null = null;
       let bestErrors: string[] = [];
@@ -2534,7 +2535,6 @@ export default function GestionMantenimientoPage() {
         nombre: name,
         documento: newTechForm.documento.trim() || undefined,
         modalidad_operativa: newTechForm.turno,
-        turno: newTechForm.turno,
         especialidad: pStr,
         capacidad_horas: parseFloat(newTechForm.capacity) || systemSettings.baseCapacity,
         activo: !isInactive
@@ -3521,7 +3521,6 @@ export default function GestionMantenimientoPage() {
         nombre: updatedTech.name,
         documento: updatedTech.documento,
         modalidad_operativa: updatedTech.turno,
-        turno: updatedTech.turno,
         especialidad: plantasStr,
         capacidad_horas: updatedTech.capacity,
         activo: !isInactive
@@ -4874,7 +4873,7 @@ export default function GestionMantenimientoPage() {
       };
     }
 
-    if (ref === freq || task.isDue) {
+    if (ref >= freq || freq <= 1) {
       return {
         category: 'hoy',
         dateLabel: 'Hoy',
@@ -4889,9 +4888,9 @@ export default function GestionMantenimientoPage() {
     const dayNum = futureDate.getDate();
     const monthStr = futureDate.toLocaleDateString('es-ES', { month: 'short' });
     return {
-      category: 'proximas',
-      dateLabel: `${dayNum} ${monthStr}`,
-      dateStatus: 'upcoming',
+      category: daysRemaining <= 3 ? 'hoy' : 'proximas',
+      dateLabel: daysRemaining === 1 ? 'Mañana (+1d)' : `En +${daysRemaining}d (${dayNum} ${monthStr})`,
+      dateStatus: daysRemaining <= 3 ? 'today' : 'upcoming',
       rawTimestamp: futureDate.getTime()
     };
   };
@@ -6970,7 +6969,7 @@ export default function GestionMantenimientoPage() {
         {/* VIEW 7: CONFIGURACIÓN */}
         {/* ========================================================================= */}
         {activeTab === 'configuracion' && (
-          <div className="max-w-5xl mx-auto w-full flex flex-col gap-7 animate-in fade-in duration-300">
+          <div className="max-w-[1600px] mx-auto w-full flex flex-col gap-7 animate-in fade-in duration-300">
             
             {/* ========================================================================= */}
             {/* SECCIÓN 1: PLANIFICACIÓN DE CUADRILLA, HORARIOS Y TURNOS (FUSIÓN TOTAL)   */}
