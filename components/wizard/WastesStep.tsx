@@ -79,13 +79,22 @@ export default function WastesStep() {
                     </div>
 
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                        <Label htmlFor="comentario" className="text-lg text-slate-700 font-bold mb-3 block">
-                            Comentarios Adicionales y Observaciones
-                        </Label>
+                        <div className="flex items-center justify-between mb-3">
+                            <Label htmlFor="comentario" className="text-lg text-slate-700 font-bold block">
+                                Comentarios Adicionales y Observaciones <span className="text-rose-600 font-bold text-sm ml-1">* (Obligatorio)</span>
+                            </Label>
+                            {!comentario.trim() && (
+                                <span className="text-xs text-rose-500 font-semibold bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+                                    Requerido para avanzar
+                                </span>
+                            )}
+                        </div>
                         <Textarea
                             id="comentario"
-                            placeholder="Describa oportunidades de mejora o cualquier observación importante encontrada durante la evaluación..."
-                            className="min-h-32 text-base shadow-inner focus-visible:ring-purple-500 border-slate-300"
+                            placeholder="Escriba las observaciones u oportunidades de mejora encontradas durante la evaluación (campo obligatorio)..."
+                            className={`min-h-32 text-base shadow-inner focus-visible:ring-purple-500 ${
+                                !comentario.trim() ? "border-rose-300 bg-rose-50/20 focus:border-rose-500" : "border-slate-300"
+                            }`}
                             value={comentario}
                             onChange={handleChangeComentario}
                         />

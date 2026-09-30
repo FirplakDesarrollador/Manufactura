@@ -22,6 +22,8 @@ export type EvaluacionHoraHora = {
     operario: string;
     creadoPor: string; // nombre del usuario que registró
     creadoPorEmail: string; // email del usuario que registró
+    realizadoPor: string; // persona que realiza la evaluación
+    compromiso: string; // compromiso / retroalimentación
     tiempoCicloTeorico: number; // seconds per piece
     tiempoInicio: number;
     tiempoFin: number | null;
@@ -75,6 +77,8 @@ const initialState: Partial<EvaluacionHoraHora> = {
     firmaOperario: '',
     creadoPor: '',
     creadoPorEmail: '',
+    realizadoPor: '',
+    compromiso: '',
     estadoGlobal: 'Pendiente',
     ciclos: [],
 };
@@ -192,7 +196,7 @@ export const useStore = create<AppState>((set) => ({
                 historial.push(finalEvaluacion);
                 localStorage.setItem('historialHoraHora', JSON.stringify(historial));
             }).catch((err) => {
-                console.error('Error saving to Supabase, saving locally:', err);
+                console.error('Error saving to Supabase, saving locally:', err?.message || err?.details || err);
                 // Fallback: save only to localStorage
                 const historial = JSON.parse(localStorage.getItem('historialHoraHora') || '[]');
                 const maxConsecutivo = historial.reduce((max: number, item: any) => Math.max(max, item.consecutivo || 0), 0);

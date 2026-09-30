@@ -4,7 +4,9 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, PenLine, BookOpen, TrendingUp, ShieldCheck, ShieldX, Trash2, BarChart2, Clock, MessageSquare } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { RotateCcw, PenLine, BookOpen, TrendingUp, ShieldCheck, ShieldX, Trash2, BarChart2, Clock, MessageSquare, Handshake } from "lucide-react";
 
 // ─── Guía data con highlights ─────────────────────────────────────────────────
 type GuiaItem = {
@@ -465,6 +467,42 @@ export default function SignatureStep() {
 
             {/* ─── Resumen de Resultados ───────────────────────────────────────── */}
             <ResultsSummary />
+
+            {/* ─── Compromiso / Retroalimentación ─────────────────────────────── */}
+            <Card className="shadow-lg border-t-4 border-t-indigo-500">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                        <CardTitle className="text-xl text-slate-800 flex items-center gap-2">
+                            <Handshake size={22} className="text-indigo-600" />
+                            Compromiso / Retroalimentación <span className="text-rose-600 font-bold text-sm ml-1">* (Obligatorio)</span>
+                        </CardTitle>
+                        {!evaluacionActual?.compromiso?.trim() && (
+                            <span className="text-xs text-rose-500 font-semibold bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+                                Requerido para avanzar
+                            </span>
+                        )}
+                    </div>
+                    <CardDescription>
+                        Ingrese los compromisos o la retroalimentación acordada con el colaborador antes de la firma.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-2">
+                        <Label htmlFor="compromiso-text" className="text-sm font-semibold text-slate-700">
+                            Observaciones de Compromiso / Retroalimentación <span className="text-rose-500">*</span>
+                        </Label>
+                        <Textarea
+                            id="compromiso-text"
+                            placeholder="Describa aquí los acuerdos, compromisos o retroalimentación brindada al colaborador (campo obligatorio)..."
+                            className={`min-h-28 text-base shadow-inner focus-visible:ring-indigo-500 ${
+                                !evaluacionActual?.compromiso?.trim() ? "border-rose-300 bg-rose-50/20 focus:border-rose-500" : "border-slate-300"
+                            }`}
+                            value={evaluacionActual?.compromiso || ""}
+                            onChange={(e) => actualizarEvaluacion({ compromiso: e.target.value })}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* ─── Firma ──────────────────────────────────────────────────────── */}
             <Card className="shadow-lg border-t-4 border-t-primary mb-24 md:mb-32">

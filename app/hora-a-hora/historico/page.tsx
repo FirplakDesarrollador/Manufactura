@@ -190,6 +190,14 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                         </div>
                     )}
 
+                    {/* Compromiso / Retroalimentación */}
+                    {item.compromiso && (
+                        <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40">
+                            <p className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-2">Compromiso / Retroalimentación</p>
+                            <p className="text-sm text-indigo-900 italic">"{item.compromiso}"</p>
+                        </div>
+                    )}
+
                     {/* Firma */}
                     {(item as any).firmaOperario && (
                         <div className="p-4 rounded-xl border border-slate-200 bg-white">
@@ -241,6 +249,8 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
     // Wastes & comments
     const [desperdicios, setDesperdicios] = useState<string[]>(item.desperdicios || []);
     const [comentario, setComentario] = useState(item.comentarioGeneral || "");
+    const [realizadoPor, setRealizadoPor] = useState(item.realizadoPor || item.creadoPor || "");
+    const [compromiso, setCompromiso] = useState(item.compromiso || "");
     const [saved, setSaved] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -270,6 +280,8 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
         const updated: EvaluacionHoraHora = {
             ...item,
             planta, linea, puesto, operario, tiempoCicloTeorico,
+            realizadoPor,
+            compromiso,
             ciclos, ciclosTotales, tiempoPromedio, piezasReales, piezasTeoricas, rendimiento,
             piezasTotalesCalidad: piezasTotales,
             piezasBuenas,
@@ -432,10 +444,22 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
                         </div>
                     </div>
 
+                    {/* Realizado Por */}
+                    <div className="space-y-2">
+                        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Realizado por</Label>
+                        <Input placeholder="Nombre de quien realizó..." value={realizadoPor} onChange={e => setRealizadoPor(e.target.value)} className="text-sm font-medium" />
+                    </div>
+
                     {/* Comentarios */}
                     <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Comentarios y Observaciones</Label>
                         <Textarea placeholder="Observaciones adicionales..." value={comentario} onChange={e => setComentario(e.target.value)} className="min-h-24 text-sm" />
+                    </div>
+
+                    {/* Compromiso / Retroalimentación */}
+                    <div className="space-y-2">
+                        <Label className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Compromiso / Retroalimentación</Label>
+                        <Textarea placeholder="Compromisos o retroalimentación con el colaborador..." value={compromiso} onChange={e => setCompromiso(e.target.value)} className="min-h-24 text-sm border-indigo-200 focus-visible:ring-indigo-500" />
                     </div>
 
                 </div>
@@ -727,7 +751,7 @@ export default function Historico() {
                                                 <div className="text-sm font-medium text-slate-800">{item.operario}</div>
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <div className="text-xs text-slate-600 font-medium truncate max-w-[160px]">{resolveUserName(item.creadoPor)}</div>
+                                                <div className="text-xs text-slate-600 font-medium truncate max-w-[160px]">{item.realizadoPor || resolveUserName(item.creadoPor)}</div>
                                             </TableCell>
                                             <TableCell className="py-4 text-xs">
                                                 <div><span className="font-semibold w-16 inline-block">Rend:</span> <span className={`font-mono font-bold ${item.rendimiento >= 90 ? 'text-emerald-600' : item.rendimiento >= 80 ? 'text-amber-500' : 'text-slate-500'}`}>{item.rendimiento.toFixed(1)}%</span></div>

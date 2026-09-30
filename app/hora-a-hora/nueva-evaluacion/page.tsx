@@ -63,7 +63,17 @@ export default function NuevaEvaluacion() {
                 return;
             }
         }
+        if (currentStep === 4) {
+            if (!evaluacionActual?.comentarioGeneral || evaluacionActual.comentarioGeneral.trim() === "") {
+                toast.error("Las observaciones son un campo obligatorio para todas las personas.");
+                return;
+            }
+        }
         if (currentStep === 5) {
+            if (!evaluacionActual?.compromiso || evaluacionActual.compromiso.trim() === "") {
+                toast.error("El comentario de compromiso / retroalimentación es un campo obligatorio.");
+                return;
+            }
             if (!evaluacionActual?.firmaOperario) {
                 toast.error("Debe registrar la firma del colaborador antes de continuar.");
                 return;
