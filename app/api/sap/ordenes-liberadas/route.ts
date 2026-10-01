@@ -215,30 +215,8 @@ export async function GET() {
                 }
             }
             console.log(`Upserted ${cleanBatch.length} Mármol Sintético orders to ordenes_fabricacion (excluidas ${msUpsertBatch.length - cleanBatch.length} canceladas/cerradas).`);
-
-            if (marmolRawRows.length > 0) {
-                const validMarmolSet = new Set(msUpsertBatch.map(b => String(b.orden_fabricacion)));
-                const { data: allPending } = await supabase
-                    .from('ordenes_fabricacion')
-                    .select('orden_fabricacion')
-                    .eq('pendiente', true);
-
-                const ofsToDeactivate = (allPending || [])
-                    .map(r => String(r.orden_fabricacion))
-                    .filter(ofNum => !validMarmolSet.has(ofNum));
-
-                if (ofsToDeactivate.length > 0) {
-                    const BATCH_SIZE = 50;
-                    for (let i = 0; i < ofsToDeactivate.length; i += BATCH_SIZE) {
-                        const batch = ofsToDeactivate.slice(i, i + BATCH_SIZE);
-                        await supabase
-                            .from('ordenes_fabricacion')
-                            .update({ pendiente: false })
-                            .in('orden_fabricacion', batch);
-                    }
-                    console.log(`Deactivated ${ofsToDeactivate.length} non-Mármol pending orders from ordenes_fabricacion.`);
-                }
-            }
+            // NOTA: NO desactivar automáticamente órdenes pendientes de ordenes_fabricacion solo porque no vengan en SAP.
+            // En planta, las órdenes cerradas virtualmente a fin de mes para facturación aún deben continuar su fabricación física.
         }
 
         return NextResponse.json({
