@@ -97,7 +97,7 @@ export default function SummaryStep() {
                             </div>
                             <div>
                                 <dt className="text-slate-500 font-semibold mb-1 uppercase text-xs tracking-wider">Hora Hora realizado por</dt>
-                                <dd className="font-bold text-slate-800 text-base">{currentUser || evaluacionActual.supervisor || "—"}</dd>
+                                <dd className="font-bold text-slate-800 text-base">{evaluacionActual.realizadoPor || currentUser || evaluacionActual.supervisor || "—"}</dd>
                             </div>
                         </dl>
                     </CardContent>
@@ -174,7 +174,7 @@ export default function SummaryStep() {
                             )}
                         </div>
 
-                        <div>
+                        <div className="border-b border-slate-100 pb-4">
                             <span className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
                                 Desperdicios Identificados ({evaluacionActual.desperdicios.length})
                             </span>
@@ -188,6 +188,19 @@ export default function SummaryStep() {
                                 </div>
                             ) : (
                                 <span className="text-sm text-slate-500 italic">Ningún desperdicio registrado.</span>
+                            )}
+                        </div>
+
+                        <div>
+                            <span className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                                Compromiso / Retroalimentación
+                            </span>
+                            {evaluacionActual.compromiso ? (
+                                <p className="text-sm bg-indigo-50/50 p-3 rounded text-indigo-900 border-l-2 border-indigo-400 italic">
+                                    "{evaluacionActual.compromiso}"
+                                </p>
+                            ) : (
+                                <span className="text-sm text-slate-500 italic">Sin compromisos registrados.</span>
                             )}
                         </div>
 

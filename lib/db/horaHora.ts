@@ -5,6 +5,11 @@ const TABLE = "Hora_Hora";
 
 // Map app model → DB columns
 function toDbRow(ev: EvaluacionHoraHora) {
+    // Combine compromiso into comentario_general if present to preserve data in Supabase without schema errors
+    const comentarioCompleto = ev.compromiso && ev.compromiso.trim() !== ""
+        ? `${ev.comentarioGeneral || ""}\n\n[Compromiso / Retroalimentación]: ${ev.compromiso}`.trim()
+        : (ev.comentarioGeneral || "");
+
     return {
         id: ev.id,
         fecha: ev.fecha,
@@ -14,7 +19,7 @@ function toDbRow(ev: EvaluacionHoraHora) {
         puesto: ev.puesto || "",
         supervisor: ev.supervisor || "",
         operario: ev.operario || "",
-        creado_por: ev.creadoPor || "",
+        creado_por: ev.realizadoPor || ev.creadoPor || "",
         creado_por_email: ev.creadoPorEmail || "",
         tiempo_ciclo_teorico: ev.tiempoCicloTeorico,
         tiempo_inicio: ev.tiempoInicio,
@@ -32,7 +37,7 @@ function toDbRow(ev: EvaluacionHoraHora) {
         hdt_cumple: ev.hdtCumple,
         hdt_comentario: ev.hdtComentario || "",
         desperdicios: ev.desperdicios || [],
-        comentario_general: ev.comentarioGeneral || "",
+        comentario_general: comentarioCompleto,
         firma_operario: ev.firmaOperario || "",
         estado_global: ev.estadoGlobal,
         ciclos: ev.ciclos || [],
@@ -41,6 +46,20 @@ function toDbRow(ev: EvaluacionHoraHora) {
 
 // Map DB row → app model
 function fromDbRow(row: any): EvaluacionHoraHora {
+    let comentarioGeneral = row.comentario_general || "";
+    let compromiso = row.compromiso || row.retroalimentacion || "";
+
+    // Parse compromise back if embedded in comentario_general
+    if (comentarioGeneral.includes("\n\n[Compromiso / Retroalimentación]: ")) {
+        const parts = comentarioGeneral.split("\n\n[Compromiso / Retroalimentación]: ");
+        comentarioGeneral = parts[0];
+        compromiso = parts[1] || "";
+    } else if (comentarioGeneral.includes("[Compromiso / Retroalimentación]: ")) {
+        const parts = comentarioGeneral.split("[Compromiso / Retroalimentación]: ");
+        comentarioGeneral = parts[0].trim();
+        compromiso = parts[1] || "";
+    }
+
     return {
         id: row.id,
         consecutivo: row.consecutivo,
@@ -53,6 +72,8 @@ function fromDbRow(row: any): EvaluacionHoraHora {
         operario: row.operario,
         creadoPor: row.creado_por,
         creadoPorEmail: row.creado_por_email,
+        realizadoPor: row.realizado_por || row.creado_por || "",
+        compromiso: compromiso,
         tiempoCicloTeorico: Number(row.tiempo_ciclo_teorico),
         tiempoInicio: Number(row.tiempo_inicio),
         tiempoFin: row.tiempo_fin ? Number(row.tiempo_fin) : null,
@@ -69,7 +90,7 @@ function fromDbRow(row: any): EvaluacionHoraHora {
         hdtCumple: row.hdt_cumple,
         hdtComentario: row.hdt_comentario,
         desperdicios: row.desperdicios || [],
-        comentarioGeneral: row.comentario_general,
+        comentarioGeneral: comentarioGeneral,
         firmaOperario: row.firma_operario,
         estadoGlobal: row.estado_global,
         ciclos: row.ciclos || [],

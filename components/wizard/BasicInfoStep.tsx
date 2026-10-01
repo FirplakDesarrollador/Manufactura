@@ -94,6 +94,11 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                 }
 
                 setCurrentUserName(nombre || email);
+                // Pre-fill realizadoPor if empty
+                setFormData(prev => ({
+                    ...prev,
+                    realizadoPor: prev.realizadoPor || nombre || email
+                }));
             }
         });
     }, []);
@@ -102,6 +107,7 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
         planta: evaluacionActual?.planta || "",
         puesto: evaluacionActual?.puesto || "",
         operario: evaluacionActual?.operario || "",
+        realizadoPor: evaluacionActual?.realizadoPor || "",
         tiempoCicloTeorico: evaluacionActual?.tiempoCicloTeorico?.toString() || "",
     });
 
@@ -124,6 +130,7 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
             tiempoCicloTeorico: Number(formData.tiempoCicloTeorico),
             creadoPor: currentUserName,
             creadoPorEmail: currentUserEmail,
+            realizadoPor: formData.realizadoPor || currentUserName,
         };
 
         if (evaluacionActual) {
@@ -149,6 +156,18 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                         <div className="space-y-2">
                             <Label htmlFor="fecha">Fecha</Label>
                             <Input id="fecha" value={evaluacionActual?.fecha || new Date().toISOString().split('T')[0]} disabled className="bg-slate-100 font-medium" />
+                        </div>
+
+                        <div className="space-y-0">
+                            <SearchableSelect 
+                                name="realizadoPor" 
+                                label="Realizado por" 
+                                options={operarios} 
+                                placeholder="Seleccione persona que realiza" 
+                                required={true}
+                                defaultValue={formData.realizadoPor}
+                                onValueChange={(val) => handleSelect("realizadoPor", val)}
+                            />
                         </div>
 
                         <div className="space-y-2">
