@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Search, X, ChevronLeft, Filter, Calendar as CalendarIcon, Trash2, Edit, Clock } from 'lucide-react'
+import { Search, X, ChevronLeft, Filter, Calendar as CalendarIcon, Trash2, Edit, Clock, ZoomIn } from 'lucide-react'
 import {
     BarChart,
     Bar,
@@ -107,6 +107,17 @@ export default function ReportedDefectsListPage() {
         defectuosos: 0,
         eficiencia: 0
     })
+
+    // Close fullscreen image on Escape key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && fullscreenImage) {
+                setFullscreenImage(null)
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [fullscreenImage])
 
     const fetchData = useCallback(async () => {
         // No synchronous setLoading(true) here to avoid cascading render error in useEffect
@@ -904,9 +915,22 @@ export default function ReportedDefectsListPage() {
                                 }).map((item, i) => (
                                     <div key={i} className="flex flex-col bg-white border border-gray-300 shadow-sm overflow-hidden h-max">
                                     {item.fotoUrl && (
-                                        <div className="aspect-square bg-gray-200 relative flex items-center justify-center">
+                                        <div 
+                                            onClick={() => setFullscreenImage(item.fotoUrl!)}
+                                            className="aspect-square bg-gray-200 relative flex items-center justify-center cursor-pointer group overflow-hidden"
+                                            title="Clic para ampliar imagen"
+                                        >
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={item.fotoUrl} alt={`Detalle ${i+1}`} className="w-full h-full object-contain" />
+                                            <img 
+                                                src={item.fotoUrl} 
+                                                alt={`Detalle ${i+1}`} 
+                                                className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105" 
+                                            />
+                                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                                <span className="bg-black/75 text-white text-[11px] font-bold px-2.5 py-1 rounded flex items-center gap-1.5 shadow-lg backdrop-blur-xs">
+                                                    <ZoomIn className="w-3.5 h-3.5" /> Ampliar
+                                                </span>
+                                            </div>
                                         </div>
                                     )}
                                     <div className="p-3 bg-white border-t border-gray-200">
@@ -977,9 +1001,22 @@ export default function ReportedDefectsListPage() {
                             <div className="w-full md:w-1/2 p-6 bg-gray-100 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-200">
                                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-4 text-center tracking-widest">Fotografía de la Pieza</label>
                                 {editRecord.currentFotoUrl ? (
-                                    <div className="aspect-square bg-gray-200 relative flex items-center justify-center border border-gray-300 shadow-inner w-full max-w-sm mx-auto">
+                                    <div 
+                                        onClick={() => setFullscreenImage(editRecord.currentFotoUrl!)}
+                                        className="aspect-square bg-gray-200 relative flex items-center justify-center border border-gray-300 shadow-inner w-full max-w-sm mx-auto cursor-pointer group overflow-hidden"
+                                        title="Clic para ampliar imagen"
+                                    >
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={editRecord.currentFotoUrl} alt="Foto actual" className="w-full h-full object-cover" />
+                                        <img 
+                                            src={editRecord.currentFotoUrl} 
+                                            alt="Foto actual" 
+                                            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
+                                        />
+                                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                            <span className="bg-black/75 text-white text-[11px] font-bold px-2.5 py-1 rounded flex items-center gap-1.5 shadow-lg backdrop-blur-xs">
+                                                <ZoomIn className="w-3.5 h-3.5" /> Ampliar
+                                            </span>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center h-full min-h-[250px] border-2 border-dashed border-gray-300 bg-white p-4">
@@ -1234,20 +1271,21 @@ export default function ReportedDefectsListPage() {
             {/* Fullscreen Image Modal */}
             {fullscreenImage && (
                 <div 
-                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-md cursor-zoom-out p-4"
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md cursor-zoom-out p-4 animate-in fade-in duration-200"
                     onClick={() => setFullscreenImage(null)}
                 >
                     <button 
                         onClick={(e) => { e.stopPropagation(); setFullscreenImage(null) }} 
-                        className="absolute top-4 right-4 p-2 text-white/50 hover:text-white transition-colors z-[210] bg-black/50 rounded-full"
+                        className="absolute top-4 right-4 p-2.5 text-white/70 hover:text-white transition-colors z-[210] bg-black/60 hover:bg-black/80 rounded-full shadow-lg"
+                        title="Cerrar (Esc)"
                     >
-                        <X className="w-8 h-8" />
+                        <X className="w-7 h-7" />
                     </button>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                         src={fullscreenImage} 
                         alt="Vista ampliada" 
-                        className="w-full h-full object-contain pointer-events-none" 
+                        className="max-w-[95vw] max-h-[92vh] w-auto h-auto object-contain rounded-md shadow-2xl pointer-events-none border border-white/10" 
                     />
                 </div>
             )}

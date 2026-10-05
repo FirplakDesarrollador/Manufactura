@@ -47,11 +47,21 @@ export async function registrarDesmolde(registrer: string, usuarioEmail: string)
         throw new Error(`Error al registrar desmolde: [${error.code}] ${error.message}`)
     }
 
-    // 3. Liberar el molde -> Disponible, resetear vueltas_actuales
+    // 3. Liberar el molde -> Disponible (a menos que esté en reparación o por desmanchar)
+    const { data: moldeActual } = await supabase
+        .from('moldes')
+        .select('estado')
+        .eq('id', registro.molde_id)
+        .single()
+
+    const estadoFinal = (moldeActual?.estado === 'En reparacion' || moldeActual?.estado === 'Por desmanchar')
+        ? moldeActual.estado
+        : 'Disponible'
+
     const { error: moldeError } = await supabase
         .from('moldes')
         .update({
-            estado: 'Disponible',
+            estado: estadoFinal,
             modificado_por: usuarioEmail,
             modified_at: new Date().toISOString()
         })
