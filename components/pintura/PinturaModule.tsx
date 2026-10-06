@@ -94,8 +94,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             const sku = (selectedOrden.molde_sku || selectedOrden.producto_sku || selectedOrden.sku || '').trim().toLowerCase()
             const targetDesc = (selectedOrden.molde_descripcion || selectedOrden.producto_descripcion || '').trim().toLowerCase()
 
-            // Extract numeric code from PMOL02-0087-000-0000 -> "87"
-            const codeMatch = sku.match(/PMOL\d*-(\d+)/i)
+            // Extract numeric code from PMOL02-0087-000-0000 -> "87", PMOL02-0237-000-0000 -> "237"
+            let codeMatch = sku.match(/PMOL\d*-(\d+)/i) || (selectedOrden.molde_sku ? selectedOrden.molde_sku.match(/PMOL\d*-(\d+)/i) : null)
             const targetCode = codeMatch ? codeMatch[1].replace(/^0+/, '') : ''
 
             // Filter locally from allMoldes
@@ -110,20 +110,31 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                     // 1. Exact SKU / Serial match
                     if (sku && (mSku === sku || mSerial === sku)) return true
 
-                    // 2. Serial code prefix match (e.g. "0087-10" matches targetCode "87" or "0087")
+                    // 2. Serial code prefix match (e.g. "0087-10" matches targetCode "87" or "0087", "237-01" matches "237")
                     if (targetCode) {
                         const serialPrefix = mSerial.split('-')[0].replace(/^0+/, '')
                         if (serialPrefix === targetCode) return true
                     }
 
-                    // 3. Description keyword match (e.g. both contain "aqua 80x60" or "lavarropas aqua")
+                    // 3. Description keyword match (bidireccional para soportar referencias nuevas con variantes comerciales)
                     if (targetDesc && mDesc) {
-                        const keywords = targetDesc
-                            .replace(/molde|blanco|brillante|mate|con|flauta/gi, '')
+                        const targetKeywords = targetDesc
+                            .replace(/molde|blanco|brillante|mate|con|flauta|solo|fregadero|granito|perla|para|sin/gi, '')
                             .split(/\s+/)
                             .filter(w => w.length > 2)
 
-                        if (keywords.length > 0 && keywords.every(kw => mDesc.includes(kw))) {
+                        const mKeywords = mDesc
+                            .replace(/molde|nuevo/gi, '')
+                            .split(/\s+/)
+                            .filter(w => w.length > 2)
+
+                        // Si las palabras clave del molde están contenidas en la descripción del producto (ej: "lavarropas", "versa", "40x50")
+                        if (mKeywords.length > 0 && mKeywords.every(kw => targetDesc.includes(kw))) {
+                            return true
+                        }
+
+                        // O si las palabras del producto están contenidas en el molde
+                        if (targetKeywords.length > 0 && targetKeywords.every(kw => mDesc.includes(kw))) {
                             return true
                         }
                     }

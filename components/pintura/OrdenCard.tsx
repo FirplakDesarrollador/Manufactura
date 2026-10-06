@@ -19,8 +19,24 @@ const MiniMetric = ({ label, value, color }: { label: string, value: number, col
 )
 
 export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCardProps) {
-    const sku = (orden.molde_sku || orden.producto_sku || orden.sku || '').trim()
-    const relevantMoldes = moldes.filter(m => (m.molde_sku || '').trim().toLowerCase() === sku.toLowerCase())
+    const sku = (orden.molde_sku || orden.producto_sku || orden.sku || '').trim().toLowerCase()
+    const codeMatch = sku.match(/PMOL\d*-(\d+)/i) || (orden.molde_sku ? orden.molde_sku.match(/PMOL\d*-(\d+)/i) : null)
+    const targetCode = codeMatch ? codeMatch[1].replace(/^0+/, '') : ''
+    const targetDesc = (orden.molde_descripcion || orden.producto_descripcion || '').trim().toLowerCase()
+
+    const relevantMoldes = moldes.filter(m => {
+        const mSku = (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase()
+        const mSerial = (m.serial || '').trim().toLowerCase()
+        const mDesc = (m.molde_descripcion || (m as any).nombre_articulo || '').trim().toLowerCase()
+
+        if (sku && (mSku === sku || mSerial === sku)) return true
+        if (targetCode && mSerial.split('-')[0].replace(/^0+/, '') === targetCode) return true
+        if (targetDesc && mDesc) {
+            const mKeywords = mDesc.replace(/molde|nuevo/gi, '').split(/\s+/).filter(w => w.length > 2)
+            if (mKeywords.length > 0 && mKeywords.every(kw => targetDesc.includes(kw))) return true
+        }
+        return false
+    })
     const disponibles = relevantMoldes.filter(m => m.estado === 'Disponible').length
     const enUso = relevantMoldes.filter(m => m.estado === 'En uso').length
     const enReparacion = relevantMoldes.filter(m => !['Disponible', 'En uso'].includes(m.estado)).length

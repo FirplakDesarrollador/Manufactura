@@ -13,12 +13,42 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
         return []
     }
 
-    return (data || []).filter((ord: any) => {
+    const filtered = (data || []).filter((ord: any) => {
         const cantReq = Number(ord.cantidad) || 1
         const cediCount = Number(ord.cedi) || 0
         // Desaparecer automáticamente de la programación las OFs entregadas en su totalidad a CEDI
         return cediCount < cantReq
     })
+
+    // Enriquecer órdenes que tengan molde_sku o molde_descripcion nulo en la vista con datos de ordenes_fabricacion
+    const missingMoldeOfs = filtered
+        .filter((o: any) => !o.molde_sku || !o.molde_descripcion)
+        .map((o: any) => o.orden_fabricacion)
+
+    if (missingMoldeOfs.length > 0) {
+        try {
+            const { data: rawOfs } = await supabase
+                .from('ordenes_fabricacion')
+                .select('orden_fabricacion, molde_sku, molde_descripcion, tamano')
+                .in('orden_fabricacion', missingMoldeOfs)
+
+            if (rawOfs) {
+                const rawMap = new Map(rawOfs.map(r => [String(r.orden_fabricacion), r]))
+                filtered.forEach((o: any) => {
+                    const raw = rawMap.get(String(o.orden_fabricacion))
+                    if (raw) {
+                        if (!o.molde_sku) o.molde_sku = raw.molde_sku
+                        if (!o.molde_descripcion) o.molde_descripcion = raw.molde_descripcion
+                        if (!o.tamano) o.tamano = raw.tamano
+                    }
+                })
+            }
+        } catch (enrichErr) {
+            console.error('Error enriqueciendo molde_sku desde ordenes_fabricacion:', enrichErr)
+        }
+    }
+
+    return filtered
 }
 
 export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]> {
@@ -105,21 +135,31 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
 }
 
 export async function getAllMoldes(): Promise<Molde[]> {
-    const { data, error } = await supabase
-        .from('query_moldes')
-        .select('*')
-        .neq('estado', 'Destruido')
+    try {
+        const [viewRes, rawRes] = await Promise.all([
+            supabase.from('query_moldes').select('*').neq('estado', 'Destruido'),
+            supabase.from('moldes').select('id, nombre_articulo, descripcion_molde, tipo_molde_sku').neq('estado', 'Destruido')
+        ])
 
-    if (error) {
-        console.error('Error fetching all moldes:', error)
+        if (viewRes.error) {
+            console.error('Error fetching all moldes:', viewRes.error)
+            return []
+        }
+
+        const rawMap = new Map((rawRes.data || []).map(r => [r.id, r]))
+
+        return (viewRes.data || []).map((m: any) => {
+            const raw = rawMap.get(m.id)
+            return {
+                ...m,
+                molde_sku: m.molde_sku || m.tipo_molde_sku || raw?.tipo_molde_sku || '',
+                molde_descripcion: m.molde_descripcion || m.nombre_articulo || raw?.nombre_articulo || raw?.descripcion_molde || ''
+            }
+        })
+    } catch (e) {
+        console.error('Error fetching all moldes:', e)
         return []
     }
-
-    return (data || []).map((m: any) => ({
-        ...m,
-        molde_sku: m.molde_sku || m.tipo_molde_sku || '',
-        molde_descripcion: m.molde_descripcion || m.nombre_articulo || ''
-    }))
 }
 
 export async function updateMoldeEstado(moldeId: number, nuevoEstado: string) {
