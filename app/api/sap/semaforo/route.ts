@@ -9,11 +9,12 @@ export async function GET() {
     try {
         console.log("Iniciando solicitud a la nueva API Python (Cloudflare) para semaforo...");
         
-        const apiUrl = "https://availability-returned-jets-microphone.trycloudflare.com/semaforo";
+        const apiUrl = process.env.SEMAFORO_API_URL || "https://hispanic-paintings-rio-kit.trycloudflare.com/semaforo";
+        const apiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
         
         const listRes = await fetch(apiUrl, {
             headers: {
-                'api-key': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us'
+                'api-key': apiKey
             },
             cache: 'no-store'
         });

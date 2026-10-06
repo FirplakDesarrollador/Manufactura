@@ -46,15 +46,8 @@ export async function GET(request: Request) {
     }
   }
 
-  const apiUrl = process.env.SEMAFORO_API_URL;
-  const apiKey = process.env.SEMAFORO_API_KEY;
-
-  if (!apiUrl || !apiKey) {
-    return NextResponse.json(
-      { success: false, error: 'Faltan variables de entorno SEMAFORO_API_URL / SEMAFORO_API_KEY' },
-      { status: 500 }
-    );
-  }
+  const apiUrl = process.env.SEMAFORO_API_URL || "https://hispanic-paintings-rio-kit.trycloudflare.com/semaforo";
+  const apiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
 
   try {
     const response = await fetch(apiUrl, {
