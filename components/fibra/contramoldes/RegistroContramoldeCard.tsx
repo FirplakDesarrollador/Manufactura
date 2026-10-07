@@ -40,7 +40,7 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
                         <div className="min-w-0">
                             <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Producto</p>
                             <h3 className="text-sm font-extrabold text-[#254153] leading-tight">
-                                {registro.producto_descripcion.toUpperCase()}
+                                {(registro.producto_descripcion || 'Sin descripción').toUpperCase()}
                             </h3>
                         </div>
                     </div>

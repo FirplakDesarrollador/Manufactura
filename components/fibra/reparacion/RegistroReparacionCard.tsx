@@ -72,7 +72,7 @@ export default function RegistroReparacionCard({ registro, usuarioEmail, onRefre
                         <div className="min-w-0">
                             <p className="text-sm uppercase font-bold text-slate-400 tracking-widest">Producto / Pieza</p>
                             <h3 className="text-2xl font-black text-slate-800 leading-tight">
-                                {registro.producto_descripcion.toUpperCase()}
+                                {(registro.producto_descripcion || 'Sin descripción').toUpperCase()}
                             </h3>
                             <div className="flex items-center gap-2 mt-2">
                                 <Clock size={16} className="text-slate-400" />

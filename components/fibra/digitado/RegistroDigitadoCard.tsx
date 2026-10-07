@@ -58,7 +58,7 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
                         </div>
                         <div className="min-w-0">
                             <h3 className="text-base font-black text-slate-800 leading-tight">
-                                {registro.producto_descripcion.toUpperCase()}
+                                {(registro.producto_descripcion || 'Sin descripción').toUpperCase()}
                             </h3>
                             <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase">Serial: {registro.molde_serial}</span>

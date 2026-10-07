@@ -46,7 +46,7 @@ export default function RegistroPulidoCard({ registro, usuarioEmail, onRefresh }
                         <div className="min-w-0">
                             <p className="text-[8px] uppercase font-bold text-slate-400 tracking-widest">PRODUCTO</p>
                             <h3 className="text-sm font-black text-slate-800 leading-tight">
-                                {registro.producto_descripcion.toUpperCase()}
+                                {(registro.producto_descripcion || 'Sin descripción').toUpperCase()}
                             </h3>
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <Clock size={12} className="text-slate-400" />
