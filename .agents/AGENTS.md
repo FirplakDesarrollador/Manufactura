@@ -94,3 +94,21 @@ Este módulo cuenta con dos secciones accesibles mediante botones de alternancia
 Cualquier consulta T-SQL de SAP B1 compartida por el usuario (tablas `OWOR`, `OITM`, `ORDR`, `@FIR_FAM_SYMPH`, `@FIR_AMORTIGUADORES`, `@FIR_FECHAS_PROD`, etc.) se identifica automáticamente y se mapea con:
 - **API Backend Local (Next.js):** `app/api/sap/ordenes-liberadas/route.ts` (`http://localhost:3000/api/sap/ordenes-liberadas`).
 - **Endpoint SAP Service Layer (OData):** `https://200.7.96.194:50000/b1s/v1/SQLQueries('ordenes_marmol_sl136')/List` (Header: `Prefer: odata.maxpagesize=500`).
+
+---
+
+## 7. Módulo: Gestión de Mantenimiento (`/mantenimiento/gestion-mantenimiento`)
+
+### Regla Obligatoria de Botones de Acción Rápida:
+En las siguientes **tres vistas/pestañas principales**, siempre deben estar presentes de forma consistente los dos botones de creación rápida:
+1. **Planificador**: Botones `+ Correctivo` y `+ TPM`.
+2. **Portal Técnicos**: Botones `+ Correctivo` y `+ TPM`.
+3. **Órdenes de Trabajo (Historial)**: Botones `+ Correctivo` y `+ TPM`.
+
+> **Importante**: Cada vez que se solicite un cambio o ajuste sobre cualquiera de estos botones, sus modales o sus formularios, dicho cambio **debe replicarse y mantenerse sincronizado en las tres pestañas**.
+
+### Reglas de Evidencia Fotográfica en Formularios:
+- **Formulario de Correctivo y TPM**: Ambos formularios deben permitir hasta **máximo 4 fotos de evidencia** (para cubrir hasta 2 fotos del "antes" y 2 del "después").
+- **Acciones fotográficas**: Deben incluir tanto el botón de **Tomar Foto** (cámara en vivo / `LiveCameraModal`) como el botón de **Adjuntar Archivo** (galería / explorador de archivos).
+- **Herramientas**: Cada miniatura debe permitir eliminar (`X`) y señalar en rojo con el editor de dibujo (`PhotoAnnotationEditor` / `Señalar en Rojo`).
+
