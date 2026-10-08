@@ -79,7 +79,7 @@ import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
 import * as XLSX from 'xlsx';
 import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
-import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas, computeSemanasFromFrecuencia } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
   id: number | string;
@@ -1050,6 +1050,9 @@ export default function GestionMantenimientoPage() {
       if (historyRows.length === 0) {
         fetchHistoryRecords();
       }
+      if (correctiveRecords.length === 0) {
+        fetchCorrectivoRecords();
+      }
     }
   }, [activeTab]);
 
@@ -1100,6 +1103,25 @@ export default function GestionMantenimientoPage() {
           const category = getHistoryRecordCategory(d);
           const cleanCode = getHistoryRecordCode(d, idx);
 
+          let fotosArr: string[] = [];
+          if (Array.isArray(d.fotos_antes) && d.fotos_antes.length > 0) fotosArr = d.fotos_antes;
+          else if (Array.isArray(d.fotos) && d.fotos.length > 0) fotosArr = d.fotos;
+          else if (typeof d.fotos === 'string' && d.fotos.trim().startsWith('[')) {
+            try { fotosArr = JSON.parse(d.fotos); } catch {}
+          } else if (typeof d.fotos === 'string' && d.fotos.trim().length > 0) {
+            fotosArr = [d.fotos];
+          } else if (d.foto_url) fotosArr = [d.foto_url];
+          else if (d.foto) fotosArr = [d.foto];
+
+          let fotosSolucionArr: string[] = [];
+          if (Array.isArray(d.fotos_despues) && d.fotos_despues.length > 0) fotosSolucionArr = d.fotos_despues;
+          else if (Array.isArray(d.fotos_solucion) && d.fotos_solucion.length > 0) fotosSolucionArr = d.fotos_solucion;
+          else if (typeof d.fotos_despues === 'string' && d.fotos_despues.trim().startsWith('[')) {
+            try { fotosSolucionArr = JSON.parse(d.fotos_despues); } catch {}
+          } else if (typeof d.fotos_solucion === 'string' && d.fotos_solucion.trim().startsWith('[')) {
+            try { fotosSolucionArr = JSON.parse(d.fotos_solucion); } catch {}
+          }
+
           historyMap.set(cleanCode, {
             ...d,
             id: d.id || idx + 1,
@@ -1113,6 +1135,8 @@ export default function GestionMantenimientoPage() {
             'FECHA DE APERTURA': d.fecha_apertura || d['FECHA DE APERTURA'] || (d.created_at ? d.created_at.slice(0, 10) : ''),
             'FECHA DE CIERRE': d.fecha_cierre || d['FECHA DE CIERRE'] || '',
             'COMENTARIO DE EJECUCION': d.comentarios_ejecucion || d.accion_realizada || d['COMENTARIO DE EJECUCION'] || '',
+            fotos: fotosArr,
+            fotos_solucion: fotosSolucionArr,
             created_at: d.created_at
           });
         });
@@ -1124,6 +1148,19 @@ export default function GestionMantenimientoPage() {
           const cod = d.codigo_tarjeta || d.codigo || `TPM-${idx + 1}`;
           if (!isCleanConsecutiveCode(cod)) return;
           const existing = historyMap.get(cod);
+
+          let fotosArr: string[] = [];
+          if (Array.isArray(d.fotos) && d.fotos.length > 0) fotosArr = d.fotos;
+          else if (typeof d.fotos === 'string' && d.fotos.trim().startsWith('[')) {
+            try { fotosArr = JSON.parse(d.fotos); } catch {}
+          } else if (typeof d.fotos === 'string' && d.fotos.trim().length > 0) {
+            fotosArr = [d.fotos];
+          } else if (d.foto_url) fotosArr = [d.foto_url];
+          else if (d.foto) fotosArr = [d.foto];
+
+          let fotosSolucionArr: string[] = [];
+          if (Array.isArray(d.fotos_despues) && d.fotos_despues.length > 0) fotosSolucionArr = d.fotos_despues;
+          else if (Array.isArray(d.fotos_solucion) && d.fotos_solucion.length > 0) fotosSolucionArr = d.fotos_solucion;
 
           const rawEstado = (d.estado || '').toLowerCase();
           const estado = rawEstado === 'resuelta' || rawEstado === 'cerrada' || rawEstado === 'completado' ? 'Completado' :
@@ -1145,11 +1182,30 @@ export default function GestionMantenimientoPage() {
               'FECHA DE APERTURA': d.fecha_apertura || (d.created_at ? d.created_at.slice(0, 10) : ''),
               'FECHA DE CIERRE': d.fecha_cierre || '',
               'COMENTARIO DE EJECUCION': d.accion_inmediata || d.accion_correctiva || d.comentarios_ejecucion || '',
+              fotos: fotosArr,
+              fotos_solucion: fotosSolucionArr,
               created_at: d.created_at
             });
           } else {
             if (d.tecnico_asignado && d.tecnico_asignado !== 'Sin asignar') {
               existing['TECNICO'] = d.tecnico_asignado;
+            }
+            if (fotosArr.length > 0 && (!existing.fotos || existing.fotos.length === 0)) {
+              existing.fotos = fotosArr;
+              existing.fotos_antes = fotosArr;
+            }
+            if (fotosSolucionArr.length > 0 && (!existing.fotos_solucion || existing.fotos_solucion.length === 0)) {
+              existing.fotos_solucion = fotosSolucionArr;
+              existing.fotos_despues = fotosSolucionArr;
+            }
+            if (!existing.sintoma) {
+              existing.sintoma = rawTitle;
+            }
+            if (d.maquina && (!existing.maquina || existing.maquina === 'Equipo General')) {
+              existing.maquina = d.maquina;
+            }
+            if (d.planta && !existing.planta) {
+              existing.planta = d.planta;
             }
           }
         });
@@ -1164,22 +1220,39 @@ export default function GestionMantenimientoPage() {
             if (Array.isArray(parsed)) {
               parsed.forEach((item: any, idx: number) => {
                 const cod = item.codigo || item.codigo_tarjeta;
-                if (cod && isCleanConsecutiveCode(cod) && !historyMap.has(cod)) {
+                if (cod && isCleanConsecutiveCode(cod)) {
+                  const existing = historyMap.get(cod);
                   const rawTitle = item.sintoma || item.descripcion_que || item.titulo || 'Anomalía local';
-                  historyMap.set(cod, {
-                    id: item.id || idx + 9000,
-                    codigo: cod,
-                    'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
-                    'ESTADO': item.estado || 'Abierta',
-                    'TECNICO': item.tecnico_asignado || 'Sin asignar',
-                    'TIPO': 'TPM',
-                    tipo: 'TPM',
-                    origen: 'TPM',
-                    'FECHA DE APERTURA': item.fecha_apertura || item.fecha_reporte || '',
-                    'FECHA DE CIERRE': item.fecha_cierre || '',
-                    'COMENTARIO DE EJECUCION': item.accion_tomada || '',
-                    created_at: item.created_at
-                  });
+                  const itemFotos = Array.isArray(item.fotos) ? item.fotos : [];
+                  const itemSol = Array.isArray(item.fotos_solucion) ? item.fotos_solucion : (Array.isArray(item.fotos_despues) ? item.fotos_despues : []);
+
+                  if (!existing) {
+                    historyMap.set(cod, {
+                      id: item.id || idx + 9000,
+                      codigo: cod,
+                      'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
+                      'ESTADO': item.estado || 'Abierta',
+                      'TECNICO': item.tecnico_asignado || 'Sin asignar',
+                      'TIPO': 'TPM',
+                      tipo: 'TPM',
+                      origen: 'TPM',
+                      'FECHA DE APERTURA': item.fecha_apertura || item.fecha_reporte || '',
+                      'FECHA DE CIERRE': item.fecha_cierre || '',
+                      'COMENTARIO DE EJECUCION': item.accion_tomada || '',
+                      fotos: itemFotos,
+                      fotos_solucion: itemSol,
+                      created_at: item.created_at
+                    });
+                  } else {
+                    if (itemFotos.length > 0 && (!existing.fotos || existing.fotos.length === 0)) {
+                      existing.fotos = itemFotos;
+                      existing.fotos_antes = itemFotos;
+                    }
+                    if (itemSol.length > 0 && (!existing.fotos_solucion || existing.fotos_solucion.length === 0)) {
+                      existing.fotos_solucion = itemSol;
+                      existing.fotos_despues = itemSol;
+                    }
+                  }
                 }
               });
             }
@@ -1928,7 +2001,9 @@ export default function GestionMantenimientoPage() {
       const tiempoMinutos = p.duracion_minutos || 60;
       const id = p.id;
       const consecutiveNum = pIdx + 1;
-      const codeFormatted = `PMP-${String(consecutiveNum).padStart(4, '0')}`;
+      const codeFormatted = (p.codigo && String(p.codigo).trim().startsWith('PMP-')) 
+        ? String(p.codigo).trim() 
+        : `PMP-${String(consecutiveNum).padStart(4, '0')}`;
       const detalle = p.detalle_instrucciones || '';
       const maquina = p.maquina || 'Equipo General';
       const tipoIntervencion = p.tipo_intervencion || 'NP';
@@ -2058,7 +2133,7 @@ export default function GestionMantenimientoPage() {
       const finalApertura = matchingOrden?.fecha_apertura || matchingLocal?.fechaApertura || (finalCandidate !== 9999 ? getLocalDatetimeString() : null);
       const finalCierre = matchingOrden?.fecha_cierre || matchingLocal?.fechaCierre || null;
 
-      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title);
+      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title, frecuencia);
       const cleanTitle = cleanTaskTitle(title, nomenclaturaCalculated);
 
       newTasks.push({
@@ -2652,17 +2727,42 @@ export default function GestionMantenimientoPage() {
     setNewTechForm({ id: '', name: '', turno: 'PR', documento: '', planta: 'MS', plantas: ['MS'], capacity: '7.2', overloadMarginPercent: '10' });
   };
 
+  // Helper to determine next consecutive ID (#) and Code (PMP-XXXX)
+  const getNextPmpConsecutives = () => {
+    let maxId = 0;
+    let maxCodeNum = 0;
+
+    tasks.forEach(t => {
+      const numId = Number(t.id);
+      if (!isNaN(numId) && numId > 0 && numId < 1000000) {
+        if (numId > maxId) maxId = numId;
+      }
+      if (t.code) {
+        const match = String(t.code).match(/PMP-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxCodeNum) maxCodeNum = num;
+        }
+      }
+    });
+
+    const nextId = maxId > 0 ? maxId + 1 : tasks.length + 1;
+    const nextCodeNum = maxCodeNum > 0 ? maxCodeNum + 1 : tasks.length + 1;
+    const nextCode = `PMP-${String(nextCodeNum).padStart(4, '0')}`;
+
+    return { nextId, nextCode };
+  };
+
   const handleAddTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskForm.title.trim()) return;
 
-    let createdId = Date.now();
     const taskPlantas = (newTaskForm.plantas && newTaskForm.plantas.length > 0)
       ? newTaskForm.plantas
       : parseTechPlantas(newTaskForm.planta, plantasNomenclatura);
     const plantaStr = taskPlantas.join(', ');
 
-    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes);
+    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia);
     const cleanTitle = cleanTaskTitle(newTaskForm.title.trim(), nomenclaturaGen);
 
     // Candidate technicians matching Planta/Especialidad & Turno
@@ -2674,12 +2774,49 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
-    const nextConsecutive = tasks.length + 1;
-    let codeFormatted = `PMP-${String(nextConsecutive).padStart(4, '0')}`;
+    // 1. Calculate next consecutives based on current tasks & Supabase
+    const { nextId: localNextId, nextCode: localNextCode } = getNextPmpConsecutives();
+    let targetId = localNextId;
+    let targetCode = localNextCode;
+
+    try {
+      const { data: dbRecords } = await supabase
+        .from('mantenimiento_planes_preventivos')
+        .select('id, codigo')
+        .order('id', { ascending: false })
+        .limit(10);
+
+      if (dbRecords && dbRecords.length > 0) {
+        let dbMaxId = targetId - 1;
+        let dbMaxCode = parseInt(targetCode.replace('PMP-', ''), 10) - 1;
+
+        dbRecords.forEach((r: any) => {
+          const rId = Number(r.id);
+          if (!isNaN(rId) && rId > dbMaxId && rId < 1000000) dbMaxId = rId;
+          if (r.codigo) {
+            const m = String(r.codigo).match(/PMP-(\d+)/i);
+            if (m) {
+              const num = parseInt(m[1], 10);
+              if (!isNaN(num) && num > dbMaxCode) dbMaxCode = num;
+            }
+          }
+        });
+
+        targetId = Math.max(targetId, dbMaxId + 1);
+        const codeNum = Math.max(parseInt(targetCode.replace('PMP-', ''), 10), dbMaxCode + 1);
+        targetCode = `PMP-${String(codeNum).padStart(4, '0')}`;
+      }
+    } catch (dbErr) {
+      console.warn('Aviso verificando consecutivos en Supabase:', dbErr);
+    }
+
+    let createdId = targetId;
+    let finalCode = targetCode;
 
     try {
       const insertPayload: any = {
-        codigo: codeFormatted,
+        id: targetId,
+        codigo: targetCode,
         titulo: cleanTitle,
         duracion_minutos: newTaskForm.durationMinutes,
         tipo_intervencion: newTaskForm.intervencion,
@@ -2693,16 +2830,31 @@ export default function GestionMantenimientoPage() {
         activo: true
       };
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('mantenimiento_planes_preventivos')
         .insert([insertPayload])
         .select()
         .single();
 
       if (error) {
-        console.error('Error guardando PMP en Supabase:', error);
-      } else if (data) {
-        createdId = data.id;
+        // Fallback retry without explicit id if database identity sequence forbids manual id
+        const { id: _, ...payloadWithoutId } = insertPayload;
+        const retry = await supabase
+          .from('mantenimiento_planes_preventivos')
+          .insert([payloadWithoutId])
+          .select()
+          .single();
+        if (retry.data) {
+          data = retry.data;
+          error = null;
+        } else {
+          console.error('Error insertando PMP en Supabase:', retry.error || error);
+        }
+      }
+
+      if (data) {
+        createdId = Number(data.id) || targetId;
+        if (data.codigo) finalCode = data.codigo;
       }
     } catch (err) {
       console.warn('Excepción guardando PMP en Supabase:', err);
@@ -2711,7 +2863,7 @@ export default function GestionMantenimientoPage() {
     const newTask: MaintenanceTask = {
       id: createdId,
       csvId: `MP-${createdId}`,
-      code: codeFormatted,
+      code: finalCode,
       nomenclatura: nomenclaturaGen,
       title: cleanTitle,
       durationMinutes: newTaskForm.durationMinutes,
@@ -2786,8 +2938,11 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
+    const updatedNom = computeNomenclatura(plantaStr, editingTask.tipoIntervencion, editingTask.durationMinutes, editingTask.code || editingTask.title, editingTask.frecuencia);
+
     const updatedTask: MaintenanceTask = {
       ...editingTask,
+      nomenclatura: updatedNom,
       refFrecuencia: clampedRef,
       plantas: taskPlantas,
       planta: plantaStr,
@@ -3047,6 +3202,118 @@ export default function GestionMantenimientoPage() {
     setCorrectivoModalFeedback(null);
   };
 
+  // Handler to open full interactive detail modal from the Órdenes de Trabajo table (or anywhere)
+  const handleOpenHistoryRowDetail = (row: any) => {
+    if (!row) return;
+    const category = row._category || getHistoryRecordCategory(row);
+    const code = row._codeDisplay || row.codigo || getHistoryRecordCode(row);
+
+    if (category === 'TPM' || category === 'Correctivo') {
+      // 1. Check if correctiveRecords has this record
+      const foundInCorrectivos = correctiveRecords.find(c => 
+        (c.codigo && (c.codigo === code || c.codigo === row.codigo)) || 
+        c.id === row.id
+      );
+
+      if (foundInCorrectivos) {
+        handleOpenCorrectivoDetail(foundInCorrectivos);
+        return;
+      }
+
+      // 2. Build full CorrectiveRecord from row
+      let fotosArr: string[] = [];
+      if (Array.isArray(row.fotos_antes) && row.fotos_antes.length > 0) fotosArr = row.fotos_antes;
+      else if (Array.isArray(row.fotos) && row.fotos.length > 0) fotosArr = row.fotos;
+      else if (typeof row.fotos === 'string' && row.fotos.trim().startsWith('[')) {
+        try { fotosArr = JSON.parse(row.fotos); } catch {}
+      } else if (typeof row.fotos === 'string' && row.fotos.trim().length > 0) {
+        fotosArr = [row.fotos];
+      } else if (row.foto_url) fotosArr = [row.foto_url];
+      else if (row.foto) fotosArr = [row.foto];
+
+      let fotosSolucionArr: string[] = [];
+      if (Array.isArray(row.fotos_despues) && row.fotos_despues.length > 0) fotosSolucionArr = row.fotos_despues;
+      else if (Array.isArray(row.fotos_solucion) && row.fotos_solucion.length > 0) fotosSolucionArr = row.fotos_solucion;
+      else if (typeof row.fotos_despues === 'string' && row.fotos_despues.trim().startsWith('[')) {
+        try { fotosSolucionArr = JSON.parse(row.fotos_despues); } catch {}
+      } else if (typeof row.fotos_solucion === 'string' && row.fotos_solucion.trim().startsWith('[')) {
+        try { fotosSolucionArr = JSON.parse(row.fotos_solucion); } catch {}
+      }
+
+      const rawEstado = (row._estadoDisplay || row['ESTADO'] || row.estado || 'Abierta').toLowerCase();
+      const estadoMapped: 'Abierta' | 'En Proceso' | 'Resuelta' = 
+        rawEstado === 'resuelta' || rawEstado === 'cerrada' || rawEstado === 'completado' ? 'Resuelta' :
+        rawEstado === 'en proceso' || rawEstado === 'en_proceso' ? 'En Proceso' : 'Abierta';
+
+      const resolvedMachine = row._resolvedMachine || resolveHistoryRowMachine(row, maquinasCatalogo);
+
+      const builtRecord: CorrectiveRecord = {
+        id: row.id,
+        codigo: code || row.codigo,
+        maquina: resolvedMachine?.name || row.maquina || 'Equipo General',
+        planta: row.planta || row['Planta'] || 'Mármol Sintético',
+        origen: category === 'TPM' ? 'Tarjeta TPM' : 'Correctivo Directo',
+        sintoma: cleanDescriptionText(row['Título'] || row.sintoma || row.titulo || row.descripcion_que),
+        prioridad: (row.prioridad as any) || 'Alta',
+        tecnico_asignado: row._techName || row['TECNICO'] || row.tecnico_asignado || 'Sin asignar',
+        estado: estadoMapped,
+        fecha_reporte: row['FECHA DE APERTURA'] || row.fecha_apertura || row.fecha_reporte || row.created_at || getLocalDatetimeString().replace('T', ' '),
+        fecha_limite: row._rawPlazo ? String(row._rawPlazo).slice(0, 10) : null,
+        fecha_cierre: row['FECHA DE CIERRE'] || row.fecha_cierre || null,
+        accion_tomada: row['COMENTARIO DE EJECUCION'] || row.accion_realizada || row.accion_tomada || '',
+        fotos: fotosArr,
+        fotos_solucion: fotosSolucionArr
+      };
+
+      handleOpenCorrectivoDetail(builtRecord);
+      return;
+    }
+
+    // 3. If Preventivo (PMP):
+    const foundTask = tasks.find(t => 
+      t.code === code || 
+      t.csvId === code || 
+      t.id === row.id || 
+      t.title === row['Título']
+    );
+
+    if (foundTask) {
+      handleOpenPreventivoExecution(foundTask);
+      return;
+    }
+
+    let pmpFotos: string[] = [];
+    if (Array.isArray(row.fotos)) pmpFotos = row.fotos;
+    else if (typeof row.fotos === 'string' && row.fotos.trim().startsWith('[')) {
+      try { pmpFotos = JSON.parse(row.fotos); } catch {}
+    } else if (typeof row.fotos === 'string' && row.fotos.trim().length > 0) {
+      pmpFotos = [row.fotos];
+    }
+
+    const resolvedMachine = row._resolvedMachine || resolveHistoryRowMachine(row, maquinasCatalogo);
+
+    const builtTask: MaintenanceTask = {
+      id: row.id || 1,
+      idtecs: 0,
+      title: row['Título'] || row.titulo || 'Mantenimiento Preventivo',
+      detalle: row.detalle || row.descripcion || '',
+      planta: row.planta || row['Planta'] || 'Mármol Sintético',
+      maquina: resolvedMachine?.name || row.maquina || 'Equipo General',
+      frecuencia: row.frecuencia || 15,
+      refFrecuencia: row.refFrecuencia || 0,
+      durationHours: 1,
+      status: (row._estadoDisplay || row['ESTADO'] || row.estado || 'Pendiente') as any,
+      code: code || row.codigo,
+      csvId: code || row.codigo,
+      tipoIntervencion: 'NP',
+      observations: row['COMENTARIO DE EJECUCION'] || row.accion_realizada || '',
+      fechaApertura: row['FECHA DE APERTURA'] || row.fecha_apertura,
+      fechaCierre: row['FECHA DE CIERRE'] || row.fecha_cierre,
+      fotos: pmpFotos
+    };
+    handleOpenPreventivoExecution(builtTask);
+  };
+
   // Handler to save changes from the Correctivo Detail Modal
   const handleSaveCorrectivoModal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3069,12 +3336,39 @@ export default function GestionMantenimientoPage() {
       fotos_solucion: form.fotos_solucion || []
     };
 
-    const updatedList = correctiveRecords.map(c => c.id === viewingCorrectivo.id ? updatedRecord : c);
+    const updatedList = correctiveRecords.map(c => (c.id === viewingCorrectivo.id || c.codigo === viewingCorrectivo.codigo) ? updatedRecord : c);
     setCorrectiveRecords(updatedList);
     setViewingCorrectivo(updatedRecord);
 
     const dbTpmStatus = form.estado === 'Resuelta' ? 'cerrada' : form.estado === 'En Proceso' ? 'en_proceso' : 'abierta';
     const fechaCierreVal = form.estado === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null;
+
+    // Update historyRows in real time so the Órdenes de Trabajo table updates immediately
+    setHistoryRows(prev => prev.map(h => {
+      const match = h.codigo === viewingCorrectivo.codigo || 
+                    h.id === viewingCorrectivo.id ||
+                    (h.codigo && viewingCorrectivo.codigo && h.codigo.trim().toUpperCase() === viewingCorrectivo.codigo.trim().toUpperCase());
+      if (match) {
+        const newEstado = form.estado === 'Resuelta' ? 'Completado' : form.estado === 'En Proceso' ? 'En Proceso' : 'Abierta';
+        return {
+          ...h,
+          'ESTADO': newEstado,
+          estado: newEstado,
+          'TECNICO': finalTechName,
+          tecnico_asignado: finalTechName,
+          tecnico_nombre: finalTechName,
+          'FECHA DE CIERRE': fechaCierreVal || h['FECHA DE CIERRE'] || '',
+          fecha_cierre: fechaCierreVal || h.fecha_cierre || '',
+          fecha_limite: form.fecha_limite.trim() || h.fecha_limite,
+          prioridad: form.prioridad,
+          'COMENTARIO DE EJECUCION': form.accion_tomada.trim() || h['COMENTARIO DE EJECUCION'] || '',
+          accion_realizada: form.accion_tomada.trim() || h.accion_realizada || '',
+          fotos_solucion: form.fotos_solucion || h.fotos_solucion || [],
+          fotos_despues: form.fotos_solucion || h.fotos_despues || []
+        };
+      }
+      return h;
+    }));
 
     // 1. Persist directly to LocalStorage (firplak_correctivos_records & firplak_tarjetas_tpm_records)
     if (typeof window !== 'undefined') {
@@ -4001,8 +4295,58 @@ export default function GestionMantenimientoPage() {
     }));
   };
 
+  // Helper to calculate the next consecutive code and identify gaps for machines
+  const getNextMachineConsecutiveInfo = () => {
+    let maxNum = 0;
+    const existingNums = new Set<number>();
+
+    maquinasCatalogo.forEach(m => {
+      const codeStr = (m.codigo_equipo || '').trim();
+      if (codeStr) {
+        const match = codeStr.match(/(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > 0 && num < 100000) {
+            existingNums.add(num);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      }
+    });
+
+    const nextMax = maxNum > 0 ? maxNum + 1 : 1;
+    const nextMaxCode = String(nextMax).padStart(4, '0');
+
+    // Find gaps in sequence between 1 and maxNum
+    const gaps: number[] = [];
+    if (maxNum > 1) {
+      for (let i = 1; i < maxNum; i++) {
+        if (!existingNums.has(i)) {
+          gaps.push(i);
+        }
+      }
+    }
+
+    const firstGap = gaps.length > 0 ? gaps[0] : null;
+    const firstGapCode = firstGap ? String(firstGap).padStart(4, '0') : null;
+
+    return {
+      maxNum,
+      nextMaxCode,
+      gaps,
+      firstGapCode,
+      totalGaps: gaps.length
+    };
+  };
+
   const handleOpenCreateMachine = () => {
     resetMachineForm();
+    const { firstGapCode, nextMaxCode } = getNextMachineConsecutiveInfo();
+    const suggestedCode = firstGapCode || nextMaxCode;
+    setMachineFormData(prev => ({
+      ...prev,
+      codigo_equipo: suggestedCode
+    }));
     setMachineFormMode('create');
     setShowMachineFormModal(true);
   };
@@ -4635,7 +4979,7 @@ export default function GestionMantenimientoPage() {
         const brand = (m.marca || '').toLowerCase();
         const model = (m.modelo || '').toLowerCase();
         const plant = (m.planta || '').toLowerCase();
-        const process = (m.proceso || '').toLowerCase();
+        const af = (m.activo_fijo || '').toLowerCase();
 
         if (
           !code.includes(q) &&
@@ -4644,7 +4988,8 @@ export default function GestionMantenimientoPage() {
           !brand.includes(q) &&
           !model.includes(q) &&
           !plant.includes(q) &&
-          !process.includes(q)
+          !process.includes(q) &&
+          !af.includes(q)
         ) {
           return false;
         }
@@ -4675,10 +5020,16 @@ export default function GestionMantenimientoPage() {
       let valA: any = '';
       let valB: any = '';
       switch (maquinasSortColumn) {
-        case 'codigo_equipo':
+        case 'codigo_equipo': {
+          const numA = parseInt((a.codigo_equipo || '').replace(/\D/g, ''), 10);
+          const numB = parseInt((b.codigo_equipo || '').replace(/\D/g, ''), 10);
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return maquinasSortAsc ? numA - numB : numB - numA;
+          }
           valA = (a.codigo_equipo || '').toLowerCase();
           valB = (b.codigo_equipo || '').toLowerCase();
           break;
+        }
         case 'nombre_equipo':
           valA = (a.nombre_equipo || '').toLowerCase();
           valB = (b.nombre_equipo || '').toLowerCase();
@@ -4738,7 +5089,7 @@ export default function GestionMantenimientoPage() {
         return {
           '#': t.id,
           'Código': t.code || `PMP-${String(t.id).padStart(4, '0')}`,
-          'Nomenclatura': t.nomenclatura || computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes),
+          'Nomenclatura': computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes, t.nomenclatura || t.code, t.frecuencia),
           'Mantenimiento / Tarea': t.title,
           'Detalle / Instrucciones': t.detalle || '',
           'Planta / Especialidad': plantasLabel || t.planta,
@@ -6290,11 +6641,11 @@ export default function GestionMantenimientoPage() {
                       {/* Máquina */}
                       <th
                         onClick={() => handlePmpSort('maquina')}
-                        className="py-2.5 px-1.5 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors truncate"
+                        className="py-2.5 px-2 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors min-w-[150px] max-w-[240px]"
                         title="Clic para ordenar por Máquinas y Equipos"
                       >
                         <div className="flex items-center gap-1">
-                          <span className="truncate">Máquinas / Equipos</span>
+                          <span>Máquinas / Equipos</span>
                           {pmpSortField === 'maquina' ? (
                             pmpSortAsc ? <ArrowUp className="w-3 h-3 text-amber-300 shrink-0" /> : <ArrowDown className="w-3 h-3 text-amber-300 shrink-0" />
                           ) : (
@@ -6431,7 +6782,7 @@ export default function GestionMantenimientoPage() {
                             {/* Nomenclatura Estándar ([S...]) */}
                             <td className="py-2 px-1.5 font-bold text-[#324354] overflow-hidden">
                               <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[10px] group-hover:bg-white group-hover:border-slate-300 transition-colors block truncate" title={task.nomenclatura}>
-                                {task.nomenclatura || computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes)}
+                                {computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes, task.nomenclatura || task.code, task.frecuencia)}
                               </span>
                             </td>
 
@@ -6448,14 +6799,16 @@ export default function GestionMantenimientoPage() {
                             </td>
 
                             {/* Máquina / Equipo */}
-                            <td className="py-2 px-1.5 text-gray-800 font-medium overflow-hidden">
-                              <div className="flex items-center gap-1 overflow-hidden" title={task.maquina}>
+                            <td className="py-2 px-2 text-gray-800 font-medium min-w-[150px] max-w-[240px]">
+                              <div className="flex items-start gap-1.5" title={task.maquina}>
                                 {task.codigoMaquina && (
-                                  <span className="px-1 py-0.2 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9px] font-mono font-bold shrink-0">
+                                  <span className="px-1 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9px] font-mono font-bold shrink-0 mt-0.5">
                                     {task.codigoMaquina}
                                   </span>
                                 )}
-                                <span className="font-semibold text-gray-800 text-[11px] truncate block">{task.maquina}</span>
+                                <span className="font-semibold text-gray-800 text-[11px] leading-snug break-words whitespace-normal min-w-0">
+                                  {task.maquina}
+                                </span>
                               </div>
                             </td>
 
@@ -7154,9 +7507,9 @@ export default function GestionMantenimientoPage() {
                         return (
                           <tr 
                             key={row.id || idx} 
-                            onClick={() => setViewingHistoryRecord({ ...row, codigoDisplay, category })}
+                            onClick={() => handleOpenHistoryRowDetail(row)}
                             className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
-                            title="Haz clic para ver la información completa de esta orden de trabajo"
+                            title="Haz clic para ver la información completa o modificar esta orden de trabajo"
                           >
                             {/* Mini Foto Thumbnail */}
                             <td className="py-2.5 px-2 text-center">
@@ -8144,11 +8497,18 @@ export default function GestionMantenimientoPage() {
                             onClick={() => setSelectedMachineModal(m)}
                             className="hover:bg-[#F6F3EE]/60 transition-colors cursor-pointer group"
                           >
-                            {/* Código */}
+                            {/* Código y Activo Fijo */}
                             <td className="py-3 px-4">
-                              <span className="px-2 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-md text-xs border border-slate-200 inline-block">
-                                {m.codigo_equipo || '-'}
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="px-2 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-md text-xs border border-slate-200 inline-block" title="Código de Equipo">
+                                  {m.codigo_equipo || '-'}
+                                </span>
+                                {m.activo_fijo && (
+                                  <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shadow-2xs" title="Activo Fijo SAP (Contabilidad)">
+                                    AF: {m.activo_fijo}
+                                  </span>
+                                )}
+                              </div>
                             </td>
 
                             {/* Nombre y Foto */}
@@ -8908,18 +9268,26 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Banner de Nomenclatura Estándar y Código PMP */}
-            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-center justify-between gap-2 mb-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Código Único (PMP)</span>
-                <span className="text-xs font-mono font-bold text-amber-900">PMP-AUTO (Asignado al guardar)</span>
-              </div>
-              <div className="flex flex-col text-right">
-                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Nomenclatura Estándar</span>
-                <span className="text-xs font-mono font-bold text-slate-800 px-2 py-0.5 bg-white border border-slate-300 rounded">
-                  {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes)}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const { nextId, nextCode } = getNextPmpConsecutives();
+              return (
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-center justify-between gap-2 mb-2">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Consecutivo Asignado</span>
+                    <span className="text-xs font-mono font-bold text-amber-900 flex items-center gap-1.5 mt-0.5">
+                      <span className="px-1.5 py-0.5 bg-white border border-amber-300 rounded text-slate-700">#{nextId}</span>
+                      <span className="px-1.5 py-0.5 bg-amber-100 border border-amber-300 rounded text-amber-900">{nextCode}</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Nomenclatura Estándar</span>
+                    <span className="text-xs font-mono font-bold text-slate-800 px-2 py-0.5 bg-white border border-slate-300 rounded mt-0.5">
+                      {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <form onSubmit={handleAddTaskSubmit} className="flex flex-col gap-3.5">
               <div>
@@ -10133,7 +10501,11 @@ export default function GestionMantenimientoPage() {
                 </div>
                 <h3 className="text-lg sm:text-xl font-black text-[#324354] leading-snug mt-1 flex items-center gap-2">
                   <Wrench className="w-5 h-5 text-[#324354]" />
-                  <span>Detalle de Mantenimiento Correctivo</span>
+                  <span>
+                    {(viewingCorrectivo.origen === 'Tarjeta TPM' || viewingCorrectivo.codigo.startsWith('TPM-'))
+                      ? 'Detalle de Tarjeta TPM'
+                      : 'Detalle de Mantenimiento Correctivo'}
+                  </span>
                 </h3>
               </div>
               <button
@@ -10844,7 +11216,7 @@ export default function GestionMantenimientoPage() {
                     {viewingTask.code || `PMP-${String(viewingTask.id).padStart(4, '0')}`}
                   </span>
                   <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200" title="Nomenclatura Estándar">
-                    {viewingTask.nomenclatura || computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes)}
+                    {computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes, viewingTask.nomenclatura || viewingTask.code, viewingTask.frecuencia)}
                   </span>
                   <span className="px-2.5 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                     <span className="font-bold text-[#324354]">{obtenerCodigoPlanta(viewingTask.planta)}</span>
@@ -11057,7 +11429,7 @@ export default function GestionMantenimientoPage() {
                             <div
                               key={ord.id || idx}
                               onClick={() => {
-                                setViewingHistoryRecord({ ...ord, codigoDisplay, category, 'TECNICO': tecnicoNombre, 'ESTADO': estado });
+                                handleOpenHistoryRowDetail({ ...ord, codigoDisplay, category, 'TECNICO': tecnicoNombre, 'ESTADO': estado });
                               }}
                               className="p-3 bg-white hover:bg-amber-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
                               title="Haz clic para ver la orden completa"
@@ -11426,7 +11798,20 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Modal Actions - Fixed at Bottom */}
-            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-end">
+            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const targetRecord = viewingHistoryRecord;
+                  setViewingHistoryRecord(null);
+                  handleOpenHistoryRowDetail(targetRecord);
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5"
+                title="Abrir formulario completo para modificar o gestionar esta orden"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                <span>Editar / Gestionar Orden</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setViewingHistoryRecord(null)}
@@ -11851,7 +12236,7 @@ export default function GestionMantenimientoPage() {
                             <div
                               key={item.id || idx}
                               onClick={() => {
-                                setViewingHistoryRecord({ ...item, codigoDisplay, category });
+                                handleOpenHistoryRowDetail({ ...item, codigoDisplay, category });
                               }}
                               className="p-3 hover:bg-amber-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
                               title="Haz clic para ver el detalle completo de esta intervención"
@@ -12270,25 +12655,80 @@ export default function GestionMantenimientoPage() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Código de Equipo</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase block">Código de Equipo</label>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          Consecutivo Automático
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={machineFormData.codigo_equipo}
                         onChange={(e) => setMachineFormData(prev => ({ ...prev, codigo_equipo: e.target.value }))}
-                        placeholder="Ej. C-0154 o PH-02"
+                        placeholder="Ej. 1333"
                         className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-mono font-bold text-[#324354] focus:outline-none focus:border-[#324354]"
                       />
+                      {/* Chips / Botones para seleccionar consecutivo o llenar huecos */}
+                      {(() => {
+                        const { firstGapCode, nextMaxCode, gaps } = getNextMachineConsecutiveInfo();
+                        return (
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
+                            <span className="text-[11px] text-gray-500 font-semibold">Sugerencias:</span>
+                            {firstGapCode && (
+                              <button
+                                type="button"
+                                onClick={() => setMachineFormData(prev => ({ ...prev, codigo_equipo: firstGapCode }))}
+                                className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs border transition-all cursor-pointer flex items-center gap-1 ${
+                                  machineFormData.codigo_equipo === firstGapCode
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300 ring-2 ring-amber-400/40 shadow-xs'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                }`}
+                                title="Llenar el primer espacio/hueco faltante en la secuencia numérica"
+                              >
+                                <span>📌 Primer hueco libre:</span>
+                                <u>{firstGapCode}</u>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setMachineFormData(prev => ({ ...prev, codigo_equipo: nextMaxCode }))}
+                              className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs border transition-all cursor-pointer flex items-center gap-1 ${
+                                machineFormData.codigo_equipo === nextMaxCode
+                                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300 ring-2 ring-emerald-400/40 shadow-xs'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                              title="Continuar con el consecutivo más alto registrado + 1"
+                            >
+                              <span>⏭️ Siguiente del último:</span>
+                              <u>{nextMaxCode}</u>
+                            </button>
+                            {gaps.length > 0 && (
+                              <span className="text-[10px] text-amber-700 font-medium">
+                                ({gaps.length} espacios libres en secuencia)
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Activo Fijo (SAP)</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase block">Activo Fijo (SAP)</label>
+                        <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          Opcional · Contabilidad
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={machineFormData.activo_fijo}
                         onChange={(e) => setMachineFormData(prev => ({ ...prev, activo_fijo: e.target.value }))}
-                        placeholder="Ej. AF-100234"
+                        placeholder="Ej. AF-100234 (opcional)"
                         className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-mono text-[#324354] focus:outline-none focus:border-[#324354]"
                       />
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        Código otorgado por contabilidad. Si aún no ha sido asignado, déjalo en blanco (no es obligatorio).
+                      </p>
                     </div>
 
                     <div>

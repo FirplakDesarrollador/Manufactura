@@ -429,12 +429,59 @@ export default function MaquinasPage() {
     }
   };
 
+  // Helper to calculate the next consecutive code and identify gaps for machines
+  const getNextMachineConsecutiveInfo = () => {
+    let maxNum = 0;
+    const existingNums = new Set<number>();
+
+    maquinas.forEach(m => {
+      const codeStr = (m.codigo_equipo || '').trim();
+      if (codeStr) {
+        const match = codeStr.match(/(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > 0 && num < 100000) {
+            existingNums.add(num);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      }
+    });
+
+    const nextMax = maxNum > 0 ? maxNum + 1 : 1;
+    const nextMaxCode = String(nextMax).padStart(4, '0');
+
+    // Find gaps in sequence between 1 and maxNum
+    const gaps: number[] = [];
+    if (maxNum > 1) {
+      for (let i = 1; i < maxNum; i++) {
+        if (!existingNums.has(i)) {
+          gaps.push(i);
+        }
+      }
+    }
+
+    const firstGap = gaps.length > 0 ? gaps[0] : null;
+    const firstGapCode = firstGap ? String(firstGap).padStart(4, '0') : null;
+
+    return {
+      maxNum,
+      nextMaxCode,
+      gaps,
+      firstGapCode,
+      totalGaps: gaps.length
+    };
+  };
+
   // Reset form helper
   const resetForm = () => {
+    const { firstGapCode, nextMaxCode } = getNextMachineConsecutiveInfo();
+    const suggestedCode = firstGapCode || nextMaxCode;
+
     setFormData({
       nombre_equipo: "",
       nombre_alterno: "",
-      codigo_equipo: "",
+      codigo_equipo: suggestedCode,
       activo_fijo: "",
       tipo: "",
       estado: "ACTIVO",
@@ -1257,24 +1304,78 @@ export default function MaquinasPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-[#324354] uppercase mb-1.5">Código Equipo</label>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="block text-xs font-bold text-[#324354] uppercase">Código Equipo</label>
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                Consecutivo Automático
+                              </span>
+                            </div>
                             <input
                               type="text"
-                              placeholder="Ej. MT-045"
+                              placeholder="Ej. 1333"
                               value={formData.codigo_equipo}
                               onChange={(e) => setFormData(prev => ({ ...prev, codigo_equipo: e.target.value }))}
-                              className="w-full px-4 py-2.5 bg-[#F6F3EE] rounded-xl border border-transparent focus:border-[#324354]/30 focus:bg-white text-sm font-medium outline-none transition-all"
+                              className="w-full px-4 py-2.5 bg-[#F6F3EE] rounded-xl border border-transparent focus:border-[#324354]/30 focus:bg-white text-sm font-mono font-bold outline-none transition-all"
                             />
+                            {(() => {
+                              const { firstGapCode, nextMaxCode, gaps } = getNextMachineConsecutiveInfo();
+                              return (
+                                <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
+                                  <span className="text-[11px] text-gray-500 font-semibold">Sugerencias:</span>
+                                  {firstGapCode && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setFormData(prev => ({ ...prev, codigo_equipo: firstGapCode }))}
+                                      className={`px-2 py-0.5 rounded-lg font-mono font-bold text-xs border transition-all cursor-pointer flex items-center gap-1 ${
+                                        formData.codigo_equipo === firstGapCode
+                                          ? 'bg-amber-100 text-amber-900 border-amber-300 ring-2 ring-amber-400/40'
+                                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                      }`}
+                                      title="Llenar primer espacio libre en la secuencia"
+                                    >
+                                      <span>📌 Espacio libre:</span>
+                                      <u>{firstGapCode}</u>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, codigo_equipo: nextMaxCode }))}
+                                    className={`px-2 py-0.5 rounded-lg font-mono font-bold text-xs border transition-all cursor-pointer flex items-center gap-1 ${
+                                      formData.codigo_equipo === nextMaxCode
+                                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300 ring-2 ring-emerald-400/40'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                    title="Siguiente consecutivo después del último registrado"
+                                  >
+                                    <span>⏭️ Siguiente del último:</span>
+                                    <u>{nextMaxCode}</u>
+                                  </button>
+                                  {gaps.length > 0 && (
+                                    <span className="text-[10px] text-amber-700 font-medium">
+                                      ({gaps.length} espacios libres)
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-[#324354] uppercase mb-1.5">Activo Fijo</label>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="block text-xs font-bold text-[#324354] uppercase">Activo Fijo</label>
+                              <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                Opcional · Contabilidad
+                              </span>
+                            </div>
                             <input
                               type="text"
-                              placeholder="Ej. AF-12345"
+                              placeholder="Ej. AF-12345 (opcional)"
                               value={formData.activo_fijo}
                               onChange={(e) => setFormData(prev => ({ ...prev, activo_fijo: e.target.value }))}
                               className="w-full px-4 py-2.5 bg-[#F6F3EE] rounded-xl border border-transparent focus:border-[#324354]/30 focus:bg-white text-sm font-medium outline-none transition-all"
                             />
+                            <p className="text-[10px] text-gray-400 mt-1">
+                              Proporcionado por Contabilidad. Dejar en blanco si aún no existe.
+                            </p>
                           </div>
                           <div>
                             <label className="block text-xs font-bold text-[#324354] uppercase mb-1.5">Tipo de Equipo</label>
