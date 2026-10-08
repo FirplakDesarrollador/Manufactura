@@ -79,7 +79,7 @@ import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
 import * as XLSX from 'xlsx';
 import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
-import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas, computeSemanasFromFrecuencia } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
   id: number | string;
@@ -2001,7 +2001,9 @@ export default function GestionMantenimientoPage() {
       const tiempoMinutos = p.duracion_minutos || 60;
       const id = p.id;
       const consecutiveNum = pIdx + 1;
-      const codeFormatted = `PMP-${String(consecutiveNum).padStart(4, '0')}`;
+      const codeFormatted = (p.codigo && String(p.codigo).trim().startsWith('PMP-')) 
+        ? String(p.codigo).trim() 
+        : `PMP-${String(consecutiveNum).padStart(4, '0')}`;
       const detalle = p.detalle_instrucciones || '';
       const maquina = p.maquina || 'Equipo General';
       const tipoIntervencion = p.tipo_intervencion || 'NP';
@@ -2131,7 +2133,7 @@ export default function GestionMantenimientoPage() {
       const finalApertura = matchingOrden?.fecha_apertura || matchingLocal?.fechaApertura || (finalCandidate !== 9999 ? getLocalDatetimeString() : null);
       const finalCierre = matchingOrden?.fecha_cierre || matchingLocal?.fechaCierre || null;
 
-      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title);
+      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title, frecuencia);
       const cleanTitle = cleanTaskTitle(title, nomenclaturaCalculated);
 
       newTasks.push({
@@ -2725,17 +2727,42 @@ export default function GestionMantenimientoPage() {
     setNewTechForm({ id: '', name: '', turno: 'PR', documento: '', planta: 'MS', plantas: ['MS'], capacity: '7.2', overloadMarginPercent: '10' });
   };
 
+  // Helper to determine next consecutive ID (#) and Code (PMP-XXXX)
+  const getNextPmpConsecutives = () => {
+    let maxId = 0;
+    let maxCodeNum = 0;
+
+    tasks.forEach(t => {
+      const numId = Number(t.id);
+      if (!isNaN(numId) && numId > 0 && numId < 1000000) {
+        if (numId > maxId) maxId = numId;
+      }
+      if (t.code) {
+        const match = String(t.code).match(/PMP-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxCodeNum) maxCodeNum = num;
+        }
+      }
+    });
+
+    const nextId = maxId > 0 ? maxId + 1 : tasks.length + 1;
+    const nextCodeNum = maxCodeNum > 0 ? maxCodeNum + 1 : tasks.length + 1;
+    const nextCode = `PMP-${String(nextCodeNum).padStart(4, '0')}`;
+
+    return { nextId, nextCode };
+  };
+
   const handleAddTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskForm.title.trim()) return;
 
-    let createdId = Date.now();
     const taskPlantas = (newTaskForm.plantas && newTaskForm.plantas.length > 0)
       ? newTaskForm.plantas
       : parseTechPlantas(newTaskForm.planta, plantasNomenclatura);
     const plantaStr = taskPlantas.join(', ');
 
-    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes);
+    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia);
     const cleanTitle = cleanTaskTitle(newTaskForm.title.trim(), nomenclaturaGen);
 
     // Candidate technicians matching Planta/Especialidad & Turno
@@ -2747,12 +2774,49 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
-    const nextConsecutive = tasks.length + 1;
-    let codeFormatted = `PMP-${String(nextConsecutive).padStart(4, '0')}`;
+    // 1. Calculate next consecutives based on current tasks & Supabase
+    const { nextId: localNextId, nextCode: localNextCode } = getNextPmpConsecutives();
+    let targetId = localNextId;
+    let targetCode = localNextCode;
+
+    try {
+      const { data: dbRecords } = await supabase
+        .from('mantenimiento_planes_preventivos')
+        .select('id, codigo')
+        .order('id', { ascending: false })
+        .limit(10);
+
+      if (dbRecords && dbRecords.length > 0) {
+        let dbMaxId = targetId - 1;
+        let dbMaxCode = parseInt(targetCode.replace('PMP-', ''), 10) - 1;
+
+        dbRecords.forEach((r: any) => {
+          const rId = Number(r.id);
+          if (!isNaN(rId) && rId > dbMaxId && rId < 1000000) dbMaxId = rId;
+          if (r.codigo) {
+            const m = String(r.codigo).match(/PMP-(\d+)/i);
+            if (m) {
+              const num = parseInt(m[1], 10);
+              if (!isNaN(num) && num > dbMaxCode) dbMaxCode = num;
+            }
+          }
+        });
+
+        targetId = Math.max(targetId, dbMaxId + 1);
+        const codeNum = Math.max(parseInt(targetCode.replace('PMP-', ''), 10), dbMaxCode + 1);
+        targetCode = `PMP-${String(codeNum).padStart(4, '0')}`;
+      }
+    } catch (dbErr) {
+      console.warn('Aviso verificando consecutivos en Supabase:', dbErr);
+    }
+
+    let createdId = targetId;
+    let finalCode = targetCode;
 
     try {
       const insertPayload: any = {
-        codigo: codeFormatted,
+        id: targetId,
+        codigo: targetCode,
         titulo: cleanTitle,
         duracion_minutos: newTaskForm.durationMinutes,
         tipo_intervencion: newTaskForm.intervencion,
@@ -2766,16 +2830,31 @@ export default function GestionMantenimientoPage() {
         activo: true
       };
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('mantenimiento_planes_preventivos')
         .insert([insertPayload])
         .select()
         .single();
 
       if (error) {
-        console.error('Error guardando PMP en Supabase:', error);
-      } else if (data) {
-        createdId = data.id;
+        // Fallback retry without explicit id if database identity sequence forbids manual id
+        const { id: _, ...payloadWithoutId } = insertPayload;
+        const retry = await supabase
+          .from('mantenimiento_planes_preventivos')
+          .insert([payloadWithoutId])
+          .select()
+          .single();
+        if (retry.data) {
+          data = retry.data;
+          error = null;
+        } else {
+          console.error('Error insertando PMP en Supabase:', retry.error || error);
+        }
+      }
+
+      if (data) {
+        createdId = Number(data.id) || targetId;
+        if (data.codigo) finalCode = data.codigo;
       }
     } catch (err) {
       console.warn('Excepción guardando PMP en Supabase:', err);
@@ -2784,7 +2863,7 @@ export default function GestionMantenimientoPage() {
     const newTask: MaintenanceTask = {
       id: createdId,
       csvId: `MP-${createdId}`,
-      code: codeFormatted,
+      code: finalCode,
       nomenclatura: nomenclaturaGen,
       title: cleanTitle,
       durationMinutes: newTaskForm.durationMinutes,
@@ -2859,8 +2938,11 @@ export default function GestionMantenimientoPage() {
       return matchesPlanta && matchesTurno;
     });
 
+    const updatedNom = computeNomenclatura(plantaStr, editingTask.tipoIntervencion, editingTask.durationMinutes, editingTask.code || editingTask.title, editingTask.frecuencia);
+
     const updatedTask: MaintenanceTask = {
       ...editingTask,
+      nomenclatura: updatedNom,
       refFrecuencia: clampedRef,
       plantas: taskPlantas,
       planta: plantaStr,
@@ -4950,7 +5032,7 @@ export default function GestionMantenimientoPage() {
         return {
           '#': t.id,
           'Código': t.code || `PMP-${String(t.id).padStart(4, '0')}`,
-          'Nomenclatura': t.nomenclatura || computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes),
+          'Nomenclatura': computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes, t.nomenclatura || t.code, t.frecuencia),
           'Mantenimiento / Tarea': t.title,
           'Detalle / Instrucciones': t.detalle || '',
           'Planta / Especialidad': plantasLabel || t.planta,
@@ -6502,11 +6584,11 @@ export default function GestionMantenimientoPage() {
                       {/* Máquina */}
                       <th
                         onClick={() => handlePmpSort('maquina')}
-                        className="py-2.5 px-1.5 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors truncate"
+                        className="py-2.5 px-2 font-bold cursor-pointer select-none hover:bg-[#3d5166] transition-colors min-w-[150px] max-w-[240px]"
                         title="Clic para ordenar por Máquinas y Equipos"
                       >
                         <div className="flex items-center gap-1">
-                          <span className="truncate">Máquinas / Equipos</span>
+                          <span>Máquinas / Equipos</span>
                           {pmpSortField === 'maquina' ? (
                             pmpSortAsc ? <ArrowUp className="w-3 h-3 text-amber-300 shrink-0" /> : <ArrowDown className="w-3 h-3 text-amber-300 shrink-0" />
                           ) : (
@@ -6643,7 +6725,7 @@ export default function GestionMantenimientoPage() {
                             {/* Nomenclatura Estándar ([S...]) */}
                             <td className="py-2 px-1.5 font-bold text-[#324354] overflow-hidden">
                               <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[10px] group-hover:bg-white group-hover:border-slate-300 transition-colors block truncate" title={task.nomenclatura}>
-                                {task.nomenclatura || computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes)}
+                                {computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes, task.nomenclatura || task.code, task.frecuencia)}
                               </span>
                             </td>
 
@@ -6660,14 +6742,16 @@ export default function GestionMantenimientoPage() {
                             </td>
 
                             {/* Máquina / Equipo */}
-                            <td className="py-2 px-1.5 text-gray-800 font-medium overflow-hidden">
-                              <div className="flex items-center gap-1 overflow-hidden" title={task.maquina}>
+                            <td className="py-2 px-2 text-gray-800 font-medium min-w-[150px] max-w-[240px]">
+                              <div className="flex items-start gap-1.5" title={task.maquina}>
                                 {task.codigoMaquina && (
-                                  <span className="px-1 py-0.2 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9px] font-mono font-bold shrink-0">
+                                  <span className="px-1 py-0.5 bg-[#324354]/10 text-[#324354] border border-[#324354]/20 rounded text-[9px] font-mono font-bold shrink-0 mt-0.5">
                                     {task.codigoMaquina}
                                   </span>
                                 )}
-                                <span className="font-semibold text-gray-800 text-[11px] truncate block">{task.maquina}</span>
+                                <span className="font-semibold text-gray-800 text-[11px] leading-snug break-words whitespace-normal min-w-0">
+                                  {task.maquina}
+                                </span>
                               </div>
                             </td>
 
@@ -9120,18 +9204,26 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Banner de Nomenclatura Estándar y Código PMP */}
-            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-center justify-between gap-2 mb-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Código Único (PMP)</span>
-                <span className="text-xs font-mono font-bold text-amber-900">PMP-AUTO (Asignado al guardar)</span>
-              </div>
-              <div className="flex flex-col text-right">
-                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Nomenclatura Estándar</span>
-                <span className="text-xs font-mono font-bold text-slate-800 px-2 py-0.5 bg-white border border-slate-300 rounded">
-                  {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes)}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const { nextId, nextCode } = getNextPmpConsecutives();
+              return (
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-center justify-between gap-2 mb-2">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Consecutivo Asignado</span>
+                    <span className="text-xs font-mono font-bold text-amber-900 flex items-center gap-1.5 mt-0.5">
+                      <span className="px-1.5 py-0.5 bg-white border border-amber-300 rounded text-slate-700">#{nextId}</span>
+                      <span className="px-1.5 py-0.5 bg-amber-100 border border-amber-300 rounded text-amber-900">{nextCode}</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Nomenclatura Estándar</span>
+                    <span className="text-xs font-mono font-bold text-slate-800 px-2 py-0.5 bg-white border border-slate-300 rounded mt-0.5">
+                      {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <form onSubmit={handleAddTaskSubmit} className="flex flex-col gap-3.5">
               <div>
@@ -11060,7 +11152,7 @@ export default function GestionMantenimientoPage() {
                     {viewingTask.code || `PMP-${String(viewingTask.id).padStart(4, '0')}`}
                   </span>
                   <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200" title="Nomenclatura Estándar">
-                    {viewingTask.nomenclatura || computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes)}
+                    {computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes, viewingTask.nomenclatura || viewingTask.code, viewingTask.frecuencia)}
                   </span>
                   <span className="px-2.5 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                     <span className="font-bold text-[#324354]">{obtenerCodigoPlanta(viewingTask.planta)}</span>
