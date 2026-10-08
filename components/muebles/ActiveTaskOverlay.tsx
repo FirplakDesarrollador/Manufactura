@@ -168,9 +168,10 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
 
             await setTareaActiva(userEmail, null)
             onFinished()
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error finishing task:', error)
-            toast.error('Error al finalizar la tarea')
+            const errorMsg = error?.message || error?.details || 'Error al finalizar la tarea'
+            toast.error(errorMsg)
         } finally {
             setLoading(false)
         }
