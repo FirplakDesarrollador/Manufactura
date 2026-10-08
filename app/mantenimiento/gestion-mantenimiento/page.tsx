@@ -1050,6 +1050,9 @@ export default function GestionMantenimientoPage() {
       if (historyRows.length === 0) {
         fetchHistoryRecords();
       }
+      if (correctiveRecords.length === 0) {
+        fetchCorrectivoRecords();
+      }
     }
   }, [activeTab]);
 
@@ -1100,6 +1103,25 @@ export default function GestionMantenimientoPage() {
           const category = getHistoryRecordCategory(d);
           const cleanCode = getHistoryRecordCode(d, idx);
 
+          let fotosArr: string[] = [];
+          if (Array.isArray(d.fotos_antes) && d.fotos_antes.length > 0) fotosArr = d.fotos_antes;
+          else if (Array.isArray(d.fotos) && d.fotos.length > 0) fotosArr = d.fotos;
+          else if (typeof d.fotos === 'string' && d.fotos.trim().startsWith('[')) {
+            try { fotosArr = JSON.parse(d.fotos); } catch {}
+          } else if (typeof d.fotos === 'string' && d.fotos.trim().length > 0) {
+            fotosArr = [d.fotos];
+          } else if (d.foto_url) fotosArr = [d.foto_url];
+          else if (d.foto) fotosArr = [d.foto];
+
+          let fotosSolucionArr: string[] = [];
+          if (Array.isArray(d.fotos_despues) && d.fotos_despues.length > 0) fotosSolucionArr = d.fotos_despues;
+          else if (Array.isArray(d.fotos_solucion) && d.fotos_solucion.length > 0) fotosSolucionArr = d.fotos_solucion;
+          else if (typeof d.fotos_despues === 'string' && d.fotos_despues.trim().startsWith('[')) {
+            try { fotosSolucionArr = JSON.parse(d.fotos_despues); } catch {}
+          } else if (typeof d.fotos_solucion === 'string' && d.fotos_solucion.trim().startsWith('[')) {
+            try { fotosSolucionArr = JSON.parse(d.fotos_solucion); } catch {}
+          }
+
           historyMap.set(cleanCode, {
             ...d,
             id: d.id || idx + 1,
@@ -1113,6 +1135,8 @@ export default function GestionMantenimientoPage() {
             'FECHA DE APERTURA': d.fecha_apertura || d['FECHA DE APERTURA'] || (d.created_at ? d.created_at.slice(0, 10) : ''),
             'FECHA DE CIERRE': d.fecha_cierre || d['FECHA DE CIERRE'] || '',
             'COMENTARIO DE EJECUCION': d.comentarios_ejecucion || d.accion_realizada || d['COMENTARIO DE EJECUCION'] || '',
+            fotos: fotosArr,
+            fotos_solucion: fotosSolucionArr,
             created_at: d.created_at
           });
         });
@@ -1124,6 +1148,19 @@ export default function GestionMantenimientoPage() {
           const cod = d.codigo_tarjeta || d.codigo || `TPM-${idx + 1}`;
           if (!isCleanConsecutiveCode(cod)) return;
           const existing = historyMap.get(cod);
+
+          let fotosArr: string[] = [];
+          if (Array.isArray(d.fotos) && d.fotos.length > 0) fotosArr = d.fotos;
+          else if (typeof d.fotos === 'string' && d.fotos.trim().startsWith('[')) {
+            try { fotosArr = JSON.parse(d.fotos); } catch {}
+          } else if (typeof d.fotos === 'string' && d.fotos.trim().length > 0) {
+            fotosArr = [d.fotos];
+          } else if (d.foto_url) fotosArr = [d.foto_url];
+          else if (d.foto) fotosArr = [d.foto];
+
+          let fotosSolucionArr: string[] = [];
+          if (Array.isArray(d.fotos_despues) && d.fotos_despues.length > 0) fotosSolucionArr = d.fotos_despues;
+          else if (Array.isArray(d.fotos_solucion) && d.fotos_solucion.length > 0) fotosSolucionArr = d.fotos_solucion;
 
           const rawEstado = (d.estado || '').toLowerCase();
           const estado = rawEstado === 'resuelta' || rawEstado === 'cerrada' || rawEstado === 'completado' ? 'Completado' :
@@ -1145,11 +1182,30 @@ export default function GestionMantenimientoPage() {
               'FECHA DE APERTURA': d.fecha_apertura || (d.created_at ? d.created_at.slice(0, 10) : ''),
               'FECHA DE CIERRE': d.fecha_cierre || '',
               'COMENTARIO DE EJECUCION': d.accion_inmediata || d.accion_correctiva || d.comentarios_ejecucion || '',
+              fotos: fotosArr,
+              fotos_solucion: fotosSolucionArr,
               created_at: d.created_at
             });
           } else {
             if (d.tecnico_asignado && d.tecnico_asignado !== 'Sin asignar') {
               existing['TECNICO'] = d.tecnico_asignado;
+            }
+            if (fotosArr.length > 0 && (!existing.fotos || existing.fotos.length === 0)) {
+              existing.fotos = fotosArr;
+              existing.fotos_antes = fotosArr;
+            }
+            if (fotosSolucionArr.length > 0 && (!existing.fotos_solucion || existing.fotos_solucion.length === 0)) {
+              existing.fotos_solucion = fotosSolucionArr;
+              existing.fotos_despues = fotosSolucionArr;
+            }
+            if (!existing.sintoma) {
+              existing.sintoma = rawTitle;
+            }
+            if (d.maquina && (!existing.maquina || existing.maquina === 'Equipo General')) {
+              existing.maquina = d.maquina;
+            }
+            if (d.planta && !existing.planta) {
+              existing.planta = d.planta;
             }
           }
         });
@@ -1164,22 +1220,39 @@ export default function GestionMantenimientoPage() {
             if (Array.isArray(parsed)) {
               parsed.forEach((item: any, idx: number) => {
                 const cod = item.codigo || item.codigo_tarjeta;
-                if (cod && isCleanConsecutiveCode(cod) && !historyMap.has(cod)) {
+                if (cod && isCleanConsecutiveCode(cod)) {
+                  const existing = historyMap.get(cod);
                   const rawTitle = item.sintoma || item.descripcion_que || item.titulo || 'Anomalía local';
-                  historyMap.set(cod, {
-                    id: item.id || idx + 9000,
-                    codigo: cod,
-                    'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
-                    'ESTADO': item.estado || 'Abierta',
-                    'TECNICO': item.tecnico_asignado || 'Sin asignar',
-                    'TIPO': 'TPM',
-                    tipo: 'TPM',
-                    origen: 'TPM',
-                    'FECHA DE APERTURA': item.fecha_apertura || item.fecha_reporte || '',
-                    'FECHA DE CIERRE': item.fecha_cierre || '',
-                    'COMENTARIO DE EJECUCION': item.accion_tomada || '',
-                    created_at: item.created_at
-                  });
+                  const itemFotos = Array.isArray(item.fotos) ? item.fotos : [];
+                  const itemSol = Array.isArray(item.fotos_solucion) ? item.fotos_solucion : (Array.isArray(item.fotos_despues) ? item.fotos_despues : []);
+
+                  if (!existing) {
+                    historyMap.set(cod, {
+                      id: item.id || idx + 9000,
+                      codigo: cod,
+                      'Título': rawTitle.startsWith('[') ? rawTitle : `[Tarjeta TPM] ${rawTitle}`,
+                      'ESTADO': item.estado || 'Abierta',
+                      'TECNICO': item.tecnico_asignado || 'Sin asignar',
+                      'TIPO': 'TPM',
+                      tipo: 'TPM',
+                      origen: 'TPM',
+                      'FECHA DE APERTURA': item.fecha_apertura || item.fecha_reporte || '',
+                      'FECHA DE CIERRE': item.fecha_cierre || '',
+                      'COMENTARIO DE EJECUCION': item.accion_tomada || '',
+                      fotos: itemFotos,
+                      fotos_solucion: itemSol,
+                      created_at: item.created_at
+                    });
+                  } else {
+                    if (itemFotos.length > 0 && (!existing.fotos || existing.fotos.length === 0)) {
+                      existing.fotos = itemFotos;
+                      existing.fotos_antes = itemFotos;
+                    }
+                    if (itemSol.length > 0 && (!existing.fotos_solucion || existing.fotos_solucion.length === 0)) {
+                      existing.fotos_solucion = itemSol;
+                      existing.fotos_despues = itemSol;
+                    }
+                  }
                 }
               });
             }
@@ -3047,6 +3120,118 @@ export default function GestionMantenimientoPage() {
     setCorrectivoModalFeedback(null);
   };
 
+  // Handler to open full interactive detail modal from the Órdenes de Trabajo table (or anywhere)
+  const handleOpenHistoryRowDetail = (row: any) => {
+    if (!row) return;
+    const category = row._category || getHistoryRecordCategory(row);
+    const code = row._codeDisplay || row.codigo || getHistoryRecordCode(row);
+
+    if (category === 'TPM' || category === 'Correctivo') {
+      // 1. Check if correctiveRecords has this record
+      const foundInCorrectivos = correctiveRecords.find(c => 
+        (c.codigo && (c.codigo === code || c.codigo === row.codigo)) || 
+        c.id === row.id
+      );
+
+      if (foundInCorrectivos) {
+        handleOpenCorrectivoDetail(foundInCorrectivos);
+        return;
+      }
+
+      // 2. Build full CorrectiveRecord from row
+      let fotosArr: string[] = [];
+      if (Array.isArray(row.fotos_antes) && row.fotos_antes.length > 0) fotosArr = row.fotos_antes;
+      else if (Array.isArray(row.fotos) && row.fotos.length > 0) fotosArr = row.fotos;
+      else if (typeof row.fotos === 'string' && row.fotos.trim().startsWith('[')) {
+        try { fotosArr = JSON.parse(row.fotos); } catch {}
+      } else if (typeof row.fotos === 'string' && row.fotos.trim().length > 0) {
+        fotosArr = [row.fotos];
+      } else if (row.foto_url) fotosArr = [row.foto_url];
+      else if (row.foto) fotosArr = [row.foto];
+
+      let fotosSolucionArr: string[] = [];
+      if (Array.isArray(row.fotos_despues) && row.fotos_despues.length > 0) fotosSolucionArr = row.fotos_despues;
+      else if (Array.isArray(row.fotos_solucion) && row.fotos_solucion.length > 0) fotosSolucionArr = row.fotos_solucion;
+      else if (typeof row.fotos_despues === 'string' && row.fotos_despues.trim().startsWith('[')) {
+        try { fotosSolucionArr = JSON.parse(row.fotos_despues); } catch {}
+      } else if (typeof row.fotos_solucion === 'string' && row.fotos_solucion.trim().startsWith('[')) {
+        try { fotosSolucionArr = JSON.parse(row.fotos_solucion); } catch {}
+      }
+
+      const rawEstado = (row._estadoDisplay || row['ESTADO'] || row.estado || 'Abierta').toLowerCase();
+      const estadoMapped: 'Abierta' | 'En Proceso' | 'Resuelta' = 
+        rawEstado === 'resuelta' || rawEstado === 'cerrada' || rawEstado === 'completado' ? 'Resuelta' :
+        rawEstado === 'en proceso' || rawEstado === 'en_proceso' ? 'En Proceso' : 'Abierta';
+
+      const resolvedMachine = row._resolvedMachine || resolveHistoryRowMachine(row, maquinasCatalogo);
+
+      const builtRecord: CorrectiveRecord = {
+        id: row.id,
+        codigo: code || row.codigo,
+        maquina: resolvedMachine?.name || row.maquina || 'Equipo General',
+        planta: row.planta || row['Planta'] || 'Mármol Sintético',
+        origen: category === 'TPM' ? 'Tarjeta TPM' : 'Correctivo Directo',
+        sintoma: cleanDescriptionText(row['Título'] || row.sintoma || row.titulo || row.descripcion_que),
+        prioridad: (row.prioridad as any) || 'Alta',
+        tecnico_asignado: row._techName || row['TECNICO'] || row.tecnico_asignado || 'Sin asignar',
+        estado: estadoMapped,
+        fecha_reporte: row['FECHA DE APERTURA'] || row.fecha_apertura || row.fecha_reporte || row.created_at || getLocalDatetimeString().replace('T', ' '),
+        fecha_limite: row._rawPlazo ? String(row._rawPlazo).slice(0, 10) : null,
+        fecha_cierre: row['FECHA DE CIERRE'] || row.fecha_cierre || null,
+        accion_tomada: row['COMENTARIO DE EJECUCION'] || row.accion_realizada || row.accion_tomada || '',
+        fotos: fotosArr,
+        fotos_solucion: fotosSolucionArr
+      };
+
+      handleOpenCorrectivoDetail(builtRecord);
+      return;
+    }
+
+    // 3. If Preventivo (PMP):
+    const foundTask = tasks.find(t => 
+      t.code === code || 
+      t.csvId === code || 
+      t.id === row.id || 
+      t.title === row['Título']
+    );
+
+    if (foundTask) {
+      handleOpenPreventivoExecution(foundTask);
+      return;
+    }
+
+    let pmpFotos: string[] = [];
+    if (Array.isArray(row.fotos)) pmpFotos = row.fotos;
+    else if (typeof row.fotos === 'string' && row.fotos.trim().startsWith('[')) {
+      try { pmpFotos = JSON.parse(row.fotos); } catch {}
+    } else if (typeof row.fotos === 'string' && row.fotos.trim().length > 0) {
+      pmpFotos = [row.fotos];
+    }
+
+    const resolvedMachine = row._resolvedMachine || resolveHistoryRowMachine(row, maquinasCatalogo);
+
+    const builtTask: MaintenanceTask = {
+      id: row.id || 1,
+      idtecs: 0,
+      title: row['Título'] || row.titulo || 'Mantenimiento Preventivo',
+      detalle: row.detalle || row.descripcion || '',
+      planta: row.planta || row['Planta'] || 'Mármol Sintético',
+      maquina: resolvedMachine?.name || row.maquina || 'Equipo General',
+      frecuencia: row.frecuencia || 15,
+      refFrecuencia: row.refFrecuencia || 0,
+      durationHours: 1,
+      status: (row._estadoDisplay || row['ESTADO'] || row.estado || 'Pendiente') as any,
+      code: code || row.codigo,
+      csvId: code || row.codigo,
+      tipoIntervencion: 'NP',
+      observations: row['COMENTARIO DE EJECUCION'] || row.accion_realizada || '',
+      fechaApertura: row['FECHA DE APERTURA'] || row.fecha_apertura,
+      fechaCierre: row['FECHA DE CIERRE'] || row.fecha_cierre,
+      fotos: pmpFotos
+    };
+    handleOpenPreventivoExecution(builtTask);
+  };
+
   // Handler to save changes from the Correctivo Detail Modal
   const handleSaveCorrectivoModal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3069,12 +3254,39 @@ export default function GestionMantenimientoPage() {
       fotos_solucion: form.fotos_solucion || []
     };
 
-    const updatedList = correctiveRecords.map(c => c.id === viewingCorrectivo.id ? updatedRecord : c);
+    const updatedList = correctiveRecords.map(c => (c.id === viewingCorrectivo.id || c.codigo === viewingCorrectivo.codigo) ? updatedRecord : c);
     setCorrectiveRecords(updatedList);
     setViewingCorrectivo(updatedRecord);
 
     const dbTpmStatus = form.estado === 'Resuelta' ? 'cerrada' : form.estado === 'En Proceso' ? 'en_proceso' : 'abierta';
     const fechaCierreVal = form.estado === 'Resuelta' ? getLocalDatetimeString().replace('T', ' ') : null;
+
+    // Update historyRows in real time so the Órdenes de Trabajo table updates immediately
+    setHistoryRows(prev => prev.map(h => {
+      const match = h.codigo === viewingCorrectivo.codigo || 
+                    h.id === viewingCorrectivo.id ||
+                    (h.codigo && viewingCorrectivo.codigo && h.codigo.trim().toUpperCase() === viewingCorrectivo.codigo.trim().toUpperCase());
+      if (match) {
+        const newEstado = form.estado === 'Resuelta' ? 'Completado' : form.estado === 'En Proceso' ? 'En Proceso' : 'Abierta';
+        return {
+          ...h,
+          'ESTADO': newEstado,
+          estado: newEstado,
+          'TECNICO': finalTechName,
+          tecnico_asignado: finalTechName,
+          tecnico_nombre: finalTechName,
+          'FECHA DE CIERRE': fechaCierreVal || h['FECHA DE CIERRE'] || '',
+          fecha_cierre: fechaCierreVal || h.fecha_cierre || '',
+          fecha_limite: form.fecha_limite.trim() || h.fecha_limite,
+          prioridad: form.prioridad,
+          'COMENTARIO DE EJECUCION': form.accion_tomada.trim() || h['COMENTARIO DE EJECUCION'] || '',
+          accion_realizada: form.accion_tomada.trim() || h.accion_realizada || '',
+          fotos_solucion: form.fotos_solucion || h.fotos_solucion || [],
+          fotos_despues: form.fotos_solucion || h.fotos_despues || []
+        };
+      }
+      return h;
+    }));
 
     // 1. Persist directly to LocalStorage (firplak_correctivos_records & firplak_tarjetas_tpm_records)
     if (typeof window !== 'undefined') {
@@ -7154,9 +7366,9 @@ export default function GestionMantenimientoPage() {
                         return (
                           <tr 
                             key={row.id || idx} 
-                            onClick={() => setViewingHistoryRecord({ ...row, codigoDisplay, category })}
+                            onClick={() => handleOpenHistoryRowDetail(row)}
                             className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
-                            title="Haz clic para ver la información completa de esta orden de trabajo"
+                            title="Haz clic para ver la información completa o modificar esta orden de trabajo"
                           >
                             {/* Mini Foto Thumbnail */}
                             <td className="py-2.5 px-2 text-center">
@@ -10133,7 +10345,11 @@ export default function GestionMantenimientoPage() {
                 </div>
                 <h3 className="text-lg sm:text-xl font-black text-[#324354] leading-snug mt-1 flex items-center gap-2">
                   <Wrench className="w-5 h-5 text-[#324354]" />
-                  <span>Detalle de Mantenimiento Correctivo</span>
+                  <span>
+                    {(viewingCorrectivo.origen === 'Tarjeta TPM' || viewingCorrectivo.codigo.startsWith('TPM-'))
+                      ? 'Detalle de Tarjeta TPM'
+                      : 'Detalle de Mantenimiento Correctivo'}
+                  </span>
                 </h3>
               </div>
               <button
@@ -11057,7 +11273,7 @@ export default function GestionMantenimientoPage() {
                             <div
                               key={ord.id || idx}
                               onClick={() => {
-                                setViewingHistoryRecord({ ...ord, codigoDisplay, category, 'TECNICO': tecnicoNombre, 'ESTADO': estado });
+                                handleOpenHistoryRowDetail({ ...ord, codigoDisplay, category, 'TECNICO': tecnicoNombre, 'ESTADO': estado });
                               }}
                               className="p-3 bg-white hover:bg-amber-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
                               title="Haz clic para ver la orden completa"
@@ -11426,7 +11642,20 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Modal Actions - Fixed at Bottom */}
-            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-end">
+            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const targetRecord = viewingHistoryRecord;
+                  setViewingHistoryRecord(null);
+                  handleOpenHistoryRowDetail(targetRecord);
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5"
+                title="Abrir formulario completo para modificar o gestionar esta orden"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                <span>Editar / Gestionar Orden</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setViewingHistoryRecord(null)}
@@ -11851,7 +12080,7 @@ export default function GestionMantenimientoPage() {
                             <div
                               key={item.id || idx}
                               onClick={() => {
-                                setViewingHistoryRecord({ ...item, codigoDisplay, category });
+                                handleOpenHistoryRowDetail({ ...item, codigoDisplay, category });
                               }}
                               className="p-3 hover:bg-amber-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
                               title="Haz clic para ver el detalle completo de esta intervención"
