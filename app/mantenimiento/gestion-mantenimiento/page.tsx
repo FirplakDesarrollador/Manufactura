@@ -4295,8 +4295,58 @@ export default function GestionMantenimientoPage() {
     }));
   };
 
+  // Helper to calculate the next consecutive code and identify gaps for machines
+  const getNextMachineConsecutiveInfo = () => {
+    let maxNum = 0;
+    const existingNums = new Set<number>();
+
+    maquinasCatalogo.forEach(m => {
+      const codeStr = (m.codigo_equipo || '').trim();
+      if (codeStr) {
+        const match = codeStr.match(/(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > 0 && num < 100000) {
+            existingNums.add(num);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      }
+    });
+
+    const nextMax = maxNum > 0 ? maxNum + 1 : 1;
+    const nextMaxCode = String(nextMax).padStart(4, '0');
+
+    // Find gaps in sequence between 1 and maxNum
+    const gaps: number[] = [];
+    if (maxNum > 1) {
+      for (let i = 1; i < maxNum; i++) {
+        if (!existingNums.has(i)) {
+          gaps.push(i);
+        }
+      }
+    }
+
+    const firstGap = gaps.length > 0 ? gaps[0] : null;
+    const firstGapCode = firstGap ? String(firstGap).padStart(4, '0') : null;
+
+    return {
+      maxNum,
+      nextMaxCode,
+      gaps,
+      firstGapCode,
+      totalGaps: gaps.length
+    };
+  };
+
   const handleOpenCreateMachine = () => {
     resetMachineForm();
+    const { firstGapCode, nextMaxCode } = getNextMachineConsecutiveInfo();
+    const suggestedCode = firstGapCode || nextMaxCode;
+    setMachineFormData(prev => ({
+      ...prev,
+      codigo_equipo: suggestedCode
+    }));
     setMachineFormMode('create');
     setShowMachineFormModal(true);
   };
@@ -4929,7 +4979,7 @@ export default function GestionMantenimientoPage() {
         const brand = (m.marca || '').toLowerCase();
         const model = (m.modelo || '').toLowerCase();
         const plant = (m.planta || '').toLowerCase();
-        const process = (m.proceso || '').toLowerCase();
+        const af = (m.activo_fijo || '').toLowerCase();
 
         if (
           !code.includes(q) &&
@@ -4938,7 +4988,8 @@ export default function GestionMantenimientoPage() {
           !brand.includes(q) &&
           !model.includes(q) &&
           !plant.includes(q) &&
-          !process.includes(q)
+          !process.includes(q) &&
+          !af.includes(q)
         ) {
           return false;
         }
@@ -4969,10 +5020,16 @@ export default function GestionMantenimientoPage() {
       let valA: any = '';
       let valB: any = '';
       switch (maquinasSortColumn) {
-        case 'codigo_equipo':
+        case 'codigo_equipo': {
+          const numA = parseInt((a.codigo_equipo || '').replace(/\D/g, ''), 10);
+          const numB = parseInt((b.codigo_equipo || '').replace(/\D/g, ''), 10);
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return maquinasSortAsc ? numA - numB : numB - numA;
+          }
           valA = (a.codigo_equipo || '').toLowerCase();
           valB = (b.codigo_equipo || '').toLowerCase();
           break;
+        }
         case 'nombre_equipo':
           valA = (a.nombre_equipo || '').toLowerCase();
           valB = (b.nombre_equipo || '').toLowerCase();
@@ -8440,11 +8497,18 @@ export default function GestionMantenimientoPage() {
                             onClick={() => setSelectedMachineModal(m)}
                             className="hover:bg-[#F6F3EE]/60 transition-colors cursor-pointer group"
                           >
-                            {/* Código */}
+                            {/* Código y Activo Fijo */}
                             <td className="py-3 px-4">
-                              <span className="px-2 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-md text-xs border border-slate-200 inline-block">
-                                {m.codigo_equipo || '-'}
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="px-2 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-md text-xs border border-slate-200 inline-block" title="Código de Equipo">
+                                  {m.codigo_equipo || '-'}
+                                </span>
+                                {m.activo_fijo && (
+                                  <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shadow-2xs" title="Activo Fijo SAP (Contabilidad)">
+                                    AF: {m.activo_fijo}
+                                  </span>
+                                )}
+                              </div>
                             </td>
 
                             {/* Nombre y Foto */}
@@ -12591,25 +12655,80 @@ export default function GestionMantenimientoPage() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Código de Equipo</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase block">Código de Equipo</label>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          Consecutivo Automático
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={machineFormData.codigo_equipo}
                         onChange={(e) => setMachineFormData(prev => ({ ...prev, codigo_equipo: e.target.value }))}
-                        placeholder="Ej. C-0154 o PH-02"
+                        placeholder="Ej. 1333"
                         className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-mono font-bold text-[#324354] focus:outline-none focus:border-[#324354]"
                       />
+                      {/* Chips / Botones para seleccionar consecutivo o llenar huecos */}
+                      {(() => {
+                        const { firstGapCode, nextMaxCode, gaps } = getNextMachineConsecutiveInfo();
+                        return (
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
+                            <span className="text-[11px] text-gray-500 font-semibold">Sugerencias:</span>
+                            {firstGapCode && (
+                              <button
+                                type="button"
+                                onClick={() => setMachineFormData(prev => ({ ...prev, codigo_equipo: firstGapCode }))}
+                                className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs border transition-all cursor-pointer flex items-center gap-1 ${
+                                  machineFormData.codigo_equipo === firstGapCode
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300 ring-2 ring-amber-400/40 shadow-xs'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                }`}
+                                title="Llenar el primer espacio/hueco faltante en la secuencia numérica"
+                              >
+                                <span>📌 Primer hueco libre:</span>
+                                <u>{firstGapCode}</u>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setMachineFormData(prev => ({ ...prev, codigo_equipo: nextMaxCode }))}
+                              className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs border transition-all cursor-pointer flex items-center gap-1 ${
+                                machineFormData.codigo_equipo === nextMaxCode
+                                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300 ring-2 ring-emerald-400/40 shadow-xs'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                              title="Continuar con el consecutivo más alto registrado + 1"
+                            >
+                              <span>⏭️ Siguiente del último:</span>
+                              <u>{nextMaxCode}</u>
+                            </button>
+                            {gaps.length > 0 && (
+                              <span className="text-[10px] text-amber-700 font-medium">
+                                ({gaps.length} espacios libres en secuencia)
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Activo Fijo (SAP)</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase block">Activo Fijo (SAP)</label>
+                        <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          Opcional · Contabilidad
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={machineFormData.activo_fijo}
                         onChange={(e) => setMachineFormData(prev => ({ ...prev, activo_fijo: e.target.value }))}
-                        placeholder="Ej. AF-100234"
+                        placeholder="Ej. AF-100234 (opcional)"
                         className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-mono text-[#324354] focus:outline-none focus:border-[#324354]"
                       />
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        Código otorgado por contabilidad. Si aún no ha sido asignado, déjalo en blanco (no es obligatorio).
+                      </p>
                     </div>
 
                     <div>
