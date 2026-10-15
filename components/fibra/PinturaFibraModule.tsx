@@ -5,8 +5,8 @@ import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
 import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
 import MoldSelector from '../pintura/MoldSelector'
-import { Search, X, Calendar, History, ClipboardList } from 'lucide-react'
-import HistorySection from '../pintura/HistorySection'
+import { Search, X, Calendar, History, ClipboardList, RefreshCw } from 'lucide-react'
+import HistorySection from './HistorySection'
 import ModalBuscarMolde from '../pintura/ModalBuscarMolde'
 
 
@@ -154,7 +154,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             const matchesSearch = !search ||
                 (orden.producto_descripcion || '').toLowerCase().includes(search) ||
                 (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
-                (orden.pedido || orden.numero_pedido || '').toLowerCase().includes(search) ||
+                (orden.pedido || (orden as any).numero_pedido || '').toLowerCase().includes(search) ||
                 (orden.molde_descripcion || '').toLowerCase().includes(search) ||
                 (orden.producto_sku || '').toLowerCase().includes(search) ||
                 (orden.molde_sku || '').toLowerCase().includes(search) ||
@@ -243,9 +243,25 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         }
     }, [baseFilteredOrdenes, trazabilidad])
 
+    const [syncing, setSyncing] = useState(false)
+
     const handleClearFilters = () => {
         setSearchText('')
         setSelectedDate('')
+    }
+
+    const handleSyncSap = async () => {
+        setSyncing(true)
+        try {
+            await fetch('/api/sap/ordenes-liberadas', { cache: 'no-store' })
+            await loadOrdenes()
+            setNotification({ message: 'Órdenes actualizadas y sincronizadas desde SAP correctamente', type: 'success' })
+        } catch (e) {
+            await loadOrdenes()
+            setNotification({ message: 'Órdenes recargadas', type: 'success' })
+        } finally {
+            setSyncing(false)
+        }
     }
 
     const checkMantenimiento = (molde: Molde) => {
@@ -382,6 +398,16 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                         title="Limpiar filtros"
                     >
                         <X size={20} />
+                    </button>
+
+                    <button
+                        onClick={handleSyncSap}
+                        disabled={syncing || loading}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors shadow-sm disabled:opacity-50 text-xs font-bold uppercase tracking-wider h-[38px] self-end mb-[1px]"
+                        title="Sincronizar y recargar órdenes desde SAP"
+                    >
+                        <RefreshCw size={15} className={syncing || loading ? 'animate-spin' : ''} />
+                        <span className="hidden sm:inline">Actualizar SAP</span>
                     </button>
                 </div>
             </div>

@@ -19,7 +19,7 @@ export default function RegistroEmpaqueCard({ registro, usuarioEmail, onRefresh 
 
         setLoading(true)
         try {
-            await registrarEmpaque(registro.registrer, usuarioEmail)
+            await registrarEmpaque(registro.registrer || '', usuarioEmail)
             alert('¡Empaque registrado exitosamente!')
             onRefresh()
         } catch (error) {

@@ -4973,24 +4973,38 @@ export default function GestionMantenimientoPage() {
 
     const list = maquinasCatalogo.filter(m => {
       if (q) {
+        const qNorm = normalize(q);
         const code = (m.codigo_equipo || '').toLowerCase();
         const name = (m.nombre_equipo || '').toLowerCase();
         const alt = (m.nombre_alterno || '').toLowerCase();
         const brand = (m.marca || '').toLowerCase();
         const model = (m.modelo || '').toLowerCase();
         const plant = (m.planta || '').toLowerCase();
+        const proc = (m.proceso || '').toLowerCase();
         const af = (m.activo_fijo || '').toLowerCase();
 
-        if (
-          !code.includes(q) &&
-          !name.includes(q) &&
-          !alt.includes(q) &&
-          !brand.includes(q) &&
-          !model.includes(q) &&
-          !plant.includes(q) &&
-          !process.includes(q) &&
-          !af.includes(q)
-        ) {
+        const matchPlain =
+          code.includes(q) ||
+          name.includes(q) ||
+          alt.includes(q) ||
+          brand.includes(q) ||
+          model.includes(q) ||
+          plant.includes(q) ||
+          proc.includes(q) ||
+          af.includes(q);
+
+        const matchNorm = qNorm
+          ? normalize(m.codigo_equipo || '').includes(qNorm) ||
+            normalize(m.nombre_equipo || '').includes(qNorm) ||
+            normalize(m.nombre_alterno || '').includes(qNorm) ||
+            normalize(m.marca || '').includes(qNorm) ||
+            normalize(m.modelo || '').includes(qNorm) ||
+            normalize(m.planta || '').includes(qNorm) ||
+            normalize(m.proceso || '').includes(qNorm) ||
+            normalize(m.activo_fijo || '').includes(qNorm)
+          : false;
+
+        if (!matchPlain && !matchNorm) {
           return false;
         }
       }

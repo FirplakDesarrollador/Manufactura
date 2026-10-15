@@ -34,7 +34,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
-    const [expandedRegistros, setExpandedRegistros] = useState<Set<number>>(new Set())
+    const [expandedRegistros, setExpandedRegistros] = useState<Set<string | number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
 
     // Modal State
@@ -152,7 +152,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         }
     }, [filteredOrdenes, filteredRegistros])
 
-    const handleDelete = async (type: 'of' | 'registro', id: number) => {
+    const handleDelete = async (type: 'of' | 'registro', id: any) => {
         if (!confirm('¿Seguro que desea eliminar este registro? ESTA ACCIÓN NO SE PUEDE DESHACER.')) return
 
         try {
@@ -206,7 +206,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         setSaving(true)
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await updateRegistroTrazabilidad(registro.registrer, { orden_fabricacion_id: targetOrden.id } as any)
+            await updateRegistroTrazabilidad(registro.registrer || String(registro.id), { orden_fabricacion_id: targetOrden.id } as any)
             toast.success(`Pieza transferida a la orden ${targetOrden.orden_fabricacion}`)
             setTransferModal(null)
             loadData()
@@ -218,7 +218,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         }
     }
 
-    const toggleRegistro = (id: number) => {
+    const toggleRegistro = (id: string | number) => {
         setExpandedRegistros(prev => {
             const next = new Set(prev)
             if (next.has(id)) next.delete(id)
@@ -237,13 +237,13 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     }
 
     const allRegistrosExpanded = filteredRegistros.length > 0 &&
-        filteredRegistros.every(registro => expandedRegistros.has(registro.registrer))
+        filteredRegistros.every(registro => expandedRegistros.has(registro.registrer || String(registro.id)))
     const allOrdenesExpanded = filteredOrdenes.length > 0 &&
         filteredOrdenes.every(orden => expandedOrdenes.has(orden.id))
 
     const toggleAllVisible = () => {
         if (activeTab === 'trazabilidad') {
-            setExpandedRegistros(allRegistrosExpanded ? new Set() : new Set(filteredRegistros.map(registro => registro.registrer)))
+            setExpandedRegistros(allRegistrosExpanded ? new Set() : new Set(filteredRegistros.map(registro => registro.registrer || String(registro.id))))
             return
         }
 
@@ -477,13 +477,13 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                     </tr>
                                 ) : (
                                     filteredRegistros.map((item) => (
-                                        <React.Fragment key={item.id}>
+                                        <React.Fragment key={item.registrer || item.id}>
                                         <tr className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="p-4 flex gap-2">
                                                 <button
-                                                    onClick={() => toggleRegistro(item.id)}
-                                                    className={`p-1.5 rounded transition-colors ${expandedRegistros.has(item.id) ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50'}`}
-                                                    title={expandedRegistros.has(item.id) ? 'Ocultar procesos' : 'Ver procesos'}
+                                                    onClick={() => toggleRegistro(item.registrer || item.id || '')}
+                                                    className={`p-1.5 rounded transition-colors ${expandedRegistros.has(item.registrer || item.id || '') ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50'}`}
+                                                    title={expandedRegistros.has(item.registrer || item.id || '') ? 'Ocultar procesos' : 'Ver procesos'}
                                                 >
                                                     <ChevronsUpDown size={16} />
                                                 </button>
@@ -502,13 +502,13 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                                     <ArrowRightLeft size={16} />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDelete('registro', item.id)}
+                                                    onClick={() => handleDelete('registro', item.registrer || item.id || '')}
                                                     className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
                                             </td>
-                                            <td className="p-4 text-[11px] font-black text-blue-600">#{item.id}</td>
+                                            <td className="p-4 text-[11px] font-black text-blue-600">#{item.registrer || item.id}</td>
                                             <td className="p-4">
                                                 <div className="font-bold text-slate-700">{item.orden_fabricacion}</div>
                                                 <div className="text-[10px] text-slate-400 font-bold">P: {item.numero_pedido}</div>
@@ -530,7 +530,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                                 {item.pintura_fecha ? new Date(item.pintura_fecha).toLocaleDateString('es-ES') : '-'}
                                             </td>
                                         </tr>
-                                        {expandedRegistros.has(item.id) && (
+                                        {expandedRegistros.has(item.registrer || item.id || '') && (
                                             <tr>
                                                 <td colSpan={10} className="bg-slate-50/70 p-4">
                                                     <TraceProcessTimeline registro={item} />
@@ -599,15 +599,19 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             onChange={(e) => setEditModal({ ...editModal, item: { ...editModal.item, estado: e.target.value } })}
                                             className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                         >
-                                            <option value="Pintura text-black">Pintura</option>
-                                            <option value="Desgelcado text-black">Desgelcado</option>
-                                            <option value="Vaciado text-black">Vaciado</option>
-                                            <option value="Pulido text-black">Pulido</option>
-                                            <option value="Acabado text-black">Acabado</option>
-                                            <option value="Empaque text-black">Empaque</option>
-                                            <option value="Digitado text-black">Digitado</option>
-                                            <option value="Transito text-black">Transito</option>
-                                            <option value="Cedi text-black">Cedi</option>
+                                            <option value="Pintura">Pintura</option>
+                                            <option value="Desgelcada">Desgelcada</option>
+                                            <option value="Vaciado">Vaciado</option>
+                                            <option value="Pulido">Pulido</option>
+                                            <option value="Acabado">Acabado</option>
+                                            <option value="Empaque">Empaque</option>
+                                            <option value="Digitado">Digitado</option>
+                                            <option value="Transito">Transito</option>
+                                            <option value="Cedi">Cedi</option>
+                                            <option value="Estanteria">Estantería</option>
+                                            <option value="Reparacion">Reparación</option>
+                                            <option value="Saldo">Saldo</option>
+                                            <option value="Destruccion">Destrucción</option>
                                         </select>
                                     </div>
                                     <div>
@@ -747,7 +751,7 @@ const TRACE_STAGES: Array<{
 
 function OrderProcessesPanel({
     orden,
-    registros,
+    registros: parentRegistros,
     onEdit,
     onDelete,
     onTransfer
@@ -758,6 +762,43 @@ function OrderProcessesPanel({
     onDelete: (registro: RegistroTrazabilidad) => void
     onTransfer: (registro: RegistroTrazabilidad) => void
 }) {
+    const [fetchedRegistros, setFetchedRegistros] = useState<RegistroTrazabilidad[] | null>(parentRegistros && parentRegistros.length > 0 ? parentRegistros : null)
+    const [loadingRecords, setLoadingRecords] = useState(false)
+
+    useEffect(() => {
+        let isMounted = true
+        setLoadingRecords(true)
+        supabase
+            .from('query_trazabilidad_fv')
+            .select('*')
+            .eq('orden_fabricacion', orden.orden_fabricacion)
+            .order('pintura_fecha', { ascending: false })
+            .then(
+                ({ data, error }) => {
+                    if (isMounted) {
+                        setLoadingRecords(false)
+                        if (!error && data) {
+                            setFetchedRegistros(data)
+                        }
+                    }
+                },
+                () => {
+                    if (isMounted) setLoadingRecords(false)
+                }
+            )
+
+        return () => { isMounted = false }
+    }, [orden.orden_fabricacion])
+
+    const registros = fetchedRegistros !== null ? fetchedRegistros : parentRegistros
+
+    const handleDeleteRecord = (registro: RegistroTrazabilidad) => {
+        onDelete(registro)
+        if (fetchedRegistros) {
+            setFetchedRegistros(prev => prev ? prev.filter(r => (r.registrer || r.id) !== (registro.registrer || registro.id)) : null)
+        }
+    }
+
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
@@ -767,18 +808,27 @@ function OrderProcessesPanel({
                         OF {orden.orden_fabricacion} · {registros.length} registro{registros.length === 1 ? '' : 's'} encontrado{registros.length === 1 ? '' : 's'}
                     </div>
                 </div>
+                {loadingRecords && (
+                    <div className="text-xs text-blue-500 font-bold flex items-center gap-1.5 animate-pulse">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Cargando historial completo...
+                    </div>
+                )}
             </div>
-            {registros.length === 0 ? (
+            {loadingRecords && registros.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-[12px] font-bold text-slate-400 flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-blue-500" /> Consultando piezas registradas en trazabilidad...
+                </div>
+            ) : registros.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-[12px] font-bold text-slate-400">
                     No hay registros de trazabilidad cargados para esta orden.
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {registros.map(registro => (
-                        <div key={registro.registrer || index} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                    {registros.map((registro, idx) => (
+                        <div key={registro.registrer || registro.id || idx} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 text-[12px]">
                                 <div className="flex flex-wrap gap-4">
-                                    <InfoPill label="ID" value={registro.registrer} />
+                                    <InfoPill label="ID" value={registro.registrer || registro.id || '-'} />
                                     <InfoPill label="Estado" value={registro.estado || '-'} />
                                     <InfoPill label="Pedido" value={registro.numero_pedido || registro.pedido || '-'} />
                                     <InfoPill label="Molde" value={registro.molde_serial || '-'} />
@@ -790,7 +840,7 @@ function OrderProcessesPanel({
                                     <button onClick={() => onTransfer(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
                                         <ArrowRightLeft size={16} />
                                     </button>
-                                    <button onClick={() => onDelete(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
+                                    <button onClick={() => handleDeleteRecord(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
                                         <Trash2 size={16} />
                                     </button>
                                 </div>

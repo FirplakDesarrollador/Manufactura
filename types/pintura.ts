@@ -52,15 +52,18 @@ export interface Molde {
 }
 
 export interface RegistroTrazabilidad {
-    id: number
+    id?: number
+    registrer?: string
     pintura_fecha: string
     molde_serial: string
     molde_descripcion: string
     orden_fabricacion: string
     pedido: string
-    producto_descripcion: string
-    linea: string
-    usuario_email: string
+    producto_descripcion?: string
+    linea?: string
+    pintura_linea?: string
+    vaciado_linea?: string
+    usuario_email?: string
     contramolde: boolean
     contramolde_fecha?: string
     vaciado_fecha?: string

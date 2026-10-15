@@ -52,10 +52,13 @@ export interface MetricasDia {
 export interface OrdenFabricacionDetalle {
     id: number
     numero_pedido: string
+    pedido?: string
     orden_fabricacion: string
     cantidad: number
     producto_descripcion: string
+    producto_sku?: string
     cliente: string
+    cliente_nombre?: string
     tamano: string
     ensayo: boolean
     pintura: number

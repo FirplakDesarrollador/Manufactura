@@ -9,67 +9,113 @@ export async function GET() {
         let marmolRawRows: any[] = [];
         let fetchedFromSap = false;
 
-        // 1. Consultar SAP Service Layer (órdenes pendientes generales y órdenes de mármol sintético)
+        // 1. Consultar SAP Service Layer (Intentando primero vía API Python Cloudflare con fallback directo)
+        const cloudflareBaseUrl = process.env.SEMAFORO_API_URL 
+            ? process.env.SEMAFORO_API_URL.replace(/\/semaforo\/?$/, '')
+            : "https://toner-villages-acoustic-colony.trycloudflare.com";
+        const cloudflareApiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
+
         try {
-            console.log('Consultando órdenes de fabricación liberadas en SAP Service Layer...');
-            const sapUrl = process.env.SAP_API_URL || 'https://200.7.96.194:50000/b1s/v1/Login';
-            const sapDb = process.env.SAP_COMPANY_DB || 'Firplak_SA';
-            const sapUser = process.env.SAP_USERNAME || 'manager';
-            const sapPass = process.env.SAP_PASSWORD || '2023Fir#.*';
+            console.log('Consultando órdenes vía API Python Cloudflare...');
+            const [cfMarmolRes, cfGenRes] = await Promise.allSettled([
+                fetch(`${cloudflareBaseUrl}/ordenes_marmol/`, {
+                    headers: { 'api-key': cloudflareApiKey },
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(12000)
+                }),
+                fetch(`${cloudflareBaseUrl}/ordenesliberadasms`, {
+                    headers: { 'api-key': cloudflareApiKey },
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(12000)
+                })
+            ]);
 
-            const loginUrl = sapUrl.endsWith('/Login') ? sapUrl : `${sapUrl.replace(/\/$/, '')}/Login`;
-            const loginRes = await fetch(loginUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ CompanyDB: sapDb, Password: sapPass, UserName: sapUser })
-            });
-
-            if (loginRes.ok) {
-                const loginData = await loginRes.json();
-                const sessionId = loginData.SessionId;
-                if (sessionId) {
-                    const baseUrl = loginUrl.replace('/Login', '');
-                    
-                    // a) Query general para /consulta-sap (441 órdenes liberadas)
-                    const queryRes = await fetch(`${baseUrl}/SQLQueries('ordenes_pendientes_clean')/List`, {
-                        headers: {
-                            'Cookie': `B1SESSION=${sessionId}`,
-                            'Prefer': 'odata.maxpagesize=500'
-                        }
-                    });
-
-                    if (queryRes.ok) {
-                        const queryData = await queryRes.json();
-                        const items = queryData.value || [];
-                        if (Array.isArray(items) && items.length > 0) {
-                            rawRows = items;
-                            fetchedFromSap = true;
-                            console.log(`SAP Service Layer (general) devolvió ${rawRows.length} órdenes liberadas.`);
-                        }
-                    }
-
-                    // b) Query específica para Mármol Sintético (129 órdenes enriquecidas con molde y gelcoat)
-                    try {
-                        const marmolRes = await fetch(`${baseUrl}/SQLQueries('ordenes_marmol_sl136')/List`, {
-                            headers: {
-                                'Cookie': `B1SESSION=${sessionId}`,
-                                'Prefer': 'odata.maxpagesize=500'
-                            }
-                        });
-                        if (marmolRes.ok) {
-                            const marmolData = await marmolRes.json();
-                            if (Array.isArray(marmolData.value) && marmolData.value.length > 0) {
-                                marmolRawRows = marmolData.value;
-                                console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
-                            }
-                        }
-                    } catch (mErr) {
-                        console.error('Error consultando ordenes_marmol_sl136:', mErr);
-                    }
+            if (cfMarmolRes.status === 'fulfilled' && cfMarmolRes.value.ok) {
+                const marmolData = await cfMarmolRes.value.json();
+                const mItems = Array.isArray(marmolData) ? marmolData : (marmolData.response || []);
+                if (mItems.length > 0) {
+                    marmolRawRows = mItems;
+                    console.log(`Cloudflare API (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
                 }
             }
-        } catch (sapErr) {
-            console.error('Error al conectar con SAP Service Layer:', sapErr);
+
+            if (cfGenRes.status === 'fulfilled' && cfGenRes.value.ok) {
+                const genData = await cfGenRes.value.json();
+                const gItems = Array.isArray(genData) ? genData : (genData.response || []);
+                if (gItems.length > 0) {
+                    rawRows = gItems;
+                    fetchedFromSap = true;
+                    console.log(`Cloudflare API (general) devolvió ${rawRows.length} órdenes.`);
+                }
+            }
+        } catch (cfErr) {
+            console.warn('Fallo o timeout en Cloudflare Python API:', cfErr);
+        }
+
+        // Si no se obtuvieron órdenes de mármol o generales, intentar SAP Service Layer directo (con timeout seguro)
+        if (marmolRawRows.length === 0 || rawRows.length === 0) {
+            try {
+                console.log('Consultando órdenes de fabricación liberadas en SAP Service Layer directo...');
+                const sapUrl = process.env.SAP_API_URL || 'https://200.7.96.194:50000/b1s/v1/Login';
+                const sapDb = process.env.SAP_COMPANY_DB || 'Firplak_SA';
+                const sapUser = process.env.SAP_USERNAME || 'manager';
+                const sapPass = process.env.SAP_PASSWORD || '2023Fir#.*';
+
+                const loginUrl = sapUrl.endsWith('/Login') ? sapUrl : `${sapUrl.replace(/\/$/, '')}/Login`;
+                const loginRes = await fetch(loginUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ CompanyDB: sapDb, Password: sapPass, UserName: sapUser }),
+                    signal: AbortSignal.timeout(10000)
+                });
+
+                if (loginRes.ok) {
+                    const loginData = await loginRes.json();
+                    const sessionId = loginData.SessionId;
+                    if (sessionId) {
+                        const baseUrl = loginUrl.replace('/Login', '');
+                        
+                        if (rawRows.length === 0) {
+                            const queryRes = await fetch(`${baseUrl}/SQLQueries('ordenes_pendientes_clean')/List`, {
+                                headers: {
+                                    'Cookie': `B1SESSION=${sessionId}`,
+                                    'Prefer': 'odata.maxpagesize=500'
+                                },
+                                signal: AbortSignal.timeout(15000)
+                            });
+
+                            if (queryRes.ok) {
+                                const queryData = await queryRes.json();
+                                const items = queryData.value || [];
+                                if (Array.isArray(items) && items.length > 0) {
+                                    rawRows = items;
+                                    fetchedFromSap = true;
+                                    console.log(`SAP Service Layer (general) devolvió ${rawRows.length} órdenes liberadas.`);
+                                }
+                            }
+                        }
+
+                        if (marmolRawRows.length === 0) {
+                            const marmolRes = await fetch(`${baseUrl}/SQLQueries('ordenes_marmol_sl136')/List`, {
+                                headers: {
+                                    'Cookie': `B1SESSION=${sessionId}`,
+                                    'Prefer': 'odata.maxpagesize=500'
+                                },
+                                signal: AbortSignal.timeout(15000)
+                            });
+                            if (marmolRes.ok) {
+                                const marmolData = await marmolRes.json();
+                                if (Array.isArray(marmolData.value) && marmolData.value.length > 0) {
+                                    marmolRawRows = marmolData.value;
+                                    console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (sapErr) {
+                console.error('Error al conectar con SAP Service Layer:', sapErr);
+            }
         }
 
         // Helper para distinguir SKUs que NO pertenecen a Mármol Sintético / Fibra / Vaciado (Muebles, Empaque, Cajas, Insumos)
@@ -84,21 +130,24 @@ export async function GET() {
             const docNum = item.DocNum || item.orden_fabricacion || '';
             const typeStr = item.Type === 'S' ? 'Estándar' : (item.Type === 'D' ? 'Desmontar' : (item.type || 'Especial'));
             const statusStr = item.Status === 'R' ? 'Liberado' : (item.Status === 'L' ? 'Cerrado' : (item.Status === 'C' ? 'Cancelado' : (item.Status || 'Planificado')));
-            const plannedQty = Number(item.PlannedQty !== undefined ? item.PlannedQty : item.cantidad) || 1;
-            const cmpltQty = Number(item.CmpltQty !== undefined ? item.CmpltQty : 0) || 0;
-            const pendienteQty = item.Pendiente !== undefined ? Number(item.Pendiente) : (plannedQty - cmpltQty);
+            const plannedQty = Number(item.PlannedQty !== undefined ? item.PlannedQty : (item['Cant.Planificada'] !== undefined ? item['Cant.Planificada'] : item.cantidad)) || 1;
+            const cmpltQty = Number(item.CmpltQty !== undefined ? item.CmpltQty : (item['Cant.Completada'] !== undefined ? item['Cant.Completada'] : 0)) || 0;
+            const pendienteQty = item.Pendiente !== undefined ? Number(item.Pendiente) : (item['PENDIENTE-OJO cuando sea superior a 1'] !== undefined ? Number(item['PENDIENTE-OJO cuando sea superior a 1']) : (plannedQty - cmpltQty));
+            const prodDesc = item.ItemName || item.Itemname || item.producto_descripcion || '';
+            const fechaFin = item.DueDate || item['Fecha Finalización'] || item.fecha_entrega_estimada || null;
+            const fechaFab = item.PostDate || item['Fecha Fabricación'] || item.fecha_liberacion || '';
 
             return {
                 docNum: docNum,
                 tipo: typeStr,
                 status: statusStr,
-                fechaFabricacion: item.PostDate || item.fecha_liberacion || '',
-                fechaFinalizacion: item.DueDate || item.fecha_entrega_estimada || '',
+                fechaFabricacion: fechaFab,
+                fechaFinalizacion: fechaFin || '',
                 fechaCierre: item.CloseDate || null,
                 codigoCliente: item.CardCode || item.cliente || '',
                 nombreSN: item.CardName || item.Cliente || item.cliente || 'FIRPLAK S A',
                 itemCode: item.ItemCode || item.producto_sku || '',
-                itemName: item.ItemName || item.producto_descripcion || '',
+                itemName: prodDesc,
                 almacen: item.Warehouse || item.almacen || '',
                 cantPlanificada: plannedQty,
                 cantCompletada: cmpltQty,
@@ -108,17 +157,17 @@ export async function GET() {
                 orden_fabricacion: String(docNum),
                 numero_pedido: item.numero_pedido || String(docNum),
                 producto_sku: item.ItemCode || item.producto_sku || '',
-                producto_descripcion: item.ItemName || item.producto_descripcion || '',
+                producto_descripcion: prodDesc,
                 color: item.color || '',
                 cantidad: plannedQty,
                 cliente: item.CardName || item.Cliente || item.cliente || 'FIRPLAK S A',
                 comentario: item.comentarios || item.comentario || '',
-                fecha_entrega_estimada: item.DueDate || item.fecha_entrega_estimada || null,
-                fecha_ideal_produccion: item['fecha_ideal_producci n'] || item.fecha_ideal_produccion || item.DueDate || null,
+                fecha_entrega_estimada: fechaFin,
+                fecha_ideal_produccion: item['fecha_ideal_producci n'] || item.fecha_ideal_produccion || fechaFin || null,
                 tamano: item.tamano || '',
                 linea: item.U_Linea || item.linea || 'F02',
                 molde_sku: item.molde_sku || '',
-                molde_descripcion: item.molde_descripcion || item.ItemName || '',
+                molde_descripcion: item.molde_descripcion || prodDesc,
                 kilos_gelcoat: item['Kilos Gelcoat'] !== undefined && item['Kilos Gelcoat'] !== null ? Number(item['Kilos Gelcoat']) : null,
                 modificado_por: 'Sistema SAP'
             };
@@ -219,12 +268,70 @@ export async function GET() {
             // En planta, las órdenes cerradas virtualmente a fin de mes para facturación aún deben continuar su fabricación física.
         }
 
+        // 4. Preparar y sincronizar registros de Fibra de Vidrio para la tabla 'ordenes_fabricacion_fibra'
+        const isFibraSku = (sku: string, desc?: string) => {
+            if (/^(VHPT|VTIN|VHEM|PPRD)/i.test(sku)) return true;
+            if (desc) {
+                const upper = desc.toUpperCase();
+                if (upper.includes('HIDROMASAJE') || upper.includes('BAÑERA') || upper.includes('JACUZZI') || upper.includes('SPA ') || upper.includes('TINA ')) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        const fibraRows = mappedRows.filter(r => isFibraSku(r.producto_sku, r.producto_descripcion));
+        let totalFibraUpserted = 0;
+
+        if (fibraRows.length > 0) {
+            const { data: nonPendingFibra } = await supabase
+                .from('ordenes_fabricacion_fibra')
+                .select('orden_fabricacion')
+                .eq('pendiente', false);
+
+            const nonPendingFibraSet = new Set((nonPendingFibra || []).map(r => String(r.orden_fabricacion)));
+            const cleanFibraBatch = fibraRows
+                .filter(item => !nonPendingFibraSet.has(String(item.orden_fabricacion)))
+                .map(r => ({
+                    orden_fabricacion: String(r.orden_fabricacion),
+                    numero_pedido: String(r.numero_pedido || r.orden_fabricacion),
+                    producto_sku: r.producto_sku,
+                    cantidad: r.cantidad,
+                    fecha_entrega_estimada: r.fecha_entrega_estimada,
+                    fecha_ideal_produccion: r.fecha_ideal_produccion,
+                    pendiente: true,
+                    cliente: r.cliente,
+                    comentario: r.comentario,
+                    tamano: r.tamano,
+                    linea: r.linea,
+                    molde_sku: r.molde_sku,
+                    molde_descripcion: r.molde_descripcion,
+                    kilos_gelcoat: r.kilos_gelcoat,
+                    modificado_por: 'Sistema SAP'
+                }));
+
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < cleanFibraBatch.length; i += BATCH_SIZE) {
+                const batch = cleanFibraBatch.slice(i, i + BATCH_SIZE);
+                const { error: errFibra } = await supabase
+                    .from('ordenes_fabricacion_fibra')
+                    .upsert(batch, { onConflict: 'orden_fabricacion' });
+                if (errFibra) {
+                    console.error('Error upserting ordenes_fabricacion_fibra:', errFibra);
+                } else {
+                    totalFibraUpserted += batch.length;
+                }
+            }
+            console.log(`Upserted ${cleanFibraBatch.length} Fibra orders to ordenes_fabricacion_fibra.`);
+        }
+
         return NextResponse.json({
             success: true,
             error: false,
             message: `200 - Se consultaron ${mappedRows.length} órdenes de fabricación liberadas directamente desde SAP Service Layer.`,
             total: mappedRows.length,
             totalMarmol: msUpsertBatch.length,
+            totalFibra: totalFibraUpserted,
             data: mappedRows,
             response: mappedRows
         }, { status: 200 });

@@ -9,6 +9,9 @@ import ContramoldeFibraModule from '@/components/fibra/contramoldes/ContramoldeF
 import VaciadoFibraModule from '@/components/fibra/vaciado/VaciadoFibraModule'
 import DesmoldeFibraModule from '@/components/fibra/desmolde/DesmoldeFibraModule'
 import PulidoFibraModule from '@/components/fibra/pulido/PulidoFibraModule'
+import AcabadoFibraModule from '@/components/fibra/acabado/AcabadoFibraModule'
+import ReparacionFibraModule from '@/components/fibra/reparacion/ReparacionFibraModule'
+import EmpaqueFibraModule from '@/components/fibra/empaque/EmpaqueFibraModule'
 import DigitadoFibraModule from '@/components/fibra/digitado/DigitadoFibraModule'
 import CediFibraModule from '@/components/fibra/cedi/CediFibraModule'
 import ParametrosFibraModule from '@/components/fibra/parametros/ParametrosFibraModule'
@@ -38,7 +41,9 @@ interface User {
     id: string
     email?: string
     permisos?: {
-        modulos: PermisosModulos
+        modulos?: PermisosModulos
+        fibra?: PermisosModulos
+        [key: string]: any
     }
 }
 
@@ -77,15 +82,18 @@ export default function FibraPage() {
 
         setUser(combinedUser)
 
-        // Definir el módulo activo inicial basado en permisos
+        // Definir el módulo activo inicial basado en permisos (modulos o fibra)
         const modulos = combinedUser.permisos?.modulos;
-        if (modulos) {
-            // Si el módulo por defecto (pintura) no está permitido, buscar el primero que sí lo esté
-            if (!modulos['pintura']) {
-                const firstAllowed = Object.keys(modulos).find(key => modulos[key] === true);
+        const fibraPerms = (combinedUser.permisos as any)?.fibra;
+        const checkPerm = (m: string) => modulos?.[m] === true || fibraPerms?.[m] === true;
+
+        if (modulos || fibraPerms) {
+            if (!checkPerm('pintura')) {
+                const priorityModules = ['pintura', 'contramoldes', 'vaciado', 'desmolde', 'pulido', 'acabado', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
+                const firstAllowed = priorityModules.find(m => checkPerm(m));
                 if (firstAllowed) {
                     setActiveModule(firstAllowed);
-                } else if (modulos['dashboard']) {
+                } else if (checkPerm('dashboard')) {
                     setActiveModule('dashboard');
                 }
             } else {
@@ -116,7 +124,7 @@ export default function FibraPage() {
     if (!user) return null
 
     const hasPermission = (moduleName: string) => {
-        return user.permisos?.modulos?.[moduleName] === true;
+        return user.permisos?.modulos?.[moduleName] === true || (user.permisos as any)?.fibra?.[moduleName] === true;
     }
 
     return (
@@ -259,6 +267,50 @@ export default function FibraPage() {
                             </button>
                         )}
 
+                        {hasPermission('acabado') && (
+                            <button
+                                onClick={() => setActiveModule('acabado')}
+                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'acabado'
+                                    ? 'bg-[#254153] text-white'
+                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                </svg>
+                                <span>Acabado</span>
+                            </button>
+                        )}
+
+                        {hasPermission('reparacion') && (
+                            <button
+                                onClick={() => setActiveModule('reparacion')}
+                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'reparacion'
+                                    ? 'bg-[#254153] text-white'
+                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <span>Reparación</span>
+                            </button>
+                        )}
+
+                        {hasPermission('empaque') && (
+                            <button
+                                onClick={() => setActiveModule('empaque')}
+                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'empaque'
+                                    ? 'bg-[#254153] text-white'
+                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                <span>Empaque</span>
+                            </button>
+                        )}
 
                         {hasPermission('digitado') && (
                             <button
@@ -378,6 +430,12 @@ export default function FibraPage() {
                             <DesmoldeFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'pulido' && hasPermission('pulido') ? (
                             <PulidoFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'acabado' && hasPermission('acabado') ? (
+                            <AcabadoFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'reparacion' && hasPermission('reparacion') ? (
+                            <ReparacionFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'empaque' && hasPermission('empaque') ? (
+                            <EmpaqueFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'digitado' && hasPermission('digitado') ? (
                             <DigitadoFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'cedi' && hasPermission('cedi') ? (
