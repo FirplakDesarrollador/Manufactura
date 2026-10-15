@@ -9,112 +9,136 @@ export async function GET() {
         let marmolRawRows: any[] = [];
         let fetchedFromSap = false;
 
-        // 1. Consultar SAP Service Layer (Intentando primero vía API Python Cloudflare con fallback directo)
+        // Helper para normalizar fechas de SAP o Cloudflare a formato ISO YYYY-MM-DDTHH:mm:ss sin desfasar zona horaria
+        const formatSapDate = (raw: any): string | null => {
+            if (!raw) return null;
+            const str = String(raw).trim();
+            if (!str || str === 'null' || str === 'undefined') return null;
+            if (/^\d{8}$/.test(str)) {
+                return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}T00:00:00`;
+            }
+            const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                return `${match[1]}-${match[2]}-${match[3]}T00:00:00`;
+            }
+            const parsed = new Date(str);
+            if (!isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}T00:00:00`;
+            }
+            return null;
+        };
+
         const cloudflareBaseUrl = process.env.SEMAFORO_API_URL 
             ? process.env.SEMAFORO_API_URL.replace(/\/semaforo\/?$/, '')
             : "https://toner-villages-acoustic-colony.trycloudflare.com";
         const cloudflareApiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
 
+        let fibraExtraMap = new Map<string, any>();
+
+        // 1. Consultar SAP Service Layer directamente (fuente primaria con U_FRealLiberacion para fecha ideal)
         try {
-            console.log('Consultando órdenes vía API Python Cloudflare...');
-            const [cfMarmolRes, cfGenRes] = await Promise.allSettled([
-                fetch(`${cloudflareBaseUrl}/ordenes_marmol/`, {
-                    headers: { 'api-key': cloudflareApiKey },
-                    cache: 'no-store',
-                    signal: AbortSignal.timeout(12000)
-                }),
-                fetch(`${cloudflareBaseUrl}/ordenesliberadasms`, {
-                    headers: { 'api-key': cloudflareApiKey },
-                    cache: 'no-store',
-                    signal: AbortSignal.timeout(12000)
-                })
-            ]);
+            console.log('Consultando órdenes directamente en SAP Service Layer...');
+            const sapUrl = process.env.SAP_API_URL || 'https://200.7.96.194:50000/b1s/v1/Login';
+            const sapDb = process.env.SAP_COMPANY_DB || 'Firplak_SA';
+            const sapUser = process.env.SAP_USERNAME || 'manager';
+            const sapPass = process.env.SAP_PASSWORD || '2023Fir#.*';
 
-            if (cfMarmolRes.status === 'fulfilled' && cfMarmolRes.value.ok) {
-                const marmolData = await cfMarmolRes.value.json();
-                const mItems = Array.isArray(marmolData) ? marmolData : (marmolData.response || []);
-                if (mItems.length > 0) {
-                    marmolRawRows = mItems;
-                    console.log(`Cloudflare API (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
-                }
-            }
+            const loginUrl = sapUrl.endsWith('/Login') ? sapUrl : `${sapUrl.replace(/\/$/, '')}/Login`;
+            const loginRes = await fetch(loginUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ CompanyDB: sapDb, Password: sapPass, UserName: sapUser }),
+                signal: AbortSignal.timeout(12000)
+            });
 
-            if (cfGenRes.status === 'fulfilled' && cfGenRes.value.ok) {
-                const genData = await cfGenRes.value.json();
-                const gItems = Array.isArray(genData) ? genData : (genData.response || []);
-                if (gItems.length > 0) {
-                    rawRows = gItems;
-                    fetchedFromSap = true;
-                    console.log(`Cloudflare API (general) devolvió ${rawRows.length} órdenes.`);
-                }
-            }
-        } catch (cfErr) {
-            console.warn('Fallo o timeout en Cloudflare Python API:', cfErr);
-        }
+            if (loginRes.ok) {
+                const loginData = await loginRes.json();
+                const sessionId = loginData.SessionId;
+                if (sessionId) {
+                    const baseUrl = loginUrl.replace('/Login', '');
+                    const [genRes, marmolRes] = await Promise.allSettled([
+                        fetch(`${baseUrl}/SQLQueries('ordenes_pendientes_clean')/List`, {
+                            headers: { 'Cookie': `B1SESSION=${sessionId}`, 'Prefer': 'odata.maxpagesize=1000' },
+                            signal: AbortSignal.timeout(15000)
+                        }),
+                        fetch(`${baseUrl}/SQLQueries('ordenes_marmol_sl136')/List`, {
+                            headers: { 'Cookie': `B1SESSION=${sessionId}`, 'Prefer': 'odata.maxpagesize=1000' },
+                            signal: AbortSignal.timeout(15000)
+                        })
+                    ]);
 
-        // Si no se obtuvieron órdenes de mármol o generales, intentar SAP Service Layer directo (con timeout seguro)
-        if (marmolRawRows.length === 0 || rawRows.length === 0) {
-            try {
-                console.log('Consultando órdenes de fabricación liberadas en SAP Service Layer directo...');
-                const sapUrl = process.env.SAP_API_URL || 'https://200.7.96.194:50000/b1s/v1/Login';
-                const sapDb = process.env.SAP_COMPANY_DB || 'Firplak_SA';
-                const sapUser = process.env.SAP_USERNAME || 'manager';
-                const sapPass = process.env.SAP_PASSWORD || '2023Fir#.*';
-
-                const loginUrl = sapUrl.endsWith('/Login') ? sapUrl : `${sapUrl.replace(/\/$/, '')}/Login`;
-                const loginRes = await fetch(loginUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ CompanyDB: sapDb, Password: sapPass, UserName: sapUser }),
-                    signal: AbortSignal.timeout(10000)
-                });
-
-                if (loginRes.ok) {
-                    const loginData = await loginRes.json();
-                    const sessionId = loginData.SessionId;
-                    if (sessionId) {
-                        const baseUrl = loginUrl.replace('/Login', '');
-                        
-                        if (rawRows.length === 0) {
-                            const queryRes = await fetch(`${baseUrl}/SQLQueries('ordenes_pendientes_clean')/List`, {
-                                headers: {
-                                    'Cookie': `B1SESSION=${sessionId}`,
-                                    'Prefer': 'odata.maxpagesize=500'
-                                },
-                                signal: AbortSignal.timeout(15000)
-                            });
-
-                            if (queryRes.ok) {
-                                const queryData = await queryRes.json();
-                                const items = queryData.value || [];
-                                if (Array.isArray(items) && items.length > 0) {
-                                    rawRows = items;
-                                    fetchedFromSap = true;
-                                    console.log(`SAP Service Layer (general) devolvió ${rawRows.length} órdenes liberadas.`);
-                                }
-                            }
+                    if (genRes.status === 'fulfilled' && genRes.value.ok) {
+                        const qData = await genRes.value.json();
+                        if (Array.isArray(qData.value) && qData.value.length > 0) {
+                            rawRows = qData.value;
+                            fetchedFromSap = true;
+                            console.log(`SAP Service Layer (general) devolvió ${rawRows.length} órdenes liberadas.`);
                         }
+                    }
 
-                        if (marmolRawRows.length === 0) {
-                            const marmolRes = await fetch(`${baseUrl}/SQLQueries('ordenes_marmol_sl136')/List`, {
-                                headers: {
-                                    'Cookie': `B1SESSION=${sessionId}`,
-                                    'Prefer': 'odata.maxpagesize=500'
-                                },
-                                signal: AbortSignal.timeout(15000)
-                            });
-                            if (marmolRes.ok) {
-                                const marmolData = await marmolRes.json();
-                                if (Array.isArray(marmolData.value) && marmolData.value.length > 0) {
-                                    marmolRawRows = marmolData.value;
-                                    console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
-                                }
-                            }
+                    if (marmolRes.status === 'fulfilled' && marmolRes.value.ok) {
+                        const mData = await marmolRes.value.json();
+                        if (Array.isArray(mData.value) && mData.value.length > 0) {
+                            marmolRawRows = mData.value;
+                            console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
                         }
                     }
                 }
-            } catch (sapErr) {
-                console.error('Error al conectar con SAP Service Layer:', sapErr);
+            }
+        } catch (sapErr) {
+            console.warn('Fallo o timeout conectando a SAP Service Layer directo:', sapErr);
+        }
+
+        // 2. Si no se obtuvieron datos directos de SAP, intentar API Cloudflare como fallback
+        if (rawRows.length === 0 || marmolRawRows.length === 0) {
+            try {
+                console.log('Intentando fallback vía API Cloudflare...');
+                const [cfMarmolRes, cfGenRes, cfFibraRes] = await Promise.allSettled([
+                    fetch(`${cloudflareBaseUrl}/ordenes_marmol/`, {
+                        headers: { 'api-key': cloudflareApiKey },
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(12000)
+                    }),
+                    fetch(`${cloudflareBaseUrl}/ordenesliberadasms`, {
+                        headers: { 'api-key': cloudflareApiKey },
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(12000)
+                    }),
+                    fetch(`${cloudflareBaseUrl}/ordenes_fibra/`, {
+                        headers: { 'api-key': cloudflareApiKey },
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(12000)
+                    })
+                ]);
+
+                if (marmolRawRows.length === 0 && cfMarmolRes.status === 'fulfilled' && cfMarmolRes.value.ok) {
+                    const mData = await cfMarmolRes.value.json();
+                    const mItems = Array.isArray(mData) ? mData : (mData.response || []);
+                    if (mItems.length > 0) marmolRawRows = mItems;
+                }
+
+                if (rawRows.length === 0 && cfGenRes.status === 'fulfilled' && cfGenRes.value.ok) {
+                    const gData = await cfGenRes.value.json();
+                    const gItems = Array.isArray(gData) ? gData : (gData.response || []);
+                    if (gItems.length > 0) {
+                        rawRows = gItems;
+                        fetchedFromSap = true;
+                    }
+                }
+
+                if (cfFibraRes.status === 'fulfilled' && cfFibraRes.value.ok) {
+                    const fData = await cfFibraRes.value.json();
+                    const fItems = Array.isArray(fData) ? fData : (fData.response || []);
+                    fItems.forEach((item: any) => {
+                        const doc = String(item.orden_fabricacion || item.DocNum);
+                        fibraExtraMap.set(doc, item);
+                    });
+                }
+            } catch (cfErr) {
+                console.warn('Fallo en API Cloudflare:', cfErr);
             }
         }
 
@@ -125,7 +149,7 @@ export async function GET() {
             return false;
         };
 
-        // 2. Mapear datos para el frontend (page.tsx), Power Automate y Supabase
+        // 3. Mapear datos para el frontend (page.tsx), Power Automate y Supabase
         const mappedRows = rawRows.map(item => {
             const docNum = item.DocNum || item.orden_fabricacion || '';
             const typeStr = item.Type === 'S' ? 'Estándar' : (item.Type === 'D' ? 'Desmontar' : (item.type || 'Especial'));
@@ -134,8 +158,23 @@ export async function GET() {
             const cmpltQty = Number(item.CmpltQty !== undefined ? item.CmpltQty : (item['Cant.Completada'] !== undefined ? item['Cant.Completada'] : 0)) || 0;
             const pendienteQty = item.Pendiente !== undefined ? Number(item.Pendiente) : (item['PENDIENTE-OJO cuando sea superior a 1'] !== undefined ? Number(item['PENDIENTE-OJO cuando sea superior a 1']) : (plannedQty - cmpltQty));
             const prodDesc = item.ItemName || item.Itemname || item.producto_descripcion || '';
-            const fechaFin = item.DueDate || item['Fecha Finalización'] || item.fecha_entrega_estimada || null;
-            const fechaFab = item.PostDate || item['Fecha Fabricación'] || item.fecha_liberacion || '';
+
+            const fechaFin = formatSapDate(item.DueDate || item['Fecha Finalización'] || item.fecha_entrega_estimada);
+            const fechaFab = formatSapDate(item.PostDate || item['Fecha Fabricación'] || item.fecha_liberacion || item.StartDate) || '';
+
+            const rawIdeal = item.U_FRealLiberacion ||
+                             item['fecha_ideal_producción'] ||
+                             item['fecha_ideal_produccion'] ||
+                             item['fecha_ideal_producci n'] ||
+                             item.fecha_ideal_produccion ||
+                             item.U_FLiberacionPlan ||
+                             item.U_FechaLibToc ||
+                             item.fecha_liberacion ||
+                             item.RlsDate ||
+                             fechaFin;
+            const fechaIdeal = formatSapDate(rawIdeal) || fechaFin;
+
+            const extraFibra = fibraExtraMap.get(String(docNum));
 
             return {
                 docNum: docNum,
@@ -143,7 +182,7 @@ export async function GET() {
                 status: statusStr,
                 fechaFabricacion: fechaFab,
                 fechaFinalizacion: fechaFin || '',
-                fechaCierre: item.CloseDate || null,
+                fechaCierre: item.CloseDate ? formatSapDate(item.CloseDate) : null,
                 codigoCliente: item.CardCode || item.cliente || '',
                 nombreSN: item.CardName || item.Cliente || item.cliente || 'FIRPLAK S A',
                 itemCode: item.ItemCode || item.producto_sku || '',
@@ -163,23 +202,38 @@ export async function GET() {
                 cliente: item.CardName || item.Cliente || item.cliente || 'FIRPLAK S A',
                 comentario: item.comentarios || item.comentario || '',
                 fecha_entrega_estimada: fechaFin,
-                fecha_ideal_produccion: item['fecha_ideal_producci n'] || item.fecha_ideal_produccion || fechaFin || null,
+                fecha_ideal_produccion: fechaIdeal,
                 tamano: item.tamano || '',
                 linea: item.U_Linea || item.linea || 'F02',
                 molde_sku: item.molde_sku || '',
                 molde_descripcion: item.molde_descripcion || prodDesc,
                 kilos_gelcoat: item['Kilos Gelcoat'] !== undefined && item['Kilos Gelcoat'] !== null ? Number(item['Kilos Gelcoat']) : null,
+                componentes: extraFibra ? extraFibra.componentes : (item.componentes || null),
                 modificado_por: 'Sistema SAP'
             };
         });
 
-        // 3. Preparar los registros EXCLUSIVOS de Mármol Sintético para la tabla 'ordenes_fabricacion'
+        // 4. Preparar los registros EXCLUSIVOS de Mármol Sintético para la tabla 'ordenes_fabricacion'
         let msUpsertBatch: any[] = [];
 
         if (marmolRawRows.length > 0) {
             msUpsertBatch = marmolRawRows.map(item => {
                 const rawDesc = (item.producto_descripcion || item.ItemName || '').trim();
                 const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
+
+                const rawIdeal = item.U_FRealLiberacion ||
+                                 item.fecha_ideal_produccion ||
+                                 item['fecha_ideal_producción'] ||
+                                 item['fecha_ideal_produccion'] ||
+                                 item['fecha_ideal_producci n'] ||
+                                 item.U_FLiberacionPlan ||
+                                 item.fecha_liberacion ||
+                                 item.RlsDate ||
+                                 item.fecha_entrega_estimada ||
+                                 item.DueDate;
+                const rawFin = item.fecha_entrega_estimada || item.DueDate;
+                const fechaFin = formatSapDate(rawFin);
+                const fechaIdeal = formatSapDate(rawIdeal) || fechaFin;
 
                 return {
                     orden_fabricacion: String(item.orden_fabricacion || item.DocNum),
@@ -189,8 +243,8 @@ export async function GET() {
                     cantidad: Number(item.cantidad || item.PlannedQty) || 1,
                     cliente: item.cliente || item.CardName || 'FIRPLAK S A',
                     comentario: item.comentarios || item.comentario || '',
-                    fecha_entrega_estimada: item.fecha_entrega_estimada || item.DueDate || null,
-                    fecha_ideal_produccion: item.fecha_liberacion || item.fecha_ideal_produccion || item.RlsDate || null,
+                    fecha_entrega_estimada: fechaFin,
+                    fecha_ideal_produccion: fechaIdeal,
                     tamano: item.tamano || '',
                     linea: item.linea || 'F02',
                     molde_sku: item.molde_sku || '',
@@ -273,7 +327,7 @@ export async function GET() {
             if (/^(VHPT|VTIN|VHEM|PPRD)/i.test(sku)) return true;
             if (desc) {
                 const upper = desc.toUpperCase();
-                if (upper.includes('HIDROMASAJE') || upper.includes('BAÑERA') || upper.includes('JACUZZI') || upper.includes('SPA ') || upper.includes('TINA ')) {
+                if (upper.includes('HIDROMASAJE') || upper.includes('BAÑERA') || upper.includes('JACUZZI') || upper.includes('SPA ') || upper.includes('TINA ') || upper.includes('FALDON')) {
                     return true;
                 }
             }
@@ -307,6 +361,7 @@ export async function GET() {
                     molde_sku: r.molde_sku,
                     molde_descripcion: r.molde_descripcion,
                     kilos_gelcoat: r.kilos_gelcoat,
+                    componentes: r.componentes || null,
                     modificado_por: 'Sistema SAP'
                 }));
 

@@ -162,7 +162,10 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
 
             const matchesDate = !selectedDate ||
                 (orden.fecha_ideal_produccion &&
-                    orden.fecha_ideal_produccion.includes(selectedDate))
+                    orden.fecha_ideal_produccion.includes(selectedDate)) ||
+                (!orden.fecha_ideal_produccion &&
+                    orden.fecha_entrega_estimada &&
+                    orden.fecha_entrega_estimada.includes(selectedDate))
 
             return matchesSearch && matchesDate
         })
@@ -177,13 +180,15 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         })
 
         return filtered.sort((a, b) => {
-            const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
-            const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
+            const dateAStr = a.fecha_ideal_produccion || a.fecha_entrega_estimada
+            const dateBStr = b.fecha_ideal_produccion || b.fecha_entrega_estimada
+            const dateA = dateAStr ? new Date(dateAStr).getTime() : Infinity
+            const dateB = dateBStr ? new Date(dateBStr).getTime() : Infinity
             const valA = isNaN(dateA) ? Infinity : dateA
             const valB = isNaN(dateB) ? Infinity : dateB
             return valA - valB
         })
-    }, [ordenes, searchText, selectedDate])
+    }, [baseFilteredOrdenes])
 
     // Calculate metrics to match reference app (FlutterFlow)
     const metrics = useMemo(() => {

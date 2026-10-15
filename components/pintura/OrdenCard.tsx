@@ -86,12 +86,16 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                     </div>
                     <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || orden.numero_pedido || 'Sin pedido'}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
-                        {(orden.fecha_ideal_produccion || orden.fecha_entrega_estimada) && (
+                        {orden.fecha_ideal_produccion ? (
                             <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
-                                📅 Entrega Ideal: {parseDBDate(orden.fecha_ideal_produccion || orden.fecha_entrega_estimada).toLocaleDateString('es-ES')}
+                                📅 Ideal Producción: {parseDBDate(orden.fecha_ideal_produccion).toLocaleDateString('es-ES')}
                             </div>
-                        )}
-                        {orden.fecha_ideal_produccion && orden.fecha_entrega_estimada && orden.fecha_ideal_produccion !== orden.fecha_entrega_estimada && (
+                        ) : orden.fecha_entrega_estimada ? (
+                            <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
+                                📅 Ideal Producción: {parseDBDate(orden.fecha_entrega_estimada).toLocaleDateString('es-ES')}
+                            </div>
+                        ) : null}
+                        {orden.fecha_entrega_estimada && orden.fecha_ideal_produccion && orden.fecha_ideal_produccion.split('T')[0] !== orden.fecha_entrega_estimada.split('T')[0] && (
                             <div className="text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded inline-block">
                                 📦 Entrega Estimada: {parseDBDate(orden.fecha_entrega_estimada).toLocaleDateString('es-ES')}
                             </div>
