@@ -19,7 +19,8 @@ const PLANT_ALIASES: Record<string, string[]> = {
   FV: ['FV', 'FIBRA', 'FIBRA DE VIDRIO'],
   MBL: ['ESPGAB', 'MBLP', 'MUEBLE', 'MBL', 'MUEBLES'],
   CEFI: ['MBL CEFI', 'PFZ-CEMA', 'CEFI', 'MBL-CEFI'],
-  QZ: ['QUARTZSTONE', 'RTM', 'RTMM', 'CUARZO', 'QZ']
+  QZ: ['QUARTZSTONE', 'RTM', 'RTMM', 'CUARZO', 'QZ'],
+  RMOLD: ['RMOLD', 'REPARACION DE MOLDES', 'REPARACIÓN DE MOLDES', 'MOLDES']
 };
 
 export async function GET(request: Request) {

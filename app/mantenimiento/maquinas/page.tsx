@@ -105,13 +105,13 @@ export default function MaquinasPage() {
       if (p.id_maquina && p.id_maquina === m.id) return true;
 
       const pTitle = normalizeText(p.titulo || "");
-      const pCode = (p.codigo || "").toUpperCase();
+      const pCodMaq = (p.codigo_maquina || p.codigoMaquina || "").toUpperCase();
       const pMaq = normalizeText(p.maquina || "");
 
       if (code && code !== "-" && code !== "N/A" && code !== "0" && code.length >= 2) {
         const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
-        if (regex.test(pTitle) || regex.test(pCode) || regex.test(pMaq)) {
+        if (regex.test(pTitle) || regex.test(pCodMaq) || regex.test(pMaq)) {
           return true;
         }
       }

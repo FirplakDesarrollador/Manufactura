@@ -36,7 +36,7 @@ const DEFAULT_FIRPLAK_MACHINES: MachineItem[] = [
   { nombre_equipo: '0181- Mantenimiento taladro vertical Holzher 7405', codigo_equipo: 'D01CEFIPRT20', planta: 'CEFI' },
   { nombre_equipo: 'Mantenimiento líneas 2 de vaciado M.S', codigo_equipo: 'S01MSPRT30', planta: 'Mármol Sintético' },
   { nombre_equipo: 'Revisar estructura de linea 2 M.S', codigo_equipo: 'S01MSPRT30', planta: 'Mármol Sintético' },
-  { nombre_equipo: 'Mantenimiento secado de aire RTM C-0244', codigo_equipo: 'S02RTMPRT30', planta: 'Mármol Sintético' },
+  { nombre_equipo: 'Maquina de vaciado Ultracaster 2 - Azul C-0402', codigo_equipo: '0402', planta: 'Mármol Sintético' },
   { nombre_equipo: 'Mantenimiento ultracaster #2 C-0402', codigo_equipo: 'S01MSPRT60', planta: 'Mármol Sintético' },
   { nombre_equipo: 'Mantenimiento equipo laser (Muebles) C-01042 (grande)', codigo_equipo: 'S01MBLNPT240', planta: 'Muebles' },
   { nombre_equipo: 'Mantenimiento equipo laser (CEFI) C-01184', codigo_equipo: 'S02CEFIPR60', planta: 'CEFI' },
