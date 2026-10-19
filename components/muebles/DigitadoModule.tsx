@@ -68,16 +68,23 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
             
             const matchesDate = !selectedDate || (ordenDate && ordenDate.includes(selectedDate))
 
-            // Only show orders with pieces ready for Digitado (WIP from Empaque)
-            // Logic: empaque > 0
-            const isPacked = (orden.empaque || 0) > 0
+            // Only show orders with pieces ready for Digitado (WIP from Empaque, or directly from Inspección in CEFI)
+            const isReadyForDigitado = (plantaMuebles || '').toLowerCase() === 'cefi' || (orden.planta || '').toLowerCase().includes('cefi')
+                ? ((orden.inspeccion || 0) > 0 || (orden.empaque || 0) > 0)
+                : ((orden.empaque || 0) > 0 || (orden.inspeccion || 0) > 0);
 
-            return matchesSearch && matchesDate && isPacked
+            return matchesSearch && matchesDate && isReadyForDigitado
         })
-    }, [ordenes, searchText, selectedDate, dateType])
+    }, [ordenes, searchText, selectedDate, dateType, plantaMuebles])
 
     // Calculate WIP sums for this stage
-    const sumEmpaque = filteredOrdenes.reduce((sum, o) => sum + (o.empaque || 0), 0)
+    const isCefiPlant = (plantaMuebles || '').toLowerCase() === 'cefi'
+    const sumPrevStage = filteredOrdenes.reduce((sum, o) => {
+        if (isCefiPlant) {
+            return sum + (o.inspeccion || 0) + (o.empaque || 0)
+        }
+        return sum + (o.empaque || 0)
+    }, 0)
     const sumDigitado = filteredOrdenes.reduce((sum, o) => sum + (o.digitado || 0), 0)
 
     return (
@@ -126,7 +133,11 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
 
                         {/* Digitado Specific Metrics */}
                         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0 shrink-0">
-                            <MetricCard title="Empaque" value={sumEmpaque} bgColor="bg-amber-600" />
+                            <MetricCard 
+                                title={isCefiPlant ? "Por Digitar" : "Empaque"} 
+                                value={sumPrevStage} 
+                                bgColor={isCefiPlant ? "bg-emerald-600" : "bg-amber-600"} 
+                            />
                             <MetricCard title="Digitado" value={sumDigitado} bgColor="bg-cyan-600" />
                             <MetricCard title="Digitado hoy" value={metricas?.digitado || 0} bgColor="bg-gray-400" />
                         </div>

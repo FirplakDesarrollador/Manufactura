@@ -318,8 +318,50 @@ export async function GET() {
                 }
             }
             console.log(`Upserted ${cleanBatch.length} Mármol Sintético orders to ordenes_fabricacion (excluidas ${msUpsertBatch.length - cleanBatch.length} canceladas/cerradas).`);
-            // NOTA: NO desactivar automáticamente órdenes pendientes de ordenes_fabricacion solo porque no vengan en SAP.
-            // En planta, las órdenes cerradas virtualmente a fin de mes para facturación aún deben continuar su fabricación física.
+
+            // Cierre automático de órdenes que ya completaron 100% en CEDI y están cerradas en SAP.
+            // Regla: Si cedi >= cantidad, todos los pasos en planta están en 0 y ya no vienen en la lista de liberadas de SAP,
+            // se marcan como pendiente = false para no saturar Control de Piso.
+            try {
+                const sapActiveSet = new Set(mappedRows.map(r => String(r.orden_fabricacion)).filter(Boolean));
+                const { data: pendingPlantOrders } = await supabase
+                    .from('query_ordenes_fabricacion')
+                    .select('id, orden_fabricacion, cantidad, cedi, pintura, vaciado, pulido, acabado, empaque, digitado, transito')
+                    .eq('pendiente', true);
+
+                if (pendingPlantOrders && pendingPlantOrders.length > 0) {
+                    const pasosEval = ['pintura', 'vaciado', 'pulido', 'acabado', 'empaque', 'digitado', 'transito'];
+                    const idsToClose = pendingPlantOrders
+                        .filter(ord => {
+                            const cant = Number(ord.cantidad) || 0;
+                            const cedi = Number(ord.cedi) || 0;
+                            const stepsZero = pasosEval.every(p => (Number((ord as any)[p]) || 0) === 0);
+                            const ofDoc = String(ord.orden_fabricacion);
+                            return cant > 0 && cedi >= cant && stepsZero && !sapActiveSet.has(ofDoc);
+                        })
+                        .map(o => o.id)
+                        .filter(Boolean);
+
+                    if (idsToClose.length > 0) {
+                        const { error: closeErr } = await supabase
+                            .from('ordenes_fabricacion')
+                            .update({
+                                pendiente: false,
+                                fecha_entrega_real: new Date().toISOString(),
+                                modificado_por: 'Sistema SAP (Cierre Automático)'
+                            })
+                            .in('id', idsToClose);
+
+                        if (!closeErr) {
+                            console.log(`✅ Cierre automático: ${idsToClose.length} órdenes finalizadas en CEDI y cerradas en SAP fueron marcadas como pendiente = false.`);
+                        } else {
+                            console.error('Error en cierre automático de órdenes:', closeErr);
+                        }
+                    }
+                }
+            } catch (autoCloseErr) {
+                console.warn('Advertencia evaluando cierre automático de órdenes:', autoCloseErr);
+            }
         }
 
         // 4. Preparar y sincronizar registros de Fibra de Vidrio para la tabla 'ordenes_fabricacion_fibra'

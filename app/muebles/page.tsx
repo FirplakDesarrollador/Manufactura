@@ -85,6 +85,12 @@ export default function MueblesPage() {
         }
     }, [user])
 
+    useEffect(() => {
+        if ((profile?.planta_muebles || '').toLowerCase() === 'cefi' && activeModule === 'empaque') {
+            setActiveModule('corte')
+        }
+    }, [profile?.planta_muebles, activeModule])
+
     const reloadProfile = async () => {
         if (!user) return
         const { data: profile } = await supabase
@@ -194,6 +200,12 @@ export default function MueblesPage() {
     ]
 
     const filteredMenuItems = menuItems.filter(item => {
+        // En planta Cefi no se utiliza el ámbito/módulo de Empaque
+        const isCefi = (profile?.planta_muebles || '').toLowerCase() === 'cefi';
+        if (isCefi && item.id === 'empaque') {
+            return false;
+        }
+
         if (!profile) return true; // Show all while loading profile
         if (profile.rol === 'desarrollador' || profile.rol === 'director') return true;
         return profile.permisos?.muebles?.[item.permission] === true;

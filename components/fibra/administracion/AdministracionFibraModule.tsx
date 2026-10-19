@@ -63,7 +63,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     .order('fecha_entrega_estimada', { ascending: true }),
                 supabase.from('query_trazabilidad_fv')
                     .select('*')
-                    .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},pulido_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Pulido,estado.eq.Digitado,estado.eq.Transito`)
+                    .or(`estado.neq.Cedi,cedi_fecha.gte.${todayStr}`)
                     .order('vaciado_fecha', { ascending: false })
                     .limit(10000),
                 getAllMoldes()
@@ -77,6 +77,35 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
             setLoading(false)
         }
     }
+
+    // Búsqueda en base de datos si el usuario ingresa un número de OF, pedido o SKU específico
+    useEffect(() => {
+        const query = searchText.trim()
+        if (query.length < 3) return
+
+        let isMounted = true
+        const timer = setTimeout(async () => {
+            const { data } = await supabase
+                .from('query_trazabilidad_fv')
+                .select('*')
+                .or(`orden_fabricacion.ilike.%${query}%,numero_pedido.ilike.%${query}%,producto_sku.ilike.%${query}%,molde_serial.ilike.%${query}%`)
+                .order('vaciado_fecha', { ascending: false })
+                .limit(500)
+
+            if (isMounted && data && data.length > 0) {
+                setRegistros(prev => {
+                    const existingIds = new Set(prev.map(r => r.id))
+                    const newRecords = data.filter(r => !existingIds.has(r.id))
+                    return newRecords.length > 0 ? [...prev, ...newRecords] : prev
+                })
+            }
+        }, 300)
+
+        return () => {
+            isMounted = false
+            clearTimeout(timer)
+        }
+    }, [searchText])
 
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
