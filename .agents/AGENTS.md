@@ -46,23 +46,16 @@ Este panel consolidado cuenta con **5 pestañas** con visualizaciones completas 
 
 ## 4. Módulo: Indicadores de Productividad (`/indicadores-productividad`)
 
-Este módulo cuenta con dos secciones accesibles mediante botones de alternancia superiores:
-* **Tablero BI**: Visor que embebe el reporte de Power BI mediante un iframe.
-* **Tablero Manual**: Panel de control interactivo con 7 indicadores clave:
-  1. **Nivel Servicio (%)** (Meta: 90%)
-  2. **Productividad (%)** (Meta: 90%)
-  3. **Productividad (PZ)** (Meta: 630)
-  4. **Productividad (KG)** (Meta: 6300)
-  5. **Calidad** (Meta: 90%)
-  6. **Presentismo** (Meta: 100%)
-  7. **Accidentes** (Meta: 0)
-
-#### Comportamiento del Tablero Manual:
-* **Edición al clic**: Cada número es interactivo. Al hacer clic, se transforma en un input para actualizar el valor. Al salir, se guarda y formatea automáticamente.
-* **Semáforo Dinámico**: El fondo de la tarjeta cambia de color automáticamente en tiempo real usando los siguientes códigos de color:
-  * **Verde (`#59a96a`)**: Meta cumplida.
-  * **Amarillo (`#deb841`)**: Nivel aceptable de alerta.
-  * **Rojo (`#d14747`)**: Por debajo del umbral de alerta o accidentes > 0.
+Este módulo centraliza el tablero operativo y los visores especializados:
+* **Tablero de Control (Unificado)**: Panel interactivo híbrido que precarga valores automáticos (desde APIs/Power BI) y permite edición manual en tiempo real con recálculo dinámico para las 6 plantas: MS, FV, QZ, MBL, CEFI y RMOLD (Reparación de Moldes).
+  * **Indicadores clave**: Nivel de Servicio (%), Productividad (%), Productividad (PZ), Productividad (KG/MBL/Mesones), Calidad (%), Presentismo (%) y Accidentes.
+  * **Edición interactiva**: Al hacer clic en cualquier cifra (valor real o meta), se abre un input en línea para sobrescribir el valor.
+  * **Sincronización**: Botón "Actualizar" para re-sincronizar los valores automáticos según la fecha seleccionada.
+  * **Semáforo Dinámico Unificado**:
+    * **Verde (`#59a96a`)**: > 90% (o Accidentes = 0).
+    * **Amarillo (`#deb841`)**: 85% - 90% (>= 85% y <= 90%).
+    * **Rojo (`#d14747`)**: < 85% (o Accidentes > 0).
+* **Visores de Apoyo**: Control de Piso MS, Nivel de Servicio, Productividad, Calidad (homologado con `IndicadoresCalidadView`) y Ausentismo.
 
 ---
 
@@ -111,4 +104,23 @@ En las siguientes **tres vistas/pestañas principales**, siempre deben estar pre
 - **Formulario de Correctivo y TPM**: Ambos formularios deben permitir hasta **máximo 4 fotos de evidencia** (para cubrir hasta 2 fotos del "antes" y 2 del "después").
 - **Acciones fotográficas**: Deben incluir tanto el botón de **Tomar Foto** (cámara en vivo / `LiveCameraModal`) como el botón de **Adjuntar Archivo** (galería / explorador de archivos).
 - **Herramientas**: Cada miniatura debe permitir eliminar (`X`) y señalar en rojo con el editor de dibujo (`PhotoAnnotationEditor` / `Señalar en Rojo`).
+
+---
+
+## 8. Estándar de Pantalla y Visualización de Gráficas (Laptops FIRPLAK)
+
+### Habilidad Asociada: `skills/visualizacion-graficas`
+* **Hardware Estándar:** Dell Pro 14 (FIRPLAK060 / PC14250).
+* **Resolución Nativa:** `1920 × 1200` (16:10).
+* **Escala de Pantalla Windows:** `150%` (DPI Factor = 1.5).
+* **Viewport CSS Efectivo en Navegador:**
+  * **Ancho Útil:** `1280 px` (Límite exacto del breakpoint `xl` de Tailwind).
+  * **Alto Útil Real (restando navegador y barra de tareas):** `~640 px a 700 px`.
+
+### Reglas Críticas para Gráficas (Recharts) y Dashboards:
+1. **Alturas de Gráficos:** Los contenedores en cuadrículas de 2 columnas deben medir entre **`h-[280px]` y `h-[340px]`** (máximo 380px para full-width) para evitar obligar al usuario a hacer scroll para ver 2 gráficas.
+2. **Distribución Responsiva:** Usar `grid-cols-1 xl:grid-cols-2` o `grid-cols-1 lg:grid-cols-2`.
+3. **Tipografía en SVGs de Recharts:** Mantener `fontSize={11}` o `fontSize={12}` en ejes X/Y, Tooltips y Legends para evitar empastamiento visual provocado por la escala del 150%.
+4. **Paleta de Colores Oficial:** Primario Navy (`#324354`), Sage (`#7B8E90`), Verde Semáforo (`#59a96a`), Amarillo (`#deb841`), Rojo (`#d14747`).
+
 

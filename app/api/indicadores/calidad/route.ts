@@ -215,7 +215,8 @@ export async function GET(request: Request) {
                 FV: { calidad: 85.0, total: 30, buenos: 25, defectuosos: 5 },
                 QZ: { calidad: 95.0, total: 20, buenos: 19, defectuosos: 1 },
                 MBL: { calidad: 95.0, total: 200, buenos: 190, defectuosos: 10 },
-                CEFI: { calidad: 95.0, total: 180, buenos: 171, defectuosos: 9 }
+                CEFI: { calidad: 95.0, total: 180, buenos: 171, defectuosos: 9 },
+                RMOLD: { calidad: 92.0, total: 50, buenos: 46, defectuosos: 4 }
             };
 
             return NextResponse.json({
@@ -242,7 +243,8 @@ export async function GET(request: Request) {
             FV: { calidad: 85.0, total: 30, buenos: 25, defectuosos: 5 },
             QZ: { calidad: 95.0, total: 20, buenos: 19, defectuosos: 1 },
             MBL: { calidad: 95.0, total: 200, buenos: 190, defectuosos: 10 },
-            CEFI: { calidad: 95.0, total: 180, buenos: 171, defectuosos: 9 }
+            CEFI: { calidad: 95.0, total: 180, buenos: 171, defectuosos: 9 },
+            RMOLD: { calidad: 92.0, total: 50, buenos: 46, defectuosos: 4 }
         };
 
         return NextResponse.json({

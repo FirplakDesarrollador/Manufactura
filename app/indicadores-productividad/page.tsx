@@ -4,9 +4,10 @@ import React, { useState, useEffect } from "react";
 import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users, RefreshCw, CheckCircle2 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
+import IndicadoresCalidadView from "@/components/calidad/IndicadoresCalidadView";
 
 // Plant keys supported
-type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI";
+type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
 
 interface PlantMetrics {
     nivelServicioMeta: number;
@@ -60,7 +61,7 @@ const INITIAL_PLANT_DATA: Record<PlantKey, PlantMetrics> = {
         secondUnitName: "KG",
         secondUnitMeta: 0,
         secondUnitReal: 0,
-        calidadMeta: 35,
+        calidadMeta: 90,
         calidadReal: 25.0,
         totalPersonas: 22,
         ausentismos: 0,
@@ -122,6 +123,24 @@ const INITIAL_PLANT_DATA: Record<PlantKey, PlantMetrics> = {
         accidentesMeta: 0,
         accidentesReal: 0,
     },
+    RMOLD: {
+        nivelServicioMeta: 90,
+        nivelServicioReal: 85.0,
+        productividadPctMeta: 90,
+        productividadPzMeta: 24,
+        productividadPzReal: 24,
+        hasSecondUnit: false,
+        secondUnitName: "KG",
+        secondUnitMeta: 0,
+        secondUnitReal: 0,
+        calidadMeta: 90,
+        calidadReal: 92.0,
+        totalPersonas: 10,
+        ausentismos: 0,
+        presentismoMeta: 100,
+        accidentesMeta: 0,
+        accidentesReal: 0,
+    },
 };
 
 // URLs de Power BI cargadas desde variables de entorno para no exponerlas en el código fuente
@@ -139,9 +158,8 @@ const POWERBI_URLS = {
 };
 
 export default function IndicadoresProductividadPage() {
-    // View mode state (Default: "automatico")
-    const [viewMode, setViewMode] = useState<"automatico" | "manual" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("automatico");
-    const [calidadSubTab, setCalidadSubTab] = useState<"general" | "ms" | "fv" | "mbl" | "cefi" | "moldes">("ms");
+    // View mode state (Default: "tablero")
+    const [viewMode, setViewMode] = useState<"tablero" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("tablero");
 
     // Plant selector state
     const [selectedPlant, setSelectedPlant] = useState<PlantKey>("MS");
@@ -175,9 +193,8 @@ export default function IndicadoresProductividadPage() {
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
     const [loadingNS, setLoadingNS] = useState<boolean>(false);
 
-    // Separate Plant Data States for Manual and Automático dashboards
-    const [manualPlantData, setManualPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
-    const [autoPlantData, setAutoPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
+    // Unified Plant Data State: stores initial/automatic values and user edits
+    const [plantData, setPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
 
     // Función para consultar Nivel de Servicio y Calidad en tiempo real
     const fetchNivelServicio = async (targetFecha: string) => {
@@ -191,10 +208,10 @@ export default function IndicadoresProductividadPage() {
             const jsonNS = resNS.ok ? await resNS.json() : null;
             const jsonCalidad = resCalidad.ok ? await resCalidad.json() : null;
 
-            setAutoPlantData((prev) => {
+            setPlantData((prev) => {
                 const updated = { ...prev };
 
-                // Actualizar Nivel de Servicio
+                // Actualizar Nivel de Servicio automático
                 if (jsonNS?.success && jsonNS.plantas) {
                     for (const [pKey, vals] of Object.entries(jsonNS.plantas)) {
                         const pk = pKey as PlantKey;
@@ -210,7 +227,7 @@ export default function IndicadoresProductividadPage() {
                     }
                 }
 
-                // Actualizar Calidad (%)
+                // Actualizar Calidad (%) automático
                 if (jsonCalidad?.success && jsonCalidad.plantas) {
                     for (const [pKey, vals] of Object.entries(jsonCalidad.plantas)) {
                         const pk = pKey as PlantKey;
@@ -239,19 +256,17 @@ export default function IndicadoresProductividadPage() {
         }
     };
 
-    // NO consultar automáticamente al entrar ni al cambiar la fecha por defecto
-    // Se ejecuta únicamente cuando el usuario hace clic en el botón "Actualizar"
-
-    // Active plant data depending on selected tab
-    const plantData = viewMode === "automatico" ? autoPlantData : manualPlantData;
-    const setPlantData = viewMode === "automatico" ? setAutoPlantData : setManualPlantData;
+    // Consultar automáticamente los valores automáticos al entrar
+    useEffect(() => {
+        void fetchNivelServicio(fechaISO);
+    }, []);
 
     // Editing states for values or metas
     const [editingKey, setEditingKey] = useState<string | null>(null);
 
     const currentData = plantData[selectedPlant];
 
-    // Helper to update state for current plant
+    // Helper to update state for current plant (permite modificar cualquier valor)
     const updateCurrentPlant = (fields: Partial<PlantMetrics>) => {
         setPlantData((prev) => ({
             ...prev,
@@ -272,19 +287,17 @@ export default function IndicadoresProductividadPage() {
         ? ((currentData.totalPersonas - currentData.ausentismos) / currentData.totalPersonas) * 100
         : 100;
 
-    // Color semáforo logic:
-    // Porcentaje del valor real sobre la meta:
-    // Verde: > 90% del cumplimiento sobre la meta (o >= 90%)
-    // Amarillo: >= 85% y <= 90% sobre la meta
-    // Rojo: < 85% sobre la meta
-    const getCardColor = (realVal: number, metaVal: number, isAccidentes = false, isNoApplies = false) => {
+    // Color semáforo unificado para todos los recuadros de todas las plantas:
+    // Verde: > 90%
+    // Amarillo: 85% - 90% (>= 85% y <= 90%)
+    // Rojo: < 85%
+    // Excepción única: Accidentes (0 es verde, mayor a 0 es rojo)
+    const getCardColor = (valOrPct: number, isAccidentes = false, isNoApplies = false) => {
         if (isNoApplies) return "bg-slate-200 border-slate-300 text-slate-400 opacity-80";
-        if (isAccidentes) return realVal === 0 ? "bg-[#59a96a]" : "bg-[#d14747]";
-        if (metaVal <= 0) return "bg-[#59a96a]";
+        if (isAccidentes) return valOrPct === 0 ? "bg-[#59a96a]" : "bg-[#d14747]";
 
-        const pctOfMeta = (realVal / metaVal) * 100;
-        if (pctOfMeta > 90) return "bg-[#59a96a]";
-        if (pctOfMeta >= 85) return "bg-[#deb841]";
+        if (valOrPct > 90) return "bg-[#59a96a]";
+        if (valOrPct >= 85) return "bg-[#deb841]";
         return "bg-[#d14747]";
     };
 
@@ -299,32 +312,19 @@ export default function IndicadoresProductividadPage() {
             />
 
             {/* Sub-Header Actions */}
-            <div className="w-full bg-white border-b border-[#e2ded5] py-2.5 px-4 shadow-sm">
+            <div className="w-full bg-white border-b border-[#e2ded5] py-1.5 px-4 shadow-2xs">
                 <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-2 sm:gap-3">
-                    {/* 1. Tablero Automático */}
+                    {/* 1. Tablero de Control (Unificado) */}
                     <button
-                        onClick={() => setViewMode("automatico")}
+                        onClick={() => setViewMode("tablero")}
                         className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "automatico"
+                            viewMode === "tablero"
                                 ? "bg-[#324354] text-white shadow-md"
                                 : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                         }`}
                     >
                         <SlidersHorizontal size={15} />
-                        <span>Tablero Automático</span>
-                    </button>
-
-                    {/* 2. Tablero Manual */}
-                    <button
-                        onClick={() => setViewMode("manual")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "manual"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <SlidersHorizontal size={15} />
-                        <span>Tablero Manual</span>
+                        <span>Tablero de Control</span>
                     </button>
 
                     {/* 3. Control de Piso MS */}
@@ -395,7 +395,7 @@ export default function IndicadoresProductividadPage() {
             </div>
 
             {/* Main Area */}
-            <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-4 pb-6">
+            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" ? "max-w-[1900px] p-0 pb-4" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
                 {viewMode === "bi" ? (
                     <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
                         <iframe
@@ -445,86 +445,8 @@ export default function IndicadoresProductividadPage() {
                         ></iframe>
                     </div>
                 ) : viewMode === "calidad" ? (
-                    <div className="space-y-4">
-                        <div className="flex flex-wrap justify-center gap-3">
-                            <button
-                                onClick={() => setCalidadSubTab("general")}
-                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-                                    calidadSubTab === "general"
-                                        ? "bg-[#324354] text-white shadow-md"
-                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
-                                }`}
-                            >
-                                Calidad General Plantas
-                            </button>
-                            <button
-                                onClick={() => setCalidadSubTab("ms")}
-                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-                                    calidadSubTab === "ms"
-                                        ? "bg-[#324354] text-white shadow-md"
-                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
-                                }`}
-                            >
-                                Calidad MS
-                            </button>
-                            <button
-                                onClick={() => setCalidadSubTab("fv")}
-                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-                                    calidadSubTab === "fv"
-                                        ? "bg-[#324354] text-white shadow-md"
-                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
-                                }`}
-                            >
-                                Calidad FV
-                            </button>
-                            <button
-                                onClick={() => setCalidadSubTab("mbl")}
-                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-                                    calidadSubTab === "mbl"
-                                        ? "bg-[#324354] text-white shadow-md"
-                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
-                                }`}
-                            >
-                                Calidad MBL
-                            </button>
-                            <button
-                                onClick={() => setCalidadSubTab("cefi")}
-                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-                                    calidadSubTab === "cefi"
-                                        ? "bg-[#324354] text-white shadow-md"
-                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
-                                }`}
-                            >
-                                Calidad CEFI
-                            </button>
-                            <button
-                                onClick={() => setCalidadSubTab("moldes")}
-                                className={`px-5 py-2 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-                                    calidadSubTab === "moldes"
-                                        ? "bg-[#324354] text-white shadow-md"
-                                        : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
-                                }`}
-                            >
-                                Calidad Moldes
-                            </button>
-                        </div>
-                        <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
-                            <iframe
-                                title={`Power BI Calidad ${calidadSubTab}`}
-                                width="100%"
-                                height="100%"
-                                src={
-                                    calidadSubTab === "general" ? POWERBI_URLS.calidadGeneral :
-                                    calidadSubTab === "ms" ? POWERBI_URLS.calidadMS :
-                                    calidadSubTab === "fv" ? POWERBI_URLS.calidadFV :
-                                    calidadSubTab === "mbl" ? POWERBI_URLS.calidadMBL :
-                                    calidadSubTab === "cefi" ? POWERBI_URLS.calidadCEFI :
-                                    POWERBI_URLS.calidadMoldes
-                                }
-                                frameBorder="0"
-                                allowFullScreen={true}
-                            ></iframe>
-                        </div>
+                    <div className="w-full animate-in fade-in duration-300">
+                        <IndicadoresCalidadView showMainHeader={false} />
                     </div>
                 ) : (
                     <div className="space-y-5 animate-in fade-in duration-300">
@@ -537,9 +459,10 @@ export default function IndicadoresProductividadPage() {
                                     PLANTA:
                                 </span>
                                 <div className="flex items-center gap-1.5 ml-1">
-                                    {(["MS", "FV", "QZ", "MBL", "CEFI"] as PlantKey[]).map((p) => (
+                                    {(["MS", "FV", "QZ", "MBL", "CEFI", "RMOLD"] as PlantKey[]).map((p) => (
                                         <button
                                             key={p}
+                                            title={p === "RMOLD" ? "Reparación de Moldes (RMOLD)" : undefined}
                                             onClick={() => {
                                                 setSelectedPlant(p);
                                                 setEditingKey(null);
@@ -566,29 +489,33 @@ export default function IndicadoresProductividadPage() {
                                     <input
                                         type="date"
                                         value={fechaISO}
-                                        onChange={(e) => setFechaISO(e.target.value)}
+                                        onChange={(e) => {
+                                            const newFecha = e.target.value;
+                                            setFechaISO(newFecha);
+                                            if (newFecha) {
+                                                void fetchNivelServicio(newFecha);
+                                            }
+                                        }}
                                         className="text-xs font-bold text-[#324354] bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-[#324354] focus:outline-none cursor-pointer"
                                     />
                                 </div>
 
-                                {/* Botón Actualizar (Solo visible en Tablero Automático) */}
-                                {viewMode === "automatico" && (
-                                    <button
-                                        onClick={() => fetchNivelServicio(fechaISO)}
-                                        disabled={loadingNS}
-                                        title="Actualizar datos de esta fecha"
-                                        className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer disabled:opacity-50"
-                                    >
-                                        <RefreshCw size={13} className={loadingNS ? "animate-spin" : ""} />
-                                        <span>{loadingNS ? "Actualizando..." : "Actualizar"}</span>
-                                    </button>
-                                )}
+                                {/* Botón Actualizar */}
+                                <button
+                                    onClick={() => fetchNivelServicio(fechaISO)}
+                                    disabled={loadingNS}
+                                    title="Recargar valores automáticos para esta fecha"
+                                    className="flex items-center gap-1.5 bg-[#324354] hover:bg-[#25323f] active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                                >
+                                    <RefreshCw size={13} className={loadingNS ? "animate-spin" : ""} />
+                                    <span>{loadingNS ? "Actualizando..." : "Actualizar"}</span>
+                                </button>
 
-                                {/* Indicador de Estado Actualizado (Solo visible en Tablero Automático) */}
-                                {viewMode === "automatico" && lastUpdated && !loadingNS && (
+                                {/* Indicador de Estado Actualizado */}
+                                {lastUpdated && !loadingNS && (
                                     <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold px-2 py-1 rounded-lg animate-in fade-in duration-300">
                                         <CheckCircle2 size={13} className="text-emerald-600" />
-                                        <span>Actualizado ({lastUpdated})</span>
+                                        <span>Automático ({lastUpdated})</span>
                                     </div>
                                 )}
                             </div>
@@ -618,7 +545,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                 </div>
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.nivelServicioReal, currentData.nivelServicioMeta)}`}>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.nivelServicioReal)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
                                         {editingKey === "real_nivelServicio" ? (
                                             <div className="flex items-center justify-center gap-0.5">
@@ -670,7 +597,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                 </div>
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(calcProdPctReal, currentData.productividadPctMeta)}`}>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(calcProdPctReal)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
                                         <span className="px-2 py-1 rounded-xl text-3xl sm:text-4xl lg:text-5xl font-black text-center tracking-tight whitespace-nowrap">
                                             {calcProdPctReal.toFixed(1)} %
@@ -704,7 +631,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                 </div>
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.productividadPzReal, currentData.productividadPzMeta)}`}>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(calcProdPctReal)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
                                         {editingKey === "real_productividadPz" ? (
                                             <input
@@ -753,7 +680,7 @@ export default function IndicadoresProductividadPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.mesonesReal ?? 50, currentData.mesonesMeta ?? 50)}`}>
+                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.mesonesMeta && currentData.mesonesMeta > 0 ? (((currentData.mesonesReal ?? 50) / currentData.mesonesMeta) * 100) : 100)}`}>
                                         <div className="flex-1 flex items-center justify-center text-slate-950">
                                             {editingKey === "real_mesones" ? (
                                                 <input
@@ -807,7 +734,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                     
-                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitReal, currentData.secondUnitMeta, false, !currentData.hasSecondUnit)}`}>
+                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitMeta > 0 ? ((currentData.secondUnitReal / currentData.secondUnitMeta) * 100) : 0, false, !currentData.hasSecondUnit)}`}>
                                         <div className="flex-1 flex items-center justify-center text-slate-950">
                                             {!currentData.hasSecondUnit ? (
                                                 <span className="text-2xl font-black text-slate-400 tracking-wider whitespace-nowrap">
@@ -864,7 +791,7 @@ export default function IndicadoresProductividadPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitReal, currentData.secondUnitMeta, false, !currentData.hasSecondUnit)}`}>
+                                    <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.secondUnitMeta > 0 ? ((currentData.secondUnitReal / currentData.secondUnitMeta) * 100) : 0, false, !currentData.hasSecondUnit)}`}>
                                         <div className="flex-1 flex items-center justify-center text-slate-950">
                                             {editingKey === "real_secondUnit" ? (
                                                 <input
@@ -912,7 +839,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                 </div>
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.calidadReal, currentData.calidadMeta)}`}>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.calidadReal)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
                                         {editingKey === "real_calidad" ? (
                                             <div className="flex items-center justify-center gap-0.5">
@@ -964,7 +891,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                 </div>
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(calcPresentismoReal, currentData.presentismoMeta)}`}>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(calcPresentismoReal)}`}>
                                     <div className="flex-1 flex flex-col items-center justify-center text-slate-950">
                                         {editingKey === "real_ausentismos" ? (
                                             <div className="flex flex-col items-center gap-1 bg-white/40 p-2 rounded-xl">
@@ -1035,7 +962,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                 </div>
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.accidentesReal, currentData.accidentesMeta, true)}`}>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.accidentesReal, true)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
                                         {editingKey === "real_accidentes" ? (
                                             <input

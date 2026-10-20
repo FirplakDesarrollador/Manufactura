@@ -67,11 +67,25 @@ export async function GET() {
       let bestMatch: any = null;
       let matchType = 'none';
 
+      // Special handling for Ultracaster
+      const isTargetUltracaster =
+        normMaq === 'ultracaster' ||
+        normMaq.includes('ultracaster') ||
+        normTitle.includes('c 0402') ||
+        normTitle.includes('c0402') ||
+        normTitle.includes('ultracaster');
+
       for (const m of allMaquinas) {
         const mCode = (m.codigo_equipo || '').trim();
         const mName = (m.nombre_equipo || '').trim();
         const normMName = normalize(mName);
         const normMCode = normalize(mCode);
+
+        if (isTargetUltracaster && (mCode === '0402' || mCode === 'C-0402' || (normMName.includes('ultracaster') && normMName.includes('azul')))) {
+          bestMatch = m;
+          matchType = 'exact_name';
+          break;
+        }
 
         // 1. Exact code match
         if (mCode && (normTitle.includes(normMCode) || normMaq.includes(normMCode) || pCode.includes(mCode))) {

@@ -600,33 +600,32 @@ export default function GestionMantenimientoPage() {
   };
 
   const renderMachineEstado = (estado?: string | null) => {
-    const est = (estado || '').toUpperCase();
-    if (est.includes('ACTIVO') || est.includes('ACTIVA') || est.includes('OPERATIVA')) {
+    const est = (estado || '').trim().toUpperCase();
+
+    // 1. DE BAJA / OBSOLETO
+    if (est.includes('BAJA') || est.includes('OBSOLET')) {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          ACTIVO
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+          DE BAJA / OBSOLETO
         </span>
       );
     }
-    if (est.includes('MANTENIMIENTO') || est.includes('REPARACION')) {
+
+    // 2. INACTIVO (Must check BEFORE ACTIVO because "INACTIVO" contains "ACTIVO")
+    if (est.includes('INACTIVO') || est.includes('INACTIVA') || est.includes('FUERA')) {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-          EN MTTO
-        </span>
-      );
-    }
-    if (est.includes('INACTIVO') || est.includes('BAJA') || est.includes('OBSOLETO')) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-rose-50 text-rose-700 border border-rose-200">
           INACTIVO
         </span>
       );
     }
+
+    // 3. ACTIVO (Operativo)
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
-        {estado || 'ACTIVO'}
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        ACTIVO
       </span>
     );
   };
@@ -642,14 +641,15 @@ export default function GestionMantenimientoPage() {
       if (p.idMaquina && p.idMaquina === m.id) return true;
 
       const pTitle = normalize(p.title || (p as any).titulo || '');
-      const pCode = (p.code || (p as any).codigo || p.csvId || '').toUpperCase();
+      const pCodMaq = (p.codigoMaquina || (p as any).codigo_maquina || '').toUpperCase();
       const pMaq = normalize(p.maquina || '');
 
-      // 2. Specific machine code match (e.g. "0976" in pMaq, pCode, or pTitle)
+      // 2. Specific machine code match (e.g. "0976" in pMaq, pCodMaq, or pTitle)
+      // NOT pCode (which is the PMP plan consecutive number, e.g. PMP-0026)
       if (code && code !== '-' && code !== 'N/A' && code !== '0' && code.length >= 2) {
         const escaped = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
-        if (regex.test(pTitle) || regex.test(pCode) || regex.test(pMaq)) {
+        if (regex.test(pTitle) || regex.test(pCodMaq) || regex.test(pMaq)) {
           return true;
         }
       }
@@ -1641,6 +1641,30 @@ export default function GestionMantenimientoPage() {
     const normTitle = normalize(rawTitle);
     const normPlant = normalize(p.planta || '');
 
+    // Regla de negocio explícita para Ultracaster:
+    // Cualquier mantenimiento de Ultracaster / C-0402 debe asignarse siempre a
+    // "Maquina de vaciado Ultracaster 2 - Azul C-0402" con código "0402"
+    const isTargetUltracaster =
+      normMaq === 'ultracaster' ||
+      normMaq.includes('ultracaster') ||
+      normTitle.includes('c 0402') ||
+      normTitle.includes('c0402') ||
+      (normTitle.includes('ultracaster') && !normTitle.includes('rotoflex'));
+
+    if (isTargetUltracaster) {
+      const targetInCatalog = catalog?.find(m => {
+        const c = String(m.codigo_equipo || '').trim().toUpperCase();
+        const n = normalize(m.nombre_equipo || '');
+        return c === '0402' || c === 'C-0402' || (n.includes('ultracaster') && (n.includes('azul') || n.includes('0402') || n.includes('2')));
+      });
+
+      return {
+        matched: targetInCatalog || null,
+        codigo: targetInCatalog?.codigo_equipo || '0402',
+        nombre: targetInCatalog?.nombre_equipo || 'Maquina de vaciado Ultracaster 2 - Azul C-0402'
+      };
+    }
+
     // 1. Check if machine code (codigo_equipo) is present in machine catalog
     const withCodes = catalog.filter(m => {
       const c = (m.codigo_equipo || '').trim();
@@ -1889,6 +1913,30 @@ export default function GestionMantenimientoPage() {
           hasMoreMaq = false;
         }
       }
+
+      try {
+        const cached = localStorage.getItem('firplak_maquinas_catalogo_cache');
+        if (cached) {
+          const list = JSON.parse(cached);
+          if (Array.isArray(list) && list.length > 0) {
+            allMaquinas = allMaquinas.map(m => {
+              const found = list.find((c: any) => String(c.id) === String(m.id) || (c.codigo_equipo && m.codigo_equipo && String(c.codigo_equipo).trim().toUpperCase() === String(m.codigo_equipo).trim().toUpperCase()));
+              return found ? { ...m, ...found } : m;
+            });
+          }
+        }
+      } catch (cErr) {}
+
+      // Deduplicar máquinas por ID para evitar registros duplicados en memoria
+      const seenMaqIds = new Set<string>();
+      allMaquinas = allMaquinas.filter(m => {
+        if (!m) return false;
+        const key = m.id !== undefined && m.id !== null ? String(m.id) : (m.codigo_equipo ? `code_${m.codigo_equipo}` : JSON.stringify(m));
+        if (seenMaqIds.has(key)) return false;
+        seenMaqIds.add(key);
+        return true;
+      });
+
       setMaquinasCatalogo(allMaquinas);
 
       // 4. Planes Preventivos Maestros (PMP) desde Supabase
@@ -4356,13 +4404,24 @@ export default function GestionMantenimientoPage() {
     setEditingMachineId(m.id);
     setMachineFormMode('edit');
     setMachineFormTab('general');
+
+    let initialEstado = 'ACTIVO';
+    const rawEst = (m.estado || '').trim().toUpperCase();
+    if (rawEst.includes('BAJA') || rawEst.includes('OBSOLET')) {
+      initialEstado = 'DE BAJA / OBSOLETO';
+    } else if (rawEst.includes('INACTIVO') || rawEst.includes('INACTIVA') || rawEst.includes('FUERA')) {
+      initialEstado = 'INACTIVO';
+    } else {
+      initialEstado = 'ACTIVO';
+    }
+
     setMachineFormData({
       nombre_equipo: m.nombre_equipo || '',
       nombre_alterno: m.nombre_alterno || '',
       codigo_equipo: m.codigo_equipo || '',
       activo_fijo: m.activo_fijo || '',
       tipo: m.tipo || '',
-      estado: m.estado || 'ACTIVO',
+      estado: initialEstado,
       marca: m.marca || '',
       modelo: m.modelo || '',
       caracteristicas: m.caracteristicas || '',
@@ -4430,34 +4489,102 @@ export default function GestionMantenimientoPage() {
       };
 
       if (machineFormMode === 'create') {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('mantenimiento_maquinas_equipos')
           .insert(payload)
-          .select()
-          .single();
+          .select();
+
+        if (error) {
+          const fallback = await supabase
+            .from('maquinas_equipos')
+            .insert(payload)
+            .select();
+          if (!fallback.error) {
+            data = fallback.data;
+            error = null;
+          }
+        }
 
         if (error) throw error;
-        if (data) {
-          setMaquinasCatalogo(prev => [data, ...prev]);
-          setSelectedMachineModal(data);
-          alert('¡Máquina o equipo creado exitosamente en Supabase!');
-        }
+        const newRecord = (data && data[0]) ? data[0] : { ...payload, id: Date.now() };
+        setMaquinasCatalogo(prev => [newRecord, ...prev]);
+        setSelectedMachineModal(newRecord);
+        alert('¡Máquina o equipo creado exitosamente en Supabase!');
       } else if (machineFormMode === 'edit' && editingMachineId) {
-        const { data, error } = await supabase
+        const targetId = editingMachineId;
+        const numId = Number(targetId);
+
+        let { data, error } = await supabase
           .from('mantenimiento_maquinas_equipos')
           .update(payload)
-          .eq('id', editingMachineId)
-          .select()
-          .single();
+          .eq('id', isNaN(numId) ? targetId : numId)
+          .select();
 
-        if (error) throw error;
-        if (data) {
-          setMaquinasCatalogo(prev => prev.map(m => (m.id === editingMachineId ? data : m)));
-          if (selectedMachineModal && selectedMachineModal.id === editingMachineId) {
-            setSelectedMachineModal(data);
+        if (error) {
+          const fallback = await supabase
+            .from('maquinas_equipos')
+            .update(payload)
+            .eq('id', isNaN(numId) ? targetId : numId)
+            .select();
+          if (!fallback.error) {
+            data = fallback.data;
+            error = null;
           }
-          alert('¡Ficha técnica de máquina actualizada correctamente en Supabase!');
         }
+
+        // Si no devolvió filas, intentar también por codigo_equipo
+        if ((!data || data.length === 0) && payload.codigo_equipo) {
+          const byCode = await supabase
+            .from('mantenimiento_maquinas_equipos')
+            .update(payload)
+            .eq('codigo_equipo', payload.codigo_equipo)
+            .select();
+          if (byCode.data && byCode.data.length > 0) {
+            data = byCode.data;
+          }
+        }
+
+        if (error) {
+          console.warn('Advertencia al sincronizar actualización con Supabase:', error);
+        }
+
+        const updatedRecord = (data && data[0])
+          ? { ...payload, ...data[0] }
+          : { ...payload, id: targetId };
+
+        // Actualizar catálogo local asegurando coincidencia de id (número o texto) o por código
+        setMaquinasCatalogo(prev => prev.map(m => {
+          const isIdMatch = String(m.id) === String(targetId);
+          const isCodeMatch = payload.codigo_equipo && m.codigo_equipo && String(m.codigo_equipo).trim().toUpperCase() === String(payload.codigo_equipo).trim().toUpperCase();
+          if (isIdMatch || isCodeMatch) {
+            return { ...m, ...updatedRecord, estado: payload.estado };
+          }
+          return m;
+        }));
+
+        if (selectedMachineModal) {
+          const isIdMatch = String(selectedMachineModal.id) === String(targetId);
+          const isCodeMatch = payload.codigo_equipo && selectedMachineModal.codigo_equipo && String(selectedMachineModal.codigo_equipo).trim().toUpperCase() === String(payload.codigo_equipo).trim().toUpperCase();
+          if (isIdMatch || isCodeMatch) {
+            setSelectedMachineModal(prev => (prev ? { ...prev, ...updatedRecord, estado: payload.estado } : { ...updatedRecord, estado: payload.estado }));
+          }
+        }
+
+        // Guardar en caché local para persistencia inmediata
+        try {
+          const cached = localStorage.getItem('firplak_maquinas_catalogo_cache');
+          let list = cached ? JSON.parse(cached) : [];
+          if (!Array.isArray(list)) list = [];
+          const idx = list.findIndex((m: any) => String(m.id) === String(targetId) || (payload.codigo_equipo && m.codigo_equipo && String(m.codigo_equipo).trim().toUpperCase() === String(payload.codigo_equipo).trim().toUpperCase()));
+          if (idx >= 0) {
+            list[idx] = { ...list[idx], ...updatedRecord, estado: payload.estado };
+          } else {
+            list.push({ ...updatedRecord, estado: payload.estado });
+          }
+          localStorage.setItem('firplak_maquinas_catalogo_cache', JSON.stringify(list));
+        } catch (lsErr) {}
+
+        alert('¡Ficha técnica de máquina actualizada correctamente en Supabase!');
       }
 
       setShowMachineFormModal(false);
@@ -4952,10 +5079,10 @@ export default function GestionMantenimientoPage() {
       if (code && code !== '-' && code !== 'N/A' && code !== '0' && code.length >= 2) {
         for (let i = 0; i < tasks.length; i++) {
           const p = tasks[i];
-          const pCode = (p.code || p.csvId || '').toUpperCase();
+          const pCodMaq = (p.codigoMaquina || (p as any).codigo_maquina || '').toUpperCase();
           const pTitle = (p.title || '').toUpperCase();
           const pMaq = (p.maquina || '').toUpperCase();
-          if (pCode.includes(code) || pTitle.includes(code) || pMaq.includes(code)) {
+          if (pCodMaq.includes(code) || pTitle.includes(code) || pMaq.includes(code)) {
             cnt++;
           }
         }
@@ -5021,10 +5148,14 @@ export default function GestionMantenimientoPage() {
       }
 
       if (maquinasEstado !== 'Todos') {
-        const est = (m.estado || '').toUpperCase();
-        const isAct = est.includes('ACTIVO') || est.includes('ACTIVA') || est.includes('OPERATIVA') || !est;
+        const est = (m.estado || '').trim().toUpperCase();
+        const isBaja = est.includes('BAJA') || est.includes('OBSOLET');
+        const isInact = (est.includes('INACTIVO') || est.includes('INACTIVA') || est.includes('FUERA')) && !isBaja;
+        const isAct = !isBaja && !isInact;
+
         if (maquinasEstado === 'Activos' && !isAct) return false;
-        if (maquinasEstado === 'Inactivos' && isAct) return false;
+        if (maquinasEstado === 'Inactivos' && !isInact) return false;
+        if (maquinasEstado === 'Baja' && !isBaja) return false;
       }
 
       return true;
@@ -7520,7 +7651,7 @@ export default function GestionMantenimientoPage() {
 
                         return (
                           <tr 
-                            key={row.id || idx} 
+                            key={`hist_${row.id || 'noid'}_${row.codigo || ''}_${idx}`} 
                             onClick={() => handleOpenHistoryRowDetail(row)}
                             className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
                             title="Haz clic para ver la información completa o modificar esta orden de trabajo"
@@ -8384,8 +8515,9 @@ export default function GestionMantenimientoPage() {
                     className="px-3 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-200 text-xs font-semibold text-[#324354] focus:outline-none"
                   >
                     <option value="Todos">Estado: Todos</option>
-                    <option value="Activos">Solo Activos / Operativos</option>
-                    <option value="Inactivos">Solo Inactivos / Baja</option>
+                    <option value="Activos">Solo Activos</option>
+                    <option value="Inactivos">Solo Inactivos</option>
+                    <option value="Baja">Solo De Baja / Obsoleto</option>
                   </select>
 
                   {/* Nueva Máquina Button */}
@@ -8503,11 +8635,11 @@ export default function GestionMantenimientoPage() {
                         </td>
                       </tr>
                     ) : (
-                      paginatedMaquinasList.map(m => {
+                      paginatedMaquinasList.map((m, idx) => {
                         const linkedPmpCount = machinePmpCountsMap.get(m.id) || 0;
                         return (
                           <tr 
-                            key={m.id}
+                            key={`maq_${m.id || 'noid'}_${m.codigo_equipo || ''}_${idx}`}
                             onClick={() => setSelectedMachineModal(m)}
                             className="hover:bg-[#F6F3EE]/60 transition-colors cursor-pointer group"
                           >
@@ -9267,7 +9399,7 @@ export default function GestionMantenimientoPage() {
       {showTaskModal && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-24 pb-8 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
           <div 
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl border border-[#e2ded5] max-h-[85vh] overflow-y-auto my-auto"
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-3xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] overflow-y-auto my-auto"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -9322,7 +9454,8 @@ export default function GestionMantenimientoPage() {
                   value={newTaskForm.detalle}
                   onChange={(e) => setNewTaskForm(prev => ({ ...prev, detalle: e.target.value }))}
                   placeholder="Descripción detallada de la rutina de mantenimiento..."
-                  className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:border-[#324354] min-h-[50px]"
+                  rows={7}
+                  className="w-full p-3.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm leading-relaxed focus:outline-none focus:border-[#324354] min-h-[180px] resize-y"
                 />
               </div>
 
@@ -9496,7 +9629,7 @@ export default function GestionMantenimientoPage() {
       {showEditTaskModal && editingTask && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-24 pb-8 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in">
           <div 
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl border border-[#e2ded5] max-h-[85vh] overflow-y-auto my-auto"
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-3xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] overflow-y-auto my-auto"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -9531,7 +9664,8 @@ export default function GestionMantenimientoPage() {
                   value={editingTask.detalle || ''}
                   onChange={(e) => setEditingTask(prev => prev ? { ...prev, detalle: e.target.value } : null)}
                   placeholder="Detalle o instrucciones del mantenimiento..."
-                  className="w-full p-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:border-[#324354] min-h-[55px]"
+                  rows={7}
+                  className="w-full p-3.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm leading-relaxed focus:outline-none focus:border-[#324354] min-h-[180px] resize-y"
                 />
               </div>
 
@@ -12248,7 +12382,7 @@ export default function GestionMantenimientoPage() {
 
                           return (
                             <div
-                              key={item.id || idx}
+                              key={`interv_${item.id || 'noid'}_${item.codigo || ''}_${idx}`}
                               onClick={() => {
                                 handleOpenHistoryRowDetail({ ...item, codigoDisplay, category });
                               }}
@@ -12778,10 +12912,9 @@ export default function GestionMantenimientoPage() {
                         onChange={(e) => setMachineFormData(prev => ({ ...prev, estado: e.target.value }))}
                         className="w-full px-3.5 py-2.5 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-bold text-[#324354] focus:outline-none"
                       >
-                        <option value="ACTIVO">ACTIVO (Operativo)</option>
-                        <option value="EN MANTENIMIENTO">EN MANTENIMIENTO</option>
-                        <option value="INACTIVO">INACTIVO / FUERA DE SERVICIO</option>
-                        <option value="OBSOLETO">OBSOLETO / BAJA</option>
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="INACTIVO">INACTIVO</option>
+                        <option value="DE BAJA / OBSOLETO">DE BAJA / OBSOLETO</option>
                       </select>
                     </div>
 
