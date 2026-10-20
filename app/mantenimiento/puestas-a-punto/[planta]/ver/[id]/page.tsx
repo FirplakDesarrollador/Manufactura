@@ -156,6 +156,12 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
                 📜 Historial
               </Link>
             )}
+            <Link
+              href={`/mantenimiento/puestas-a-punto/${encodeURIComponent(planta)}/modificar/${id}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', backgroundColor: '#1A435B', color: 'white', borderRadius: '8px', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600 }}
+            >
+              ✏ Editar
+            </Link>
             <BackButton />
             <PrintActions />
           </div>
