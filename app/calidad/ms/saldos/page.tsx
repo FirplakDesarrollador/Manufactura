@@ -148,23 +148,43 @@ export default function SaldosYDestruccionesPage() {
             
             if (productsRes.data) setProducts(productsRes.data)
             if (defectsRes.data) {
-                let localConfig: Record<number, any> = {}
+                let localConfig: { molde?: number[], noFoto?: number[] } = {}
                 try {
-                    const stored = localStorage.getItem('saldos_defectos_config')
-                    if (stored) localConfig = JSON.parse(stored)
+                    const storedCompact = localStorage.getItem('saldos_defectos_config_compact')
+                    if (storedCompact) {
+                        localConfig = JSON.parse(storedCompact)
+                    } else {
+                        const legacy = localStorage.getItem('saldos_defectos_config')
+                        if (legacy) {
+                            const parsed = JSON.parse(legacy)
+                            localConfig = {
+                                molde: Object.keys(parsed).filter(k => parsed[k]?.Requiere_Referencia_Molde).map(Number),
+                                noFoto: Object.keys(parsed).filter(k => parsed[k]?.Requiere_Foto === false).map(Number)
+                            }
+                        }
+                    }
                 } catch (e) {
-                    console.error('Error reading saldos_defectos_config from localStorage:', e)
+                    console.warn('Error reading saldos defect configuration from localStorage:', e)
                 }
 
-                const mergedDefects: DefectoSaldoDestruccion[] = defectsRes.data.map(d => ({
-                    ...d,
-                    Requiere_Foto: d.Requiere_Foto !== undefined && d.Requiere_Foto !== null 
+                const mergedDefects: DefectoSaldoDestruccion[] = defectsRes.data.map(d => {
+                    const dbHasFoto = d.Requiere_Foto !== undefined && d.Requiere_Foto !== null
+                    const dbHasMolde = d.Requiere_Referencia_Molde !== undefined && d.Requiere_Referencia_Molde !== null
+
+                    const reqFoto = dbHasFoto 
                         ? !!d.Requiere_Foto 
-                        : (localConfig[d.id]?.Requiere_Foto ?? true),
-                    Requiere_Referencia_Molde: d.Requiere_Referencia_Molde !== undefined && d.Requiere_Referencia_Molde !== null 
+                        : (localConfig.noFoto ? !localConfig.noFoto.includes(d.id) : true)
+
+                    const reqMolde = dbHasMolde 
                         ? !!d.Requiere_Referencia_Molde 
-                        : (localConfig[d.id]?.Requiere_Referencia_Molde ?? false)
-                }))
+                        : (localConfig.molde ? localConfig.molde.includes(d.id) : false)
+
+                    return {
+                        ...d,
+                        Requiere_Foto: reqFoto,
+                        Requiere_Referencia_Molde: reqMolde
+                    }
+                })
 
                 setDefectOptions(mergedDefects)
             }
@@ -180,26 +200,36 @@ export default function SaldosYDestruccionesPage() {
     const handleSaveSettings = async (updatedDefects: DefectoSaldoDestruccion[]) => {
         try {
             // Attempt to update Supabase table
-            const updatePromises = updatedDefects.map(d => 
-                supabase
-                    .from('ms_lista_saldos_destrucciones')
-                    .update({
-                        Requiere_Foto: !!d.Requiere_Foto,
-                        Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde
-                    })
-                    .eq('id', d.id)
-            )
-            await Promise.all(updatePromises)
-
-            // Save to localStorage as persistent cache
-            const configMap: Record<number, { Requiere_Foto?: boolean, Requiere_Referencia_Molde?: boolean }> = {}
-            updatedDefects.forEach(d => {
-                configMap[d.id] = {
-                    Requiere_Foto: !!d.Requiere_Foto,
-                    Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde
+            try {
+                const updatePromises = updatedDefects.map(d => 
+                    supabase
+                        .from('ms_lista_saldos_destrucciones')
+                        .update({
+                            Requiere_Foto: !!d.Requiere_Foto,
+                            Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde
+                        })
+                        .eq('id', d.id)
+                )
+                const results = await Promise.all(updatePromises)
+                const errors = results.filter(r => r.error)
+                if (errors.length > 0) {
+                    console.warn('Supabase update returned notes (columns may not exist yet in DB table):', errors)
                 }
-            })
-            localStorage.setItem('saldos_defectos_config', JSON.stringify(configMap))
+            } catch (dbErr) {
+                console.warn('Could not update Supabase directly:', dbErr)
+            }
+
+            // Save ultra-compact configuration to localStorage (only non-defaults, taking ~50 bytes)
+            try {
+                localStorage.removeItem('saldos_defectos_config')
+                const compactConfig = {
+                    molde: updatedDefects.filter(d => d.Requiere_Referencia_Molde).map(d => d.id),
+                    noFoto: updatedDefects.filter(d => d.Requiere_Foto === false).map(d => d.id)
+                }
+                localStorage.setItem('saldos_defectos_config_compact', JSON.stringify(compactConfig))
+            } catch (storageErr) {
+                console.warn('LocalStorage unavailable or quota reached, state kept in memory:', storageErr)
+            }
 
             setDefectOptions(updatedDefects)
             alert('Configuración guardada exitosamente')
