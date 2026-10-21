@@ -346,6 +346,7 @@ export default function GestionMantenimientoPage() {
   const [historySortAsc, setHistorySortAsc] = useState<boolean>(false);
   const [historyPage, setHistoryPage] = useState<number>(1);
   const [historyPageSize, setHistoryPageSize] = useState<number>(30);
+  const [historySummaryFilter, setHistorySummaryFilter] = useState<'ayer' | 'hoy'>('hoy');
   const isFetchingHistoryRef = useRef(false);
 
   const handleHistorySort = (field: HistorySortField) => {
@@ -1079,6 +1080,14 @@ export default function GestionMantenimientoPage() {
     isFetchingHistoryRef.current = true;
     setHistoryLoading(true);
     try {
+      if (force) {
+        try {
+          await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
+        } catch (genErr) {
+          console.warn('Aviso verificando generación automática de preventivos:', genErr);
+        }
+      }
+
       // 1. Query ordenes
       const { data: ordenesData, error: ordErr } = await supabase
         .from('mantenimiento_ordenes')
@@ -1939,6 +1948,13 @@ export default function GestionMantenimientoPage() {
 
       setMaquinasCatalogo(allMaquinas);
 
+      // Verificación y generación automática de preventivos del día
+      try {
+        await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
+      } catch (genErr) {
+        console.warn('Aviso verificando generación automática de preventivos:', genErr);
+      }
+
       // 4. Planes Preventivos Maestros (PMP) desde Supabase
       const { data: preventivosData, error: prevErr } = await supabase
         .from('mantenimiento_planes_preventivos')
@@ -2223,16 +2239,24 @@ export default function GestionMantenimientoPage() {
       setSelectedTechId(newTechnicians[0].id);
     }
 
-    localStorage.setItem('techflow_v2_technicians', JSON.stringify(newTechnicians));
-    localStorage.setItem('techflow_v2_tasks', JSON.stringify(newTasks));
+    try {
+      localStorage.setItem('techflow_v2_technicians', JSON.stringify(newTechnicians));
+      localStorage.setItem('techflow_v2_tasks', JSON.stringify(newTasks));
+    } catch (lsErr) {
+      console.warn('Aviso guardando en localStorage (cuota excedida):', lsErr);
+    }
   };
 
   const persistState = (updatedTasks: MaintenanceTask[], updatedTechs: Technician[]) => {
     setTasks(updatedTasks);
     setTechnicians(updatedTechs);
-    localStorage.setItem('techflow_v2_tasks', JSON.stringify(updatedTasks));
-    localStorage.setItem('techflow_v2_technicians', JSON.stringify(updatedTechs));
-    localStorage.setItem('techflow_v2_techs', JSON.stringify(updatedTechs));
+    try {
+      localStorage.setItem('techflow_v2_tasks', JSON.stringify(updatedTasks));
+      localStorage.setItem('techflow_v2_technicians', JSON.stringify(updatedTechs));
+      localStorage.setItem('techflow_v2_techs', JSON.stringify(updatedTechs));
+    } catch (lsErr) {
+      console.warn('Aviso persistiendo en localStorage:', lsErr);
+    }
   };
 
   const handleUpdateStatus = async (taskId: number, newStatus: string) => {
@@ -2246,6 +2270,14 @@ export default function GestionMantenimientoPage() {
         if (newStatus === 'Completado') {
           item.refFrecuencia = 0;
           item.isDue = false;
+          // Reiniciar contador de frecuencia en Supabase
+          supabase
+            .from('mantenimiento_planes_preventivos')
+            .update({ ref_frecuencia: 0, updated_at: new Date().toISOString() })
+            .eq('id', taskId)
+            .then(({ error }) => {
+              if (error) console.warn('Aviso reiniciando ref_frecuencia en PMP:', error);
+            });
         }
         currentTask = item;
         return item;
@@ -2261,23 +2293,46 @@ export default function GestionMantenimientoPage() {
       const techName = tech ? tech.name : 'Super técnico';
 
       try {
-        await supabase.from('mantenimiento_ordenes').insert({
-          id_plan_preventivo: task.id,
-          codigo: task.code,
-          titulo: task.title,
-          maquina: task.maquina,
-          planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
-          id_tecnico: tech?.id !== 9999 ? tech?.id : null,
-          tecnico_nombre: techName,
-          turno: tech?.turno || 'General',
-          fecha_programada: new Date().toISOString().slice(0, 10),
-          duracion_estimada_min: task.durationMinutes,
-          estado: task.status,
-          fecha_apertura: formatDateForSupabase(task.fechaApertura),
-          fecha_cierre: formatDateForSupabase(task.fechaCierre),
-          comentarios_ejecucion: task.observations || '',
-          adelantada: !!task.adelantada
-        });
+        // Verificar si ya existe una orden pendiente para este plan preventivo
+        const { data: existingOrd } = await supabase
+          .from('mantenimiento_ordenes')
+          .select('id')
+          .eq('id_plan_preventivo', task.id)
+          .eq('estado', 'Pendiente')
+          .order('id', { ascending: false })
+          .limit(1);
+
+        if (existingOrd && existingOrd.length > 0) {
+          await supabase
+            .from('mantenimiento_ordenes')
+            .update({
+              estado: task.status,
+              id_tecnico: tech?.id !== 9999 ? tech?.id : null,
+              tecnico_nombre: techName,
+              fecha_cierre: formatDateForSupabase(task.fechaCierre),
+              comentarios_ejecucion: task.observations || '',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingOrd[0].id);
+        } else {
+          await supabase.from('mantenimiento_ordenes').insert({
+            id_plan_preventivo: task.id,
+            codigo: task.code,
+            titulo: task.title,
+            maquina: task.maquina,
+            planta: obtenerCodigoPlanta(task.planta, plantasNomenclatura),
+            id_tecnico: tech?.id !== 9999 ? tech?.id : null,
+            tecnico_nombre: techName,
+            turno: tech?.turno || 'General',
+            fecha_programada: new Date().toISOString().slice(0, 10),
+            duracion_estimada_min: task.durationMinutes,
+            estado: task.status,
+            fecha_apertura: formatDateForSupabase(task.fechaApertura),
+            fecha_cierre: formatDateForSupabase(task.fechaCierre),
+            comentarios_ejecucion: task.observations || '',
+            adelantada: !!task.adelantada
+          });
+        }
 
         setSaveFeedback(prev => ({ ...prev, [taskId]: true }));
         fetchHistoryRecords();
@@ -3614,25 +3669,56 @@ export default function GestionMantenimientoPage() {
       const tech = technicians.find(t => t.id === updatedTask.idtecs);
       const techName = tech ? tech.name : 'Super técnico';
 
-      // Insert/update into mantenimiento_ordenes
-      await supabase.from('mantenimiento_ordenes').insert({
-        id_plan_preventivo: updatedTask.id,
-        codigo: updatedTask.code,
-        titulo: updatedTask.title,
-        maquina: updatedTask.maquina,
-        planta: updatedTask.planta,
-        id_tecnico: tech?.id !== 9999 ? tech?.id : null,
-        tecnico_nombre: techName,
-        turno: tech?.turno || 'General',
-        fecha_programada: new Date().toISOString().slice(0, 10),
-        duracion_estimada_min: updatedTask.durationMinutes,
-        estado: form.status,
-        fecha_apertura: formatDateForSupabase(finalFechaApertura),
-        fecha_cierre: formatDateForSupabase(finalFechaCierre),
-        comentarios_ejecucion: form.observations.trim(),
-        fotos: form.fotos || [],
-        adelantada: !!updatedTask.adelantada
-      });
+      // Reiniciar contador del plan preventivo en Supabase si se completó
+      if (isCompleted && updatedTask.id) {
+        await supabase
+          .from('mantenimiento_planes_preventivos')
+          .update({ ref_frecuencia: 0, updated_at: new Date().toISOString() })
+          .eq('id', updatedTask.id);
+      }
+
+      // Buscar si ya existe una orden en mantenimiento_ordenes para este plan
+      const { data: existingOrd } = await supabase
+        .from('mantenimiento_ordenes')
+        .select('id')
+        .eq('id_plan_preventivo', updatedTask.id)
+        .eq('estado', 'Pendiente')
+        .order('id', { ascending: false })
+        .limit(1);
+
+      if (existingOrd && existingOrd.length > 0) {
+        await supabase
+          .from('mantenimiento_ordenes')
+          .update({
+            estado: form.status,
+            id_tecnico: tech?.id !== 9999 ? tech?.id : null,
+            tecnico_nombre: techName,
+            fecha_cierre: formatDateForSupabase(finalFechaCierre),
+            comentarios_ejecucion: form.observations.trim(),
+            fotos_despues: form.fotos || [],
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingOrd[0].id);
+      } else {
+        await supabase.from('mantenimiento_ordenes').insert({
+          id_plan_preventivo: updatedTask.id,
+          codigo: updatedTask.code,
+          titulo: updatedTask.title,
+          maquina: updatedTask.maquina,
+          planta: updatedTask.planta,
+          id_tecnico: tech?.id !== 9999 ? tech?.id : null,
+          tecnico_nombre: techName,
+          turno: tech?.turno || 'General',
+          fecha_programada: new Date().toISOString().slice(0, 10),
+          duracion_estimada_min: updatedTask.durationMinutes,
+          estado: form.status,
+          fecha_apertura: formatDateForSupabase(finalFechaApertura),
+          fecha_cierre: formatDateForSupabase(finalFechaCierre),
+          comentarios_ejecucion: form.observations.trim(),
+          fotos_despues: form.fotos || [],
+          adelantada: !!updatedTask.adelantada
+        });
+      }
 
       fetchHistoryRecords();
       setPreventivoModalFeedback('¡Ejecución de mantenimiento preventivo guardada exitosamente!');
@@ -4912,6 +4998,79 @@ export default function GestionMantenimientoPage() {
       };
     });
   }, [historyRows, maquinasCatalogo, plantasNomenclatura]);
+
+  // Resumen dinámico de órdenes generadas (Ayer y Hoy)
+  const historySummaryCounts = useMemo(() => {
+    const todayStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+
+    const yestDate = new Date();
+    yestDate.setDate(yestDate.getDate() - 1);
+    const yestStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(yestDate);
+
+    const getRowDate = (row: any): string => {
+      const raw = row.created_at || row.fecha_apertura || row['FECHA DE APERTURA'];
+      if (!raw) return '';
+      try {
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return String(raw).slice(0, 10);
+        return new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Bogota',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(d);
+      } catch {
+        return String(raw).slice(0, 10);
+      }
+    };
+
+    let ayerPrev = 0, ayerCorr = 0, ayerTpm = 0;
+    let hoyPrev = 0, hoyCorr = 0, hoyTpm = 0;
+
+    historyRows.forEach(row => {
+      const d = getRowDate(row);
+      const cat = row._category || getHistoryRecordCategory(row);
+
+      if (d === yestStr) {
+        if (cat === 'Preventivo') ayerPrev++;
+        else if (cat === 'Correctivo') ayerCorr++;
+        else if (cat === 'TPM') ayerTpm++;
+      } else if (d === todayStr) {
+        if (cat === 'Preventivo') hoyPrev++;
+        else if (cat === 'Correctivo') hoyCorr++;
+        else if (cat === 'TPM') hoyTpm++;
+      }
+    });
+
+    return {
+      ayer: {
+        fecha: yestStr,
+        preventivas: ayerPrev,
+        correctivas: ayerCorr,
+        tpm: ayerTpm,
+        total: ayerPrev + ayerCorr + ayerTpm
+      },
+      hoy: {
+        fecha: todayStr,
+        preventivas: hoyPrev,
+        correctivas: hoyCorr,
+        tpm: hoyTpm,
+        total: hoyPrev + hoyCorr + hoyTpm
+      }
+    };
+  }, [historyRows]);
+
+  const activeHistorySummary = historySummaryFilter === 'ayer' ? historySummaryCounts.ayer : historySummaryCounts.hoy;
 
   const deferredHistorySearch = useDeferredValue(historySearch);
 
@@ -7329,11 +7488,64 @@ export default function GestionMantenimientoPage() {
             
             {/* Filter Bar for Órdenes de Trabajo */}
             <div className="bg-white rounded-3xl p-5 border border-[#e2ded5] shadow-xs flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <h3 className="font-bold text-[#324354] text-sm sm:text-base flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-[#7B8E90]" />
-                  <span>Órdenes de Trabajo ({filteredHistoryRows.length} registros)</span>
-                </h3>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className="font-bold text-[#324354] text-sm sm:text-base flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-[#7B8E90]" />
+                    <span>Órdenes de Trabajo ({filteredHistoryRows.length} registros)</span>
+                  </h3>
+
+                  {/* Resumen dinámico de órdenes generadas (Ayer / Hoy) */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#F6F3EE] border border-[#e2ded5] rounded-2xl text-xs text-[#324354] shadow-2xs">
+                    <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-[#e2ded5] text-[11px] font-semibold text-[#7B8E90]">
+                      <button
+                        type="button"
+                        onClick={() => setHistorySummaryFilter('ayer')}
+                        className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                          historySummaryFilter === 'ayer'
+                            ? 'bg-[#324354] text-white font-bold shadow-2xs'
+                            : 'hover:text-[#324354]'
+                        }`}
+                        title="Ver órdenes creadas el día anterior (Ayer)"
+                      >
+                        Ayer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistorySummaryFilter('hoy')}
+                        className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                          historySummaryFilter === 'hoy'
+                            ? 'bg-[#324354] text-white font-bold shadow-2xs'
+                            : 'hover:text-[#324354]'
+                        }`}
+                        title="Ver órdenes creadas hoy (Último ciclo)"
+                      >
+                        Hoy
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11.5px] font-medium text-[#324354] flex-wrap">
+                      <span>
+                        <strong className="text-emerald-700 font-bold">Preventivas:</strong>{' '}
+                        {activeHistorySummary.preventivas}
+                      </span>
+                      <span className="text-[#d8d3c8]">•</span>
+                      <span>
+                        <strong className="text-rose-600 font-bold">Correctivas:</strong>{' '}
+                        {activeHistorySummary.correctivas}
+                      </span>
+                      <span className="text-[#d8d3c8]">•</span>
+                      <span>
+                        <strong className="text-purple-700 font-bold">TPM:</strong>{' '}
+                        {activeHistorySummary.tpm}
+                      </span>
+                      <span className="text-[#d8d3c8]">•</span>
+                      <span className="px-2 py-0.5 bg-[#324354] text-white font-bold rounded-lg text-[11px] shadow-2xs">
+                        Total: {activeHistorySummary.total}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                   {/* + Correctivo Button */}
