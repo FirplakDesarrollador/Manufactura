@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users, RefreshCw, CheckCircle2 } from "lucide-react";
+import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
 import IndicadoresCalidadView from "@/components/calidad/IndicadoresCalidadView";
+import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView";
 
 // Plant keys supported
 type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
@@ -159,7 +160,7 @@ const POWERBI_URLS = {
 
 export default function IndicadoresProductividadPage() {
     // View mode state (Default: "tablero")
-    const [viewMode, setViewMode] = useState<"tablero" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("tablero");
+    const [viewMode, setViewMode] = useState<"tablero" | "hora-a-hora" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("tablero");
 
     // Plant selector state
     const [selectedPlant, setSelectedPlant] = useState<PlantKey>("MS");
@@ -314,6 +315,19 @@ export default function IndicadoresProductividadPage() {
             {/* Sub-Header Actions */}
             <div className="w-full bg-white border-b border-[#e2ded5] py-1.5 px-4 shadow-2xs">
                 <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-2 sm:gap-3">
+                    {/* 0. Hora a Hora */}
+                    <button
+                        onClick={() => setViewMode("hora-a-hora")}
+                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
+                            viewMode === "hora-a-hora"
+                                ? "bg-[#324354] text-white shadow-md"
+                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        }`}
+                    >
+                        <Clock size={15} />
+                        <span>Hora a Hora</span>
+                    </button>
+
                     {/* 1. Tablero de Control (Unificado) */}
                     <button
                         onClick={() => setViewMode("tablero")}
@@ -395,8 +409,12 @@ export default function IndicadoresProductividadPage() {
             </div>
 
             {/* Main Area */}
-            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" ? "max-w-[1900px] p-0 pb-4" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
-                {viewMode === "bi" ? (
+            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" ? "max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
+                {viewMode === "hora-a-hora" ? (
+                    <div className="w-full animate-in fade-in duration-300">
+                        <HoraAHoraPlantasView fecha={fechaISO} />
+                    </div>
+                ) : viewMode === "bi" ? (
                     <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
                         <iframe
                             title="Control de Piso MS"
