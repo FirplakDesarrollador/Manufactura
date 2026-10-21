@@ -9,6 +9,7 @@ import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
 import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
+import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -386,10 +387,10 @@ export default function CalidadMsReportPage() {
                         </button>
                         <button
                             onClick={() => router.push('/calidad/ms/saldos')}
-                            className="p-2.5 bg-white border border-gray-300 text-red-500 hover:bg-red-50 rounded-r border-l-0"
+                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-50 rounded-r border-l-0 transition-colors flex items-center justify-center"
                             title="Saldos y Destrucciones"
                         >
-                            <Trash2 className="w-5 h-5" />
+                            <BrokenSinkIcon className="w-5 h-5" />
                         </button>
                     </div>
 

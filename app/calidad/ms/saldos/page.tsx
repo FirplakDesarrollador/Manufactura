@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Calendar as CalendarIcon, Filter, Pencil, Settings } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SaldosDefectsSettingsModal, DefectoSaldoDestruccion } from '@/components/calidad/SaldosDefectsSettingsModal'
+import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
 import { v4 as uuidv4 } from 'uuid'
 
 interface ProducloMS {
@@ -415,7 +416,7 @@ export default function SaldosYDestruccionesPage() {
                     </button>
                     <div>
                         <h1 className="text-xl font-black tracking-widest uppercase flex items-center gap-2">
-                            <Trash2 className="w-5 h-5 text-red-400" />
+                            <BrokenSinkIcon className="w-6 h-6 text-white" />
                             Saldos y Destrucciones
                         </h1>
                         <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">
@@ -614,7 +615,7 @@ export default function SaldosYDestruccionesPage() {
                             >
                                 <X className="w-6 h-6" />
                             </button>
-                            <Trash2 className="w-10 h-10 text-white/80 mx-auto mb-2" />
+                            <BrokenSinkIcon className="w-12 h-12 text-white/90 mx-auto mb-2" />
                             <h2 className="text-white font-black text-xl tracking-wider uppercase">
                                 {editingReportId ? 'Editar Evento' : 'Registrar Evento'}
                             </h2>
@@ -735,7 +736,7 @@ export default function SaldosYDestruccionesPage() {
                                     {isUploading ? (
                                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
-                                        editingReportId ? <Pencil className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />
+                                        editingReportId ? <Pencil className="w-4 h-4" /> : <BrokenSinkIcon className="w-4 h-4 text-white" />
                                     )}
                                     <span>{isUploading ? 'Guardando...' : (editingReportId ? 'Guardar Cambios' : 'Registrar')}</span>
                                 </button>
