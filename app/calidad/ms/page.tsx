@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings, Archive, Trash2, History } from 'lucide-react'
+import { Camera, X, Settings, Archive, Trash2, History, ClipboardList, BarChart2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -362,42 +362,40 @@ export default function CalidadMsReportPage() {
                         </button>
                         <button
                             onClick={() => router.push('/calidad/ms/list')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50"
+                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 rounded-l transition-colors flex items-center justify-center"
                             title="Ver Reportes del Día"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
+                            <ClipboardList className="w-5 h-5 text-[#254153]" />
                         </button>
                         <button
                             onClick={() => router.push('/calidad/ms/historico')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-blue-50 border-l-0 transition-colors"
+                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 border-l-0 transition-colors flex items-center justify-center"
                             title="Histórico General de Defectos"
                         >
-                            <History className="w-5 h-5 text-blue-600" />
+                            <History className="w-5 h-5 text-[#254153]" />
                         </button>
                         {hasSettingsPermission && (
                             <button
                                 onClick={() => setIsSettingsOpen(true)}
-                                className={`p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 border-l-0`}
+                                className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 border-l-0 transition-colors flex items-center justify-center"
                                 title="Configurar Defectos"
                             >
-                                <Settings className="w-5 h-5" />
+                                <Settings className="w-5 h-5 text-[#254153]" />
                             </button>
                         )}
                         <button
                             onClick={() => setShowHourlyChart(prev => !prev)}
-                            className={`p-2.5 bg-white border border-gray-300 hover:bg-blue-50 border-l-0 transition-colors ${showHourlyChart ? 'text-blue-600' : 'text-gray-400'}`}
+                            className={`p-2.5 border border-gray-300 border-l-0 transition-colors flex items-center justify-center ${showHourlyChart ? 'bg-slate-200 text-[#254153]' : 'bg-white text-[#254153] hover:bg-slate-100'}`}
                             title="Indicador Hora a Hora"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                            <BarChart2 className="w-5 h-5 text-[#254153]" />
                         </button>
                         <button
                             onClick={() => router.push('/calidad/ms/saldos')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-50 rounded-r border-l-0 transition-colors flex items-center justify-center"
+                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 rounded-r border-l-0 transition-colors flex items-center justify-center"
                             title="Saldos y Destrucciones"
                         >
-                            <BrokenSinkIcon className="w-5 h-5" />
+                            <BrokenSinkIcon className="w-5 h-5 text-[#254153]" />
                         </button>
                     </div>
 
