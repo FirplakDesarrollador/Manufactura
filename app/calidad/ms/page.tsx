@@ -9,8 +9,8 @@ import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
 import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
-import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
 import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -132,6 +132,15 @@ export default function CalidadMsReportPage() {
     useEffect(() => {
         const load = async () => {
             await fetchData()
+            if (typeof window !== 'undefined') {
+                const params = new URLSearchParams(window.location.search)
+                if (params.get('chart') === 'true') {
+                    setShowHourlyChart(true)
+                }
+                if (params.get('settings') === 'true') {
+                    setIsSettingsOpen(true)
+                }
+            }
         }
         void load()
     }, [fetchData])
@@ -305,26 +314,26 @@ export default function CalidadMsReportPage() {
 
             {/* Control Bar - Full Width */}
             <div className="bg-gray-50 border-b border-gray-200 sticky top-[56px] z-40">
-                <div className="max-w-full px-4 py-3 flex flex-wrap items-center gap-6">
-                    <div className="flex-1 min-w-[300px]">
+                <div className="max-w-full px-4 py-2 flex flex-wrap items-center gap-4">
+                    <div className="flex-1 min-w-[280px]">
                         <SearchableSelect
                             name="producto"
                             options={products.map((p) => p.Referencia)}
-                            placeholder="-- SELECCIONAR REFERENCIA DE PRODUCTO --"
+                            placeholder="SELECCIONAR REFERENCIA DE PRODUCTO"
                             defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
                             onValueChange={(val) => {
                                 const product = products.find(p => p.Referencia === val)
                                 setSelectedProduct(product ? product.id.toString() : '')
                             }}
-                            className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-[#254153] font-black text-base focus:border-[#254153] outline-none transition-all"
+                            className="w-full h-10 bg-white border border-gray-300 rounded px-3 text-[#254153] font-bold text-xs md:text-sm focus:border-[#254153] outline-none transition-all flex items-center"
                         />
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3">
                         <button
                             onClick={handleSave}
                             disabled={isUploading}
-                            className={`flex items-center space-x-2 px-6 py-2.5 text-white font-black uppercase tracking-widest text-xs transition-all ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
+                            className={`h-10 flex items-center space-x-2 px-5 text-white font-black uppercase tracking-widest text-xs transition-all rounded shadow-sm ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
                             {isUploading ? (
                                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -335,43 +344,15 @@ export default function CalidadMsReportPage() {
                             )}
                             <span>{isUploading ? 'Guardando...' : 'Ejecutar Registro'}</span>
                         </button>
-                        <button
-                            onClick={() => router.push('/calidad/ms/list')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 rounded-l transition-colors flex items-center justify-center"
-                            title="Ver Reportes del Día"
-                        >
-                            <ClipboardList className="w-5 h-5 text-[#254153]" />
-                        </button>
-                        <button
-                            onClick={() => router.push('/calidad/ms/historico')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 border-l-0 transition-colors flex items-center justify-center"
-                            title="Histórico General de Defectos"
-                        >
-                            <History className="w-5 h-5 text-[#254153]" />
-                        </button>
-                        {hasSettingsPermission && (
-                            <button
-                                onClick={() => setIsSettingsOpen(true)}
-                                className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 border-l-0 transition-colors flex items-center justify-center"
-                                title="Configurar Defectos"
-                            >
-                                <Settings className="w-5 h-5 text-[#254153]" />
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setShowHourlyChart(prev => !prev)}
-                            className={`p-2.5 border border-gray-300 border-l-0 transition-colors flex items-center justify-center ${showHourlyChart ? 'bg-slate-200 text-[#254153]' : 'bg-white text-[#254153] hover:bg-slate-100'}`}
-                            title="Indicador Hora a Hora"
-                        >
-                            <BarChart2 className="w-5 h-5 text-[#254153]" />
-                        </button>
-                        <button
-                            onClick={() => router.push('/calidad/ms/saldos')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-slate-100 rounded-r border-l-0 transition-colors flex items-center justify-center"
-                            title="Saldos y Destrucciones"
-                        >
-                            <BrokenSinkIcon className="w-5 h-5 text-[#254153]" />
-                        </button>
+
+                        <CalidadMsNavButtons
+                            activeTab="registro"
+                            onOpenSettings={() => setIsSettingsOpen(true)}
+                            onToggleChart={() => setShowHourlyChart(prev => !prev)}
+                            hasSettingsPermission={hasSettingsPermission}
+                            isChartActive={showHourlyChart}
+                            isSettingsActive={isSettingsOpen}
+                        />
                     </div>
 
                     {/* Hidden Photo Upload Input */}

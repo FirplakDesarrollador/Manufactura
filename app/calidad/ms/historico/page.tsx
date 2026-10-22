@@ -20,6 +20,8 @@ import {
     RefreshCw
 } from 'lucide-react'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 
 interface HistoricoReporte {
     id: number
@@ -39,6 +41,7 @@ interface HistoricoReporte {
 export default function HistoricoDefectosPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(true)
+    const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<HistoricoReporte[]>([])
     const [searchTerm, setSearchTerm] = useState('')
     const [typeFilter, setTypeFilter] = useState<'TODOS' | 'LINEA' | 'SALDO' | 'DESTRUCCION'>('TODOS')
@@ -125,6 +128,13 @@ export default function HistoricoDefectosPage() {
 
     useEffect(() => {
         fetchHistorico()
+        const getAuth = async () => {
+            const { data: authData } = await supabase.auth.getUser()
+            if (authData?.user?.email) {
+                setUserEmail(authData.user.email)
+            }
+        }
+        void getAuth()
     }, [fetchHistorico])
 
     // Filter and search
@@ -226,42 +236,20 @@ export default function HistoricoDefectosPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-            {/* Header */}
-            <header className="bg-[#254153] text-white p-4 flex items-center justify-between shadow-lg sticky top-0 z-50">
-                <div className="flex items-center space-x-4">
-                    <button 
-                        onClick={() => router.push('/calidad/ms')}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                        title="Volver a Calidad MS"
-                    >
-                        <ArrowLeft className="w-6 h-6" />
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-black tracking-widest uppercase flex items-center gap-2">
-                            <History className="w-5 h-5 text-blue-300" />
-                            Histórico de Defectos
-                        </h1>
-                        <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">
-                            Base de Datos Completa • MS Quality Control
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={fetchHistorico}
-                        className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 text-xs font-bold"
-                        title="Actualizar datos"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        <span>Actualizar</span>
-                    </button>
-                </div>
-            </header>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad MS"
+                subtitle=""
+                compact={true}
+                userEmail={userEmail}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
 
             {/* Sticky Search & Filter Toolbar */}
-            <div className="bg-white border-b border-gray-200 p-3 sticky top-[72px] z-40 shadow-xs">
+            <div className="bg-white border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40 shadow-xs">
                 <div className="max-w-full flex flex-wrap items-center gap-3 justify-between">
+                    <CalidadMsNavButtons activeTab="historico" hasSettingsPermission={true} />
                     {/* Search Bar */}
                     <div className="flex-1 min-w-[280px] relative">
                         <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -355,8 +343,17 @@ export default function HistoricoDefectosPage() {
                         )}
                     </div>
 
-                    {/* Actions: Export CSV & Counter Badge */}
+                    {/* Actions: Export CSV, Actualizar & Counter Badge */}
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={fetchHistorico}
+                            className="bg-white border border-gray-300 hover:bg-gray-100 text-[#254153] px-3 py-2 rounded font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                            title="Actualizar datos"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">Actualizar</span>
+                        </button>
+
                         <button
                             onClick={exportToCSV}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"

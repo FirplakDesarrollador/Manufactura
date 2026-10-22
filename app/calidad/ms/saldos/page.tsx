@@ -7,6 +7,8 @@ import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Calendar as CalendarI
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SaldosDefectsSettingsModal, DefectoSaldoDestruccion } from '@/components/calidad/SaldosDefectsSettingsModal'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import { v4 as uuidv4 } from 'uuid'
 
 interface ProducloMS {
@@ -406,54 +408,28 @@ export default function SaldosYDestruccionesPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-            <header className="bg-[#254153] text-white p-4 flex items-center justify-between shadow-lg sticky top-0 z-50">
-                <div className="flex items-center space-x-4">
-                    <button 
-                        onClick={() => router.push('/calidad/ms')}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-black tracking-widest uppercase flex items-center gap-2">
-                            <BrokenSinkIcon className="w-6 h-6 text-white" />
-                            Saldos y Destrucciones
-                        </h1>
-                        <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">
-                            Módulo de Calidad
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 border border-white/20 transition-all shadow-sm"
-                        title="Configuración de Defectos"
-                    >
-                        <Settings className="w-4 h-4 text-white" />
-                        <span className="hidden sm:inline">Configuración</span>
-                    </button>
-                    <button
-                        onClick={() => {
-                            setEditingReportId(null)
-                            setSaldosProduct('')
-                            setSelectedDefect('')
-                            setMoldeInputValue('')
-                            setIsModalOpen(true)
-                        }}
-                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-black text-sm uppercase tracking-wider flex items-center gap-2 shadow-md transition-all"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Agregar Evento
-                    </button>
-                </div>
-            </header>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad MS"
+                subtitle=""
+                compact={true}
+                userEmail={user?.email}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
             
             {/* Filter Bar */}
-            <div className="bg-white border-b border-gray-200 p-3 sticky top-[72px] z-40 shadow-sm">
+            <div className="bg-white border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40 shadow-sm">
                 <div className="max-w-full flex flex-wrap items-center gap-3">
+                    <CalidadMsNavButtons
+                        activeTab="saldos"
+                        onOpenSettings={() => setIsSettingsOpen(true)}
+                        hasSettingsPermission={hasSettingsPermission}
+                        isSettingsActive={isSettingsOpen}
+                    />
+
                     {/* Date Picker */}
-                    <div className="flex-none w-48 relative">
+                    <div className="flex-none w-44 relative">
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#254153]">
                             <CalendarIcon className="w-4 h-4" />
                         </div>
@@ -461,7 +437,7 @@ export default function SaldosYDestruccionesPage() {
                             type="date"
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153]"
+                            className="w-full h-10 pl-9 pr-3 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153]"
                         />
                     </div>
 
@@ -475,15 +451,30 @@ export default function SaldosYDestruccionesPage() {
                             placeholder="BUSCAR REFERENCIA, DEFECTO O MOLDE..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
+                            className="w-full h-10 pl-9 pr-4 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
                         />
                     </div>
 
                     {/* Stats Counter */}
-                    <div className="flex-none bg-[#254153] text-white px-4 py-2 rounded flex items-center gap-2">
+                    <div className="flex-none h-10 bg-[#254153] text-white px-4 rounded flex items-center gap-2">
                         <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Total:</span>
                         <span className="text-sm font-black">{displayedReports.length}</span>
                     </div>
+
+                    {/* Action: Agregar Evento */}
+                    <button
+                        onClick={() => {
+                            setEditingReportId(null)
+                            setSaldosProduct('')
+                            setSelectedDefect('')
+                            setMoldeInputValue('')
+                            setIsModalOpen(true)
+                        }}
+                        className="h-10 bg-red-600 hover:bg-red-700 text-white px-4 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Agregar Evento</span>
+                    </button>
                 </div>
             </div>
 

@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Search, X, ChevronLeft, Filter, Calendar as CalendarIcon, Trash2, Edit, Clock, ZoomIn } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import {
     BarChart,
     Bar,
@@ -20,6 +22,7 @@ import {
 export default function ReportedDefectsListPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(true)
+    const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<ReportDefectItem[]>([])
     const [products, setProducts] = useState<ProductMS[]>([])
     const [defectsList, setDefectsList] = useState<{ id: number, defecto?: string, Defecto?: string, nombre?: string, Nombre?: string }[]>([])
@@ -369,6 +372,7 @@ export default function ReportedDefectsListPage() {
         const loadUserAndPermissions = async () => {
             const { data: authData } = await supabase.auth.getUser()
             if (authData?.user?.email) {
+                setUserEmail(authData.user.email)
                 const { data: userData } = await supabase
                     .from('usuarios')
                     .select('permisos')
@@ -563,34 +567,20 @@ export default function ReportedDefectsListPage() {
 
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans">
-            {/* Professional Header */}
-            <header className="bg-[#254153] text-white px-4 h-14 flex items-center justify-between sticky top-0 z-50">
-                <div className="flex items-center space-x-4">
-                    <button
-                        onClick={() => router.push('/calidad/ms')}
-                        className="p-1 hover:bg-white/10 transition-colors"
-                    >
-                        <ChevronLeft className="w-6 h-6" />
-                    </button>
-                    <div className="flex flex-col">
-                        <h1 className="text-sm font-black tracking-widest uppercase">Consulta de Defectos</h1>
-                        <span className="text-[10px] font-bold opacity-40 uppercase tracking-tighter italic">Engineered by Firplak Quality</span>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                    <div className="text-right hidden sm:block">
-                        <span className="text-[9px] font-black opacity-30 uppercase tracking-[0.2em] block">Base de Datos Activa</span>
-                        <span className="text-xs font-black text-blue-400">ms_reporte_defectos</span>
-                    </div>
-                    <div className="w-10 h-10 bg-white/5 rounded-none border border-white/10 flex items-center justify-center">
-                        <Filter className="w-5 h-5 opacity-40" />
-                    </div>
-                </div>
-            </header>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad MS"
+                subtitle=""
+                compact={true}
+                userEmail={userEmail}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
 
             {/* Filter Bar */}
-            <div className="bg-gray-50 border-b border-gray-200 p-2 sticky top-14 z-40">
-                <div className="max-w-full flex flex-wrap items-center gap-2">
+            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40">
+                <div className="max-w-full flex flex-wrap items-center gap-3">
+                    <CalidadMsNavButtons activeTab="list" hasSettingsPermission={true} />
 
                     {/* Date Picker */}
                     <div className="flex-none w-44 relative">
@@ -603,7 +593,7 @@ export default function ReportedDefectsListPage() {
                             onChange={(e) => {
                                 setSelectedDate(e.target.value)
                             }}
-                            className="w-full bg-white border border-gray-300 rounded-none px-4 py-2 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-10"
+                            className="w-full h-10 bg-white border border-gray-300 rounded px-4 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-10"
                         />
                     </div>
 

@@ -65,7 +65,7 @@ export function SearchableSelect({ name, options, placeholder, required, label, 
     }
 
     return (
-        <div className="space-y-2 w-full" ref={containerRef}>
+        <div className={`w-full ${label ? 'space-y-1.5' : ''}`} ref={containerRef}>
             {label && <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{label}</label>}
             <div className="relative">
                 <input 
@@ -82,10 +82,10 @@ export function SearchableSelect({ name, options, placeholder, required, label, 
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                     className={`flex items-center justify-between rounded-md border border-slate-300 bg-white ring-offset-white focus-within:outline-none focus-within:ring-2 focus-within:ring-[#254153] focus-within:ring-offset-2 ${disabled ? 'cursor-not-allowed opacity-50 bg-slate-50' : 'cursor-pointer hover:bg-slate-50/50'} ${className || 'h-10 px-3 py-2 text-sm'}`}
                 >
-                    <span className={selectedValue ? 'font-medium' : 'text-slate-500 font-normal'}>
+                    <span className={`truncate whitespace-nowrap text-left flex-1 mr-2 ${selectedValue ? 'font-medium' : 'text-slate-500 font-normal'}`}>
                         {selectedValue || placeholder}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                         {selectedValue && !disabled && (
                             <X
                                 size={14}
