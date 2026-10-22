@@ -286,8 +286,7 @@ export default function DefectModal({
                 </label>
                 <input
                   type="text"
-                  disabled={currentPlant === 'Cefi'}
-                  className="w-full px-2.5 py-1.5 bg-amber-50/50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none disabled:opacity-40"
+                  className="w-full px-2.5 py-1.5 bg-amber-50/50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   value={naranja}
                   onChange={(e) => setNaranja(e.target.value)}
                   placeholder="Ej. 0 o N/A"
@@ -300,8 +299,7 @@ export default function DefectModal({
                 </label>
                 <input
                   type="text"
-                  disabled={currentPlant === 'Cefi'}
-                  className="w-full px-2.5 py-1.5 bg-yellow-50/50 border border-yellow-200 rounded-lg text-xs font-semibold text-yellow-900 focus:ring-2 focus:ring-yellow-500 focus:outline-none disabled:opacity-40"
+                  className="w-full px-2.5 py-1.5 bg-yellow-50/50 border border-yellow-200 rounded-lg text-xs font-semibold text-yellow-900 focus:ring-2 focus:ring-yellow-500 focus:outline-none"
                   value={amarillo}
                   onChange={(e) => setAmarillo(e.target.value)}
                   placeholder="Ej. 2 o N/A"

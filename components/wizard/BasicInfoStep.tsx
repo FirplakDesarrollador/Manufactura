@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { ArrowRight, Info } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { createExternalClient } from "@/lib/supabase/external";
+import { createExternalClient, isExternalConfigured } from "@/lib/supabase/external";
 import { createClient } from "@/lib/supabase/client";
 
 const PROCESOS_POR_PLANTA: Record<string, string[]> = {
@@ -30,35 +30,69 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
 
     useEffect(() => {
         async function fetchEmpleados() {
+            let loadedOperarios: string[] = [];
+            let loadedPuestos: string[] = [];
+
             try {
-                const externalSupabase = createExternalClient();
+                // 1. Fetch from Talento Humano external Supabase if configured
+                if (isExternalConfigured()) {
+                    try {
+                        const externalSupabase = createExternalClient();
 
-                // Fetch Operarios (todos los activos)
-                const { data: dataOp, error: errOp } = await externalSupabase
-                    .from('empleados')
-                    .select('nombreCompleto')
-                    .eq('activo', true)
-                    .order('nombreCompleto', { ascending: true });
-                
-                if (errOp) {
-                    console.error('Error fetching operarios:', errOp);
-                } else if (dataOp) {
-                    setOperarios(dataOp.map(d => d.nombreCompleto));
+                        const { data: dataOp, error: errOp } = await externalSupabase
+                            .from('empleados')
+                            .select('nombreCompleto')
+                            .eq('activo', true)
+                            .order('nombreCompleto', { ascending: true });
+                        
+                        if (errOp) {
+                            console.warn('Talento Humano (empleados) no disponible:', errOp.message || errOp);
+                        } else if (dataOp && dataOp.length > 0) {
+                            loadedOperarios = dataOp.map(d => d.nombreCompleto).filter(Boolean);
+                        }
+
+                        const { data: dataCargos, error: errCargos } = await externalSupabase
+                            .from('cargos')
+                            .select('cargo')
+                            .order('cargo', { ascending: true });
+                        
+                        if (errCargos) {
+                            console.warn('Talento Humano (cargos) no disponible:', errCargos.message || errCargos);
+                        } else if (dataCargos && dataCargos.length > 0) {
+                            loadedPuestos = dataCargos.map(d => d.cargo).filter(Boolean);
+                        }
+                    } catch (extErr) {
+                        console.warn('Error consultando base externa:', extErr);
+                    }
                 }
 
-                // Fetch Puestos (cargos)
-                const { data: dataCargos, error: errCargos } = await externalSupabase
-                    .from('cargos')
-                    .select('cargo')
-                    .order('cargo', { ascending: true });
-                
-                if (errCargos) {
-                    console.error('Error fetching cargos:', errCargos);
-                } else if (dataCargos) {
-                    setPuestos(dataCargos.map(d => d.cargo));
+                // 2. Fallback: fetch operarios from local usuarios table
+                const supabase = createClient();
+                if (loadedOperarios.length === 0) {
+                    try {
+                        const { data: uData } = await supabase
+                            .from('usuarios')
+                            .select('nombre')
+                            .order('nombre', { ascending: true });
+                        if (uData && uData.length > 0) {
+                            loadedOperarios = uData.map(u => u.nombre).filter(Boolean);
+                        }
+                    } catch (uErr) {
+                        console.warn('No se pudieron obtener usuarios locales:', uErr);
+                    }
                 }
+
+                // 3. Fallback: default puestos from plant processes
+                if (loadedPuestos.length === 0) {
+                    const defaultPuestos = Array.from(new Set(Object.values(PROCESOS_POR_PLANTA).flat())).sort();
+                    loadedPuestos = defaultPuestos;
+                }
+
+                if (loadedOperarios.length > 0) setOperarios(loadedOperarios);
+                if (loadedPuestos.length > 0) setPuestos(loadedPuestos);
+
             } catch (err) {
-                console.error('Error general fetching data:', err);
+                console.warn('Error general obteniendo lista de operarios/puestos:', err);
             }
         }
         fetchEmpleados();
@@ -81,7 +115,7 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                     if (u1?.nombre) nombre = u1.nombre;
                 } catch { /* ignore */ }
 
-                if (!nombre) {
+                if (!nombre && isExternalConfigured()) {
                     try {
                         const ext = createExternalClient();
                         const { data: u2 } = await ext

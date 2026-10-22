@@ -33,11 +33,16 @@ const PLANT_LABELS: Record<string, string> = {
   Fv: 'Fibra de Vidrio',
   'R moldes': 'Revisión de Moldes',
   Qznt: 'Quarzstone',
-  Mbles: 'Muebles',
-  Cefi: 'Zócalos (CEFI)'
+  'Mbles/Cefi': 'Muebles / Cefi'
 };
 
-const PLANTS = ['Ms', 'Fv', 'R moldes', 'Qznt', 'Mbles', 'Cefi'];
+const PLANTS = ['Ms', 'Fv', 'R moldes', 'Qznt', 'Mbles/Cefi'];
+
+const isMatchPlant = (defectPlanta: string, targetPlant: string) => {
+  if (defectPlanta === targetPlant) return true;
+  if (targetPlant === 'Mbles/Cefi' && (defectPlanta === 'Mbles' || defectPlanta === 'Mbles/Cefi')) return true;
+  return false;
+};
 
 export default function CriteriosCalidadPage() {
   const router = useRouter();
@@ -268,7 +273,7 @@ export default function CriteriosCalidadPage() {
 
   // Filter criteria for active plant and single unified search query
   const filteredDefects = defects.filter(d => {
-    if (d.planta !== activePlant) return false;
+    if (!isMatchPlant(d.planta, activePlant)) return false;
     
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
@@ -352,10 +357,10 @@ export default function CriteriosCalidadPage() {
           </div>
         </div>
 
-        {/* Plant Selector Grid (6 Plants) */}
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* Plant Selector Grid (5 Plants) */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {PLANTS.map(plant => {
-            const count = defects.filter(d => d.planta === plant).length;
+            const count = defects.filter(d => isMatchPlant(d.planta, plant)).length;
             const isActive = activePlant === plant;
             return (
               <button
@@ -375,7 +380,7 @@ export default function CriteriosCalidadPage() {
                   isActive ? 'bg-[#324354]' : 'bg-transparent'
                 }`} />
 
-                <span className="text-xl font-black text-[#324354] mt-1">
+                <span className="text-lg sm:text-xl font-black text-[#324354] mt-1 tracking-tight">
                   {plant}
                 </span>
                 <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-tight line-clamp-1">
@@ -565,19 +570,15 @@ export default function CriteriosCalidadPage() {
                                   <p className="text-xs font-bold text-red-950">{defect.rojo || 'N/A'}</p>
                                 </div>
 
-                                {activePlant !== 'Cefi' && (
-                                  <>
-                                    <div className="p-3 bg-amber-50/70 border-l-4 border-amber-500 rounded-xl space-y-0.5">
-                                      <span className="text-[10px] font-black text-amber-700 uppercase">Zona Naranja</span>
-                                      <p className="text-xs font-bold text-amber-950">{defect.naranja || 'N/A'}</p>
-                                    </div>
+                                <div className="p-3 bg-amber-50/70 border-l-4 border-amber-500 rounded-xl space-y-0.5">
+                                  <span className="text-[10px] font-black text-amber-700 uppercase">Zona Naranja</span>
+                                  <p className="text-xs font-bold text-amber-950">{defect.naranja || 'N/A'}</p>
+                                </div>
 
-                                    <div className="p-3 bg-yellow-50/70 border-l-4 border-yellow-500 rounded-xl space-y-0.5">
-                                      <span className="text-[10px] font-black text-yellow-700 uppercase">Zona Amarilla</span>
-                                      <p className="text-xs font-bold text-yellow-950">{defect.amarillo || 'N/A'}</p>
-                                    </div>
-                                  </>
-                                )}
+                                <div className="p-3 bg-yellow-50/70 border-l-4 border-yellow-500 rounded-xl space-y-0.5">
+                                  <span className="text-[10px] font-black text-yellow-700 uppercase">Zona Amarilla</span>
+                                  <p className="text-xs font-bold text-yellow-950">{defect.amarillo || 'N/A'}</p>
+                                </div>
 
                                 <div className="p-3 bg-emerald-50/70 border-l-4 border-emerald-500 rounded-xl space-y-0.5">
                                   <span className="text-[10px] font-black text-emerald-700 uppercase">Zona Verde</span>
