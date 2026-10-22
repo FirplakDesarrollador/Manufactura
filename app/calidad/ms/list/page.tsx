@@ -87,10 +87,14 @@ export default function ReportedDefectsListPage() {
     }
 
     // Filters
+    const getColombiaToday = () => {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date())
+    }
+
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDefect, setSelectedDefect] = useState('')
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+    const [selectedDate, setSelectedDate] = useState(getColombiaToday())
     const [modalStartTime, setModalStartTime] = useState('')
     const [modalEndTime, setModalEndTime] = useState('')
     const [modalProductSearch, setModalProductSearch] = useState('')
@@ -579,54 +583,57 @@ export default function ReportedDefectsListPage() {
 
             {/* Filter Bar */}
             <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40">
-                <div className="max-w-full flex flex-wrap items-center gap-3">
-                    <CalidadMsNavButtons activeTab="list" hasSettingsPermission={true} />
-
-                    {/* Date Picker */}
-                    <div className="flex-none w-44 relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#254153]">
-                            <CalendarIcon className="w-4 h-4" />
+                <div className="max-w-[1800px] mx-auto flex items-center justify-between relative min-h-[50px] gap-3">
+                    {/* Left: Filters */}
+                    <div className="flex items-center gap-2 max-w-[440px] flex-1">
+                        {/* Date Picker */}
+                        <div className="w-36 relative shrink-0">
+                            <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => {
+                                    setSelectedDate(e.target.value)
+                                }}
+                                className="w-full h-10 bg-white border border-gray-300 rounded px-2 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-8"
+                            />
                         </div>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => {
-                                setSelectedDate(e.target.value)
-                            }}
-                            className="w-full h-10 bg-white border border-gray-300 rounded px-4 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-10"
-                        />
+
+                        {/* Product Filter with Search */}
+                        <div className="flex-1 min-w-[130px]">
+                            <SearchableSelect
+                                name="productoFilter"
+                                options={productOptions}
+                                placeholder="REFERENCIA"
+                                value={selectedProduct}
+                                onValueChange={(val) => setSelectedProduct(val)}
+                                className="w-full bg-white border border-gray-300 rounded px-2 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                            />
+                        </div>
+
+                        {/* Defect Filter with Search */}
+                        <div className="flex-1 min-w-[130px]">
+                            <SearchableSelect
+                                name="defectoFilter"
+                                options={defectOptions}
+                                placeholder="DEFECTO"
+                                value={selectedDefect}
+                                onValueChange={(val) => setSelectedDefect(val)}
+                                className="w-full bg-white border border-gray-300 rounded px-2 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                            />
+                        </div>
                     </div>
 
-                    {/* Product Filter with Search */}
-                    <div className="flex-1 min-w-[260px]">
-                        <SearchableSelect
-                            name="productoFilter"
-                            options={productOptions}
-                            placeholder="TODAS LAS REFERENCIAS"
-                            value={selectedProduct}
-                            onValueChange={(val) => setSelectedProduct(val)}
-                            className="w-full bg-white border border-gray-300 rounded-none px-3 py-1 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-[34px] uppercase"
-                        />
+                    {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
+                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                        <CalidadMsNavButtons activeTab="list" hasSettingsPermission={true} />
                     </div>
 
-                    {/* Defect Filter with Search */}
-                    <div className="flex-1 min-w-[260px]">
-                        <SearchableSelect
-                            name="defectoFilter"
-                            options={defectOptions}
-                            placeholder="TODOS LOS DEFECTOS"
-                            value={selectedDefect}
-                            onValueChange={(val) => setSelectedDefect(val)}
-                            className="w-full bg-white border border-gray-300 rounded-none px-3 py-1 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-[34px] uppercase"
-                        />
-                    </div>
-
-                    <div className="bg-[#254153] text-white px-6 py-2 rounded-none text-xs font-black uppercase tracking-widest border border-black shadow-inner">
-                        REGISTROS: {filteredReports.length}
-                    </div>
-
-                    {/* Piece Stats Summary */}
-                    <div className="flex items-center space-x-4 ml-auto">
+                    {/* Right: Piece Stats Summary */}
+                    <div className="flex items-center space-x-3 ml-auto shrink-0">
+                        <div className="bg-[#254153] text-white px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest border border-black shadow-inner">
+                            REG: {filteredReports.length}
+                        </div>
                         <div className="flex items-center space-x-1.5">
                             <div className="w-2 h-2 bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
                             <span className="text-[10px] font-black text-gray-400 uppercase">OK:</span>
@@ -637,14 +644,14 @@ export default function ReportedDefectsListPage() {
                             <span className="text-[10px] font-black text-gray-400 uppercase">DEF:</span>
                             <span className="text-base font-black text-red-600">{pieceStats.defectuosos}</span>
                         </div>
-                        <div className="h-8 w-px bg-gray-300" />
+                        <div className="h-7 w-px bg-gray-300" />
                         <div className="flex flex-col items-center">
-                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Total Piezas</span>
-                            <span className="text-lg font-black text-[#254153] leading-none">{pieceStats.total}</span>
+                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Total</span>
+                            <span className="text-base font-black text-[#254153] leading-none">{pieceStats.total}</span>
                         </div>
-                        <div className="flex flex-col items-center px-3 border-l border-gray-300">
-                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Eficiencia</span>
-                            <span className={`text-lg font-black leading-none ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
+                        <div className="flex flex-col items-center px-2 border-l border-gray-300">
+                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">IFI</span>
+                            <span className={`text-base font-black leading-none ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
                         </div>
                     </div>
                 </div>

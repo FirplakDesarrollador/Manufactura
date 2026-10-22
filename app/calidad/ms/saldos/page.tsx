@@ -58,39 +58,44 @@ export default function SaldosYDestruccionesPage() {
     // Auth
     const [user, setUser] = useState<{ id: string, email?: string, localId?: number } | null>(null)
 
-    // Filters
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+    // Filters - Default to Colombia local date (America/Bogota, UTC-5)
+    const getColombiaToday = () => {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date())
+    }
+
+    const [selectedDate, setSelectedDate] = useState(getColombiaToday())
     const [searchTerm, setSearchTerm] = useState('')
 
     const fetchData = useCallback(async () => {
         setLoading(true)
         
-        const day = new Date(selectedDate)
-        const nextDay = new Date(day)
-        nextDay.setDate(day.getDate() + 1)
-        const nextDayStr = nextDay.toISOString().split('T')[0]
-
-        const queryStart = `${selectedDate}T00:00:00Z`
-        const queryEnd = `${nextDayStr}T12:00:00Z`
+        // Exact 24-hour range for Colombia date in UTC
+        const startIso = new Date(`${selectedDate}T00:00:00-05:00`).toISOString()
+        const endIso = new Date(`${selectedDate}T23:59:59.999-05:00`).toISOString()
 
         // Fetch reports for date
-        const { data: reportsRes } = await supabase
+        const { data: reportsRes, error: fetchErr } = await supabase
             .from('ms_reporte_defectos')
             .select(`
                 *,
                 producto:productos_defectos_ms (Referencia)
             `)
-            .gte('created_at', queryStart)
-            .lte('created_at', queryEnd)
+            .gte('created_at', startIso)
+            .lte('created_at', endIso)
             .order('created_at', { ascending: false })
 
+        if (fetchErr) {
+            console.error('Error fetching saldos/destrucciones:', fetchErr)
+        }
+
         if (reportsRes) {
-            // Filter to only Saldos y Destrucciones
+            // Filter to only Saldos y Destrucciones (case-insensitive, includes any mention of saldo or destrucci)
             const filteredReports = reportsRes.filter(r => {
-                const defects = Array.isArray(r.defecto) ? r.defecto : []
+                const defects = Array.isArray(r.defecto) ? r.defecto : (typeof r.defecto === 'string' ? [r.defecto] : [])
                 return defects.some((d: any) => {
-                    const defectName = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)
-                    return defectName && (defectName.startsWith('Saldo -') || defectName.startsWith('Destrucción -'))
+                    const defectName = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '')
+                    const nameLower = defectName.toLowerCase()
+                    return nameLower.includes('saldo') || nameLower.includes('destrucci')
                 })
             })
 
@@ -420,61 +425,62 @@ export default function SaldosYDestruccionesPage() {
             
             {/* Filter Bar */}
             <div className="bg-white border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40 shadow-sm">
-                <div className="max-w-full flex flex-wrap items-center gap-3">
-                    <CalidadMsNavButtons
-                        activeTab="saldos"
-                        onOpenSettings={() => setIsSettingsOpen(true)}
-                        hasSettingsPermission={hasSettingsPermission}
-                        isSettingsActive={isSettingsOpen}
-                    />
-
-                    {/* Date Picker */}
-                    <div className="flex-none w-44 relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#254153]">
-                            <CalendarIcon className="w-4 h-4" />
+                <div className="max-w-[1800px] mx-auto flex items-center justify-between relative min-h-[48px] gap-3">
+                    {/* Left: Date picker & Search */}
+                    <div className="flex items-center gap-2 max-w-[440px] flex-1">
+                        <div className="w-40 relative shrink-0">
+                            <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full h-10 pl-8 pr-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153]"
+                            />
                         </div>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full h-10 pl-9 pr-3 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153]"
+
+                        <div className="relative flex-1 min-w-[160px]">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                placeholder="BUSCAR REFERENCIA, DEFECTO..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full h-10 pl-8 pr-3 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
+                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                        <CalidadMsNavButtons
+                            activeTab="saldos"
+                            onOpenSettings={() => setIsSettingsOpen(true)}
+                            hasSettingsPermission={hasSettingsPermission}
+                            isSettingsActive={isSettingsOpen}
                         />
                     </div>
 
-                    {/* Search */}
-                    <div className="flex-1 min-w-[200px] relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            <Search className="w-4 h-4" />
+                    {/* Right: Total & Agregar Evento */}
+                    <div className="flex items-center gap-3 ml-auto shrink-0">
+                        <div className="h-10 bg-[#254153] text-white px-3.5 rounded flex items-center gap-1.5 text-xs font-black">
+                            <span className="text-[10px] font-bold text-gray-300 uppercase">Total:</span>
+                            <span>{displayedReports.length}</span>
                         </div>
-                        <input
-                            type="text"
-                            placeholder="BUSCAR REFERENCIA, DEFECTO O MOLDE..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full h-10 pl-9 pr-4 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
-                        />
-                    </div>
 
-                    {/* Stats Counter */}
-                    <div className="flex-none h-10 bg-[#254153] text-white px-4 rounded flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Total:</span>
-                        <span className="text-sm font-black">{displayedReports.length}</span>
+                        <button
+                            onClick={() => {
+                                setEditingReportId(null)
+                                setSaldosProduct('')
+                                setSelectedDefect('')
+                                setMoldeInputValue('')
+                                setIsModalOpen(true)
+                            }}
+                            className="h-10 bg-red-600 hover:bg-red-700 text-white px-4 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Agregar Evento</span>
+                        </button>
                     </div>
-
-                    {/* Action: Agregar Evento */}
-                    <button
-                        onClick={() => {
-                            setEditingReportId(null)
-                            setSaldosProduct('')
-                            setSelectedDefect('')
-                            setMoldeInputValue('')
-                            setIsModalOpen(true)
-                        }}
-                        className="h-10 bg-red-600 hover:bg-red-700 text-white px-4 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all"
-                    >
-                        <Plus className="w-4 h-4" />
-                        <span>Agregar Evento</span>
-                    </button>
                 </div>
             </div>
 

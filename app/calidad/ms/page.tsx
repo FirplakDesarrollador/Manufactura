@@ -314,26 +314,27 @@ export default function CalidadMsReportPage() {
 
             {/* Control Bar - Full Width */}
             <div className="bg-gray-50 border-b border-gray-200 sticky top-[56px] z-40">
-                <div className="max-w-full px-4 py-2 flex flex-wrap items-center gap-4">
-                    <div className="flex-1 min-w-[280px]">
-                        <SearchableSelect
-                            name="producto"
-                            options={products.map((p) => p.Referencia)}
-                            placeholder="SELECCIONAR REFERENCIA DE PRODUCTO"
-                            defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
-                            onValueChange={(val) => {
-                                const product = products.find(p => p.Referencia === val)
-                                setSelectedProduct(product ? product.id.toString() : '')
-                            }}
-                            className="w-full h-10 bg-white border border-gray-300 rounded px-3 text-[#254153] font-bold text-xs md:text-sm focus:border-[#254153] outline-none transition-all flex items-center"
-                        />
-                    </div>
+                <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center justify-between relative min-h-[56px]">
+                    {/* Left: Product Selector & Save button */}
+                    <div className="flex items-center gap-3 max-w-[420px] flex-1">
+                        <div className="flex-1 min-w-[200px]">
+                            <SearchableSelect
+                                name="producto"
+                                options={products.map((p) => p.Referencia)}
+                                placeholder="SELECCIONAR REFERENCIA DE PRODUCTO"
+                                defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
+                                onValueChange={(val) => {
+                                    const product = products.find(p => p.Referencia === val)
+                                    setSelectedProduct(product ? product.id.toString() : '')
+                                }}
+                                className="w-full h-10 bg-white border border-gray-300 rounded px-3 text-[#254153] font-bold text-xs md:text-sm focus:border-[#254153] outline-none transition-all flex items-center"
+                            />
+                        </div>
 
-                    <div className="flex items-center space-x-3">
                         <button
                             onClick={handleSave}
                             disabled={isUploading}
-                            className={`h-10 flex items-center space-x-2 px-5 text-white font-black uppercase tracking-widest text-xs transition-all rounded shadow-sm ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
+                            className={`h-10 flex items-center space-x-2 px-4 text-white font-black uppercase tracking-widest text-xs transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
                             {isUploading ? (
                                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -342,9 +343,12 @@ export default function CalidadMsReportPage() {
                                     <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                 </svg>
                             )}
-                            <span>{isUploading ? 'Guardando...' : 'Ejecutar Registro'}</span>
+                            <span>{isUploading ? 'Guardando...' : 'Ejecutar'}</span>
                         </button>
+                    </div>
 
+                    {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
+                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
                         <CalidadMsNavButtons
                             activeTab="registro"
                             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -373,10 +377,8 @@ export default function CalidadMsReportPage() {
                         }}
                     />
 
-                    <div className="h-10 w-px bg-gray-200 hidden lg:block" />
-
-                    {/* Quick Metrics */}
-                    <div className="flex items-center space-x-8 overflow-x-auto no-scrollbar ml-auto">
+                    {/* Right: Quick Metrics */}
+                    <div className="flex items-center space-x-6 overflow-x-auto no-scrollbar ml-auto shrink-0">
                         <div className="flex items-center space-x-2">
                             <div className="w-6 h-6 rounded-full bg-[#36A284] flex items-center justify-center text-white">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
