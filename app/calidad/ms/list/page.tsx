@@ -582,12 +582,12 @@ export default function ReportedDefectsListPage() {
             />
 
             {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
-            <div className="bg-gray-50 border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
-                <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-3">
+            <div className="bg-gray-50 border-b border-gray-200 px-3 sm:px-4 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto flex flex-wrap xl:flex-nowrap items-center justify-between relative xl:h-full gap-2 xl:gap-3">
                     {/* Left: Filters - Ampliado para aprovechar el espacio */}
-                    <div className="flex items-center gap-2.5 max-w-[560px] xl:max-w-[640px] flex-1">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto sm:flex-1 min-w-0 xl:max-w-[640px]">
                         {/* Date Picker */}
-                        <div className="w-36 relative shrink-0">
+                        <div className="w-full sm:w-36 relative shrink-0">
                             <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                                 type="date"
@@ -600,7 +600,7 @@ export default function ReportedDefectsListPage() {
                         </div>
 
                         {/* Product Filter with Search */}
-                        <div className="flex-1 min-w-[180px] xl:min-w-[220px]">
+                        <div className="flex-1 min-w-0 xl:min-w-[220px]">
                             <SearchableSelect
                                 name="productoFilter"
                                 options={productOptions}
@@ -612,7 +612,7 @@ export default function ReportedDefectsListPage() {
                         </div>
 
                         {/* Defect Filter with Search */}
-                        <div className="flex-1 min-w-[180px] xl:min-w-[220px]">
+                        <div className="flex-1 min-w-0 xl:min-w-[220px]">
                             <SearchableSelect
                                 name="defectoFilter"
                                 options={defectOptions}
@@ -625,12 +625,12 @@ export default function ReportedDefectsListPage() {
                     </div>
 
                     {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
-                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center xl:absolute xl:left-1/2 xl:top-1/2 xl:-translate-x-1/2 xl:-translate-y-1/2 z-20">
                         <CalidadMsNavButtons activeTab="list" hasSettingsPermission={true} />
                     </div>
 
                     {/* Right: Piece Stats Summary */}
-                    <div className="flex items-center space-x-3 ml-auto shrink-0">
+                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-3 gap-y-1 w-full sm:w-auto xl:ml-auto min-w-0">
                         <div className="bg-[#254153] text-white px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest border border-black shadow-inner">
                             REG: {filteredReports.length}
                         </div>

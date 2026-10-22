@@ -113,10 +113,10 @@ export default function CriteriosCalidadMsPage() {
             />
 
             {/* Control Bar */}
-            <div className="bg-gray-50 border-b border-gray-200 h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
-                <div className="max-w-[1800px] w-full mx-auto px-4 flex items-center justify-between relative h-full">
-                    <div className="flex items-center gap-3 max-w-[560px] xl:max-w-[640px] flex-1">
-                        <div className="relative flex-1 min-w-[260px]">
+            <div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 relative xl:h-full">
+                    <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-1 min-w-0 xl:max-w-[640px]">
+                        <div className="relative flex-1 min-w-0 xl:min-w-[260px]">
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
@@ -128,11 +128,11 @@ export default function CriteriosCalidadMsPage() {
                         </div>
                     </div>
 
-                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center xl:absolute xl:left-1/2 xl:top-1/2 xl:-translate-x-1/2 xl:-translate-y-1/2 z-20">
                         <CalidadMsNavButtons activeTab="criterios" hasSettingsPermission={true} />
                     </div>
 
-                    <div className="flex items-center ml-auto shrink-0">
+                    <div className="order-2 xl:order-none flex items-center justify-center sm:justify-end w-full sm:w-auto xl:ml-auto">
                         <span className="text-sm font-bold text-gray-800">
                             Criterios: {conCriterio} / {items.length}
                         </span>

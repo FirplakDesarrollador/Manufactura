@@ -437,11 +437,11 @@ export default function SaldosYDestruccionesPage() {
             />
             
             {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
-            <div className="bg-white border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
-                <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-3">
+            <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
+                <div className="max-w-[1800px] w-full mx-auto flex flex-wrap xl:flex-nowrap items-center justify-between relative xl:h-full gap-2 xl:gap-3">
                     {/* Left: Date picker & Search - Ampliado para aprovechar el espacio antes de los botones */}
-                    <div className="flex items-center gap-2 max-w-[calc(50%-130px)] flex-1 min-w-[340px]">
-                        <div className="w-40 relative shrink-0">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 xl:max-w-[calc(50%-130px)] xl:min-w-[340px]">
+                        <div className="w-full sm:w-40 relative shrink-0">
                             <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                                 type="date"
@@ -464,7 +464,7 @@ export default function SaldosYDestruccionesPage() {
                     </div>
 
                     {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
-                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center xl:absolute xl:left-1/2 xl:top-1/2 xl:-translate-x-1/2 xl:-translate-y-1/2 z-20">
                         <CalidadMsNavButtons
                             activeTab="saldos"
                             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -474,7 +474,7 @@ export default function SaldosYDestruccionesPage() {
                     </div>
 
                     {/* Right: Total & Agregar Evento */}
-                    <div className="flex items-center gap-3 ml-auto shrink-0">
+                    <div className="order-2 xl:order-none flex items-center justify-center sm:justify-end gap-3 w-full sm:w-auto xl:ml-auto min-w-0">
                         <div className="h-10 bg-[#254153] text-white px-3.5 rounded flex items-center gap-1.5 text-xs font-black">
                             <span className="text-[10px] font-bold text-gray-300 uppercase">Total:</span>
                             <span>{displayedReports.length}</span>
