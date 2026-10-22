@@ -439,8 +439,8 @@ export default function SaldosYDestruccionesPage() {
             {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
             <div className="bg-white border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
                 <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-3">
-                    {/* Left: Date picker & Search */}
-                    <div className="flex items-center gap-2 max-w-[440px] flex-1">
+                    {/* Left: Date picker & Search - Ampliado para aprovechar el espacio antes de los botones */}
+                    <div className="flex items-center gap-2 max-w-[calc(50%-130px)] flex-1 min-w-[340px]">
                         <div className="w-40 relative shrink-0">
                             <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input

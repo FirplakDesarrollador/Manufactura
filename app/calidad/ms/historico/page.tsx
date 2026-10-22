@@ -453,8 +453,8 @@ export default function HistoricoDefectosPage() {
             {/* Sticky Search & Filter Toolbar - EXACT SAME HEIGHT (h-14 / 56px) AS MAIN HEADER */}
             <div className="bg-white border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
                 <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-2">
-                    {/* Left: Search input & Type Filter */}
-                    <div className="flex items-center gap-2 max-w-[430px] flex-1">
+                    {/* Left: Search input & Type Filter - Ampliado para aprovechar el espacio antes de los botones */}
+                    <div className="flex items-center gap-2 max-w-[calc(50%-130px)] flex-1 min-w-[340px]">
                         {/* Search Input */}
                         <div className="relative flex-1 min-w-[150px]">
                             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
