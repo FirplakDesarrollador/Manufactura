@@ -47,7 +47,7 @@ export default function HistoricoDefectosPage() {
     // Pagination
     const [currentPage, setCurrentPage] = useState(1)
     const [pageSize, setPageSize] = useState(50)
-    const [totalCount, setTotalCount] = useState(0)
+    const [totalDbCount, setTotalDbCount] = useState(0)
 
     // Optional Date Range
     const [startDate, setStartDate] = useState('')
@@ -81,17 +81,17 @@ export default function HistoricoDefectosPage() {
                 query = query.lte('created_at', `${nextDayStr}T12:00:00Z`)
             }
 
-            // Pagination range
-            const from = (currentPage - 1) * pageSize
-            const to = from + pageSize - 1
-            query = query.range(from, to)
+            // When date range is specified, fetch all records in that window (up to 5000) so no destructions/saldos are missed.
+            // If no date range is set, fetch the most recent 1000 records.
+            const queryLimit = (startDate || endDate) ? 5000 : 1000
+            query = query.limit(queryLimit)
 
             const { data, count, error } = await query
 
             if (error) {
                 console.error('Error fetching defects history:', error)
             } else if (data) {
-                if (count !== null) setTotalCount(count)
+                if (count !== null) setTotalDbCount(count)
 
                 // Fetch reporter names
                 const userIds = [...new Set(data.map(r => r.create_by))].filter(Boolean)
@@ -114,13 +114,14 @@ export default function HistoricoDefectosPage() {
                 }))
 
                 setReports(mapped)
+                setCurrentPage(1)
             }
         } catch (err) {
             console.error('Unexpected error fetching history:', err)
         } finally {
             setLoading(false)
         }
-    }, [currentPage, pageSize, startDate, endDate])
+    }, [startDate, endDate])
 
     useEffect(() => {
         fetchHistorico()
@@ -130,7 +131,9 @@ export default function HistoricoDefectosPage() {
     const filteredReports = useMemo(() => {
         return reports.filter(r => {
             // Defect details
-            const defectItems = Array.isArray(r.defecto) ? r.defecto : []
+            const defectItems = Array.isArray(r.defecto) 
+                ? r.defecto 
+                : (typeof r.defecto === 'string' ? [r.defecto] : [])
             const defectNames = defectItems.map((d: any) => 
                 typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '')
             ).join(', ')
@@ -156,6 +159,13 @@ export default function HistoricoDefectosPage() {
             return matchId || matchRef || matchDefecto || matchMolde || matchUser
         })
     }, [reports, searchTerm, typeFilter])
+
+    // Client-side pagination over filtered results
+    const totalPages = Math.ceil(filteredReports.length / pageSize) || 1
+    const paginatedReports = useMemo(() => {
+        const from = (currentPage - 1) * pageSize
+        return filteredReports.slice(from, from + pageSize)
+    }, [filteredReports, currentPage, pageSize])
 
     // Export to CSV
     const exportToCSV = () => {
@@ -213,7 +223,6 @@ export default function HistoricoDefectosPage() {
         document.body.removeChild(link)
     }
 
-    const totalPages = Math.ceil(totalCount / pageSize) || 1
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -238,21 +247,14 @@ export default function HistoricoDefectosPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={exportToCSV}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-md transition-all"
-                        title="Descargar datos en CSV"
-                    >
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline">Exportar CSV</span>
-                    </button>
+                <div className="flex items-center gap-2">
                     <button
                         onClick={fetchHistorico}
-                        className="bg-white/10 hover:bg-white/20 text-white p-2 rounded transition-colors"
+                        className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 text-xs font-bold"
                         title="Actualizar datos"
                     >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                        <span>Actualizar</span>
                     </button>
                 </div>
             </header>
@@ -267,7 +269,10 @@ export default function HistoricoDefectosPage() {
                             type="text"
                             placeholder="BUSCAR POR REFERENCIA, DEFECTO, MOLDE, INSPECTOR O # ID..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value)
+                                setCurrentPage(1)
+                            }}
                             className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400 shadow-inner"
                         />
                     </div>
@@ -275,25 +280,37 @@ export default function HistoricoDefectosPage() {
                     {/* Filter by Type */}
                     <div className="flex items-center bg-gray-100 rounded p-1 text-[11px] font-bold">
                         <button
-                            onClick={() => setTypeFilter('TODOS')}
+                            onClick={() => {
+                                setTypeFilter('TODOS')
+                                setCurrentPage(1)
+                            }}
                             className={`px-3 py-1.5 rounded transition-all ${typeFilter === 'TODOS' ? 'bg-[#254153] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                         >
                             Todos
                         </button>
                         <button
-                            onClick={() => setTypeFilter('LINEA')}
+                            onClick={() => {
+                                setTypeFilter('LINEA')
+                                setCurrentPage(1)
+                            }}
                             className={`px-3 py-1.5 rounded transition-all ${typeFilter === 'LINEA' ? 'bg-[#254153] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                         >
                             En Línea
                         </button>
                         <button
-                            onClick={() => setTypeFilter('SALDO')}
+                            onClick={() => {
+                                setTypeFilter('SALDO')
+                                setCurrentPage(1)
+                            }}
                             className={`px-3 py-1.5 rounded transition-all ${typeFilter === 'SALDO' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                         >
                             Saldos
                         </button>
                         <button
-                            onClick={() => setTypeFilter('DESTRUCCION')}
+                            onClick={() => {
+                                setTypeFilter('DESTRUCCION')
+                                setCurrentPage(1)
+                            }}
                             className={`px-3 py-1.5 rounded transition-all ${typeFilter === 'DESTRUCCION' ? 'bg-red-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                         >
                             Destrucciones
@@ -338,10 +355,23 @@ export default function HistoricoDefectosPage() {
                         )}
                     </div>
 
-                    {/* Total Counter Badge */}
-                    <div className="bg-[#254153] text-white px-3.5 py-1.5 rounded flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Total BD:</span>
-                        <span className="text-xs font-black">{totalCount.toLocaleString('es-CO')}</span>
+                    {/* Actions: Export CSV & Counter Badge */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={exportToCSV}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                            title="Descargar datos filtrados en CSV"
+                        >
+                            <Download className="w-4 h-4" />
+                            <span>Exportar CSV</span>
+                        </button>
+
+                        <div className="bg-[#254153] text-white px-3 py-2 rounded flex items-center gap-1.5 shadow-xs whitespace-nowrap">
+                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">
+                                {typeFilter !== 'TODOS' || searchTerm || startDate || endDate ? 'Registros:' : 'Total BD:'}
+                            </span>
+                            <span className="text-xs font-black">{filteredReports.length.toLocaleString('es-CO')}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -377,7 +407,7 @@ export default function HistoricoDefectosPage() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-100">
-                                {filteredReports.map((report) => {
+                                {paginatedReports.map((report) => {
                                     // Parse defects
                                     const rawDefects = Array.isArray(report.defecto) ? report.defecto : []
                                     const defectNamesList = rawDefects.map((d: any) => 
@@ -523,7 +553,7 @@ export default function HistoricoDefectosPage() {
                                     <option value={100}>100</option>
                                     <option value={200}>200</option>
                                 </select>
-                                <span>registros por página • Total: <strong>{totalCount}</strong></span>
+                                <span>registros por página • Total: <strong>{filteredReports.length}</strong></span>
                             </div>
 
                             <div className="flex items-center gap-2">
