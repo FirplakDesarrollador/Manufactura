@@ -53,6 +53,8 @@ export default function SaldosYDestruccionesPage() {
     const [hasDeletePermission, setHasDeletePermission] = useState(false)
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
     const [editingReportId, setEditingReportId] = useState<number | null>(null)
+    const [deleteConfirmReport, setDeleteConfirmReport] = useState<ReporteSaldo | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     
     // Auth
@@ -384,17 +386,28 @@ export default function SaldosYDestruccionesPage() {
         setIsModalOpen(true)
     }
 
-    const handleDeleteReport = async (id: number, e: React.MouseEvent) => {
+    const handleDeleteReport = (report: ReporteSaldo, e: React.MouseEvent) => {
         e.stopPropagation()
-        if (window.confirm('¿Estás seguro de que deseas eliminar este registro?')) {
-            const { error } = await supabase.from('ms_reporte_defectos').delete().eq('id', id)
+        setDeleteConfirmReport(report)
+    }
+
+    const confirmDeleteReport = async () => {
+        if (!deleteConfirmReport) return
+        setIsDeleting(true)
+        try {
+            const { error } = await supabase.from('ms_reporte_defectos').delete().eq('id', deleteConfirmReport.id)
             if (error) {
                 console.error('Error deleting report:', error)
                 alert('Error al eliminar el registro')
             } else {
-                alert('Registro eliminado exitosamente')
+                setDeleteConfirmReport(null)
                 fetchData()
             }
+        } catch (err) {
+            console.error('Error in confirmDeleteReport:', err)
+            alert('Error inesperado al eliminar')
+        } finally {
+            setIsDeleting(false)
         }
     }
 
@@ -423,9 +436,9 @@ export default function SaldosYDestruccionesPage() {
                 onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
             />
             
-            {/* Filter Bar */}
-            <div className="bg-white border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40 shadow-sm">
-                <div className="max-w-[1800px] mx-auto flex items-center justify-between relative min-h-[48px] gap-3">
+            {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
+            <div className="bg-white border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
+                <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-3">
                     {/* Left: Date picker & Search */}
                     <div className="flex items-center gap-2 max-w-[440px] flex-1">
                         <div className="w-40 relative shrink-0">
@@ -578,7 +591,7 @@ export default function SaldosYDestruccionesPage() {
                                                         )}
                                                         {hasDeletePermission && (
                                                             <button
-                                                                onClick={(e) => handleDeleteReport(report.id, e)}
+                                                                onClick={(e) => handleDeleteReport(report, e)}
                                                                 className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-full transition-colors"
                                                                 title="Eliminar"
                                                             >
@@ -884,6 +897,52 @@ export default function SaldosYDestruccionesPage() {
                 defects={defectOptions}
                 onSave={handleSaveSettings}
             />
+
+            {/* POPUP DE CONFIRMACIÓN DE ELIMINACIÓN */}
+            {deleteConfirmReport && (
+                <div className="fixed inset-0 bg-black/60 z-[70] backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150">
+                        <div className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0 text-red-600">
+                                    <AlertTriangle className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-base font-black text-[#254153] uppercase tracking-wide">
+                                        ¿Eliminar este registro?
+                                    </h3>
+                                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                                        ¿Estás seguro de que deseas eliminar permanentemente el registro{' '}
+                                        <span className="font-black text-red-600">#{deleteConfirmReport.id}</span>
+                                        {deleteConfirmReport.producto?.Referencia && (
+                                            <> ({deleteConfirmReport.producto.Referencia})</>
+                                        )}? Esta acción removerá el registro de la base de datos y no se puede deshacer.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteConfirmReport(null)}
+                                disabled={isDeleting}
+                                className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 rounded font-black text-xs uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDeleteReport}
+                                disabled={isDeleting}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>{isDeleting ? 'Eliminando...' : 'Sí, Eliminar'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

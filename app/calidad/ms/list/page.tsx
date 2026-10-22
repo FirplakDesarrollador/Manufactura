@@ -581,9 +581,9 @@ export default function ReportedDefectsListPage() {
                 onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
             />
 
-            {/* Filter Bar */}
-            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40">
-                <div className="max-w-[1800px] mx-auto flex items-center justify-between relative min-h-[50px] gap-3">
+            {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
+            <div className="bg-gray-50 border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-3">
                     {/* Left: Filters - Ampliado para aprovechar el espacio */}
                     <div className="flex items-center gap-2.5 max-w-[560px] xl:max-w-[640px] flex-1">
                         {/* Date Picker */}
