@@ -114,9 +114,9 @@ export default function CriteriosCalidadMsPage() {
 
             {/* Control Bar */}
             <div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
-                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 relative xl:h-full">
-                    <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-1 min-w-0 xl:max-w-[640px]">
-                        <div className="relative flex-1 min-w-0 xl:min-w-[260px]">
+                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 gap-2 relative xl:h-full">
+                    <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min xl:max-w-[440px] 2xl:max-w-[520px]">
+                        <div className="relative flex-1 min-w-[150px] [contain:inline-size]">
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
@@ -128,11 +128,11 @@ export default function CriteriosCalidadMsPage() {
                         </div>
                     </div>
 
-                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center xl:absolute xl:left-1/2 xl:top-1/2 xl:-translate-x-1/2 xl:-translate-y-1/2 z-20">
+                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center z-20">
                         <CalidadMsNavButtons activeTab="criterios" hasSettingsPermission={true} />
                     </div>
 
-                    <div className="order-2 xl:order-none flex items-center justify-center sm:justify-end w-full sm:w-auto xl:ml-auto">
+                    <div className="order-2 xl:order-none flex items-center justify-center sm:justify-end w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end">
                         <span className="text-sm font-bold text-gray-800">
                             Criterios: {conCriterio} / {items.length}
                         </span>
