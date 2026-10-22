@@ -584,8 +584,8 @@ export default function ReportedDefectsListPage() {
             {/* Filter Bar */}
             <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 sticky top-[56px] z-40">
                 <div className="max-w-[1800px] mx-auto flex items-center justify-between relative min-h-[50px] gap-3">
-                    {/* Left: Filters */}
-                    <div className="flex items-center gap-2 max-w-[440px] flex-1">
+                    {/* Left: Filters - Ampliado para aprovechar el espacio */}
+                    <div className="flex items-center gap-2.5 max-w-[560px] xl:max-w-[640px] flex-1">
                         {/* Date Picker */}
                         <div className="w-36 relative shrink-0">
                             <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -600,26 +600,26 @@ export default function ReportedDefectsListPage() {
                         </div>
 
                         {/* Product Filter with Search */}
-                        <div className="flex-1 min-w-[130px]">
+                        <div className="flex-1 min-w-[180px] xl:min-w-[220px]">
                             <SearchableSelect
                                 name="productoFilter"
                                 options={productOptions}
-                                placeholder="REFERENCIA"
+                                placeholder="TODAS LAS REFERENCIAS"
                                 value={selectedProduct}
                                 onValueChange={(val) => setSelectedProduct(val)}
-                                className="w-full bg-white border border-gray-300 rounded px-2 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
                             />
                         </div>
 
                         {/* Defect Filter with Search */}
-                        <div className="flex-1 min-w-[130px]">
+                        <div className="flex-1 min-w-[180px] xl:min-w-[220px]">
                             <SearchableSelect
                                 name="defectoFilter"
                                 options={defectOptions}
-                                placeholder="DEFECTO"
+                                placeholder="TODOS LOS DEFECTOS"
                                 value={selectedDefect}
                                 onValueChange={(val) => setSelectedDefect(val)}
-                                className="w-full bg-white border border-gray-300 rounded px-2 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
                             />
                         </div>
                     </div>

@@ -315,9 +315,9 @@ export default function CalidadMsReportPage() {
             {/* Control Bar - Full Width */}
             <div className="bg-gray-50 border-b border-gray-200 sticky top-[56px] z-40">
                 <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center justify-between relative min-h-[56px]">
-                    {/* Left: Product Selector & Save button */}
-                    <div className="flex items-center gap-3 max-w-[420px] flex-1">
-                        <div className="flex-1 min-w-[200px]">
+                    {/* Left: Product Selector & Save button - Ampliado para aprovechar espacio */}
+                    <div className="flex items-center gap-3 max-w-[560px] xl:max-w-[640px] flex-1">
+                        <div className="flex-1 min-w-[320px]">
                             <SearchableSelect
                                 name="producto"
                                 options={products.map((p) => p.Referencia)}

@@ -26,9 +26,16 @@ export function CalidadMsNavButtons({
 }: CalidadMsNavButtonsProps) {
     const router = useRouter()
 
+    // Pre-cargar todas las rutas en segundo plano para cambio instantáneo
+    React.useEffect(() => {
+        router.prefetch('/calidad/ms')
+        router.prefetch('/calidad/ms/list')
+        router.prefetch('/calidad/ms/historico')
+        router.prefetch('/calidad/ms/saldos')
+    }, [router])
+
     const handleRegistroClick = () => {
         if (activeTab === 'registro') {
-            // Close any open modals/charts on main screen
             if (isChartActive && onToggleChart) onToggleChart()
             return
         }

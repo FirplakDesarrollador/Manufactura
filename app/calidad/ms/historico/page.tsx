@@ -54,7 +54,7 @@ export default function HistoricoDefectosPage() {
     const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<HistoricoReporte[]>([])
     const [searchTerm, setSearchTerm] = useState('')
-    const [typeFilter, setTypeFilter] = useState<'TODOS' | 'LINEA' | 'SALDO' | 'DESTRUCCION'>('TODOS')
+    const [typeFilter, setTypeFilter] = useState<'TODOS' | 'LINEA' | 'SALDO' | 'DESTRUCCION' | 'MOLDE'>('TODOS')
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
     
     // Catalogs for Edit
@@ -218,6 +218,10 @@ export default function HistoricoDefectosPage() {
             if (typeFilter === 'LINEA' && tipo !== 'LINEA') return false
             if (typeFilter === 'SALDO' && tipo !== 'SALDO') return false
             if (typeFilter === 'DESTRUCCION' && tipo !== 'DESTRUCCION') return false
+            if (typeFilter === 'MOLDE') {
+                const moldeVal = (r.Molde || r.molde || '').toString().trim()
+                if (!moldeVal || moldeVal === '-' || moldeVal.toLowerCase() === 'n/a' || moldeVal === '0') return false
+            }
 
             if (!searchTerm.trim()) return true
 
@@ -489,6 +493,13 @@ export default function HistoricoDefectosPage() {
                             >
                                 Dest.
                             </button>
+                            <button
+                                onClick={() => { setTypeFilter('MOLDE'); setCurrentPage(1); }}
+                                className={`px-2 py-1 rounded transition-all ${typeFilter === 'MOLDE' ? 'bg-amber-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                title="Filtrar solo registros con Molde asignado"
+                            >
+                                Moldes
+                            </button>
                         </div>
                     </div>
 
@@ -498,7 +509,7 @@ export default function HistoricoDefectosPage() {
                     </div>
 
                     {/* Right: Date Range, Actualizar, Exportar CSV, Total BD */}
-                    <div className="flex items-center gap-2 ml-auto shrink-0">
+                    <div className="flex items-center gap-1.5 ml-auto shrink-0 z-10">
                         {/* Date Filters */}
                         <div className="flex items-center gap-1">
                             <input
@@ -508,7 +519,7 @@ export default function HistoricoDefectosPage() {
                                     setStartDate(e.target.value)
                                     setCurrentPage(1)
                                 }}
-                                className="px-2 py-1 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] h-9"
+                                className="w-[116px] px-1.5 py-1 bg-gray-50 border border-gray-300 rounded text-[11px] font-bold text-[#254153] h-9"
                                 title="Fecha Inicio"
                             />
                             <span className="text-gray-400 text-xs">a</span>
@@ -519,7 +530,7 @@ export default function HistoricoDefectosPage() {
                                     setEndDate(e.target.value)
                                     setCurrentPage(1)
                                 }}
-                                className="px-2 py-1 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] h-9"
+                                className="w-[116px] px-1.5 py-1 bg-gray-50 border border-gray-300 rounded text-[11px] font-bold text-[#254153] h-9"
                                 title="Fecha Fin"
                             />
                             {(startDate || endDate) && (
@@ -529,7 +540,7 @@ export default function HistoricoDefectosPage() {
                                         setEndDate('')
                                         setCurrentPage(1)
                                     }}
-                                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded h-9 flex items-center justify-center"
+                                    className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded h-9 flex items-center justify-center"
                                     title="Ver todo (sin filtro de fecha)"
                                 >
                                     <X className="w-3.5 h-3.5" />
@@ -544,7 +555,7 @@ export default function HistoricoDefectosPage() {
                             title="Actualizar datos"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                            <span className="hidden xl:inline">Actualizar</span>
+                            <span className="hidden 2xl:inline">Actualizar</span>
                         </button>
 
                         {/* Export CSV */}
@@ -554,11 +565,11 @@ export default function HistoricoDefectosPage() {
                             title="Descargar datos filtrados en CSV"
                         >
                             <Download className="w-3.5 h-3.5" />
-                            <span className="hidden xl:inline">Exportar</span>
+                            <span className="hidden 2xl:inline">Exportar</span>
                         </button>
 
                         {/* Counter Badge */}
-                        <div className="bg-[#254153] text-white px-3 py-1.5 rounded flex items-center gap-1.5 shadow-xs whitespace-nowrap h-9 text-xs font-black">
+                        <div className="bg-[#254153] text-white px-2.5 py-1.5 rounded flex items-center gap-1 shadow-xs whitespace-nowrap h-9 text-xs font-black">
                             <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">
                                 Total:
                             </span>
