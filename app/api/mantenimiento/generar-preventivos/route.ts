@@ -12,29 +12,45 @@ function getColombiaDate(date: Date = new Date()): string {
   return formatter.format(date); // YYYY-MM-DD
 }
 
+// Días calendario entre dos fechas YYYY-MM-DD
+function daysBetween(fromStr: string, toStr: string): number {
+  const dFrom = new Date(fromStr + 'T00:00:00Z').getTime();
+  const dTo = new Date(toStr + 'T00:00:00Z').getTime();
+  return Math.max(0, Math.round((dTo - dFrom) / (1000 * 60 * 60 * 24)));
+}
+
+// Supabase limita cada consulta a 1000 filas: paginar para traer todo
+async function fetchAllRows<T>(buildQuery: () => any, pageSize = 1000): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
 export async function POST(req: Request) {
   try {
     const todayStr = getColombiaDate(new Date());
 
-    // 1. Consultar fecha de última orden preventiva creada en Supabase
-    const { data: lastPrev, error: lastErr } = await supabase
-      .from('mantenimiento_ordenes')
-      .select('created_at')
-      .eq('origen', 'PLAN_PREVENTIVO')
-      .order('created_at', { ascending: false })
-      .limit(1);
+    // 1. Fecha de la última OT generada por cada plan (generación por calendario)
+    const prevOrders = await fetchAllRows<{ id_plan_preventivo: number | null; fecha_programada: string | null; created_at: string }>(
+      () => supabase
+        .from('mantenimiento_ordenes')
+        .select('id_plan_preventivo, fecha_programada, created_at')
+        .eq('origen', 'PLAN_PREVENTIVO')
+        .order('id', { ascending: true })
+    );
 
-    if (lastErr) {
-      console.warn('Aviso consultando última orden preventiva:', lastErr);
-    }
-
-    const lastCreated = lastPrev && lastPrev.length > 0 ? lastPrev[0].created_at : null;
-    const lastDateStr = lastCreated ? getColombiaDate(new Date(lastCreated)) : todayStr;
-
-    // Calcular días calendario transcurridos
-    const dToday = new Date(todayStr + 'T00:00:00Z').getTime();
-    const dLast = new Date(lastDateStr + 'T00:00:00Z').getTime();
-    const diffDays = Math.max(0, Math.round((dToday - dLast) / (1000 * 60 * 60 * 24)));
+    const lastGenByPlan = new Map<number, string>();
+    prevOrders.forEach(o => {
+      if (!o.id_plan_preventivo) return;
+      const d = o.fecha_programada ? String(o.fecha_programada).slice(0, 10) : getColombiaDate(new Date(o.created_at));
+      const prev = lastGenByPlan.get(o.id_plan_preventivo);
+      if (!prev || d > prev) lastGenByPlan.set(o.id_plan_preventivo, d);
+    });
 
     // 2. Consultar Planes Preventivos Maestros (PMP) activos
     const { data: pmps, error: pmpErr } = await supabase
@@ -50,21 +66,7 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    // 3. Consultar órdenes preventivas que están ABIERTAS o PENDIENTES actualmente
-    // (Para no duplicar órdenes si un preventivo ya tiene una OT abierta pendiente de ejecución)
-    const { data: openOrders, error: openErr } = await supabase
-      .from('mantenimiento_ordenes')
-      .select('id, id_plan_preventivo, estado')
-      .eq('origen', 'PLAN_PREVENTIVO')
-      .not('estado', 'in', '("Completado","Cancelada","Resuelta")');
-
-    if (openErr) {
-      console.warn('Aviso consultando órdenes abiertas:', openErr);
-    }
-
-    const openPlanIds = new Set((openOrders || []).map(o => o.id_plan_preventivo).filter(Boolean));
-
-    // 4. Consultar técnicos disponibles para pre-asignación
+    // 3. Consultar técnicos disponibles para pre-asignación
     const { data: tecnicosData } = await supabase
       .from('mantenimiento_tecnicos')
       .select('*')
@@ -72,14 +74,17 @@ export async function POST(req: Request) {
 
     const activeTechs = tecnicosData || [];
 
-    // 5. Determinar el consecutivo máximo actual para PREV-
-    const { data: prevCodes } = await supabase
-      .from('mantenimiento_ordenes')
-      .select('codigo')
-      .filter('codigo', 'ilike', 'PREV-%');
+    // 4. Determinar el consecutivo máximo actual para PREV-
+    const prevCodes = await fetchAllRows<{ codigo: string | null }>(
+      () => supabase
+        .from('mantenimiento_ordenes')
+        .select('codigo')
+        .filter('codigo', 'ilike', 'PREV-%')
+        .order('id', { ascending: true })
+    );
 
     let maxNum = 0;
-    (prevCodes || []).forEach(row => {
+    prevCodes.forEach(row => {
       const match = (row.codigo || '').trim().match(/^PREV-(\d+)$/i);
       if (match) {
         const n = parseInt(match[1], 10);
@@ -89,29 +94,34 @@ export async function POST(req: Request) {
       }
     });
 
-    // 6. Evaluar planes vencidos e incrementar ref_frecuencia si pasaron días
+    // 5. Evaluar planes vencidos por calendario. El contador de cada plan avanza
+    // según los días desde su propio updated_at, así múltiples corridas en el mismo día no lo inflan.
     const plansToUpdateCounter: { id: number; ref_frecuencia: number }[] = [];
     const ordersToInsert: any[] = [];
     let nextCodeNum = maxNum + 1;
 
     for (const p of pmps) {
       const freq = Number(p.frecuencia_dias) || 1;
-      const currentRef = Number(p.ref_frecuencia || 0);
-      
-      // Si han transcurrido días desde la última corrida, incrementamos el contador
-      const newRef = diffDays > 0 ? Math.min(freq, currentRef + diffDays) : currentRef;
+      const currentRef = Math.min(freq, Number(p.ref_frecuencia || 0));
+      const lastCountStr = p.updated_at || p.created_at
+        ? getColombiaDate(new Date(p.updated_at || p.created_at))
+        : todayStr;
+      const elapsed = daysBetween(lastCountStr, todayStr);
 
-      if (newRef !== currentRef) {
-        plansToUpdateCounter.push({
-          id: p.id,
-          ref_frecuencia: newRef
-        });
+      let newRef = Math.min(freq, currentRef + elapsed);
+
+      // Nunca generar dos OT del mismo plan dentro de un mismo ciclo de frecuencia
+      const lastGenStr = lastGenByPlan.get(p.id);
+      const daysSinceGen = lastGenStr ? daysBetween(lastGenStr, todayStr) : null;
+      if (daysSinceGen !== null && daysSinceGen < freq && newRef >= freq) {
+        newRef = daysSinceGen;
       }
 
-      const isDue = newRef >= freq || freq <= 1;
+      const isDue = newRef >= freq;
 
-      // Si está vencido y NO tiene una OT abierta pendiente, generamos su nueva OT
-      if (isDue && !openPlanIds.has(p.id)) {
+      // Vencido por calendario: se genera la OT aunque la anterior siga abierta,
+      // y el contador se reinicia para iniciar el siguiente ciclo
+      if (isDue) {
         const codigoOT = `PREV-${nextCodeNum++}`;
         const pPlanta = (p.planta || 'MS').trim();
 
@@ -142,10 +152,44 @@ export async function POST(req: Request) {
           fotos_despues: []
         });
 
-        // Marcar este plan para no duplicarlo en este mismo ciclo
-        openPlanIds.add(p.id);
+        newRef = 0;
+      }
+
+      if (newRef !== currentRef || elapsed > 0) {
+        plansToUpdateCounter.push({
+          id: p.id,
+          ref_frecuencia: newRef
+        });
       }
     }
+
+    // 6. Insertar las nuevas órdenes generadas en mantenimiento_ordenes en lotes de 50
+    let insertedCount = 0;
+    const failedPlanIds = new Set<number>();
+    if (ordersToInsert.length > 0) {
+      const insertBatchSize = 50;
+      for (let i = 0; i < ordersToInsert.length; i += insertBatchSize) {
+        const batch = ordersToInsert.slice(i, i + insertBatchSize);
+        const { error: insErr } = await supabase
+          .from('mantenimiento_ordenes')
+          .insert(batch);
+
+        if (insErr) {
+          console.error('Error insertando lote de órdenes preventivas:', insErr);
+          batch.forEach(o => failedPlanIds.add(o.id_plan_preventivo));
+        } else {
+          insertedCount += batch.length;
+        }
+      }
+    }
+
+    // Si la OT no se pudo insertar, el plan sigue vencido para reintentar en la próxima corrida
+    plansToUpdateCounter.forEach(item => {
+      if (failedPlanIds.has(item.id)) {
+        const plan = pmps.find(p => p.id === item.id);
+        item.ref_frecuencia = Number(plan?.frecuencia_dias) || 1;
+      }
+    });
 
     // 7. Ejecutar actualizaciones de contadores de ref_frecuencia en lotes
     if (plansToUpdateCounter.length > 0) {
@@ -167,28 +211,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // 8. Insertar las nuevas órdenes generadas en mantenimiento_ordenes en lotes de 50
-    let insertedCount = 0;
-    if (ordersToInsert.length > 0) {
-      const insertBatchSize = 50;
-      for (let i = 0; i < ordersToInsert.length; i += insertBatchSize) {
-        const batch = ordersToInsert.slice(i, i + insertBatchSize);
-        const { error: insErr } = await supabase
-          .from('mantenimiento_ordenes')
-          .insert(batch);
-
-        if (insErr) {
-          console.error('Error insertando lote de órdenes preventivas:', insErr);
-        } else {
-          insertedCount += batch.length;
-        }
-      }
-    }
-
     return NextResponse.json({
       success: true,
       mensaje: `Generación completada exitosamente`,
-      diasTranscurridos: diffDays,
       planesActualizadosContador: plansToUpdateCounter.length,
       ordenesGeneradas: insertedCount,
       rangoCodigos: insertedCount > 0 ? `PREV-${maxNum + 1} a PREV-${maxNum + insertedCount}` : 'Sin nuevas órdenes',
