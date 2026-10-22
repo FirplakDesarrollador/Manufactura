@@ -6,6 +6,9 @@ import { supabase } from '@/lib/supabase'
 import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Calendar as CalendarIcon, Filter, Pencil, Settings } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SaldosDefectsSettingsModal, DefectoSaldoDestruccion } from '@/components/calidad/SaldosDefectsSettingsModal'
+import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import { v4 as uuidv4 } from 'uuid'
 
 interface ProducloMS {
@@ -50,44 +53,51 @@ export default function SaldosYDestruccionesPage() {
     const [hasDeletePermission, setHasDeletePermission] = useState(false)
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
     const [editingReportId, setEditingReportId] = useState<number | null>(null)
+    const [deleteConfirmReport, setDeleteConfirmReport] = useState<ReporteSaldo | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     
     // Auth
     const [user, setUser] = useState<{ id: string, email?: string, localId?: number } | null>(null)
 
-    // Filters
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+    // Filters - Default to Colombia local date (America/Bogota, UTC-5)
+    const getColombiaToday = () => {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date())
+    }
+
+    const [selectedDate, setSelectedDate] = useState(getColombiaToday())
     const [searchTerm, setSearchTerm] = useState('')
 
     const fetchData = useCallback(async () => {
         setLoading(true)
         
-        const day = new Date(selectedDate)
-        const nextDay = new Date(day)
-        nextDay.setDate(day.getDate() + 1)
-        const nextDayStr = nextDay.toISOString().split('T')[0]
-
-        const queryStart = `${selectedDate}T00:00:00Z`
-        const queryEnd = `${nextDayStr}T12:00:00Z`
+        // Exact 24-hour range for Colombia date in UTC
+        const startIso = new Date(`${selectedDate}T00:00:00-05:00`).toISOString()
+        const endIso = new Date(`${selectedDate}T23:59:59.999-05:00`).toISOString()
 
         // Fetch reports for date
-        const { data: reportsRes } = await supabase
+        const { data: reportsRes, error: fetchErr } = await supabase
             .from('ms_reporte_defectos')
             .select(`
                 *,
                 producto:productos_defectos_ms (Referencia)
             `)
-            .gte('created_at', queryStart)
-            .lte('created_at', queryEnd)
+            .gte('created_at', startIso)
+            .lte('created_at', endIso)
             .order('created_at', { ascending: false })
 
+        if (fetchErr) {
+            console.error('Error fetching saldos/destrucciones:', fetchErr)
+        }
+
         if (reportsRes) {
-            // Filter to only Saldos y Destrucciones
+            // Filter to only Saldos y Destrucciones (case-insensitive, includes any mention of saldo or destrucci)
             const filteredReports = reportsRes.filter(r => {
-                const defects = Array.isArray(r.defecto) ? r.defecto : []
+                const defects = Array.isArray(r.defecto) ? r.defecto : (typeof r.defecto === 'string' ? [r.defecto] : [])
                 return defects.some((d: any) => {
-                    const defectName = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre)
-                    return defectName && (defectName.startsWith('Saldo -') || defectName.startsWith('Destrucción -'))
+                    const defectName = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '')
+                    const nameLower = defectName.toLowerCase()
+                    return nameLower.includes('saldo') || nameLower.includes('destrucci')
                 })
             })
 
@@ -148,23 +158,43 @@ export default function SaldosYDestruccionesPage() {
             
             if (productsRes.data) setProducts(productsRes.data)
             if (defectsRes.data) {
-                let localConfig: Record<number, any> = {}
+                let localConfig: { molde?: number[], noFoto?: number[] } = {}
                 try {
-                    const stored = localStorage.getItem('saldos_defectos_config')
-                    if (stored) localConfig = JSON.parse(stored)
+                    const storedCompact = localStorage.getItem('saldos_defectos_config_compact')
+                    if (storedCompact) {
+                        localConfig = JSON.parse(storedCompact)
+                    } else {
+                        const legacy = localStorage.getItem('saldos_defectos_config')
+                        if (legacy) {
+                            const parsed = JSON.parse(legacy)
+                            localConfig = {
+                                molde: Object.keys(parsed).filter(k => parsed[k]?.Requiere_Referencia_Molde).map(Number),
+                                noFoto: Object.keys(parsed).filter(k => parsed[k]?.Requiere_Foto === false).map(Number)
+                            }
+                        }
+                    }
                 } catch (e) {
-                    console.error('Error reading saldos_defectos_config from localStorage:', e)
+                    console.warn('Error reading saldos defect configuration from localStorage:', e)
                 }
 
-                const mergedDefects: DefectoSaldoDestruccion[] = defectsRes.data.map(d => ({
-                    ...d,
-                    Requiere_Foto: d.Requiere_Foto !== undefined && d.Requiere_Foto !== null 
+                const mergedDefects: DefectoSaldoDestruccion[] = defectsRes.data.map(d => {
+                    const dbHasFoto = d.Requiere_Foto !== undefined && d.Requiere_Foto !== null
+                    const dbHasMolde = d.Requiere_Referencia_Molde !== undefined && d.Requiere_Referencia_Molde !== null
+
+                    const reqFoto = dbHasFoto 
                         ? !!d.Requiere_Foto 
-                        : (localConfig[d.id]?.Requiere_Foto ?? true),
-                    Requiere_Referencia_Molde: d.Requiere_Referencia_Molde !== undefined && d.Requiere_Referencia_Molde !== null 
+                        : (localConfig.noFoto ? !localConfig.noFoto.includes(d.id) : true)
+
+                    const reqMolde = dbHasMolde 
                         ? !!d.Requiere_Referencia_Molde 
-                        : (localConfig[d.id]?.Requiere_Referencia_Molde ?? false)
-                }))
+                        : (localConfig.molde ? localConfig.molde.includes(d.id) : false)
+
+                    return {
+                        ...d,
+                        Requiere_Foto: reqFoto,
+                        Requiere_Referencia_Molde: reqMolde
+                    }
+                })
 
                 setDefectOptions(mergedDefects)
             }
@@ -180,26 +210,36 @@ export default function SaldosYDestruccionesPage() {
     const handleSaveSettings = async (updatedDefects: DefectoSaldoDestruccion[]) => {
         try {
             // Attempt to update Supabase table
-            const updatePromises = updatedDefects.map(d => 
-                supabase
-                    .from('ms_lista_saldos_destrucciones')
-                    .update({
-                        Requiere_Foto: !!d.Requiere_Foto,
-                        Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde
-                    })
-                    .eq('id', d.id)
-            )
-            await Promise.all(updatePromises)
-
-            // Save to localStorage as persistent cache
-            const configMap: Record<number, { Requiere_Foto?: boolean, Requiere_Referencia_Molde?: boolean }> = {}
-            updatedDefects.forEach(d => {
-                configMap[d.id] = {
-                    Requiere_Foto: !!d.Requiere_Foto,
-                    Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde
+            try {
+                const updatePromises = updatedDefects.map(d => 
+                    supabase
+                        .from('ms_lista_saldos_destrucciones')
+                        .update({
+                            Requiere_Foto: !!d.Requiere_Foto,
+                            Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde
+                        })
+                        .eq('id', d.id)
+                )
+                const results = await Promise.all(updatePromises)
+                const errors = results.filter(r => r.error)
+                if (errors.length > 0) {
+                    console.warn('Supabase update returned notes (columns may not exist yet in DB table):', errors)
                 }
-            })
-            localStorage.setItem('saldos_defectos_config', JSON.stringify(configMap))
+            } catch (dbErr) {
+                console.warn('Could not update Supabase directly:', dbErr)
+            }
+
+            // Save ultra-compact configuration to localStorage (only non-defaults, taking ~50 bytes)
+            try {
+                localStorage.removeItem('saldos_defectos_config')
+                const compactConfig = {
+                    molde: updatedDefects.filter(d => d.Requiere_Referencia_Molde).map(d => d.id),
+                    noFoto: updatedDefects.filter(d => d.Requiere_Foto === false).map(d => d.id)
+                }
+                localStorage.setItem('saldos_defectos_config_compact', JSON.stringify(compactConfig))
+            } catch (storageErr) {
+                console.warn('LocalStorage unavailable or quota reached, state kept in memory:', storageErr)
+            }
 
             setDefectOptions(updatedDefects)
             alert('Configuración guardada exitosamente')
@@ -346,17 +386,28 @@ export default function SaldosYDestruccionesPage() {
         setIsModalOpen(true)
     }
 
-    const handleDeleteReport = async (id: number, e: React.MouseEvent) => {
+    const handleDeleteReport = (report: ReporteSaldo, e: React.MouseEvent) => {
         e.stopPropagation()
-        if (window.confirm('¿Estás seguro de que deseas eliminar este registro?')) {
-            const { error } = await supabase.from('ms_reporte_defectos').delete().eq('id', id)
+        setDeleteConfirmReport(report)
+    }
+
+    const confirmDeleteReport = async () => {
+        if (!deleteConfirmReport) return
+        setIsDeleting(true)
+        try {
+            const { error } = await supabase.from('ms_reporte_defectos').delete().eq('id', deleteConfirmReport.id)
             if (error) {
                 console.error('Error deleting report:', error)
                 alert('Error al eliminar el registro')
             } else {
-                alert('Registro eliminado exitosamente')
+                setDeleteConfirmReport(null)
                 fetchData()
             }
+        } catch (err) {
+            console.error('Error in confirmDeleteReport:', err)
+            alert('Error inesperado al eliminar')
+        } finally {
+            setIsDeleting(false)
         }
     }
 
@@ -375,83 +426,73 @@ export default function SaldosYDestruccionesPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-            <header className="bg-[#254153] text-white p-4 flex items-center justify-between shadow-lg sticky top-0 z-50">
-                <div className="flex items-center space-x-4">
-                    <button 
-                        onClick={() => router.push('/calidad/ms')}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-black tracking-widest uppercase flex items-center gap-2">
-                            <Trash2 className="w-5 h-5 text-red-400" />
-                            Saldos y Destrucciones
-                        </h1>
-                        <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">
-                            Módulo de Calidad
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 border border-white/20 transition-all shadow-sm"
-                        title="Configuración de Defectos"
-                    >
-                        <Settings className="w-4 h-4 text-white" />
-                        <span className="hidden sm:inline">Configuración</span>
-                    </button>
-                    <button
-                        onClick={() => {
-                            setEditingReportId(null)
-                            setSaldosProduct('')
-                            setSelectedDefect('')
-                            setMoldeInputValue('')
-                            setIsModalOpen(true)
-                        }}
-                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-black text-sm uppercase tracking-wider flex items-center gap-2 shadow-md transition-all"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Agregar Evento
-                    </button>
-                </div>
-            </header>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad MS"
+                subtitle=""
+                compact={true}
+                userEmail={user?.email}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
             
-            {/* Filter Bar */}
-            <div className="bg-white border-b border-gray-200 p-3 sticky top-[72px] z-40 shadow-sm">
-                <div className="max-w-full flex flex-wrap items-center gap-3">
-                    {/* Date Picker */}
-                    <div className="flex-none w-48 relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#254153]">
-                            <CalendarIcon className="w-4 h-4" />
+            {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
+            <div className="bg-white border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
+                <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-3">
+                    {/* Left: Date picker & Search - Ampliado para aprovechar el espacio antes de los botones */}
+                    <div className="flex items-center gap-2 max-w-[calc(50%-130px)] flex-1 min-w-[340px]">
+                        <div className="w-40 relative shrink-0">
+                            <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full h-10 pl-8 pr-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153]"
+                            />
                         </div>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153]"
+
+                        <div className="relative flex-1 min-w-[160px]">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                placeholder="BUSCAR REFERENCIA, DEFECTO..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full h-10 pl-8 pr-3 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
+                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                        <CalidadMsNavButtons
+                            activeTab="saldos"
+                            onOpenSettings={() => setIsSettingsOpen(true)}
+                            hasSettingsPermission={hasSettingsPermission}
+                            isSettingsActive={isSettingsOpen}
                         />
                     </div>
 
-                    {/* Search */}
-                    <div className="flex-1 min-w-[200px] relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            <Search className="w-4 h-4" />
+                    {/* Right: Total & Agregar Evento */}
+                    <div className="flex items-center gap-3 ml-auto shrink-0">
+                        <div className="h-10 bg-[#254153] text-white px-3.5 rounded flex items-center gap-1.5 text-xs font-black">
+                            <span className="text-[10px] font-bold text-gray-300 uppercase">Total:</span>
+                            <span>{displayedReports.length}</span>
                         </div>
-                        <input
-                            type="text"
-                            placeholder="BUSCAR REFERENCIA, DEFECTO O MOLDE..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
-                        />
-                    </div>
 
-                    {/* Stats Counter */}
-                    <div className="flex-none bg-[#254153] text-white px-4 py-2 rounded flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Total:</span>
-                        <span className="text-sm font-black">{displayedReports.length}</span>
+                        <button
+                            onClick={() => {
+                                setEditingReportId(null)
+                                setSaldosProduct('')
+                                setSelectedDefect('')
+                                setMoldeInputValue('')
+                                setIsModalOpen(true)
+                            }}
+                            className="h-10 bg-red-600 hover:bg-red-700 text-white px-4 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Agregar Evento</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -550,7 +591,7 @@ export default function SaldosYDestruccionesPage() {
                                                         )}
                                                         {hasDeletePermission && (
                                                             <button
-                                                                onClick={(e) => handleDeleteReport(report.id, e)}
+                                                                onClick={(e) => handleDeleteReport(report, e)}
                                                                 className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-full transition-colors"
                                                                 title="Eliminar"
                                                             >
@@ -584,7 +625,7 @@ export default function SaldosYDestruccionesPage() {
                             >
                                 <X className="w-6 h-6" />
                             </button>
-                            <Trash2 className="w-10 h-10 text-white/80 mx-auto mb-2" />
+                            <BrokenSinkIcon className="w-12 h-12 text-white/90 mx-auto mb-2" />
                             <h2 className="text-white font-black text-xl tracking-wider uppercase">
                                 {editingReportId ? 'Editar Evento' : 'Registrar Evento'}
                             </h2>
@@ -705,7 +746,7 @@ export default function SaldosYDestruccionesPage() {
                                     {isUploading ? (
                                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
-                                        editingReportId ? <Pencil className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />
+                                        editingReportId ? <Pencil className="w-4 h-4" /> : <BrokenSinkIcon className="w-4 h-4 text-white" />
                                     )}
                                     <span>{isUploading ? 'Guardando...' : (editingReportId ? 'Guardar Cambios' : 'Registrar')}</span>
                                 </button>
@@ -856,6 +897,52 @@ export default function SaldosYDestruccionesPage() {
                 defects={defectOptions}
                 onSave={handleSaveSettings}
             />
+
+            {/* POPUP DE CONFIRMACIÓN DE ELIMINACIÓN */}
+            {deleteConfirmReport && (
+                <div className="fixed inset-0 bg-black/60 z-[70] backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150">
+                        <div className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0 text-red-600">
+                                    <AlertTriangle className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-base font-black text-[#254153] uppercase tracking-wide">
+                                        ¿Eliminar este registro?
+                                    </h3>
+                                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                                        ¿Estás seguro de que deseas eliminar permanentemente el registro{' '}
+                                        <span className="font-black text-red-600">#{deleteConfirmReport.id}</span>
+                                        {deleteConfirmReport.producto?.Referencia && (
+                                            <> ({deleteConfirmReport.producto.Referencia})</>
+                                        )}? Esta acción removerá el registro de la base de datos y no se puede deshacer.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteConfirmReport(null)}
+                                disabled={isDeleting}
+                                className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 rounded font-black text-xs uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDeleteReport}
+                                disabled={isDeleting}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>{isDeleting ? 'Eliminando...' : 'Sí, Eliminar'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

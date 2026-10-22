@@ -2268,16 +2268,8 @@ export default function GestionMantenimientoPage() {
           item.fechaCierre = getLocalDatetimeString();
         }
         if (newStatus === 'Completado') {
-          item.refFrecuencia = 0;
+          // El contador ref_frecuencia lo reinicia el generador al crear la OT (ciclo por calendario)
           item.isDue = false;
-          // Reiniciar contador de frecuencia en Supabase
-          supabase
-            .from('mantenimiento_planes_preventivos')
-            .update({ ref_frecuencia: 0, updated_at: new Date().toISOString() })
-            .eq('id', taskId)
-            .then(({ error }) => {
-              if (error) console.warn('Aviso reiniciando ref_frecuencia en PMP:', error);
-            });
         }
         currentTask = item;
         return item;
@@ -3656,7 +3648,7 @@ export default function GestionMantenimientoPage() {
       fechaApertura: finalFechaApertura,
       fechaCierre: finalFechaCierre,
       fotos: form.fotos || [],
-      refFrecuencia: isCompleted ? 0 : executingPreventivo.refFrecuencia,
+      refFrecuencia: executingPreventivo.refFrecuencia,
       isDue: isCompleted ? false : executingPreventivo.isDue
     };
 
@@ -3668,14 +3660,6 @@ export default function GestionMantenimientoPage() {
     try {
       const tech = technicians.find(t => t.id === updatedTask.idtecs);
       const techName = tech ? tech.name : 'Super técnico';
-
-      // Reiniciar contador del plan preventivo en Supabase si se completó
-      if (isCompleted && updatedTask.id) {
-        await supabase
-          .from('mantenimiento_planes_preventivos')
-          .update({ ref_frecuencia: 0, updated_at: new Date().toISOString() })
-          .eq('id', updatedTask.id);
-      }
 
       // Buscar si ya existe una orden en mantenimiento_ordenes para este plan
       const { data: existingOrd } = await supabase

@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Search, X, ChevronLeft, Filter, Calendar as CalendarIcon, Trash2, Edit, Clock, ZoomIn } from 'lucide-react'
+import { SearchableSelect } from '@/components/ui/searchable-select'
+import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import {
     BarChart,
     Bar,
@@ -19,6 +22,7 @@ import {
 export default function ReportedDefectsListPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(true)
+    const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<ReportDefectItem[]>([])
     const [products, setProducts] = useState<ProductMS[]>([])
     const [defectsList, setDefectsList] = useState<{ id: number, defecto?: string, Defecto?: string, nombre?: string, Nombre?: string }[]>([])
@@ -83,10 +87,14 @@ export default function ReportedDefectsListPage() {
     }
 
     // Filters
+    const getColombiaToday = () => {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date())
+    }
+
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedProduct, setSelectedProduct] = useState('')
     const [selectedDefect, setSelectedDefect] = useState('')
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+    const [selectedDate, setSelectedDate] = useState(getColombiaToday())
     const [modalStartTime, setModalStartTime] = useState('')
     const [modalEndTime, setModalEndTime] = useState('')
     const [modalProductSearch, setModalProductSearch] = useState('')
@@ -368,6 +376,7 @@ export default function ReportedDefectsListPage() {
         const loadUserAndPermissions = async () => {
             const { data: authData } = await supabase.auth.getUser()
             if (authData?.user?.email) {
+                setUserEmail(authData.user.email)
                 const { data: userData } = await supabase
                     .from('usuarios')
                     .select('permisos')
@@ -458,8 +467,20 @@ export default function ReportedDefectsListPage() {
         }
     }
 
+    const productOptions = useMemo(() => {
+        const fromCatalog = products.map(p => p.Referencia).filter(Boolean)
+        const fromReports = reports.flatMap(r => Array.from(r.productos)).filter(p => p && p !== 'Sin Producto')
+        return Array.from(new Set([...fromReports, ...fromCatalog])).sort()
+    }, [products, reports])
+
+    const defectOptions = useMemo(() => {
+        const fromCatalog = defectosCatalog.map(d => d.defecto || d.Defecto || d.nombre || d.Nombre).filter(Boolean) as string[]
+        const fromReports = reports.map(r => r.defecto_especifico).filter(Boolean)
+        return Array.from(new Set([...fromReports, ...fromCatalog]))
+    }, [defectosCatalog, reports])
+
     const filteredReports = reports.filter(report => {
-        const matchesProductFilter = selectedProduct === '' || report.productos_lista.includes(String(selectedProduct))
+        const matchesProductFilter = selectedProduct === '' || report.productos_lista.toLowerCase().includes(selectedProduct.toLowerCase())
         const matchesDefectFilter = selectedDefect === '' || report.defecto_especifico === selectedDefect
         const searchLower = searchTerm.toLowerCase()
         const matchesSearch = searchTerm === '' ||
@@ -550,112 +571,69 @@ export default function ReportedDefectsListPage() {
 
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans">
-            {/* Professional Header */}
-            <header className="bg-[#254153] text-white px-4 h-14 flex items-center justify-between sticky top-0 z-50">
-                <div className="flex items-center space-x-4">
-                    <button
-                        onClick={() => router.push('/calidad/ms')}
-                        className="p-1 hover:bg-white/10 transition-colors"
-                    >
-                        <ChevronLeft className="w-6 h-6" />
-                    </button>
-                    <div className="flex flex-col">
-                        <h1 className="text-sm font-black tracking-widest uppercase">Consulta de Defectos</h1>
-                        <span className="text-[10px] font-bold opacity-40 uppercase tracking-tighter italic">Engineered by Firplak Quality</span>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                    <div className="text-right hidden sm:block">
-                        <span className="text-[9px] font-black opacity-30 uppercase tracking-[0.2em] block">Base de Datos Activa</span>
-                        <span className="text-xs font-black text-blue-400">ms_reporte_defectos</span>
-                    </div>
-                    <div className="w-10 h-10 bg-white/5 rounded-none border border-white/10 flex items-center justify-center">
-                        <Filter className="w-5 h-5 opacity-40" />
-                    </div>
-                </div>
-            </header>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad MS"
+                subtitle=""
+                compact={true}
+                userEmail={userEmail}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
 
-            {/* Filter Bar */}
-            <div className="bg-gray-50 border-b border-gray-200 p-2 sticky top-14 z-40">
-                <div className="max-w-full flex flex-wrap items-center gap-2">
-
-                    {/* Date Picker */}
-                    <div className="flex-none w-44 relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#254153]">
-                            <CalendarIcon className="w-4 h-4" />
+            {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
+            <div className="bg-gray-50 border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-3">
+                    {/* Left: Filters - Ampliado para aprovechar el espacio */}
+                    <div className="flex items-center gap-2.5 max-w-[560px] xl:max-w-[640px] flex-1">
+                        {/* Date Picker */}
+                        <div className="w-36 relative shrink-0">
+                            <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => {
+                                    setSelectedDate(e.target.value)
+                                }}
+                                className="w-full h-10 bg-white border border-gray-300 rounded px-2 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-8"
+                            />
                         </div>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => {
-                                setSelectedDate(e.target.value)
-                            }}
-                            className="w-full bg-white border border-gray-300 rounded-none px-4 py-2 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-10"
-                        />
-                    </div>
 
-                    {/* Product Filter */}
-                    <div className="flex-1 min-w-[200px]">
-                        <select
-                            value={selectedProduct}
-                            onChange={(e) => {
-                                setSelectedProduct(e.target.value)
-                            }}
-                            className="w-full px-4 py-2 bg-white border border-gray-300 font-black text-[#254153] text-xs outline-none focus:border-[#254153]"
-                        >
-                            <option value="">TODAS LAS REFERENCIAS</option>
-                            {products.map((p) => (
-                                <option key={p.id} value={p.id.toString()}>{p.Referencia}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Defect Filter */}
-                    <div className="flex-1 min-w-[200px]">
-                        <select
-                            value={selectedDefect}
-                            onChange={(e) => setSelectedDefect(e.target.value)}
-                            className="w-full px-4 py-2 bg-white border border-gray-300 font-black text-[#254153] text-xs outline-none focus:border-[#254153]"
-                        >
-                            <option value="">TODOS LOS DEFECTOS</option>
-                            {defectosCatalog.map((d) => {
-                                const name = d.defecto || d.Defecto || d.nombre || d.Nombre
-                                if (!name) return null
-                                return (
-                                    <option key={d.id} value={name}>{name}</option>
-                                )
-                            })}
-                        </select>
-                    </div>
-
-                    {/* Search */}
-                    <div className="flex-[2] min-w-[250px] relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            <Search className="w-4 h-4" />
+                        {/* Product Filter with Search */}
+                        <div className="flex-1 min-w-[180px] xl:min-w-[220px]">
+                            <SearchableSelect
+                                name="productoFilter"
+                                options={productOptions}
+                                placeholder="TODAS LAS REFERENCIAS"
+                                value={selectedProduct}
+                                onValueChange={(val) => setSelectedProduct(val)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="BUSCAR POR PRODUCTO O DEFECTO..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-10 py-2 bg-white border border-gray-300 rounded-none font-black text-xs text-[#254153] outline-none focus:border-[#254153] uppercase placeholder:text-gray-300"
-                        />
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        )}
+
+                        {/* Defect Filter with Search */}
+                        <div className="flex-1 min-w-[180px] xl:min-w-[220px]">
+                            <SearchableSelect
+                                name="defectoFilter"
+                                options={defectOptions}
+                                placeholder="TODOS LOS DEFECTOS"
+                                value={selectedDefect}
+                                onValueChange={(val) => setSelectedDefect(val)}
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                            />
+                        </div>
                     </div>
 
-                    <div className="bg-[#254153] text-white px-6 py-2 rounded-none text-xs font-black uppercase tracking-widest border border-black shadow-inner">
-                        REGISTROS: {filteredReports.length}
+                    {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
+                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                        <CalidadMsNavButtons activeTab="list" hasSettingsPermission={true} />
                     </div>
 
-                    {/* Piece Stats Summary */}
-                    <div className="flex items-center space-x-4 ml-auto">
+                    {/* Right: Piece Stats Summary */}
+                    <div className="flex items-center space-x-3 ml-auto shrink-0">
+                        <div className="bg-[#254153] text-white px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest border border-black shadow-inner">
+                            REG: {filteredReports.length}
+                        </div>
                         <div className="flex items-center space-x-1.5">
                             <div className="w-2 h-2 bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
                             <span className="text-[10px] font-black text-gray-400 uppercase">OK:</span>
@@ -666,14 +644,14 @@ export default function ReportedDefectsListPage() {
                             <span className="text-[10px] font-black text-gray-400 uppercase">DEF:</span>
                             <span className="text-base font-black text-red-600">{pieceStats.defectuosos}</span>
                         </div>
-                        <div className="h-8 w-px bg-gray-300" />
+                        <div className="h-7 w-px bg-gray-300" />
                         <div className="flex flex-col items-center">
-                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Total Piezas</span>
-                            <span className="text-lg font-black text-[#254153] leading-none">{pieceStats.total}</span>
+                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Total</span>
+                            <span className="text-base font-black text-[#254153] leading-none">{pieceStats.total}</span>
                         </div>
-                        <div className="flex flex-col items-center px-3 border-l border-gray-300">
-                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Eficiencia</span>
-                            <span className={`text-lg font-black leading-none ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
+                        <div className="flex flex-col items-center px-2 border-l border-gray-300">
+                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">IFI</span>
+                            <span className={`text-base font-black leading-none ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
                         </div>
                     </div>
                 </div>

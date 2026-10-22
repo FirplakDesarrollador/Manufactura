@@ -3,12 +3,14 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings, Archive, Trash2 } from 'lucide-react'
+import { Camera, X, Settings, Archive, Trash2, History, ClipboardList, BarChart2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
 import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
+import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -130,6 +132,15 @@ export default function CalidadMsReportPage() {
     useEffect(() => {
         const load = async () => {
             await fetchData()
+            if (typeof window !== 'undefined') {
+                const params = new URLSearchParams(window.location.search)
+                if (params.get('chart') === 'true') {
+                    setShowHourlyChart(true)
+                }
+                if (params.get('settings') === 'true') {
+                    setIsSettingsOpen(true)
+                }
+            }
         }
         void load()
     }, [fetchData])
@@ -291,64 +302,39 @@ export default function CalidadMsReportPage() {
 
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans">
-            {/* Professional Header - Full Width */}
-            <header className="bg-[#254153] text-white sticky top-0 z-50 px-4">
-                <div className="mx-auto h-14 flex items-center justify-between">
-                    <div className="flex items-center space-x-6">
-                        <button
-                            onClick={() => router.push('/calidad')}
-                            className="p-1.5 hover:bg-white/10 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                        </button>
-                        <div className="flex items-center space-x-3">
-                            <span className="text-xl font-black tracking-tighter italic">FIRPLAK</span>
-                            <div className="h-4 w-px bg-white/20" />
-                            <span className="text-[10px] uppercase font-bold tracking-[0.3em] opacity-60">MS Quality Control</span>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad MS"
+                subtitle=""
+                compact={true}
+                userEmail={user?.email}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
+
+            {/* Control Bar - Full Width - Same height (h-14 / 56px) as main blue header */}
+            <div className="bg-gray-50 border-b border-gray-200 h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto px-4 flex items-center justify-between relative h-full">
+                    {/* Left: Product Selector & Save button - Ampliado para aprovechar espacio */}
+                    <div className="flex items-center gap-3 max-w-[560px] xl:max-w-[640px] flex-1">
+                        <div className="flex-1 min-w-[320px]">
+                            <SearchableSelect
+                                name="producto"
+                                options={products.map((p) => p.Referencia)}
+                                placeholder="SELECCIONAR REFERENCIA DE PRODUCTO"
+                                defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
+                                onValueChange={(val) => {
+                                    const product = products.find(p => p.Referencia === val)
+                                    setSelectedProduct(product ? product.id.toString() : '')
+                                }}
+                                className="w-full h-10 bg-white border border-gray-300 rounded px-3 text-[#254153] font-bold text-xs md:text-sm focus:border-[#254153] outline-none transition-all flex items-center"
+                            />
                         </div>
-                    </div>
 
-                    <div className="flex items-center space-x-4">
-                        <div className="hidden md:block text-right">
-                            <span className="text-[10px] font-black opacity-40 uppercase tracking-widest block leading-none">Terminal Activa</span>
-                            <span className="text-xs font-bold text-blue-400">{user?.email}</span>
-                        </div>
-                        <button
-                            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-                            className="p-1.5 hover:bg-red-600 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            {/* Control Bar - Full Width */}
-            <div className="bg-gray-50 border-b border-gray-200 sticky top-[56px] z-40">
-                <div className="max-w-full px-4 py-3 flex flex-wrap items-center gap-6">
-                    <div className="flex-1 min-w-[300px]">
-                        <SearchableSelect
-                            name="producto"
-                            options={products.map((p) => p.Referencia)}
-                            placeholder="-- SELECCIONAR REFERENCIA DE PRODUCTO --"
-                            defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
-                            onValueChange={(val) => {
-                                const product = products.find(p => p.Referencia === val)
-                                setSelectedProduct(product ? product.id.toString() : '')
-                            }}
-                            className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-[#254153] font-black text-base focus:border-[#254153] outline-none transition-all"
-                        />
-                    </div>
-
-                    <div className="flex items-center space-x-2">
                         <button
                             onClick={handleSave}
                             disabled={isUploading}
-                            className={`flex items-center space-x-2 px-6 py-2.5 text-white font-black uppercase tracking-widest text-xs transition-all ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
+                            className={`h-10 flex items-center space-x-2 px-4 text-white font-black uppercase tracking-widest text-xs transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
                             {isUploading ? (
                                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -357,40 +343,20 @@ export default function CalidadMsReportPage() {
                                     <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                 </svg>
                             )}
-                            <span>{isUploading ? 'Guardando...' : 'Ejecutar Registro'}</span>
+                            <span>{isUploading ? 'Guardando...' : 'Ejecutar'}</span>
                         </button>
-                        <button
-                            onClick={() => router.push('/calidad/ms/list')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50"
-                            title="Ver Reportes del Día"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                        </button>
-                        {hasSettingsPermission && (
-                            <button
-                                onClick={() => setIsSettingsOpen(true)}
-                                className={`p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 border-l-0`}
-                                title="Configurar Defectos"
-                            >
-                                <Settings className="w-5 h-5" />
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setShowHourlyChart(prev => !prev)}
-                            className={`p-2.5 bg-white border border-gray-300 hover:bg-blue-50 border-l-0 transition-colors ${showHourlyChart ? 'text-blue-600' : 'text-gray-400'}`}
-                            title="Indicador Hora a Hora"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        </button>
-                        <button
-                            onClick={() => router.push('/calidad/ms/saldos')}
-                            className="p-2.5 bg-white border border-gray-300 text-red-500 hover:bg-red-50 rounded-r border-l-0"
-                            title="Saldos y Destrucciones"
-                        >
-                            <Trash2 className="w-5 h-5" />
-                        </button>
+                    </div>
+
+                    {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
+                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                        <CalidadMsNavButtons
+                            activeTab="registro"
+                            onOpenSettings={() => setIsSettingsOpen(true)}
+                            onToggleChart={() => setShowHourlyChart(prev => !prev)}
+                            hasSettingsPermission={hasSettingsPermission}
+                            isChartActive={showHourlyChart}
+                            isSettingsActive={isSettingsOpen}
+                        />
                     </div>
 
                     {/* Hidden Photo Upload Input */}
@@ -411,10 +377,8 @@ export default function CalidadMsReportPage() {
                         }}
                     />
 
-                    <div className="h-10 w-px bg-gray-200 hidden lg:block" />
-
-                    {/* Quick Metrics */}
-                    <div className="flex items-center space-x-8 overflow-x-auto no-scrollbar ml-auto">
+                    {/* Right: Quick Metrics */}
+                    <div className="flex items-center space-x-6 overflow-x-auto no-scrollbar ml-auto shrink-0">
                         <div className="flex items-center space-x-2">
                             <div className="w-6 h-6 rounded-full bg-[#36A284] flex items-center justify-center text-white">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
