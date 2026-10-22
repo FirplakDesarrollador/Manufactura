@@ -114,12 +114,14 @@ export default function Header({
             </svg>
           </button>
           <div>
-            <h1 className={`${compact ? 'text-lg sm:text-xl font-light text-white tracking-widest uppercase leading-none mb-0.5' : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
+            <h1 className={`${compact ? 'text-lg sm:text-xl font-light text-white tracking-widest uppercase leading-none' : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
               {title}
             </h1>
-            <p className={`${compact ? 'text-[11px] sm:text-xs text-[#F6F3EE]/70 font-medium tracking-wide leading-none' : 'text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none'}`}>
-              {subtitle}
-            </p>
+            {subtitle ? (
+              <p className={`${compact ? 'text-[11px] sm:text-xs text-[#F6F3EE]/70 font-medium tracking-wide leading-none mt-0.5' : 'text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none'}`}>
+                {subtitle}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -482,7 +484,7 @@ export default function Header({
         </div>
       )}
     </header>
-    <div className="h-20 w-full shrink-0"></div>
+    {!compact && <div className="h-20 w-full shrink-0"></div>}
    </>
   );
 }

@@ -295,10 +295,9 @@ export default function CalidadMsReportPage() {
         <div className="min-h-screen bg-white flex flex-col font-sans">
             {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
             <Header
-                title="Calidad"
-                subtitle="Módulo Operativo"
+                title="Calidad MS"
+                subtitle=""
                 compact={true}
-                onBack={() => router.push('/calidad')}
                 userEmail={user?.email}
                 showLogout={true}
                 onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
