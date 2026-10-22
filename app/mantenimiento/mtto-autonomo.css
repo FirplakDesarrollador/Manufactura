@@ -16,7 +16,7 @@
 }
 
 .mtto-autonomo-wrapper {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-montserrat), 'Montserrat', system-ui, -apple-system, sans-serif;
   background: var(--bg-color);
   color: var(--text-primary);
   min-height: 100vh;
