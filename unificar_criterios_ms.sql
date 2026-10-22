@@ -1,4 +1,7 @@
 -- =====================================================================
+-- ⚠️ NO EJECUTAR: OBSOLETO. Asumía ms_defectos.id = número visible, lo cual no es cierto.
+--    Si ya se ejecutó, corregirlo con corregir_criterios_ms.sql.
+-- =====================================================================
 -- Unificar criterios de calidad MS con el catálogo de defectos de Calidad MS
 --
 -- Fuente oficial: ms_defectos (ids 1..72, la lista que usa /calidad/ms).

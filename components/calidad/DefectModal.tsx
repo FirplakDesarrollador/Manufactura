@@ -9,6 +9,8 @@ export interface Defecto {
   codigo: string;
   defecto: string;
   foto?: string | null;
+  fotos?: string[] | null; // hasta 5 fotos; `foto` es la principal (fotos[0])
+  id_defecto_ms?: number | null; // vínculo con ms_defectos.id (solo planta Ms)
   responsable?: string | null;
   detectarlo?: string | null;
   evitarlo?: string | null;

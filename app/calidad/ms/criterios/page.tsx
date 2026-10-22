@@ -3,10 +3,21 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Maximize2, Search, X } from 'lucide-react'
+import { Maximize2, Pencil, Search, X } from 'lucide-react'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
+import CriterioEditModal, { getCriterioFotos } from '@/components/calidad/CriterioEditModal'
 import type { Defecto as CriterioCalidad } from '@/components/calidad/DefectModal'
+
+// Mismas personas/roles que pueden editar en /calidad/criterios
+const ADMIN_NAMES = ['jair alvarez', 'maria isabel escobar', 'carolina escobar', 'hector', 'calidad', 'admin']
+const puedeEditarCriterios = (u: { nombre?: string | null; correo?: string | null; rol?: string | null } | null) => {
+    if (!u) return false
+    const nombre = (u.nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+    const correo = (u.correo || '').toLowerCase()
+    const rol = (u.rol || '').toLowerCase()
+    return ADMIN_NAMES.some(a => nombre.includes(a) || correo.includes(a)) || rol.includes('admin') || rol.includes('calidad')
+}
 
 interface DefectoMS {
     id: number
@@ -29,6 +40,9 @@ export default function CriteriosCalidadMsPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [expandedId, setExpandedId] = useState<number | null>(null)
     const [zoomedImage, setZoomedImage] = useState<string | null>(null)
+    const [canEdit, setCanEdit] = useState(false)
+    const [editingItem, setEditingItem] = useState<{ id: number; defectoId: number; nombre: string; criterio: CriterioCalidad | null } | null>(null)
+    const [selectedFotoIdx, setSelectedFotoIdx] = useState(0)
 
     useEffect(() => {
         const load = async () => {
@@ -39,10 +53,12 @@ export default function CriteriosCalidadMsPage() {
             }
             setUserEmail(user.email)
 
-            const [defRes, critRes] = await Promise.all([
+            const [defRes, critRes, userRes] = await Promise.all([
                 supabase.from('ms_defectos').select('*').order('id'),
-                supabase.from('criterios_calidad_plantas').select('*').eq('planta', 'Ms')
+                supabase.from('criterios_calidad_plantas').select('*').eq('planta', 'Ms'),
+                supabase.from('usuarios').select('nombre, correo, rol').ilike('correo', user.email || '').maybeSingle()
             ])
+            setCanEdit(puedeEditarCriterios(userRes.data))
             if (defRes.error) console.warn('Error cargando ms_defectos:', defRes.error)
             if (critRes.error) console.warn('Error cargando criterios_calidad_plantas:', critRes.error)
             setDefects(defRes.data || [])
@@ -52,14 +68,25 @@ export default function CriteriosCalidadMsPage() {
         void load()
     }, [router])
 
-    // Cada defecto de MS con su criterio: el código del criterio es el número del defecto
-    // (numeración unificada con unificar_criterios_ms.sql)
+    // Cada defecto de MS con su criterio. El número visible está en el nombre ("68. Pestaña…")
+    // y puede ser distinto del id interno; el criterio se vincula por id_defecto_ms
+    // (corregir_criterios_ms.sql) o, en su defecto, por código = número visible.
     const items = useMemo(() => {
+        const byDefectoId = new Map(criterios.filter(c => c.id_defecto_ms != null).map(c => [Number(c.id_defecto_ms), c]))
         const byCode = new Map(criterios.map(c => [String(c.codigo).trim(), c]))
-        return defects.map(d => {
-            const rawName = d.Defecto || d.defecto || d.nombre || d.Nombre || 'Defecto'
-            return { id: d.id, nombre: cleanName(rawName), criterio: byCode.get(String(d.id)) || null }
-        })
+        return defects
+            .map(d => {
+                const rawName = d.Defecto || d.defecto || d.nombre || d.Nombre || 'Defecto'
+                const match = rawName.match(/^\s*(\d+)/)
+                const numero = match ? Number(match[1]) : d.id
+                return {
+                    id: numero,
+                    defectoId: d.id,
+                    nombre: cleanName(rawName),
+                    criterio: byDefectoId.get(d.id) || byCode.get(String(numero)) || null
+                }
+            })
+            .sort((a, b) => a.id - b.id)
     }, [defects, criterios])
 
     const filteredItems = useMemo(() => {
@@ -127,7 +154,10 @@ export default function CriteriosCalidadMsPage() {
                             return (
                                 <React.Fragment key={item.id}>
                                     <button
-                                        onClick={() => setExpandedId(isOpen ? null : item.id)}
+                                        onClick={() => {
+                                            setExpandedId(isOpen ? null : item.id)
+                                            setSelectedFotoIdx(0)
+                                        }}
                                         className={`p-3 border transition-all duration-200 flex flex-col justify-between w-full text-left min-h-[90px] ${
                                             isOpen
                                                 ? 'bg-[#324354] border-[#324354] text-white shadow-md'
@@ -162,40 +192,75 @@ export default function CriteriosCalidadMsPage() {
                                                     </span>
                                                     <h3 className="text-xl font-black text-[#324354] mt-2">{item.nombre}</h3>
                                                 </div>
-                                                <button
-                                                    onClick={() => setExpandedId(null)}
-                                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-[#324354] text-xs font-bold rounded-xl transition flex items-center gap-1"
-                                                >
-                                                    <X size={14} />
-                                                    <span>Cerrar</span>
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    {canEdit && (
+                                                        <button
+                                                            onClick={() => setEditingItem(item)}
+                                                            className="px-3 py-1.5 bg-[#324354] hover:bg-[#324354]/90 text-white text-xs font-bold rounded-xl transition flex items-center gap-1"
+                                                        >
+                                                            <Pencil size={14} />
+                                                            <span>{c ? 'Editar Criterio' : 'Crear Criterio'}</span>
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => setExpandedId(null)}
+                                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-[#324354] text-xs font-bold rounded-xl transition flex items-center gap-1"
+                                                    >
+                                                        <X size={14} />
+                                                        <span>Cerrar</span>
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {!c ? (
                                                 <p className="text-sm text-slate-500 font-medium py-6 text-center">
-                                                    Este defecto aún no tiene criterio de calidad registrado. Puede crearse desde Criterios de Calidad.
+                                                    Este defecto aún no tiene criterio de calidad registrado.
+                                                    {canEdit ? ' Usa "Crear Criterio" para registrarlo.' : ''}
                                                 </p>
                                             ) : (
                                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-4 items-start">
-                                                    <div className="lg:col-span-4">
-                                                        <div
-                                                            onClick={() => c.foto && setZoomedImage(c.foto)}
-                                                            className={`w-full h-56 rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center relative ${
-                                                                c.foto ? 'cursor-zoom-in bg-slate-900 group' : 'bg-slate-50'
-                                                            }`}
-                                                        >
-                                                            {c.foto ? (
+                                                    <div className="lg:col-span-4 space-y-2">
+                                                        {(() => {
+                                                            const fotos = getCriterioFotos(c)
+                                                            const actual = fotos[Math.min(selectedFotoIdx, fotos.length - 1)]
+                                                            return (
                                                                 <>
-                                                                    <img src={c.foto} alt={item.nombre} className="w-full h-full object-contain" />
-                                                                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
-                                                                        <Maximize2 size={12} />
-                                                                        <span>Ampliar</span>
+                                                                    <div
+                                                                        onClick={() => actual && setZoomedImage(actual)}
+                                                                        className={`w-full h-56 rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center relative ${
+                                                                            actual ? 'cursor-zoom-in bg-slate-900' : 'bg-slate-50'
+                                                                        }`}
+                                                                    >
+                                                                        {actual ? (
+                                                                            <>
+                                                                                <img src={actual} alt={item.nombre} className="w-full h-full object-contain" />
+                                                                                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                                                                                    <Maximize2 size={12} />
+                                                                                    <span>Ampliar</span>
+                                                                                </div>
+                                                                            </>
+                                                                        ) : (
+                                                                            <span className="text-xs font-bold text-slate-400">Sin imagen ilustrativa</span>
+                                                                        )}
                                                                     </div>
+                                                                    {fotos.length > 1 && (
+                                                                        <div className="grid grid-cols-5 gap-1.5">
+                                                                            {fotos.map((f, idx) => (
+                                                                                <button
+                                                                                    key={idx}
+                                                                                    onClick={() => setSelectedFotoIdx(idx)}
+                                                                                    className={`h-12 rounded-lg overflow-hidden border-2 ${
+                                                                                        f === actual ? 'border-[#324354]' : 'border-slate-200 hover:border-slate-400'
+                                                                                    }`}
+                                                                                >
+                                                                                    <img src={f} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
                                                                 </>
-                                                            ) : (
-                                                                <span className="text-xs font-bold text-slate-400">Sin imagen ilustrativa</span>
-                                                            )}
-                                                        </div>
+                                                            )
+                                                        })()}
                                                     </div>
 
                                                     <div className="lg:col-span-8 space-y-4">
@@ -253,6 +318,22 @@ export default function CriteriosCalidadMsPage() {
                 <span>© {new Date().getFullYear()} Firplak Engineering</span>
                 <span>Secure Terminal v4.0.2</span>
             </footer>
+
+            <CriterioEditModal
+                isOpen={!!editingItem}
+                planta="Ms"
+                codigo={String(editingItem?.id ?? '')}
+                idDefectoMs={editingItem?.defectoId ?? null}
+                nombreDefecto={editingItem?.nombre || ''}
+                criterio={editingItem?.criterio || null}
+                onClose={() => setEditingItem(null)}
+                onSaved={saved => {
+                    setCriterios(prev =>
+                        prev.some(c => c.id === saved.id) ? prev.map(c => (c.id === saved.id ? saved : c)) : [...prev, saved]
+                    )
+                    setSelectedFotoIdx(0)
+                }}
+            />
 
             {/* Zoom de imagen */}
             {zoomedImage && (
