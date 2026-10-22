@@ -11,15 +11,22 @@ interface SearchableSelectProps {
     label?: string
     onValueChange?: (value: string) => void
     defaultValue?: string
+    value?: string
     disabled?: boolean
     className?: string
 }
 
-export function SearchableSelect({ name, options, placeholder, required, label, onValueChange, defaultValue = '', disabled = false, className = '' }: SearchableSelectProps) {
+export function SearchableSelect({ name, options, placeholder, required, label, onValueChange, defaultValue = '', value, disabled = false, className = '' }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState('')
-    const [selectedValue, setSelectedValue] = React.useState(defaultValue)
+    const [selectedValue, setSelectedValue] = React.useState(value !== undefined ? value : defaultValue)
     const containerRef = React.useRef<HTMLDivElement>(null)
+
+    React.useEffect(() => {
+        if (value !== undefined) {
+            setSelectedValue(value)
+        }
+    }, [value])
 
     // ... keeping the rest unchanged but modifying the trigger button class
 

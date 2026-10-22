@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Search, X, ChevronLeft, Filter, Calendar as CalendarIcon, Trash2, Edit, Clock, ZoomIn } from 'lucide-react'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import {
     BarChart,
     Bar,
@@ -458,8 +459,20 @@ export default function ReportedDefectsListPage() {
         }
     }
 
+    const productOptions = useMemo(() => {
+        const fromCatalog = products.map(p => p.Referencia).filter(Boolean)
+        const fromReports = reports.flatMap(r => Array.from(r.productos)).filter(p => p && p !== 'Sin Producto')
+        return Array.from(new Set([...fromReports, ...fromCatalog])).sort()
+    }, [products, reports])
+
+    const defectOptions = useMemo(() => {
+        const fromCatalog = defectosCatalog.map(d => d.defecto || d.Defecto || d.nombre || d.Nombre).filter(Boolean) as string[]
+        const fromReports = reports.map(r => r.defecto_especifico).filter(Boolean)
+        return Array.from(new Set([...fromReports, ...fromCatalog]))
+    }, [defectosCatalog, reports])
+
     const filteredReports = reports.filter(report => {
-        const matchesProductFilter = selectedProduct === '' || report.productos_lista.includes(String(selectedProduct))
+        const matchesProductFilter = selectedProduct === '' || report.productos_lista.toLowerCase().includes(selectedProduct.toLowerCase())
         const matchesDefectFilter = selectedDefect === '' || report.defecto_especifico === selectedDefect
         const searchLower = searchTerm.toLowerCase()
         const matchesSearch = searchTerm === '' ||
@@ -594,60 +607,28 @@ export default function ReportedDefectsListPage() {
                         />
                     </div>
 
-                    {/* Product Filter */}
-                    <div className="flex-1 min-w-[200px]">
-                        <select
+                    {/* Product Filter with Search */}
+                    <div className="flex-1 min-w-[260px]">
+                        <SearchableSelect
+                            name="productoFilter"
+                            options={productOptions}
+                            placeholder="TODAS LAS REFERENCIAS"
                             value={selectedProduct}
-                            onChange={(e) => {
-                                setSelectedProduct(e.target.value)
-                            }}
-                            className="w-full px-4 py-2 bg-white border border-gray-300 font-black text-[#254153] text-xs outline-none focus:border-[#254153]"
-                        >
-                            <option value="">TODAS LAS REFERENCIAS</option>
-                            {products.map((p) => (
-                                <option key={p.id} value={p.id.toString()}>{p.Referencia}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Defect Filter */}
-                    <div className="flex-1 min-w-[200px]">
-                        <select
-                            value={selectedDefect}
-                            onChange={(e) => setSelectedDefect(e.target.value)}
-                            className="w-full px-4 py-2 bg-white border border-gray-300 font-black text-[#254153] text-xs outline-none focus:border-[#254153]"
-                        >
-                            <option value="">TODOS LOS DEFECTOS</option>
-                            {defectosCatalog.map((d) => {
-                                const name = d.defecto || d.Defecto || d.nombre || d.Nombre
-                                if (!name) return null
-                                return (
-                                    <option key={d.id} value={name}>{name}</option>
-                                )
-                            })}
-                        </select>
-                    </div>
-
-                    {/* Search */}
-                    <div className="flex-[2] min-w-[250px] relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            <Search className="w-4 h-4" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="BUSCAR POR PRODUCTO O DEFECTO..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-10 py-2 bg-white border border-gray-300 rounded-none font-black text-xs text-[#254153] outline-none focus:border-[#254153] uppercase placeholder:text-gray-300"
+                            onValueChange={(val) => setSelectedProduct(val)}
+                            className="w-full bg-white border border-gray-300 rounded-none px-3 py-1 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-[34px] uppercase"
                         />
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        )}
+                    </div>
+
+                    {/* Defect Filter with Search */}
+                    <div className="flex-1 min-w-[260px]">
+                        <SearchableSelect
+                            name="defectoFilter"
+                            options={defectOptions}
+                            placeholder="TODOS LOS DEFECTOS"
+                            value={selectedDefect}
+                            onValueChange={(val) => setSelectedDefect(val)}
+                            className="w-full bg-white border border-gray-300 rounded-none px-3 py-1 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-[34px] uppercase"
+                        />
                     </div>
 
                     <div className="bg-[#254153] text-white px-6 py-2 rounded-none text-xs font-black uppercase tracking-widest border border-black shadow-inner">
