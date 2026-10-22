@@ -10,6 +10,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
 import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import Header from '@/components/opt-sistemica/Header'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -292,41 +293,16 @@ export default function CalidadMsReportPage() {
 
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans">
-            {/* Professional Header - Full Width */}
-            <header className="bg-[#254153] text-white sticky top-0 z-50 px-4">
-                <div className="mx-auto h-14 flex items-center justify-between">
-                    <div className="flex items-center space-x-6">
-                        <button
-                            onClick={() => router.push('/calidad')}
-                            className="p-1.5 hover:bg-white/10 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                        </button>
-                        <div className="flex items-center space-x-3">
-                            <span className="text-xl font-black tracking-tighter italic">FIRPLAK</span>
-                            <div className="h-4 w-px bg-white/20" />
-                            <span className="text-[10px] uppercase font-bold tracking-[0.3em] opacity-60">MS Quality Control</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-4">
-                        <div className="hidden md:block text-right">
-                            <span className="text-[10px] font-black opacity-40 uppercase tracking-widest block leading-none">Terminal Activa</span>
-                            <span className="text-xs font-bold text-blue-400">{user?.email}</span>
-                        </div>
-                        <button
-                            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-                            className="p-1.5 hover:bg-red-600 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </header>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad"
+                subtitle="Módulo Operativo"
+                compact={true}
+                onBack={() => router.push('/calidad')}
+                userEmail={user?.email}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
 
             {/* Control Bar - Full Width */}
             <div className="bg-gray-50 border-b border-gray-200 sticky top-[56px] z-40">

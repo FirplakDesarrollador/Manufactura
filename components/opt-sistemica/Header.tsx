@@ -8,20 +8,24 @@ interface HeaderProps {
   title: string;
   subtitle: string;
   backUrl?: string; // Mantener propiedad por compatibilidad de tipos
-  onBack?: () => void; // Mantener propiedad por compatibilidad de tipos
+  onBack?: () => void;
   userEmail?: string;
   actionButton?: React.ReactNode;
   showLogout?: boolean;
   onLogout?: () => void;
+  compact?: boolean;
 }
 
 export default function Header({
   title,
   subtitle,
+  backUrl,
+  onBack,
   userEmail,
   actionButton,
   showLogout = true,
-  onLogout
+  onLogout,
+  compact = false
 }: HeaderProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -84,36 +88,47 @@ export default function Header({
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between relative">
+      <header className={`z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full ${compact ? 'sticky top-0' : 'fixed top-0 left-0 right-0'}`}>
+      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${compact ? 'h-14' : 'h-20'}`}>
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
-        <div className="flex items-center gap-6">
+        <div className={`flex items-center ${compact ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${compact ? 'w-8 h-8' : 'w-10 h-10'}`}
+              title="Volver"
+            >
+              <svg className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} group-hover:-translate-x-0.5 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setIsOpen(true)}
-            className="group flex items-center justify-center w-10 h-10 text-white hover:text-slate-300 transition-colors cursor-pointer"
+            className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${compact ? 'w-8 h-8' : 'w-10 h-10'}`}
             title="Menú de Navegación"
           >
-            <svg className="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`${compact ? 'w-6 h-6' : 'w-8 h-8'} group-hover:scale-110 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1">
+            <h1 className={`${compact ? 'text-lg sm:text-xl font-light text-white tracking-widest uppercase leading-none mb-0.5' : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
               {title}
             </h1>
-            <p className="text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none">
+            <p className={`${compact ? 'text-[11px] sm:text-xs text-[#F6F3EE]/70 font-medium tracking-wide leading-none' : 'text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none'}`}>
               {subtitle}
             </p>
           </div>
         </div>
 
         {/* Center: Firplak Logo */}
-        <div className="absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
           <img 
             src="/logo-firplak-clean.png" 
             alt="Firplak" 
-            className="h-13 w-auto object-contain" 
+            className={`${compact ? 'h-8' : 'h-13'} w-auto object-contain`} 
           />
         </div>
 
@@ -126,13 +141,26 @@ export default function Header({
           )}
           
           {(internalEmail || userEmail) && (
-            <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
-              <p className="text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1" title={internalEmail || userEmail}>
-                {getFirstName(internalEmail || userEmail || '')}
-              </p>
-              <p className="text-xs sm:text-sm italic text-[#7B8E90] tracking-wider leading-none">
-                Usuario
-              </p>
+            <div className="flex items-center gap-2">
+              <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
+                <p className={`${compact ? 'text-base sm:text-lg font-semibold text-white truncate tracking-wide leading-none mb-0.5' : 'text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1'}`} title={internalEmail || userEmail}>
+                  {getFirstName(internalEmail || userEmail || '')}
+                </p>
+                <p className={`${compact ? 'text-[11px]' : 'text-xs sm:text-sm'} italic text-[#7B8E90] tracking-wider leading-none`}>
+                  Usuario
+                </p>
+              </div>
+              {showLogout && (
+                <button
+                  onClick={handleSignOut}
+                  className="p-1.5 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
+                  title="Cerrar sesión"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
+              )}
             </div>
           )}
         </div>
