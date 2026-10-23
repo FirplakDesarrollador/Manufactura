@@ -69,6 +69,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
+import PuestasAPuntoMaquina from '@/components/mantenimiento/PuestasAPuntoMaquina';
 import Header from '@/components/opt-sistemica/Header';
 import TarjetasTpmTab from '@/components/mantenimiento/TarjetasTpmTab';
 import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSemanalPlanner';
@@ -12430,6 +12431,9 @@ export default function GestionMantenimientoPage() {
                   </div>
                 )}
               </div>
+
+              {/* Puestas a Punto (Mtto Autónomo) relacionadas con esta máquina */}
+              <PuestasAPuntoMaquina maquina={selectedMachineModal} />
 
               {/* Complete Intervention History for this Machine */}
               {selectedMachineModal && (() => {

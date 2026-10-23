@@ -5,7 +5,8 @@ import { supabaseTalentoHumano as supabaseTH } from '@/lib/supabase_talento_huma
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import React from 'react';
-import { generateConsecutivo } from '@/lib/mtto-autonomo/utils';
+import { generateConsecutivo, insertDetallesPuesta } from '@/lib/mtto-autonomo/utils';
+import MaquinaSelect, { useMaquinasCatalogo } from './MaquinaSelect';
 import { 
   DndContext, 
   closestCenter, 
@@ -144,8 +145,9 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
   const [creadoPor, setCreadoPor] = useState('Jakeline Chaverra Soto');
 
   const [maquinas, setMaquinas] = useState<any[]>([
-    { id: uuidv4(), nombre: '', puntos: [{ id: uuidv4(), revisar: '', criticidad: 'Media', frecuencia: 'Diaria' }] }
+    { id: uuidv4(), nombre: '', id_maquina: null, puntos: [{ id: uuidv4(), revisar: '', criticidad: 'Media', frecuencia: 'Diaria' }] }
   ]);
+  const maquinasCatalogo = useMaquinasCatalogo();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -162,10 +164,10 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
     load();
   }, []);
 
-  const addMaquina = () => setMaquinas([...maquinas, { id: uuidv4(), nombre: '', puntos: [{ id: uuidv4(), revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
+  const addMaquina = () => setMaquinas([...maquinas, { id: uuidv4(), nombre: '', id_maquina: null, puntos: [{ id: uuidv4(), revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
   const removeMaquina = (mId: string) => setMaquinas(maquinas.filter(m => m.id !== mId));
-  const updateMaquinaName = (mId: string, val: string) => {
-    setMaquinas(maquinas.map(m => m.id === mId ? { ...m, nombre: val } : m));
+  const updateMaquinaEquipo = (mId: string, val: { nombre: string; id_maquina: number | null }) => {
+    setMaquinas(maquinas.map(m => m.id === mId ? { ...m, ...val } : m));
   };
   const addPunto = (mId: string) => {
     setMaquinas(maquinas.map(m => m.id === mId ? { ...m, puntos: [...m.puntos, { id: uuidv4(), revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] } : m));
@@ -247,6 +249,7 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
               id_puesta_a_punto: enc.id_puesta_a_punto,
               numero_item: counter++,
               equipo_herramienta: m.nombre,
+              id_maquina: m.id_maquina,
               punto_a_revisar: p.revisar,
               criticidad: p.criticidad,
               frecuencia: p.frecuencia,
@@ -258,7 +261,7 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
       });
 
       if (details.length > 0) {
-        const { error: err2 } = await supabase.from('puestas_a_punto_detalle').insert(details);
+        const { error: err2 } = await insertDetallesPuesta(details);
         if (err2) throw err2;
       }
       router.push(`/mantenimiento/puestas-a-punto/${encodeURIComponent(plantaSeleccionada)}`);
@@ -478,7 +481,8 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
             <SortableMachineSection 
               key={maquina.id} 
               maquina={maquina} 
-              updateMaquinaName={updateMaquinaName}
+              updateMaquinaEquipo={updateMaquinaEquipo}
+              maquinasCatalogo={maquinasCatalogo}
               addPunto={addPunto}
               updatePunto={updatePunto}
               removePunto={removePunto}
@@ -527,7 +531,7 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
 
 // --- COMPONENTES PARA DRAG & DROP ---
 
-function SortableMachineSection({ maquina, updateMaquinaName, addPunto, updatePunto, removePunto, handleDragEndPunto, sensors }: any) {
+function SortableMachineSection({ maquina, updateMaquinaEquipo, maquinasCatalogo, addPunto, updatePunto, removePunto, handleDragEndPunto, sensors }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: maquina.id });
 
   const style = {
@@ -574,8 +578,9 @@ function SortableMachineSection({ maquina, updateMaquinaName, addPunto, updatePu
                   pIdx={pIdx} 
                   mId={maquina.id}
                   rowSpan={maquina.puntos.length}
-                  maquinaNombre={maquina.nombre}
-                  updateMaquinaName={updateMaquinaName}
+                  maquina={maquina}
+                  updateMaquinaEquipo={updateMaquinaEquipo}
+                  maquinasCatalogo={maquinasCatalogo}
                   addPunto={addPunto}
                   updatePunto={updatePunto}
                   removePunto={removePunto}
@@ -589,7 +594,7 @@ function SortableMachineSection({ maquina, updateMaquinaName, addPunto, updatePu
   );
 }
 
-function SortablePuntoRow({ punto, pIdx, mId, rowSpan, maquinaNombre, updateMaquinaName, addPunto, updatePunto, removePunto }: any) {
+function SortablePuntoRow({ punto, pIdx, mId, rowSpan, maquina, updateMaquinaEquipo, maquinasCatalogo, addPunto, updatePunto, removePunto }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: punto.id });
 
   const style = {
@@ -607,15 +612,11 @@ function SortablePuntoRow({ punto, pIdx, mId, rowSpan, maquinaNombre, updateMaqu
       {pIdx === 0 && (
         <td rowSpan={rowSpan} style={{ padding: '20px', verticalAlign: 'middle', backgroundColor: '#F8FAFB', borderRight: '1px solid #F1F5F9' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-            <textarea 
-              value={maquinaNombre} 
-              onChange={(e) => updateMaquinaName(mId, e.target.value)} 
-              placeholder="Nombre del equipo..." 
-              style={{ 
-                width: '100%', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '12px', padding: '12px', textAlign: 'center', fontSize: '0.95rem', fontWeight: 700, color: '#1A445B', outline: 'none', resize: 'none', height: '80px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'all 0.2s ease'
-              }} 
-              onFocus={(e) => { e.target.style.borderColor = '#1A445B'; e.target.style.boxShadow = '0 0 0 3px rgba(26,68,91,0.1)'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.02)'; }}
+            <MaquinaSelect
+              nombre={maquina.nombre}
+              idMaquina={maquina.id_maquina}
+              catalogo={maquinasCatalogo}
+              onChange={(val) => updateMaquinaEquipo(mId, val)}
             />
             <button 
               onClick={() => addPunto(mId)} 
