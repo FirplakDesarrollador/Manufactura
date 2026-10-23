@@ -6149,6 +6149,7 @@ export default function GestionMantenimientoPage() {
               onOpenNewTpm={handleOpenNewTpm}
               onSaveTask={handleSavePreventivoFromPlanner}
               onSaveCorrectivo={handleSaveCorrectivoFromPlanner}
+              onOpenCorrectivoDetail={(corr) => handleOpenCorrectivoDetail(corr as unknown as CorrectiveRecord)}
             />
           </div>
         )}

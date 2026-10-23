@@ -97,6 +97,8 @@ interface PlannerTecnicosColumnasProps {
   onOpenNewTpm?: () => void;
   onSaveTask?: (taskId: number, updates: Partial<MaintenanceTask>) => Promise<boolean>;
   onSaveCorrectivo?: (corrId: number | string, updates: Partial<CorrectiveRecord>) => Promise<boolean>;
+  // Si se pasa, los correctivos/TPM abren el detalle completo de la página (el mismo de Órdenes de Trabajo)
+  onOpenCorrectivoDetail?: (corr: CorrectiveRecord) => void;
 }
 
 export type TaskTimeCategory = 'atrasadas' | 'hoy' | 'proximas';
@@ -143,6 +145,7 @@ export default function PlannerTecnicosColumnas({
   onOpenNewTpm,
   onSaveTask,
   onSaveCorrectivo,
+  onOpenCorrectivoDetail,
 }: PlannerTecnicosColumnasProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [animatingCardId, setAnimatingCardId] = useState<string | number | null>(null);
@@ -551,6 +554,10 @@ export default function PlannerTecnicosColumnas({
 
   // Open full edit modal and populate form fields
   const handleOpenEdit = (tipo: 'preventivo' | 'correctivo', item: MaintenanceTask | CorrectiveRecord) => {
+    if (tipo === 'correctivo' && onOpenCorrectivoDetail) {
+      onOpenCorrectivoDetail(item as CorrectiveRecord);
+      return;
+    }
     if (tipo === 'preventivo') {
       const t = item as MaintenanceTask;
       setPrevEditForm({
