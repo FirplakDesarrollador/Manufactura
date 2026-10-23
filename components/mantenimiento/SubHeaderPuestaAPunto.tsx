@@ -42,7 +42,7 @@ function SubHeaderContent({ basePath }: SubHeaderPuestaAPuntoProps) {
   ];
 
   return (
-    <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans">
+    <div className="no-print print:hidden bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans">
       <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
         {menuItems.map((item, idx) => (
           <Link key={idx} href={item.href} style={{ textDecoration: 'none' }} className="flex-shrink-0">
@@ -69,7 +69,7 @@ function SubHeaderContent({ basePath }: SubHeaderPuestaAPuntoProps) {
 
 export default function SubHeaderPuestaAPunto({ basePath }: SubHeaderPuestaAPuntoProps) {
   return (
-    <Suspense fallback={<div className="h-[45px] w-full bg-white border-b border-[#e2ded5]" />}>
+    <Suspense fallback={<div className="no-print print:hidden h-[45px] w-full bg-white border-b border-[#e2ded5]" />}>
       <SubHeaderContent basePath={basePath} />
     </Suspense>
   );
