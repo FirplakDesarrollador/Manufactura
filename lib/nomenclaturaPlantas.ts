@@ -389,23 +389,43 @@ export function obtenerNombresOficialesPlantas(
 }
 
 /**
- * Extrae la nomenclatura existente entre corchetes o la calcula
+ * Calcula el código de semanas S{semanas} a partir de la frecuencia en días.
+ * Estándar industrial FIRPLAK:
+ * - <= 7 días: 1 semana -> '01' (S01)
+ * - 15 días: 2 semanas -> '02' (S02)
+ * - 30 días: 4 semanas (1 mes ≈ 4 semanas) -> '04' (S04)
+ * - 60 días: 8 semanas (2 meses) -> '08' (S08)
+ * - 90 días: 12 semanas (3 meses = 12 semanas) -> '12' (S12)
+ * - 120 días: 16 semanas -> '16' (S16)
+ * - 180 días: 24 semanas -> '24' (S24)
+ * - >= 360 días: 52 semanas -> '52' (S52)
+ * Fórmula: Math.max(1, Math.round((frecuenciaDias / 30) * 4))
+ */
+export function computeSemanasFromFrecuencia(frecuenciaDias?: number | null): string {
+  const frec = Number(frecuenciaDias);
+  if (!frec || isNaN(frec) || frec <= 0) return '04';
+  if (frec <= 7) return '01';
+  if (frec >= 360) return '52';
+
+  // 30 días = 4 semanas -> 90 días = 12 semanas
+  const semanas = Math.max(1, Math.round((frec / 30) * 4));
+  return String(semanas).padStart(2, '0');
+}
+
+/**
+ * Extrae la nomenclatura existente entre corchetes o la calcula con la frecuencia adecuada
  */
 export function computeNomenclatura(
   planta?: string | null,
   tipoIntervencion?: string | null,
   duracionMinutos?: number | null,
-  rawCodeOrTitle?: string | null
+  rawCodeOrTitle?: string | null,
+  frecuenciaDias?: number | null
 ): string {
-  if (rawCodeOrTitle) {
-    const match = String(rawCodeOrTitle).match(/\[([A-Z0-9_-]+)\]/i);
-    if (match && match[0]) {
-      return match[0].toUpperCase();
-    }
-  }
-
-  const seccion = '04';
-  const pCode = obtenerCodigoPlanta(planta);
+  const seccion = computeSemanasFromFrecuencia(frecuenciaDias);
+  let pCode = obtenerCodigoPlanta(planta);
+  // Limpiar caracteres extraños en pCode si tiene comas o espacios
+  pCode = pCode.replace(/[^A-Za-z0-9]/g, '');
 
   let tCode = 'NPT';
   if (tipoIntervencion) {
@@ -418,6 +438,20 @@ export function computeNomenclatura(
   }
 
   const dur = duracionMinutos || 60;
+
+  if (rawCodeOrTitle) {
+    const match = String(rawCodeOrTitle).match(/\[([A-Z0-9_,\s-]+)\]/i);
+    if (match && match[1]) {
+      const inner = match[1].toUpperCase().replace(/\s+/g, '');
+      // Si la nomenclatura existente tiene S\d{2} y se suministró una frecuencia específica,
+      // actualizamos el prefijo de semanas (ej: si tenía S04 pero la frecuencia es 90d -> S12)
+      if (frecuenciaDias !== undefined && frecuenciaDias !== null && /^S\d{2}/.test(inner)) {
+        return `[S${seccion}${inner.slice(3).replace(/[^A-Za-z0-9]/g, '')}]`;
+      }
+      return `[${inner.replace(/[^A-Za-z0-9]/g, '')}]`;
+    }
+  }
+
   return `[S${seccion}${pCode}${tCode}${dur}]`;
 }
 

@@ -9,9 +9,38 @@ export async function GET() {
         let marmolRawRows: any[] = [];
         let fetchedFromSap = false;
 
-        // 1. Consultar SAP Service Layer (órdenes pendientes generales y órdenes de mármol sintético)
+        // Helper para normalizar fechas de SAP o Cloudflare a formato ISO YYYY-MM-DDTHH:mm:ss sin desfasar zona horaria
+        const formatSapDate = (raw: any): string | null => {
+            if (!raw) return null;
+            const str = String(raw).trim();
+            if (!str || str === 'null' || str === 'undefined') return null;
+            if (/^\d{8}$/.test(str)) {
+                return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}T00:00:00`;
+            }
+            const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                return `${match[1]}-${match[2]}-${match[3]}T00:00:00`;
+            }
+            const parsed = new Date(str);
+            if (!isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}T00:00:00`;
+            }
+            return null;
+        };
+
+        const cloudflareBaseUrl = process.env.SEMAFORO_API_URL 
+            ? process.env.SEMAFORO_API_URL.replace(/\/semaforo\/?$/, '')
+            : "https://toner-villages-acoustic-colony.trycloudflare.com";
+        const cloudflareApiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
+
+        let fibraExtraMap = new Map<string, any>();
+
+        // 1. Consultar SAP Service Layer directamente (fuente primaria con U_FRealLiberacion para fecha ideal)
         try {
-            console.log('Consultando órdenes de fabricación liberadas en SAP Service Layer...');
+            console.log('Consultando órdenes directamente en SAP Service Layer...');
             const sapUrl = process.env.SAP_API_URL || 'https://200.7.96.194:50000/b1s/v1/Login';
             const sapDb = process.env.SAP_COMPANY_DB || 'Firplak_SA';
             const sapUser = process.env.SAP_USERNAME || 'manager';
@@ -21,7 +50,8 @@ export async function GET() {
             const loginRes = await fetch(loginUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ CompanyDB: sapDb, Password: sapPass, UserName: sapUser })
+                body: JSON.stringify({ CompanyDB: sapDb, Password: sapPass, UserName: sapUser }),
+                signal: AbortSignal.timeout(12000)
             });
 
             if (loginRes.ok) {
@@ -29,47 +59,87 @@ export async function GET() {
                 const sessionId = loginData.SessionId;
                 if (sessionId) {
                     const baseUrl = loginUrl.replace('/Login', '');
-                    
-                    // a) Query general para /consulta-sap (441 órdenes liberadas)
-                    const queryRes = await fetch(`${baseUrl}/SQLQueries('ordenes_pendientes_clean')/List`, {
-                        headers: {
-                            'Cookie': `B1SESSION=${sessionId}`,
-                            'Prefer': 'odata.maxpagesize=500'
-                        }
-                    });
+                    const [genRes, marmolRes] = await Promise.allSettled([
+                        fetch(`${baseUrl}/SQLQueries('ordenes_pendientes_clean')/List`, {
+                            headers: { 'Cookie': `B1SESSION=${sessionId}`, 'Prefer': 'odata.maxpagesize=1000' },
+                            signal: AbortSignal.timeout(15000)
+                        }),
+                        fetch(`${baseUrl}/SQLQueries('ordenes_marmol_sl136')/List`, {
+                            headers: { 'Cookie': `B1SESSION=${sessionId}`, 'Prefer': 'odata.maxpagesize=1000' },
+                            signal: AbortSignal.timeout(15000)
+                        })
+                    ]);
 
-                    if (queryRes.ok) {
-                        const queryData = await queryRes.json();
-                        const items = queryData.value || [];
-                        if (Array.isArray(items) && items.length > 0) {
-                            rawRows = items;
+                    if (genRes.status === 'fulfilled' && genRes.value.ok) {
+                        const qData = await genRes.value.json();
+                        if (Array.isArray(qData.value) && qData.value.length > 0) {
+                            rawRows = qData.value;
                             fetchedFromSap = true;
                             console.log(`SAP Service Layer (general) devolvió ${rawRows.length} órdenes liberadas.`);
                         }
                     }
 
-                    // b) Query específica para Mármol Sintético (129 órdenes enriquecidas con molde y gelcoat)
-                    try {
-                        const marmolRes = await fetch(`${baseUrl}/SQLQueries('ordenes_marmol_sl136')/List`, {
-                            headers: {
-                                'Cookie': `B1SESSION=${sessionId}`,
-                                'Prefer': 'odata.maxpagesize=500'
-                            }
-                        });
-                        if (marmolRes.ok) {
-                            const marmolData = await marmolRes.json();
-                            if (Array.isArray(marmolData.value) && marmolData.value.length > 0) {
-                                marmolRawRows = marmolData.value;
-                                console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
-                            }
+                    if (marmolRes.status === 'fulfilled' && marmolRes.value.ok) {
+                        const mData = await marmolRes.value.json();
+                        if (Array.isArray(mData.value) && mData.value.length > 0) {
+                            marmolRawRows = mData.value;
+                            console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
                         }
-                    } catch (mErr) {
-                        console.error('Error consultando ordenes_marmol_sl136:', mErr);
                     }
                 }
             }
         } catch (sapErr) {
-            console.error('Error al conectar con SAP Service Layer:', sapErr);
+            console.warn('Fallo o timeout conectando a SAP Service Layer directo:', sapErr);
+        }
+
+        // 2. Si no se obtuvieron datos directos de SAP, intentar API Cloudflare como fallback
+        if (rawRows.length === 0 || marmolRawRows.length === 0) {
+            try {
+                console.log('Intentando fallback vía API Cloudflare...');
+                const [cfMarmolRes, cfGenRes, cfFibraRes] = await Promise.allSettled([
+                    fetch(`${cloudflareBaseUrl}/ordenes_marmol/`, {
+                        headers: { 'api-key': cloudflareApiKey },
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(12000)
+                    }),
+                    fetch(`${cloudflareBaseUrl}/ordenesliberadasms`, {
+                        headers: { 'api-key': cloudflareApiKey },
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(12000)
+                    }),
+                    fetch(`${cloudflareBaseUrl}/ordenes_fibra/`, {
+                        headers: { 'api-key': cloudflareApiKey },
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(12000)
+                    })
+                ]);
+
+                if (marmolRawRows.length === 0 && cfMarmolRes.status === 'fulfilled' && cfMarmolRes.value.ok) {
+                    const mData = await cfMarmolRes.value.json();
+                    const mItems = Array.isArray(mData) ? mData : (mData.response || []);
+                    if (mItems.length > 0) marmolRawRows = mItems;
+                }
+
+                if (rawRows.length === 0 && cfGenRes.status === 'fulfilled' && cfGenRes.value.ok) {
+                    const gData = await cfGenRes.value.json();
+                    const gItems = Array.isArray(gData) ? gData : (gData.response || []);
+                    if (gItems.length > 0) {
+                        rawRows = gItems;
+                        fetchedFromSap = true;
+                    }
+                }
+
+                if (cfFibraRes.status === 'fulfilled' && cfFibraRes.value.ok) {
+                    const fData = await cfFibraRes.value.json();
+                    const fItems = Array.isArray(fData) ? fData : (fData.response || []);
+                    fItems.forEach((item: any) => {
+                        const doc = String(item.orden_fabricacion || item.DocNum);
+                        fibraExtraMap.set(doc, item);
+                    });
+                }
+            } catch (cfErr) {
+                console.warn('Fallo en API Cloudflare:', cfErr);
+            }
         }
 
         // Helper para distinguir SKUs que NO pertenecen a Mármol Sintético / Fibra / Vaciado (Muebles, Empaque, Cajas, Insumos)
@@ -79,26 +149,44 @@ export async function GET() {
             return false;
         };
 
-        // 2. Mapear datos para el frontend (page.tsx), Power Automate y Supabase
+        // 3. Mapear datos para el frontend (page.tsx), Power Automate y Supabase
         const mappedRows = rawRows.map(item => {
             const docNum = item.DocNum || item.orden_fabricacion || '';
             const typeStr = item.Type === 'S' ? 'Estándar' : (item.Type === 'D' ? 'Desmontar' : (item.type || 'Especial'));
             const statusStr = item.Status === 'R' ? 'Liberado' : (item.Status === 'L' ? 'Cerrado' : (item.Status === 'C' ? 'Cancelado' : (item.Status || 'Planificado')));
-            const plannedQty = Number(item.PlannedQty !== undefined ? item.PlannedQty : item.cantidad) || 1;
-            const cmpltQty = Number(item.CmpltQty !== undefined ? item.CmpltQty : 0) || 0;
-            const pendienteQty = item.Pendiente !== undefined ? Number(item.Pendiente) : (plannedQty - cmpltQty);
+            const plannedQty = Number(item.PlannedQty !== undefined ? item.PlannedQty : (item['Cant.Planificada'] !== undefined ? item['Cant.Planificada'] : item.cantidad)) || 1;
+            const cmpltQty = Number(item.CmpltQty !== undefined ? item.CmpltQty : (item['Cant.Completada'] !== undefined ? item['Cant.Completada'] : 0)) || 0;
+            const pendienteQty = item.Pendiente !== undefined ? Number(item.Pendiente) : (item['PENDIENTE-OJO cuando sea superior a 1'] !== undefined ? Number(item['PENDIENTE-OJO cuando sea superior a 1']) : (plannedQty - cmpltQty));
+            const prodDesc = item.ItemName || item.Itemname || item.producto_descripcion || '';
+
+            const fechaFin = formatSapDate(item.DueDate || item['Fecha Finalización'] || item.fecha_entrega_estimada);
+            const fechaFab = formatSapDate(item.PostDate || item['Fecha Fabricación'] || item.fecha_liberacion || item.StartDate) || '';
+
+            const rawIdeal = item.U_FRealLiberacion ||
+                             item['fecha_ideal_producción'] ||
+                             item['fecha_ideal_produccion'] ||
+                             item['fecha_ideal_producci n'] ||
+                             item.fecha_ideal_produccion ||
+                             item.U_FLiberacionPlan ||
+                             item.U_FechaLibToc ||
+                             item.fecha_liberacion ||
+                             item.RlsDate ||
+                             fechaFin;
+            const fechaIdeal = formatSapDate(rawIdeal) || fechaFin;
+
+            const extraFibra = fibraExtraMap.get(String(docNum));
 
             return {
                 docNum: docNum,
                 tipo: typeStr,
                 status: statusStr,
-                fechaFabricacion: item.PostDate || item.fecha_liberacion || '',
-                fechaFinalizacion: item.DueDate || item.fecha_entrega_estimada || '',
-                fechaCierre: item.CloseDate || null,
+                fechaFabricacion: fechaFab,
+                fechaFinalizacion: fechaFin || '',
+                fechaCierre: item.CloseDate ? formatSapDate(item.CloseDate) : null,
                 codigoCliente: item.CardCode || item.cliente || '',
                 nombreSN: item.CardName || item.Cliente || item.cliente || 'FIRPLAK S A',
                 itemCode: item.ItemCode || item.producto_sku || '',
-                itemName: item.ItemName || item.producto_descripcion || '',
+                itemName: prodDesc,
                 almacen: item.Warehouse || item.almacen || '',
                 cantPlanificada: plannedQty,
                 cantCompletada: cmpltQty,
@@ -108,29 +196,44 @@ export async function GET() {
                 orden_fabricacion: String(docNum),
                 numero_pedido: item.numero_pedido || String(docNum),
                 producto_sku: item.ItemCode || item.producto_sku || '',
-                producto_descripcion: item.ItemName || item.producto_descripcion || '',
+                producto_descripcion: prodDesc,
                 color: item.color || '',
                 cantidad: plannedQty,
                 cliente: item.CardName || item.Cliente || item.cliente || 'FIRPLAK S A',
                 comentario: item.comentarios || item.comentario || '',
-                fecha_entrega_estimada: item.DueDate || item.fecha_entrega_estimada || null,
-                fecha_ideal_produccion: item['fecha_ideal_producci n'] || item.fecha_ideal_produccion || item.DueDate || null,
+                fecha_entrega_estimada: fechaFin,
+                fecha_ideal_produccion: fechaIdeal,
                 tamano: item.tamano || '',
                 linea: item.U_Linea || item.linea || 'F02',
                 molde_sku: item.molde_sku || '',
-                molde_descripcion: item.molde_descripcion || item.ItemName || '',
+                molde_descripcion: item.molde_descripcion || prodDesc,
                 kilos_gelcoat: item['Kilos Gelcoat'] !== undefined && item['Kilos Gelcoat'] !== null ? Number(item['Kilos Gelcoat']) : null,
+                componentes: extraFibra ? extraFibra.componentes : (item.componentes || null),
                 modificado_por: 'Sistema SAP'
             };
         });
 
-        // 3. Preparar los registros EXCLUSIVOS de Mármol Sintético para la tabla 'ordenes_fabricacion'
+        // 4. Preparar los registros EXCLUSIVOS de Mármol Sintético para la tabla 'ordenes_fabricacion'
         let msUpsertBatch: any[] = [];
 
         if (marmolRawRows.length > 0) {
             msUpsertBatch = marmolRawRows.map(item => {
                 const rawDesc = (item.producto_descripcion || item.ItemName || '').trim();
                 const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
+
+                const rawIdeal = item.U_FRealLiberacion ||
+                                 item.fecha_ideal_produccion ||
+                                 item['fecha_ideal_producción'] ||
+                                 item['fecha_ideal_produccion'] ||
+                                 item['fecha_ideal_producci n'] ||
+                                 item.U_FLiberacionPlan ||
+                                 item.fecha_liberacion ||
+                                 item.RlsDate ||
+                                 item.fecha_entrega_estimada ||
+                                 item.DueDate;
+                const rawFin = item.fecha_entrega_estimada || item.DueDate;
+                const fechaFin = formatSapDate(rawFin);
+                const fechaIdeal = formatSapDate(rawIdeal) || fechaFin;
 
                 return {
                     orden_fabricacion: String(item.orden_fabricacion || item.DocNum),
@@ -140,8 +243,8 @@ export async function GET() {
                     cantidad: Number(item.cantidad || item.PlannedQty) || 1,
                     cliente: item.cliente || item.CardName || 'FIRPLAK S A',
                     comentario: item.comentarios || item.comentario || '',
-                    fecha_entrega_estimada: item.fecha_entrega_estimada || item.DueDate || null,
-                    fecha_ideal_produccion: item.fecha_liberacion || item.fecha_ideal_produccion || item.RlsDate || null,
+                    fecha_entrega_estimada: fechaFin,
+                    fecha_ideal_produccion: fechaIdeal,
                     tamano: item.tamano || '',
                     linea: item.linea || 'F02',
                     molde_sku: item.molde_sku || '',
@@ -215,8 +318,108 @@ export async function GET() {
                 }
             }
             console.log(`Upserted ${cleanBatch.length} Mármol Sintético orders to ordenes_fabricacion (excluidas ${msUpsertBatch.length - cleanBatch.length} canceladas/cerradas).`);
-            // NOTA: NO desactivar automáticamente órdenes pendientes de ordenes_fabricacion solo porque no vengan en SAP.
-            // En planta, las órdenes cerradas virtualmente a fin de mes para facturación aún deben continuar su fabricación física.
+
+            // Cierre automático de órdenes que ya completaron 100% en CEDI y están cerradas en SAP.
+            // Regla: Si cedi >= cantidad, todos los pasos en planta están en 0 y ya no vienen en la lista de liberadas de SAP,
+            // se marcan como pendiente = false para no saturar Control de Piso.
+            try {
+                const sapActiveSet = new Set(mappedRows.map(r => String(r.orden_fabricacion)).filter(Boolean));
+                const { data: pendingPlantOrders } = await supabase
+                    .from('query_ordenes_fabricacion')
+                    .select('id, orden_fabricacion, cantidad, cedi, pintura, vaciado, pulido, acabado, empaque, digitado, transito')
+                    .eq('pendiente', true);
+
+                if (pendingPlantOrders && pendingPlantOrders.length > 0) {
+                    const pasosEval = ['pintura', 'vaciado', 'pulido', 'acabado', 'empaque', 'digitado', 'transito'];
+                    const idsToClose = pendingPlantOrders
+                        .filter(ord => {
+                            const cant = Number(ord.cantidad) || 0;
+                            const cedi = Number(ord.cedi) || 0;
+                            const stepsZero = pasosEval.every(p => (Number((ord as any)[p]) || 0) === 0);
+                            const ofDoc = String(ord.orden_fabricacion);
+                            return cant > 0 && cedi >= cant && stepsZero && !sapActiveSet.has(ofDoc);
+                        })
+                        .map(o => o.id)
+                        .filter(Boolean);
+
+                    if (idsToClose.length > 0) {
+                        const { error: closeErr } = await supabase
+                            .from('ordenes_fabricacion')
+                            .update({
+                                pendiente: false,
+                                fecha_entrega_real: new Date().toISOString(),
+                                modificado_por: 'Sistema SAP (Cierre Automático)'
+                            })
+                            .in('id', idsToClose);
+
+                        if (!closeErr) {
+                            console.log(`✅ Cierre automático: ${idsToClose.length} órdenes finalizadas en CEDI y cerradas en SAP fueron marcadas como pendiente = false.`);
+                        } else {
+                            console.error('Error en cierre automático de órdenes:', closeErr);
+                        }
+                    }
+                }
+            } catch (autoCloseErr) {
+                console.warn('Advertencia evaluando cierre automático de órdenes:', autoCloseErr);
+            }
+        }
+
+        // 4. Preparar y sincronizar registros de Fibra de Vidrio para la tabla 'ordenes_fabricacion_fibra'
+        const isFibraSku = (sku: string, desc?: string) => {
+            if (/^(VHPT|VTIN|VHEM|PPRD)/i.test(sku)) return true;
+            if (desc) {
+                const upper = desc.toUpperCase();
+                if (upper.includes('HIDROMASAJE') || upper.includes('BAÑERA') || upper.includes('JACUZZI') || upper.includes('SPA ') || upper.includes('TINA ') || upper.includes('FALDON')) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        const fibraRows = mappedRows.filter(r => isFibraSku(r.producto_sku, r.producto_descripcion));
+        let totalFibraUpserted = 0;
+
+        if (fibraRows.length > 0) {
+            const { data: nonPendingFibra } = await supabase
+                .from('ordenes_fabricacion_fibra')
+                .select('orden_fabricacion')
+                .eq('pendiente', false);
+
+            const nonPendingFibraSet = new Set((nonPendingFibra || []).map(r => String(r.orden_fabricacion)));
+            const cleanFibraBatch = fibraRows
+                .filter(item => !nonPendingFibraSet.has(String(item.orden_fabricacion)))
+                .map(r => ({
+                    orden_fabricacion: String(r.orden_fabricacion),
+                    numero_pedido: String(r.numero_pedido || r.orden_fabricacion),
+                    producto_sku: r.producto_sku,
+                    cantidad: r.cantidad,
+                    fecha_entrega_estimada: r.fecha_entrega_estimada,
+                    fecha_ideal_produccion: r.fecha_ideal_produccion,
+                    pendiente: true,
+                    cliente: r.cliente,
+                    comentario: r.comentario,
+                    tamano: r.tamano,
+                    linea: r.linea,
+                    molde_sku: r.molde_sku,
+                    molde_descripcion: r.molde_descripcion,
+                    kilos_gelcoat: r.kilos_gelcoat,
+                    componentes: r.componentes || null,
+                    modificado_por: 'Sistema SAP'
+                }));
+
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < cleanFibraBatch.length; i += BATCH_SIZE) {
+                const batch = cleanFibraBatch.slice(i, i + BATCH_SIZE);
+                const { error: errFibra } = await supabase
+                    .from('ordenes_fabricacion_fibra')
+                    .upsert(batch, { onConflict: 'orden_fabricacion' });
+                if (errFibra) {
+                    console.error('Error upserting ordenes_fabricacion_fibra:', errFibra);
+                } else {
+                    totalFibraUpserted += batch.length;
+                }
+            }
+            console.log(`Upserted ${cleanFibraBatch.length} Fibra orders to ordenes_fabricacion_fibra.`);
         }
 
         return NextResponse.json({
@@ -225,6 +428,7 @@ export async function GET() {
             message: `200 - Se consultaron ${mappedRows.length} órdenes de fabricación liberadas directamente desde SAP Service Layer.`,
             total: mappedRows.length,
             totalMarmol: msUpsertBatch.length,
+            totalFibra: totalFibraUpserted,
             data: mappedRows,
             response: mappedRows
         }, { status: 200 });

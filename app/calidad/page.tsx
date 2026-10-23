@@ -78,10 +78,10 @@ export default function CalidadPage() {
                 <div className="w-full max-w-[1700px] mx-auto px-4 md:px-8">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full">
                         
-                        {/* 1. Indicadores Calidad (Nuevo / En construcción) */}
+                        {/* 1. Indicadores Calidad */}
                         <div className="w-full max-w-[290px] aspect-square">
                             <button
-                                onClick={() => handleUnderConstruction('Indicadores Calidad')}
+                                onClick={() => router.push('/calidad/indicadores')}
                                 className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
                             >
                                 <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300">

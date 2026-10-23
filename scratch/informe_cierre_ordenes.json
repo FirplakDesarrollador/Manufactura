@@ -1,0 +1,2525 @@
+{
+  "fecha_ejecucion": "2026-10-14T15:28:16.493Z",
+  "modo": "EJECUCION_REAL",
+  "ordenesCompletadas": 276,
+  "totalPendientesLeidas": 567,
+  "totalCandidatasApp": 416,
+  "cerradasExitosas": [
+    {
+      "OF": "2259540",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 17
+    },
+    {
+      "OF": "2260227",
+      "SKU": "VBAN01-0043-000-0100",
+      "Cantidad": 11
+    },
+    {
+      "OF": "2260646",
+      "SKU": "VCOC04-0019-000-0160",
+      "Cantidad": 10
+    },
+    {
+      "OF": "2260231",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 50
+    },
+    {
+      "OF": "2259829",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 51
+    },
+    {
+      "OF": "2260718",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2260758",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 6
+    },
+    {
+      "OF": "2260083",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 12
+    },
+    {
+      "OF": "2260732",
+      "SKU": "VBAN01-0006-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2260278",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 33
+    },
+    {
+      "OF": "2260757",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 27
+    },
+    {
+      "OF": "2260717",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2260600",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 20
+    },
+    {
+      "OF": "2260082",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 11
+    },
+    {
+      "OF": "2260785",
+      "SKU": "VBAN01-0056-000-0103",
+      "Cantidad": 8
+    },
+    {
+      "OF": "2260844",
+      "SKU": "VBAN01-0054-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2260226",
+      "SKU": "VBAN01-0043-000-0100",
+      "Cantidad": 11
+    },
+    {
+      "OF": "2260660",
+      "SKU": "VROP01-0003-000-0100",
+      "Cantidad": 15
+    },
+    {
+      "OF": "2260081",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 11
+    },
+    {
+      "OF": "2260682",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261038",
+      "SKU": "VCOC05-0016-MDT-0901",
+      "Cantidad": 15
+    },
+    {
+      "OF": "2260232",
+      "SKU": "VBAN01-0044-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2260277",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 51
+    },
+    {
+      "OF": "2260933",
+      "SKU": "VBAN01-0015-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2260891",
+      "SKU": "VBAN01-0040-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261037",
+      "SKU": "VCOC05-0016-MDT-0901",
+      "Cantidad": 15
+    },
+    {
+      "OF": "2260890",
+      "SKU": "VBAN01-0040-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2260946",
+      "SKU": "VROP06-0004-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261076",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2260931",
+      "SKU": "VBAN01-0015-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261073",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2260945",
+      "SKU": "VROP01-0009-000-0901",
+      "Cantidad": 4
+    },
+    {
+      "OF": "2261020",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 4
+    },
+    {
+      "OF": "2261013",
+      "SKU": "VBAN01-0046-000-0100",
+      "Cantidad": 7
+    },
+    {
+      "OF": "2261046",
+      "SKU": "VROP01-0009-000-0100",
+      "Cantidad": 22
+    },
+    {
+      "OF": "2260930",
+      "SKU": "VBAN01-0015-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2260932",
+      "SKU": "VBAN01-0015-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261012",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2260893",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2260975",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 14
+    },
+    {
+      "OF": "2260862",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261082",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 15
+    },
+    {
+      "OF": "2261096",
+      "SKU": "VROP06-0004-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261017",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261051",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 50
+    },
+    {
+      "OF": "2261104",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261026",
+      "SKU": "VROP06-0004-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2260077",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 22
+    },
+    {
+      "OF": "2261081",
+      "SKU": "VROP01-0004-000-0100",
+      "Cantidad": 8
+    },
+    {
+      "OF": "2260989",
+      "SKU": "VBAN01-0050-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2260869",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2260941",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2260140",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 92
+    },
+    {
+      "OF": "2260085",
+      "SKU": "VROP01-0003-000-0100",
+      "Cantidad": 21
+    },
+    {
+      "OF": "2261124",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261123",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261022",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 9
+    },
+    {
+      "OF": "2260841",
+      "SKU": "VROP14-0001-000-0901",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2260976",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 6
+    },
+    {
+      "OF": "2261067",
+      "SKU": "VROP01-0003-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261129",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261137",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261126",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 20
+    },
+    {
+      "OF": "2261098",
+      "SKU": "VCOC05-0016-SNG-0901",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261136",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 12
+    },
+    {
+      "OF": "2261060",
+      "SKU": "VBAN28-0006-000-0100",
+      "Cantidad": 4
+    },
+    {
+      "OF": "2260076",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 22
+    },
+    {
+      "OF": "2261021",
+      "SKU": "VROP01-0004-000-0100",
+      "Cantidad": 7
+    },
+    {
+      "OF": "2260079",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 22
+    },
+    {
+      "OF": "2261131",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261135",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261018",
+      "SKU": "VBAN01-0018-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261001",
+      "SKU": "VROP02-0007-000-0300",
+      "Cantidad": 14
+    },
+    {
+      "OF": "2261074",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 10
+    },
+    {
+      "OF": "2260944",
+      "SKU": "VROP01-0009-000-0100",
+      "Cantidad": 7
+    },
+    {
+      "OF": "2260875",
+      "SKU": "VROP01-0009-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2260870",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 11
+    },
+    {
+      "OF": "2261088",
+      "SKU": "VROP02-0006-000-0300",
+      "Cantidad": 16
+    },
+    {
+      "OF": "2261127",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 8
+    },
+    {
+      "OF": "2261132",
+      "SKU": "VBAN01-0049-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261087",
+      "SKU": "VROP02-0006-000-0300",
+      "Cantidad": 16
+    },
+    {
+      "OF": "2260996",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 100
+    },
+    {
+      "OF": "2261217",
+      "SKU": "VBAN01-0049-000-0100",
+      "Cantidad": 10
+    },
+    {
+      "OF": "2260997",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 23
+    },
+    {
+      "OF": "2260657",
+      "SKU": "VROP01-0003-000-0100",
+      "Cantidad": 21
+    },
+    {
+      "OF": "2261000",
+      "SKU": "VROP02-0007-000-0300",
+      "Cantidad": 14
+    },
+    {
+      "OF": "2261210",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261215",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2260928",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261118",
+      "SKU": "VCOC04-0018-000-0103",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261211",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 46
+    },
+    {
+      "OF": "2261223",
+      "SKU": "VCOC04-0019-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261216",
+      "SKU": "VBAN01-0051-000-0100",
+      "Cantidad": 14
+    },
+    {
+      "OF": "2261170",
+      "SKU": "VROP01-0018-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261227",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261219",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261213",
+      "SKU": "VBAN01-0043-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2260078",
+      "SKU": "VROP01-0019-000-0100",
+      "Cantidad": 22
+    },
+    {
+      "OF": "2261209",
+      "SKU": "VBAN01-0032-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261221",
+      "SKU": "VBAN01-0018-000-0100",
+      "Cantidad": 6
+    },
+    {
+      "OF": "2261236",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261293",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 12
+    },
+    {
+      "OF": "2261222",
+      "SKU": "VBAN01-0018-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261220",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261200",
+      "SKU": "VCOC04-0019-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261226",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 17
+    },
+    {
+      "OF": "2261212",
+      "SKU": "VBAN01-0042-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261231",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261286",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 18
+    },
+    {
+      "OF": "2261225",
+      "SKU": "VCOC04-0019-000-0160",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261307",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2260199",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 20
+    },
+    {
+      "OF": "2261232",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261284",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 80
+    },
+    {
+      "OF": "2261011",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261199",
+      "SKU": "VROP06-0006-SNF-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261324",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261320",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261302",
+      "SKU": "VBAN01-0043-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261300",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2260276",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 51
+    },
+    {
+      "OF": "2261198",
+      "SKU": "VCOC04-0018-000-0904",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261301",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261322",
+      "SKU": "VBAN01-0018-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261325",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261318",
+      "SKU": "VBAN01-0051-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261218",
+      "SKU": "VBAN01-0049-000-0100",
+      "Cantidad": 8
+    },
+    {
+      "OF": "2261321",
+      "SKU": "VBAN01-0018-000-0100",
+      "Cantidad": 6
+    },
+    {
+      "OF": "2261107",
+      "SKU": "VROP01-0006-000-0901",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261323",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261283",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 8
+    },
+    {
+      "OF": "2261317",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261285",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 62
+    },
+    {
+      "OF": "2261319",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261247",
+      "SKU": "VROP02-0007-000-0300",
+      "Cantidad": 22
+    },
+    {
+      "OF": "2261230",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 6
+    },
+    {
+      "OF": "2261197",
+      "SKU": "VROP01-0008-000-0904",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261086",
+      "SKU": "VROP02-0006-000-0300",
+      "Cantidad": 16
+    },
+    {
+      "OF": "2261075",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 4
+    },
+    {
+      "OF": "2261276",
+      "SKU": "VCOC05-0012-SNC-0901",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2260198",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 40
+    },
+    {
+      "OF": "2261374",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 23
+    },
+    {
+      "OF": "2261351",
+      "SKU": "VCOC04-0019-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261421",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261415",
+      "SKU": "VBAN01-0049-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261423",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261282",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 72
+    },
+    {
+      "OF": "2261267",
+      "SKU": "VROP01-0002-000-0901",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261406",
+      "SKU": "VBAN01-0043-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261403",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 20
+    },
+    {
+      "OF": "2261402",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 20
+    },
+    {
+      "OF": "2261268",
+      "SKU": "VROP01-0017-000-0901",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261419",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 8
+    },
+    {
+      "OF": "2261328",
+      "SKU": "VROP01-0017-000-0901",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261412",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261414",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261413",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261427",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261407",
+      "SKU": "VBAN01-0043-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261425",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261420",
+      "SKU": "VROP01-0004-000-0100",
+      "Cantidad": 4
+    },
+    {
+      "OF": "2261408",
+      "SKU": "VBAN01-0041-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261416",
+      "SKU": "VCOC04-0019-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261306",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261452",
+      "SKU": "VBAN01-0054-000-0103",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261429",
+      "SKU": "VROP06-0004-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261281",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 80
+    },
+    {
+      "OF": "2261422",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2239229",
+      "SKU": "VCOC05-0027-SNG-0508",
+      "Cantidad": 12
+    },
+    {
+      "OF": "2261523",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261424",
+      "SKU": "VROP01-0008-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261245",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261404",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261525",
+      "SKU": "VBAN01-0042-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261173",
+      "SKU": "VROP01-0016-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261128",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 13
+    },
+    {
+      "OF": "2239230",
+      "SKU": "VCOC05-0027-SNG-0508",
+      "Cantidad": 12
+    },
+    {
+      "OF": "2261383",
+      "SKU": "VROP01-0001-000-0100",
+      "Cantidad": 20
+    },
+    {
+      "OF": "2261387",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 10
+    },
+    {
+      "OF": "2261539",
+      "SKU": "VROP01-0004-000-0100",
+      "Cantidad": 13
+    },
+    {
+      "OF": "2242160",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 88
+    },
+    {
+      "OF": "2261530",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261595",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 7
+    },
+    {
+      "OF": "2261373",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 23
+    },
+    {
+      "OF": "2261450",
+      "SKU": "VBAN28-0003-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261386",
+      "SKU": "VBAN02-0003-000-0103",
+      "Cantidad": 10
+    },
+    {
+      "OF": "2261449",
+      "SKU": "VCOC05-0016-SCG-0509",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261524",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 29
+    },
+    {
+      "OF": "2261455",
+      "SKU": "VROP06-0011-000-0509",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261292",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 64
+    },
+    {
+      "OF": "2260197",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 40
+    },
+    {
+      "OF": "2261527",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261382",
+      "SKU": "VROP01-0001-000-0100",
+      "Cantidad": 30
+    },
+    {
+      "OF": "2261597",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261533",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 30
+    },
+    {
+      "OF": "2261389",
+      "SKU": "VBAN02-0001-000-0103",
+      "Cantidad": 10
+    },
+    {
+      "OF": "2261598",
+      "SKU": "VBAN01-0039-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261535",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261579",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 24
+    },
+    {
+      "OF": "2260672",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 84
+    },
+    {
+      "OF": "2261532",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 30
+    },
+    {
+      "OF": "2261534",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 17
+    },
+    {
+      "OF": "2261528",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261411",
+      "SKU": "VBAN01-0046-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261563",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261529",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261629",
+      "SKU": "VCOC04-0019-000-0160",
+      "Cantidad": 8
+    },
+    {
+      "OF": "2261596",
+      "SKU": "VBAN01-0046-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261603",
+      "SKU": "VROP01-0006-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2260196",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 40
+    },
+    {
+      "OF": "2261214",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261409",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261410",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 6
+    },
+    {
+      "OF": "2261605",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261606",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261448",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261608",
+      "SKU": "VROP02-0001-000-0300",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261388",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 20
+    },
+    {
+      "OF": "2261622",
+      "SKU": "VROP06-0011-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261709",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261688",
+      "SKU": "VCOC05-0012-SNC-0901",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261316",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 7
+    },
+    {
+      "OF": "2261564",
+      "SKU": "VROP01-0004-000-0901",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261588",
+      "SKU": "VBAN01-0041-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261703",
+      "SKU": "VBAN01-0018-000-0100",
+      "Cantidad": 4
+    },
+    {
+      "OF": "2261708",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261584",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261710",
+      "SKU": "VROP02-0006-000-0300",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261172",
+      "SKU": "VROP01-0016-000-0100",
+      "Cantidad": 27
+    },
+    {
+      "OF": "2261711",
+      "SKU": "VROP01-0009-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261696",
+      "SKU": "VBAN01-0032-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261700",
+      "SKU": "VBAN01-0051-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261746",
+      "SKU": "VROP01-0015-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261738",
+      "SKU": "VCOC05-0016-SNG-0509",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261497",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261499",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261704",
+      "SKU": "VROP01-0017-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261637",
+      "SKU": "VROP02-0007-000-0300",
+      "Cantidad": 14
+    },
+    {
+      "OF": "2261697",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261741",
+      "SKU": "VCOC05-0016-SCG-0508",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261526",
+      "SKU": "VBAN01-0056-000-0100",
+      "Cantidad": 19
+    },
+    {
+      "OF": "2261762",
+      "SKU": "VBAN01-0015-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261699",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 4
+    },
+    {
+      "OF": "2261763",
+      "SKU": "VROP01-0002-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261733",
+      "SKU": "VROP01-0015-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261398",
+      "SKU": "VCOC05-0012-SNC-0508",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261567",
+      "SKU": "VROP01-0020-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261498",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261737",
+      "SKU": "VCOC05-0007-SCG-0901",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261764",
+      "SKU": "VROP02-0006-000-0300",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261444",
+      "SKU": "VROP01-0015-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261479",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261639",
+      "SKU": "VROP02-0007-000-0300",
+      "Cantidad": 14
+    },
+    {
+      "OF": "2261701",
+      "SKU": "VBAN01-0049-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261613",
+      "SKU": "VROP02-0007-000-0300",
+      "Cantidad": 17
+    },
+    {
+      "OF": "2261358",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 23
+    },
+    {
+      "OF": "2261492",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261471",
+      "SKU": "VBAN01-0045-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261824",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 6
+    },
+    {
+      "OF": "2261357",
+      "SKU": "VROP02-0003-000-0300",
+      "Cantidad": 23
+    },
+    {
+      "OF": "2261812",
+      "SKU": "VROP01-0015-000-0100",
+      "Cantidad": 9
+    },
+    {
+      "OF": "2261512",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261490",
+      "SKU": "VBAN01-0047-000-0100",
+      "Cantidad": 5
+    },
+    {
+      "OF": "2261520",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 12
+    },
+    {
+      "OF": "2261514",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261513",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261511",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261503",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261501",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 3
+    },
+    {
+      "OF": "2261648",
+      "SKU": "VBAN02-0001-000-0100",
+      "Cantidad": 40
+    },
+    {
+      "OF": "2261653",
+      "SKU": "VBAN02-0003-000-0100",
+      "Cantidad": 22
+    },
+    {
+      "OF": "2261889",
+      "SKU": "VBAN01-0048-000-0100",
+      "Cantidad": 1
+    },
+    {
+      "OF": "2261888",
+      "SKU": "VBAN01-0051-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261504",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261870",
+      "SKU": "VBAN02-0003-SNG-0100",
+      "Cantidad": 2
+    },
+    {
+      "OF": "2261502",
+      "SKU": "VBAN01-0038-000-0100",
+      "Cantidad": 3
+    }
+  ],
+  "discrepanciasSAP": [
+    {
+      "id": 48338,
+      "orden_fabricacion": "2261361",
+      "producto_sku": "VROP01-0003-000-0100",
+      "cantidadApp": 1,
+      "cediApp": 1,
+      "sapPlanned": 1,
+      "sapCompleted": 0,
+      "faltantesSAP": 1,
+      "sapStatus": "boposReleased"
+    },
+    {
+      "id": 48723,
+      "orden_fabricacion": "2261707",
+      "producto_sku": "VROP01-0004-000-0100",
+      "cantidadApp": 4,
+      "cediApp": 4,
+      "sapPlanned": 4,
+      "sapCompleted": 0,
+      "faltantesSAP": 4,
+      "sapStatus": "boposReleased"
+    },
+    {
+      "id": 48966,
+      "orden_fabricacion": "2261493",
+      "producto_sku": "VBAN01-0047-000-0100",
+      "cantidadApp": 5,
+      "cediApp": 5,
+      "sapPlanned": 5,
+      "sapCompleted": 0,
+      "faltantesSAP": 5,
+      "sapStatus": "boposReleased"
+    },
+    {
+      "id": 48967,
+      "orden_fabricacion": "2261495",
+      "producto_sku": "VBAN01-0047-000-0100",
+      "cantidadApp": 5,
+      "cediApp": 5,
+      "sapPlanned": 5,
+      "sapCompleted": 3,
+      "faltantesSAP": 2,
+      "sapStatus": "boposReleased"
+    }
+  ],
+  "erroresSAP": [
+    {
+      "id": 47176,
+      "orden_fabricacion": "2261244",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46675,
+      "orden_fabricacion": "2261243",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47199,
+      "orden_fabricacion": "2261315",
+      "producto_sku": "VBAN01-0056-000-0100",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46674,
+      "orden_fabricacion": "2261242",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 43541,
+      "orden_fabricacion": "2260859",
+      "producto_sku": "VBAN01-0056-000-0100",
+      "cantidad": 20,
+      "cedi": 20,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46673,
+      "orden_fabricacion": "2261241",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46672,
+      "orden_fabricacion": "2261240",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 44621,
+      "orden_fabricacion": "2261015",
+      "producto_sku": "VBAN01-0015-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46671,
+      "orden_fabricacion": "2261239",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 44620,
+      "orden_fabricacion": "2261014",
+      "producto_sku": "VBAN01-0015-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45777,
+      "orden_fabricacion": "2261090",
+      "producto_sku": "VROP02-0006-000-0300",
+      "cantidad": 16,
+      "cedi": 16,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45304,
+      "orden_fabricacion": "2261077",
+      "producto_sku": "VBAN01-0039-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45313,
+      "orden_fabricacion": "2261084",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46670,
+      "orden_fabricacion": "2261238",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45308,
+      "orden_fabricacion": "2261079",
+      "producto_sku": "VCOC04-0019-000-0160",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48823,
+      "orden_fabricacion": "2261310",
+      "producto_sku": "VBAN01-0056-000-0100",
+      "cantidad": 19,
+      "cedi": 19,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45312,
+      "orden_fabricacion": "2261083",
+      "producto_sku": "VROP01-0006-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45315,
+      "orden_fabricacion": "2261095",
+      "producto_sku": "VROP01-0009-000-0901",
+      "cantidad": 8,
+      "cedi": 8,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45323,
+      "orden_fabricacion": "2261103",
+      "producto_sku": "VROP01-0004-000-0100",
+      "cantidad": 10,
+      "cedi": 10,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45314,
+      "orden_fabricacion": "2261094",
+      "producto_sku": "VROP01-0009-000-0100",
+      "cantidad": 5,
+      "cedi": 5,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46669,
+      "orden_fabricacion": "2261237",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45788,
+      "orden_fabricacion": "2261125",
+      "producto_sku": "VBAN01-0041-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45809,
+      "orden_fabricacion": "2261161",
+      "producto_sku": "VBAN01-0049-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45812,
+      "orden_fabricacion": "2261274",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 25,
+      "cedi": 25,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45786,
+      "orden_fabricacion": "2261134",
+      "producto_sku": "VBAN01-0039-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45785,
+      "orden_fabricacion": "2261133",
+      "producto_sku": "VBAN01-0039-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45790,
+      "orden_fabricacion": "2261130",
+      "producto_sku": "VBAN01-0046-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45797,
+      "orden_fabricacion": "2261145",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45808,
+      "orden_fabricacion": "2261201",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45803,
+      "orden_fabricacion": "2261141",
+      "producto_sku": "VROP02-0003-000-0300",
+      "cantidad": 8,
+      "cedi": 8,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45802,
+      "orden_fabricacion": "2261140",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45800,
+      "orden_fabricacion": "2261138",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45806,
+      "orden_fabricacion": "2261144",
+      "producto_sku": "VROP06-0004-000-0100",
+      "cantidad": 5,
+      "cedi": 5,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45801,
+      "orden_fabricacion": "2261139",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46539,
+      "orden_fabricacion": "2261280",
+      "producto_sku": "VROP01-0019-000-0100",
+      "cantidad": 10,
+      "cedi": 10,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45804,
+      "orden_fabricacion": "2261143",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45811,
+      "orden_fabricacion": "2261160",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 45810,
+      "orden_fabricacion": "2261162",
+      "producto_sku": "VBAN01-0051-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46661,
+      "orden_fabricacion": "2261229",
+      "producto_sku": "VROP01-0006-000-0100",
+      "cantidad": 15,
+      "cedi": 15,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46657,
+      "orden_fabricacion": "2261252",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46676,
+      "orden_fabricacion": "2261246",
+      "producto_sku": "VROP02-0003-000-0300",
+      "cantidad": 7,
+      "cedi": 7,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46677,
+      "orden_fabricacion": "2261248",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46667,
+      "orden_fabricacion": "2261235",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46660,
+      "orden_fabricacion": "2261228",
+      "producto_sku": "VROP01-0004-000-0100",
+      "cantidad": 7,
+      "cedi": 7,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46665,
+      "orden_fabricacion": "2261233",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46680,
+      "orden_fabricacion": "2261278",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46678,
+      "orden_fabricacion": "2261251",
+      "producto_sku": "VROP06-0004-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46682,
+      "orden_fabricacion": "2261289",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46666,
+      "orden_fabricacion": "2261234",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 46664,
+      "orden_fabricacion": "2261250",
+      "producto_sku": "VROP01-0009-000-0901",
+      "cantidad": 4,
+      "cedi": 4,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47093,
+      "orden_fabricacion": "2261348",
+      "producto_sku": "VROP01-0007-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47224,
+      "orden_fabricacion": "2261369",
+      "producto_sku": "VROP02-0002-000-0300",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47225,
+      "orden_fabricacion": "2261375",
+      "producto_sku": "VROP02-0003-000-0300",
+      "cantidad": 23,
+      "cedi": 23,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48407,
+      "orden_fabricacion": "2261611",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47223,
+      "orden_fabricacion": "2261362",
+      "producto_sku": "VCOC05-0007-SNG-0508",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47227,
+      "orden_fabricacion": "2261394",
+      "producto_sku": "VCOC05-0017-SCG-0508",
+      "cantidad": 10,
+      "cedi": 10,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47206,
+      "orden_fabricacion": "2261326",
+      "producto_sku": "VROP06-0004-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47202,
+      "orden_fabricacion": "2261327",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47226,
+      "orden_fabricacion": "2261379",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47222,
+      "orden_fabricacion": "2261347",
+      "producto_sku": "VBAN01-0018-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47504,
+      "orden_fabricacion": "2261426",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47189,
+      "orden_fabricacion": "2261334",
+      "producto_sku": "VCOC05-0007-SCG-0901",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47395,
+      "orden_fabricacion": "2261440",
+      "producto_sku": "VROP01-0007-000-0100",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47534,
+      "orden_fabricacion": "2261546",
+      "producto_sku": "VROP06-0004-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47484,
+      "orden_fabricacion": "2261405",
+      "producto_sku": "VBAN01-0043-000-0100",
+      "cantidad": 5,
+      "cedi": 5,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47463,
+      "orden_fabricacion": "2261330",
+      "producto_sku": "VROP01-0006-000-0904",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47508,
+      "orden_fabricacion": "2261433",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47513,
+      "orden_fabricacion": "2261536",
+      "producto_sku": "VBAN01-0051-000-0100",
+      "cantidad": 8,
+      "cedi": 8,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47532,
+      "orden_fabricacion": "2261544",
+      "producto_sku": "VROP01-0009-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47527,
+      "orden_fabricacion": "2261395",
+      "producto_sku": "VCOC05-0016-SCG-0508",
+      "cantidad": 10,
+      "cedi": 10,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47856,
+      "orden_fabricacion": "2261565",
+      "producto_sku": "VCOC04-0018-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47530,
+      "orden_fabricacion": "2261540",
+      "producto_sku": "VROP01-0004-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47535,
+      "orden_fabricacion": "2261547",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47506,
+      "orden_fabricacion": "2261428",
+      "producto_sku": "VROP02-0003-000-0300",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48708,
+      "orden_fabricacion": "2261643",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47510,
+      "orden_fabricacion": "2261446",
+      "producto_sku": "VCOC05-0016-SCG-0508",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48378,
+      "orden_fabricacion": "2261531",
+      "producto_sku": "VBAN01-0056-000-0100",
+      "cantidad": 10,
+      "cedi": 10,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48406,
+      "orden_fabricacion": "2261610",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47529,
+      "orden_fabricacion": "2261538",
+      "producto_sku": "VROP01-0002-000-0100",
+      "cantidad": 4,
+      "cedi": 4,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47509,
+      "orden_fabricacion": "2261445",
+      "producto_sku": "VROP01-0005-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47533,
+      "orden_fabricacion": "2261545",
+      "producto_sku": "VROP01-0009-000-0901",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47531,
+      "orden_fabricacion": "2261543",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47920,
+      "orden_fabricacion": "2261612",
+      "producto_sku": "VROP02-0003-000-0300",
+      "cantidad": 18,
+      "cedi": 18,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47924,
+      "orden_fabricacion": "2261600",
+      "producto_sku": "VCOC04-0019-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47926,
+      "orden_fabricacion": "2261587",
+      "producto_sku": "VCOC04-0018-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47948,
+      "orden_fabricacion": "2261568",
+      "producto_sku": "VCOC04-0019-000-0160",
+      "cantidad": 5,
+      "cedi": 5,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48405,
+      "orden_fabricacion": "2261609",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47919,
+      "orden_fabricacion": "2261614",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 13,
+      "cedi": 13,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47921,
+      "orden_fabricacion": "2261604",
+      "producto_sku": "VROP01-0008-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47887,
+      "orden_fabricacion": "2261594",
+      "producto_sku": "VBAN01-0004-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48707,
+      "orden_fabricacion": "2261642",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 14,
+      "cedi": 14,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47923,
+      "orden_fabricacion": "2261616",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 8,
+      "cedi": 8,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47918,
+      "orden_fabricacion": "2261615",
+      "producto_sku": "VROP06-0004-000-0100",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 47922,
+      "orden_fabricacion": "2261617",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 7,
+      "cedi": 7,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48415,
+      "orden_fabricacion": "2261715",
+      "producto_sku": "VCOC05-0016-SNG-0508",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48390,
+      "orden_fabricacion": "2261599",
+      "producto_sku": "VBAN01-0039-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48433,
+      "orden_fabricacion": "2261689",
+      "producto_sku": "VCOC05-0012-SNC-0901",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48403,
+      "orden_fabricacion": "2261607",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48706,
+      "orden_fabricacion": "2261641",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 14,
+      "cedi": 14,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48398,
+      "orden_fabricacion": "2261602",
+      "producto_sku": "VROP01-0004-000-0100",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48412,
+      "orden_fabricacion": "2261638",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 14,
+      "cedi": 14,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48416,
+      "orden_fabricacion": "2261716",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48417,
+      "orden_fabricacion": "2261714",
+      "producto_sku": "VCOC05-0017-SNG-0508",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48414,
+      "orden_fabricacion": "2261640",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 14,
+      "cedi": 14,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48730,
+      "orden_fabricacion": "2261713",
+      "producto_sku": "VROP06-0004-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48740,
+      "orden_fabricacion": "2261753",
+      "producto_sku": "VBAN01-0052-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48776,
+      "orden_fabricacion": "2261765",
+      "producto_sku": "VROP02-0009-000-0300",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48737,
+      "orden_fabricacion": "2261749",
+      "producto_sku": "VROP01-0020-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48746,
+      "orden_fabricacion": "2261759",
+      "producto_sku": "VBAN02-0003-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48713,
+      "orden_fabricacion": "2261702",
+      "producto_sku": "VBAN01-0048-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48744,
+      "orden_fabricacion": "2261761",
+      "producto_sku": "VBAN01-0038-000-0100",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48780,
+      "orden_fabricacion": "2261780",
+      "producto_sku": "VBAN02-0003-000-0100",
+      "cantidad": 5,
+      "cedi": 5,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48738,
+      "orden_fabricacion": "2261752",
+      "producto_sku": "VBAN01-0007-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48741,
+      "orden_fabricacion": "2261750",
+      "producto_sku": "VROP01-0020-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48786,
+      "orden_fabricacion": "2261789",
+      "producto_sku": "VROP01-0004-000-0100",
+      "cantidad": 4,
+      "cedi": 4,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48783,
+      "orden_fabricacion": "2261786",
+      "producto_sku": "VBAN01-0018-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48742,
+      "orden_fabricacion": "2261754",
+      "producto_sku": "VROP01-0006-000-0901",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48785,
+      "orden_fabricacion": "2261788",
+      "producto_sku": "VBAN01-0018-000-0100",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48745,
+      "orden_fabricacion": "2261760",
+      "producto_sku": "VBAN01-0041-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48779,
+      "orden_fabricacion": "2261778",
+      "producto_sku": "VROP02-0009-000-0300",
+      "cantidad": 8,
+      "cedi": 8,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48781,
+      "orden_fabricacion": "2261784",
+      "producto_sku": "VBAN01-0047-000-0100",
+      "cantidad": 1,
+      "cedi": 1,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48778,
+      "orden_fabricacion": "2261777",
+      "producto_sku": "VBAN01-0018-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48782,
+      "orden_fabricacion": "2261785",
+      "producto_sku": "VBAN01-0018-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48784,
+      "orden_fabricacion": "2261787",
+      "producto_sku": "VBAN01-0018-000-0100",
+      "cantidad": 6,
+      "cedi": 6,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48777,
+      "orden_fabricacion": "2261766",
+      "producto_sku": "VROP01-0009-000-0100",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48934,
+      "orden_fabricacion": "2261830",
+      "producto_sku": "VROP02-0007-000-0300",
+      "cantidad": 13,
+      "cedi": 13,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48940,
+      "orden_fabricacion": "2261859",
+      "producto_sku": "VBAN02-0003-000-0100",
+      "cantidad": 4,
+      "cedi": 4,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48920,
+      "orden_fabricacion": "2261790",
+      "producto_sku": "VBAN01-0051-000-0100",
+      "cantidad": 9,
+      "cedi": 9,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48922,
+      "orden_fabricacion": "2261813",
+      "producto_sku": "VROP01-0015-000-0100",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 48929,
+      "orden_fabricacion": "2261831",
+      "producto_sku": "VCOC05-0016-SNG-0901",
+      "cantidad": 3,
+      "cedi": 3,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 49489,
+      "orden_fabricacion": "2261916",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 49488,
+      "orden_fabricacion": "2261915",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 49484,
+      "orden_fabricacion": "2261911",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 49486,
+      "orden_fabricacion": "2261913",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 49487,
+      "orden_fabricacion": "2261914",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    },
+    {
+      "id": 49485,
+      "orden_fabricacion": "2261912",
+      "producto_sku": "VROP02-0001-000-0300",
+      "cantidad": 2,
+      "cedi": 2,
+      "motivo": "Orden no encontrada en SAP"
+    }
+  ]
+}

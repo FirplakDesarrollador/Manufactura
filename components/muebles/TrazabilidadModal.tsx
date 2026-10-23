@@ -83,7 +83,8 @@ export default function TrazabilidadModal({
                 avail = ordenesSeleccionadas.reduce((sum, item) => sum + (item.inspeccion || 0), 0)
                 break
             case 'Digitado':
-                avail = orden.empaque || 0
+                const isCefiOrd = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF')
+                avail = isCefiOrd ? ((orden.inspeccion || 0) + (orden.empaque || 0)) : (orden.empaque || 0)
                 break
             case 'Transito':
                 avail = orden.digitado || 0

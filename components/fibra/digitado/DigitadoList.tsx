@@ -54,7 +54,7 @@ export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, o
         if (piezasDisponibles.length === 0) return
 
         const selectCount = Math.min(cantidadLote, piezasDisponibles.length)
-        const idsToUpdate = piezasDisponibles.slice(0, selectCount).map(r => r.id)
+        const idsToUpdate = piezasDisponibles.slice(0, selectCount).map(r => r.registrer || String(r.id)).filter(Boolean) as string[]
 
         if (!confirm(`¿Desea mover ${selectCount} piezas a Tránsito de forma masiva?`)) return
 
@@ -163,7 +163,7 @@ export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, o
                 ) : (
                     filteredRegistros.map(r => (
                         <RegistroDigitadoCard
-                            key={r.id}
+                            key={r.registrer || r.id}
                             registro={r}
                             usuarioEmail={userEmail}
                             onRefresh={() => {

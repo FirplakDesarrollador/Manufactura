@@ -88,7 +88,7 @@ export default function CediList({ order, userEmail, onRefresh }: CediListProps)
                 ) : (
                     filteredRegistros.map(r => (
                         <RegistroDigitadoCard
-                            key={r.id}
+                            key={r.registrer || r.id}
                             registro={r}
                             usuarioEmail={userEmail}
                             onRefresh={() => { loadRegistros(); onRefresh(); }}

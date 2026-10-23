@@ -19,7 +19,8 @@ const PLANT_ALIASES: Record<string, string[]> = {
   FV: ['FV', 'FIBRA', 'FIBRA DE VIDRIO'],
   MBL: ['ESPGAB', 'MBLP', 'MUEBLE', 'MBL', 'MUEBLES'],
   CEFI: ['MBL CEFI', 'PFZ-CEMA', 'CEFI', 'MBL-CEFI'],
-  QZ: ['QUARTZSTONE', 'RTM', 'RTMM', 'CUARZO', 'QZ']
+  QZ: ['QUARTZSTONE', 'RTM', 'RTMM', 'CUARZO', 'QZ'],
+  RMOLD: ['RMOLD', 'REPARACION DE MOLDES', 'REPARACIÓN DE MOLDES', 'MOLDES']
 };
 
 export async function GET(request: Request) {
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const apiUrl = process.env.SEMAFORO_API_URL || "https://hispanic-paintings-rio-kit.trycloudflare.com/semaforo";
+  const apiUrl = process.env.SEMAFORO_API_URL || "https://toner-villages-acoustic-colony.trycloudflare.com/semaforo";
   const apiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
 
   try {

@@ -175,7 +175,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                         <div className="grid grid-cols-2 p-2 gap-1 text-center divide-x divide-orange-100">
                             {(() => {
                                 // Logic to define what 'Pending' means for each stage
-                                const isCefi = orden.planta === 'Cefi';
+                                const isCefi = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF');
                                 let pendingMuebles = 0;
                                 let pendingPiezas = 0;
                                 const totalPiezas = Number(orden.piezas) || 0;
@@ -195,10 +195,10 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                                             pending = (orden.enchape || 0) + (orden.reponer_inspeccion || 0);
                                             break;
                                         case 'Empaque':
-                                            pending = orden.inspeccion || 0;
+                                            pending = 0;
                                             break;
                                         case 'Digitado':
-                                            pending = orden.empaque || 0;
+                                            pending = (orden.inspeccion || 0) + (orden.empaque || 0);
                                             break;
                                         case 'Transito':
                                             pending = orden.digitado || 0;
@@ -269,15 +269,18 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
             {/* Bottom Section: Progress Timeline */}
             <div className="bg-gray-50 border-t border-gray-100 p-2 overflow-x-auto no-scrollbar">
                 <div className="flex items-center justify-between min-w-[700px] gap-2">
-                    {[
-                        { label: 'Corte', val: orden.corte, icon: <TrendingUp size={12} />, color: 'blue' },
-                        { label: 'Enchape', val: orden.enchape, icon: <TrendingUp size={12} />, color: 'blue' },
-                        { label: 'Inspecc.', val: orden.inspeccion, icon: <TrendingUp size={12} />, color: 'blue' },
-                        { label: 'Empaque', val: orden.empaque, icon: <Package size={12} />, color: 'blue' },
-                        { label: 'Digitado', val: orden.digitado, icon: <FileText size={12} />, color: 'amber' },
-                        { label: 'Transito', val: orden.transito, icon: <Truck size={12} />, color: 'amber' },
-                        { label: 'Cedi', val: orden.cedi, icon: <CheckCircle size={12} />, color: 'green' },
-                    ].map((step, idx) => (
+                    {(() => {
+                        const isCefiCard = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF');
+                        return [
+                            { label: 'Corte', val: orden.corte, icon: <TrendingUp size={12} />, color: 'blue' },
+                            { label: 'Enchape', val: orden.enchape, icon: <TrendingUp size={12} />, color: 'blue' },
+                            { label: 'Inspecc.', val: orden.inspeccion, icon: <TrendingUp size={12} />, color: 'blue' },
+                            ...(!isCefiCard ? [{ label: 'Empaque', val: orden.empaque, icon: <Package size={12} />, color: 'blue' }] : []),
+                            { label: 'Digitado', val: orden.digitado, icon: <FileText size={12} />, color: 'amber' },
+                            { label: 'Transito', val: orden.transito, icon: <Truck size={12} />, color: 'amber' },
+                            { label: 'Cedi', val: orden.cedi, icon: <CheckCircle size={12} />, color: 'green' },
+                        ];
+                    })().map((step, idx) => (
                         <div key={idx} className="flex-1 flex flex-col items-center justify-center p-1 rounded border border-gray-200 bg-white">
                             <div className={`flex items-center gap-1 text-[9px] font-bold uppercase ${
                                 step.color === 'blue' ? 'text-blue-600' : 

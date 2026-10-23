@@ -88,6 +88,18 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
         setCantidadForOrder(of, totalPieces, taskOrders.find(o => o.of === of)?.available)
     }
 
+    const handleSetPiezaDirect = (of: string, compName: string, val: number, maxReq: number) => {
+        let nextVal = Number.isFinite(val) ? val : 0
+        if (nextVal < 0) nextVal = 0
+        if (nextVal > maxReq) nextVal = maxReq
+        const currentPiezas = { ...(cantidadesPorPieza[of] || {}) }
+        currentPiezas[compName] = nextVal
+        
+        const totalPieces = Object.values(currentPiezas).reduce((a, b) => a + b, 0)
+        setCantidadesPorPieza(prev => ({ ...prev, [of]: currentPiezas }))
+        setCantidadForOrder(of, totalPieces, taskOrders.find(o => o.of === of)?.available)
+    }
+
     const handleCompletarTodasPiezas = (of: string) => {
         const piezas = despieceMap[of] || []
         const updated: Record<string, number> = {}
@@ -356,9 +368,15 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                                 </button>
                                                 <input
                                                     type="number"
-                                                    value={cantidad}
-                                                    onChange={(e) => setCantidadForOrder(item.of, parseInt(e.target.value) || 0, item.available)}
-                                                    className="w-20 h-12 text-center text-2xl font-black text-gray-900 border-b-4 border-blue-500 focus:outline-none bg-white rounded-t-xl shadow-2xs"
+                                                    value={cantidad === 0 ? '' : cantidad}
+                                                    placeholder="0"
+                                                    onChange={(e) => {
+                                                        const raw = e.target.value.trim()
+                                                        const parsed = raw === '' ? 0 : parseInt(raw, 10)
+                                                        setCantidadForOrder(item.of, isNaN(parsed) ? 0 : parsed, item.available)
+                                                    }}
+                                                    onFocus={(e) => e.target.select()}
+                                                    className="w-24 h-12 text-center text-2xl font-black text-gray-900 border-b-4 border-blue-500 focus:outline-none bg-white rounded-t-xl shadow-2xs"
                                                 />
                                                 <button
                                                     type="button"
@@ -395,7 +413,7 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
 
                                                     {isExpanded && (
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
-                                                            {piezasDespiece.map((p) => {
+                                                             {piezasDespiece.map((p) => {
                                                                 const piezaVal = cantidadesPorPieza[item.of]?.[p.componente] ?? 0
                                                                 return (
                                                                     <div 
@@ -417,18 +435,32 @@ export default function ActiveTaskOverlay({ tarea, userEmail, usuarioNombre, onF
                                                                                 type="button"
                                                                                 onClick={() => handleUpdatePieza(item.of, p.componente, -1, p.cantidad)}
                                                                                 disabled={piezaVal <= 0}
-                                                                                className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs"
+                                                                                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs active:scale-95 transition-all"
+                                                                                title="Restar 1"
                                                                             >
                                                                                 -
                                                                             </button>
-                                                                            <span className="w-5 text-center font-black text-xs text-gray-900">
-                                                                                {piezaVal}
-                                                                            </span>
+                                                                            <input
+                                                                                type="number"
+                                                                                min={0}
+                                                                                max={p.cantidad}
+                                                                                value={piezaVal === 0 ? '' : piezaVal}
+                                                                                placeholder="0"
+                                                                                onChange={(e) => {
+                                                                                    const raw = e.target.value.trim()
+                                                                                    const parsed = raw === '' ? 0 : parseInt(raw, 10)
+                                                                                    handleSetPiezaDirect(item.of, p.componente, isNaN(parsed) ? 0 : parsed, p.cantidad)
+                                                                                }}
+                                                                                onFocus={(e) => e.target.select()}
+                                                                                className="w-12 h-7 text-center font-black text-xs text-gray-900 bg-white border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-xs"
+                                                                                title="Digitar cantidad de piezas"
+                                                                            />
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => handleUpdatePieza(item.of, p.componente, 1, p.cantidad)}
                                                                                 disabled={piezaVal >= p.cantidad}
-                                                                                className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs"
+                                                                                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs active:scale-95 transition-all"
+                                                                                title="Sumar 1"
                                                                             >
                                                                                 +
                                                                             </button>

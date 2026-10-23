@@ -54,7 +54,7 @@ export async function deleteOrdenFabricacion(id: number) {
     }
 }
 
-export async function updateRegistroTrazabilidad(id: number, data: Partial<RegistroTrazabilidad>) {
+export async function updateRegistroTrazabilidad(idOrRegistrer: string | number, data: Partial<RegistroTrazabilidad>) {
     const allowedKeys = [
         'pintura_fecha',
         'orden_fabricacion_id',
@@ -106,7 +106,7 @@ export async function updateRegistroTrazabilidad(id: number, data: Partial<Regis
     const { error } = await supabase
         .from('trazabilidad_fv')
         .update(filteredData)
-        .eq('id', id)
+        .eq('registrer', String(idOrRegistrer))
 
     if (error) {
         console.error('Error updating registro trazabilidad:', error)
@@ -114,11 +114,11 @@ export async function updateRegistroTrazabilidad(id: number, data: Partial<Regis
     }
 }
 
-export async function deleteRegistroTrazabilidad(id: number) {
+export async function deleteRegistroTrazabilidad(idOrRegistrer: string | number) {
     const { error } = await supabase
         .from('trazabilidad_fv')
         .delete()
-        .eq('id', id)
+        .eq('registrer', String(idOrRegistrer))
 
     if (error) {
         console.error('Error deleting registro trazabilidad:', error)

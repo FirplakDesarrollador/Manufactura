@@ -63,7 +63,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                     .order('fecha_entrega_estimada', { ascending: true }),
                 supabase.from('query_trazabilidad_ms')
                     .select('*')
-                    .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},pulido_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Pulido,estado.eq.Digitado,estado.eq.Transito`)
+                    .or(`estado.neq.Cedi,cedi_fecha.gte.${todayStr}`)
                     .order('vaciado_fecha', { ascending: false })
                     .limit(10000),
                 getAllMoldes()
@@ -77,6 +77,35 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
             setLoading(false)
         }
     }
+
+    // Búsqueda en base de datos si el usuario ingresa un número de OF, pedido o SKU específico
+    useEffect(() => {
+        const query = searchText.trim()
+        if (query.length < 3) return
+
+        let isMounted = true
+        const timer = setTimeout(async () => {
+            const { data } = await supabase
+                .from('query_trazabilidad_ms')
+                .select('*')
+                .or(`orden_fabricacion.ilike.%${query}%,numero_pedido.ilike.%${query}%,producto_sku.ilike.%${query}%,molde_serial.ilike.%${query}%`)
+                .order('vaciado_fecha', { ascending: false })
+                .limit(500)
+
+            if (isMounted && data && data.length > 0) {
+                setRegistros(prev => {
+                    const existingIds = new Set(prev.map(r => r.id))
+                    const newRecords = data.filter(r => !existingIds.has(r.id))
+                    return newRecords.length > 0 ? [...prev, ...newRecords] : prev
+                })
+            }
+        }, 300)
+
+        return () => {
+            isMounted = false
+            clearTimeout(timer)
+        }
+    }, [searchText])
 
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
@@ -600,15 +629,19 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                             onChange={(e) => setEditModal({ ...editModal, item: { ...editModal.item, estado: e.target.value } })}
                                             className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                         >
-                                            <option value="Pintura text-black">Pintura</option>
-                                            <option value="Desgelcado text-black">Desgelcado</option>
-                                            <option value="Vaciado text-black">Vaciado</option>
-                                            <option value="Pulido text-black">Pulido</option>
-                                            <option value="Acabado text-black">Acabado</option>
-                                            <option value="Empaque text-black">Empaque</option>
-                                            <option value="Digitado text-black">Digitado</option>
-                                            <option value="Transito text-black">Transito</option>
-                                            <option value="Cedi text-black">Cedi</option>
+                                            <option value="Pintura">Pintura</option>
+                                            <option value="Desgelcada">Desgelcada</option>
+                                            <option value="Vaciado">Vaciado</option>
+                                            <option value="Pulido">Pulido</option>
+                                            <option value="Acabado">Acabado</option>
+                                            <option value="Empaque">Empaque</option>
+                                            <option value="Digitado">Digitado</option>
+                                            <option value="Transito">Transito</option>
+                                            <option value="Cedi">Cedi</option>
+                                            <option value="Estanteria">Estantería</option>
+                                            <option value="Reparacion">Reparación</option>
+                                            <option value="Saldo">Saldo</option>
+                                            <option value="Destruccion">Destrucción</option>
                                         </select>
                                     </div>
                                     <div>
@@ -748,7 +781,7 @@ const TRACE_STAGES: Array<{
 
 function OrderProcessesPanel({
     orden,
-    registros,
+    registros: parentRegistros,
     onEdit,
     onDelete,
     onTransfer
@@ -759,6 +792,43 @@ function OrderProcessesPanel({
     onDelete: (registro: RegistroTrazabilidad) => void
     onTransfer: (registro: RegistroTrazabilidad) => void
 }) {
+    const [fetchedRegistros, setFetchedRegistros] = useState<RegistroTrazabilidad[] | null>(parentRegistros && parentRegistros.length > 0 ? parentRegistros : null)
+    const [loadingRecords, setLoadingRecords] = useState(false)
+
+    useEffect(() => {
+        let isMounted = true
+        setLoadingRecords(true)
+        supabase
+            .from('query_trazabilidad_ms')
+            .select('*')
+            .eq('orden_fabricacion', orden.orden_fabricacion)
+            .order('pintura_fecha', { ascending: false })
+            .then(
+                ({ data, error }) => {
+                    if (isMounted) {
+                        setLoadingRecords(false)
+                        if (!error && data) {
+                            setFetchedRegistros(data)
+                        }
+                    }
+                },
+                () => {
+                    if (isMounted) setLoadingRecords(false)
+                }
+            )
+
+        return () => { isMounted = false }
+    }, [orden.orden_fabricacion])
+
+    const registros = fetchedRegistros !== null ? fetchedRegistros : parentRegistros
+
+    const handleDeleteRecord = (registro: RegistroTrazabilidad) => {
+        onDelete(registro)
+        if (fetchedRegistros) {
+            setFetchedRegistros(prev => prev ? prev.filter(r => r.id !== registro.id) : null)
+        }
+    }
+
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
@@ -768,8 +838,17 @@ function OrderProcessesPanel({
                         OF {orden.orden_fabricacion} · {registros.length} registro{registros.length === 1 ? '' : 's'} encontrado{registros.length === 1 ? '' : 's'}
                     </div>
                 </div>
+                {loadingRecords && (
+                    <div className="text-xs text-blue-500 font-bold flex items-center gap-1.5 animate-pulse">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Cargando historial completo...
+                    </div>
+                )}
             </div>
-            {registros.length === 0 ? (
+            {loadingRecords && registros.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-[12px] font-bold text-slate-400 flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-blue-500" /> Consultando piezas registradas en trazabilidad...
+                </div>
+            ) : registros.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-[12px] font-bold text-slate-400">
                     No hay registros de trazabilidad cargados para esta orden.
                 </div>
@@ -779,7 +858,7 @@ function OrderProcessesPanel({
                         <div key={registro.id} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 text-[12px]">
                                 <div className="flex flex-wrap gap-4">
-                                    <InfoPill label="ID" value={registro.id} />
+                                    <InfoPill label="ID" value={registro.id || registro.registrer || '-'} />
                                     <InfoPill label="Estado" value={registro.estado || '-'} />
                                     <InfoPill label="Pedido" value={registro.numero_pedido || registro.pedido || '-'} />
                                     <InfoPill label="Molde" value={registro.molde_serial || '-'} />
@@ -791,7 +870,7 @@ function OrderProcessesPanel({
                                     <button onClick={() => onTransfer(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
                                         <ArrowRightLeft size={16} />
                                     </button>
-                                    <button onClick={() => onDelete(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
+                                    <button onClick={() => handleDeleteRecord(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
                                         <Trash2 size={16} />
                                     </button>
                                 </div>

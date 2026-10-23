@@ -17,7 +17,7 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
 
 export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
-        .from('trazabilidad_fv')
+        .from('query_trazabilidad_fv')
         .select('*')
         .order('pintura_fecha', { ascending: false })
         .limit(5000)
@@ -37,7 +37,7 @@ export async function getRegistrosTrazabilidadHoy(): Promise<RegistroTrazabilida
     const todayStr = today.toISOString()
     
     const { data, error } = await supabase
-        .from('trazabilidad_fv')
+        .from('query_trazabilidad_fv')
         .select('*')
         .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
         .order('vaciado_fecha', { ascending: false })
@@ -53,7 +53,7 @@ export async function getRegistrosTrazabilidadHoy(): Promise<RegistroTrazabilida
 
 export async function getRegistrosTrazabilidadActivos(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
-        .from('trazabilidad_fv')
+        .from('query_trazabilidad_fv')
         .select('*')
         .not('estado', 'eq', 'Cedi')
         .order('pintura_fecha', { ascending: false })
@@ -68,22 +68,10 @@ export async function getRegistrosTrazabilidadActivos(): Promise<RegistroTrazabi
 }
 
 export async function getRegistrosTrazabilidadPorOrden(ordenFabricacion: string): Promise<RegistroTrazabilidad[]> {
-    // In trazabilidad_fv we might only have orden_fabricacion_id, but the query might need to join or filter differently.
-    // For now we'll match by orden_fabricacion if it exists, or just return empty if it doesn't match the schema perfectly
-    // The original view query_trazabilidad_ms had "orden_fabricacion" as a string joined field. 
-    // trazabilidad_fv has orden_fabricacion_id.
-    const { data: ordenData } = await supabase
-        .from('ordenes_fabricacion_fv')
-        .select('id')
-        .eq('orden_fabricacion', ordenFabricacion)
-        .single()
-        
-    if (!ordenData) return [];
-
     const { data, error } = await supabase
-        .from('trazabilidad_fv')
+        .from('query_trazabilidad_fv')
         .select('*')
-        .eq('orden_fabricacion_id', ordenData.id)
+        .eq('orden_fabricacion', ordenFabricacion)
         .order('pintura_fecha', { ascending: false })
 
     if (error) {
@@ -293,8 +281,31 @@ export async function registrarPintura(pinturaData: {
 }
 
 export async function eliminarRegistroPintura(registrer: string, moldeSerial: string) {
-    // We assume trazabilidad_fv uses 'registrer' or we need to find id in trazabilidad_fv
-    // Note: trazabilidad_fv might not have 'id'. We need to be careful.
-    // If it has no 'id' but uses 'registrer' as PK:
-    throw new Error('eliminarRegistroPintura Not implemented for Fibra yet');
+    // 1. Obtener info del molde para restarle vueltas y cambiar a Disponible
+    const { data: molde, error: moldeError } = await supabase
+        .from('moldes')
+        .select('vueltas_actuales, vueltas_acumuladas')
+        .eq('serial', moldeSerial)
+        .single()
+        
+    if (!moldeError && molde) {
+        await supabase
+            .from('moldes')
+            .update({ 
+                estado: 'Disponible',
+                vueltas_actuales: Math.max(0, (molde.vueltas_actuales || 0) - 1),
+                vueltas_acumuladas: Math.max(0, (molde.vueltas_acumuladas || 0) - 1)
+            })
+            .eq('serial', moldeSerial)
+    }
+
+    // 2. Eliminar el registro
+    const { error: deleteError } = await supabase
+        .from('trazabilidad_fv')
+        .delete()
+        .eq('registrer', registrer)
+
+    if (deleteError) {
+        throw new Error(`Error al eliminar registro: ${deleteError.message}`)
+    }
 }
