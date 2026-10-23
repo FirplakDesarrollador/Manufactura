@@ -49,6 +49,7 @@ import {
     normalizarPiezas
 } from '@/lib/calidad/msCalidad';
 import CalidadFVDashboard from '@/components/calidad/CalidadFVDashboard';
+import CalidadGeneralIFI from '@/components/calidad/CalidadGeneralIFI';
 import {
     ResponsiveContainer,
     LineChart,
@@ -122,16 +123,6 @@ const MAIN_SUBHEADER_TABS: SubHeaderTab[] = [
     { id: 'PLAN_VIGILANCIA', label: 'Plan de Vigilancia', icon: <ShieldCheck size={15} /> },
     { id: 'RRC', label: 'RRC', icon: <FileSpreadsheet size={15} /> },
     { id: 'QRQC', label: 'QRQC', icon: <Layers size={15} /> }
-];
-
-// Comparativa consolidada de Calidad IFI por Planta (General)
-const COMPARATIVA_PLANTAS_IFI = [
-    { planta: 'MS', nombre: 'Mármol Sintético', calidad: 79.4, meta: 90.0, total: 4860, conformes: 3857, dpu: 0.30 },
-    { planta: 'FV', nombre: 'Fibra de Vidrio', calidad: 85.0, meta: 90.0, total: 320, conformes: 272, dpu: 0.15 },
-    { planta: 'QZ', nombre: 'Quarzstone', calidad: 95.0, meta: 90.0, total: 128, conformes: 122, dpu: 0.05 },
-    { planta: 'MBL', nombre: 'Muebles', calidad: 94.8, meta: 90.0, total: 1450, conformes: 1375, dpu: 0.07 },
-    { planta: 'CEFI', nombre: 'CEFI (Zócalos)', calidad: 95.2, meta: 90.0, total: 820, conformes: 781, dpu: 0.05 },
-    { planta: 'RMOLD', nombre: 'Reparación Moldes', calidad: 92.0, meta: 90.0, total: 50, conformes: 46, dpu: 0.08 }
 ];
 
 // Estructura de eventos para el módulo de Saldos y Destrucciones
@@ -696,7 +687,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                         </span>
                                     </div>
                                     <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Índice de Falla Inicial (IFI) y rendimiento consolidado de las 6 plantas de manufactura
+                                        Cumplimiento ponderado de calidad de las 5 plantas de producción (MS, MBL, CEFI, FV, RTM), cada una con su meta y su peso
                                     </p>
                                 </div>
 
@@ -737,105 +728,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                     />
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {/* KPI Cards Corporativas */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                        <div className="p-2.5 px-3 rounded-xl bg-amber-50/70 border border-amber-200 shadow-2xs flex flex-col justify-between">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Calidad Promedio</span>
-                                                <span className="text-[10px] font-black bg-amber-200/80 text-amber-800 px-1.5 py-0.2 rounded-full">Meta: 90%</span>
-                                            </div>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-amber-700">89.4 %</p>
-                                                <p className="text-[10px] text-amber-800/80 font-medium">Alerta leve preventiva</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Inspeccionadas</span>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-slate-800">7,628</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">Unidades auditadas</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Piezas Conformes</span>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-slate-800">6,819</p>
-                                                <p className="text-[10px] text-emerald-600 font-bold">Aprobadas primera vez</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-2.5 px-3 rounded-xl bg-emerald-50/70 border border-emerald-200 shadow-2xs flex flex-col justify-between">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wide">Plantas en Meta</span>
-                                                <span className="text-[10px] font-black bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded-full">66.7%</span>
-                                            </div>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-emerald-700">4 de 6</p>
-                                                <p className="text-[10px] text-emerald-800/80 font-medium">QZ, MBL, CEFI, RMOLD</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Gráfico Comparativo de Plantas con Semáforo */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-center">
-                                        <div className="lg:col-span-8 bg-slate-50/80 p-3 sm:p-3.5 rounded-xl border border-slate-200">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <h3 className="text-xs sm:text-sm font-black text-[#324354]">
-                                                    Comparativa de Calidad IFI por Planta vs Meta (90%)
-                                                </h3>
-                                                <span className="text-[10px] text-slate-500 font-bold">Semáforo: Verde &gt;90% | Amarillo 85-90% | Rojo &lt;85%</span>
-                                            </div>
-                                            <div className="h-[195px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={COMPARATIVA_PLANTAS_IFI} margin={{ top: 10, right: 15, left: -15, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2ded5" />
-                                                        <XAxis dataKey="planta" tick={{ fontSize: 11, fontWeight: 'bold', fill: '#324354' }} />
-                                                        <YAxis domain={[50, 100]} tick={{ fontSize: 10 }} />
-                                                        <Tooltip
-                                                            formatter={(val: any) => [`${val} %`, 'Calidad IFI']}
-                                                            labelFormatter={(label) => {
-                                                                const p = COMPARATIVA_PLANTAS_IFI.find(x => x.planta === label);
-                                                                return `${label} - ${p?.nombre || ''}`;
-                                                            }}
-                                                        />
-                                                        <ReferenceLine y={90} stroke="#2563eb" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: 'Meta: 90%', fill: '#2563eb', fontSize: 10, position: 'top' }} />
-                                                        <Bar dataKey="calidad" radius={[6, 6, 0, 0]}>
-                                                            {COMPARATIVA_PLANTAS_IFI.map((entry, idx) => {
-                                                                let color = '#d14747'; // Rojo
-                                                                if (entry.calidad > 90) color = '#59a96a'; // Verde
-                                                                else if (entry.calidad >= 85) color = '#deb841'; // Amarillo
-                                                                return <Cell key={`cell-${idx}`} fill={color} />;
-                                                            })}
-                                                        </Bar>
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-
-                                        <div className="lg:col-span-4 space-y-1.5">
-                                            <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1">Desglose por Planta</h4>
-                                            {COMPARATIVA_PLANTAS_IFI.map(p => {
-                                                const semaforo = p.calidad > 90 ? 'bg-emerald-500' : p.calidad >= 85 ? 'bg-amber-500' : 'bg-rose-500';
-                                                return (
-                                                    <div key={p.planta} className="bg-white py-1.5 px-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs shadow-2xs">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className={`w-2 h-2 rounded-full ${semaforo}`} />
-                                                            <span className="font-extrabold text-[#324354]">{p.planta}</span>
-                                                            <span className="text-slate-400 font-medium hidden sm:inline">• {p.nombre}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2.5">
-                                                            <span className="text-[10px] text-slate-400">{p.conformes}/{p.total} pz</span>
-                                                            <span className="font-black text-slate-900">{p.calidad}%</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
+                                <CalidadGeneralIFI />
                             )}
                         </section>
 
