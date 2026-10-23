@@ -451,10 +451,10 @@ export default function HistoricoDefectosPage() {
             />
 
             {/* Sticky Search & Filter Toolbar - EXACT SAME HEIGHT (h-14 / 56px) AS MAIN HEADER */}
-            <div className="bg-white border-b border-gray-200 px-4 h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
-                <div className="max-w-[1800px] w-full mx-auto flex items-center justify-between relative h-full gap-2">
+            <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 2xl:py-0 2xl:h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
+                <div className="max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between 2xl:grid 2xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] 2xl:gap-4 relative 2xl:h-full gap-2">
                     {/* Left: Search input & Type Filter - Ampliado para aprovechar el espacio antes de los botones */}
-                    <div className="flex items-center gap-2 max-w-[calc(50%-130px)] flex-1 min-w-[340px]">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min 2xl:max-w-[calc(50%-130px)] 2xl:min-w-[340px]">
                         {/* Search Input */}
                         <div className="relative flex-1 min-w-[150px]">
                             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -507,12 +507,12 @@ export default function HistoricoDefectosPage() {
                     </div>
 
                     {/* Center: Nav Buttons - EXACTLY CENTERED WITH FIRPLAK LOGO */}
-                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                    <div className="order-3 2xl:order-none w-full 2xl:w-auto flex justify-center z-20">
                         <CalidadMsNavButtons activeTab="historico" hasSettingsPermission={true} />
                     </div>
 
                     {/* Right: Date Range, Actualizar, Exportar CSV, Total BD */}
-                    <div className="flex items-center gap-1.5 ml-auto shrink-0 z-10">
+                    <div className="order-2 2xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-1.5 w-full sm:w-auto sm:ml-auto 2xl:ml-0 2xl:justify-self-end min-w-0 z-10">
                         {/* Date Filters */}
                         <div className="flex items-center gap-1">
                             <input

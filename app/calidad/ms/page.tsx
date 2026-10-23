@@ -313,11 +313,12 @@ export default function CalidadMsReportPage() {
             />
 
             {/* Control Bar - Full Width - Same height (h-14 / 56px) as main blue header */}
-            <div className="bg-gray-50 border-b border-gray-200 h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
-                <div className="max-w-[1800px] w-full mx-auto px-4 flex items-center justify-between relative h-full">
+            {/* En pantallas angostas la barra se divide en filas para no desbordar la página */}
+            <div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 gap-2 relative xl:h-full">
                     {/* Left: Product Selector & Save button - Ampliado para aprovechar espacio */}
-                    <div className="flex items-center gap-3 max-w-[560px] xl:max-w-[640px] flex-1">
-                        <div className="flex-1 min-w-[320px]">
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min xl:max-w-[440px] 2xl:max-w-[520px]">
+                        <div className="flex-1 min-w-[160px] [contain:inline-size]">
                             <SearchableSelect
                                 name="producto"
                                 options={products.map((p) => p.Referencia)}
@@ -334,7 +335,7 @@ export default function CalidadMsReportPage() {
                         <button
                             onClick={handleSave}
                             disabled={isUploading}
-                            className={`h-10 flex items-center space-x-2 px-4 text-white font-black uppercase tracking-widest text-xs transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
+                            className={`h-10 flex items-center space-x-2 px-3 sm:px-4 text-white font-black uppercase tracking-widest text-xs transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
                             {isUploading ? (
                                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -348,7 +349,7 @@ export default function CalidadMsReportPage() {
                     </div>
 
                     {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
-                    <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-20">
+                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center z-20">
                         <CalidadMsNavButtons
                             activeTab="registro"
                             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -378,19 +379,19 @@ export default function CalidadMsReportPage() {
                     />
 
                     {/* Right: Quick Metrics */}
-                    <div className="flex items-center space-x-6 overflow-x-auto no-scrollbar ml-auto shrink-0">
+                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-1 xl:gap-x-4 2xl:gap-x-6 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
                         <div className="flex items-center space-x-2">
                             <div className="w-6 h-6 rounded-full bg-[#36A284] flex items-center justify-center text-white">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                             </div>
-                            <span className="text-xl font-bold text-[#36A284]">{stats.buenos}</span>
+                            <span className="text-lg 2xl:text-xl font-bold text-[#36A284]">{stats.buenos}</span>
                             <span className="text-sm font-medium text-gray-500">Buenos</span>
                         </div>
                         <div className="flex items-center space-x-2">
                             <div className="w-6 h-6 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-sm">
                                 !
                             </div>
-                            <span className="text-xl font-bold text-[#F24E4E]">{stats.defectuosos}</span>
+                            <span className="text-lg 2xl:text-xl font-bold text-[#F24E4E]">{stats.defectuosos}</span>
                             <span className="text-sm font-medium text-gray-500">Defectuosos</span>
                         </div>
                         <div className="flex items-center">

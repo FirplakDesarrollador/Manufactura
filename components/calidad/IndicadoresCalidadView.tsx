@@ -36,6 +36,20 @@ import {
     Activity
 } from 'lucide-react';
 import {
+    MS_FECHA_INICIO_BI,
+    MsPiezaNormalizada,
+    calcularIfiPorDia,
+    calcularIfiPorMes,
+    calcularPareto,
+    calcularReferencias,
+    calcularResumen,
+    fetchCatalogoDefectosMs,
+    fetchMsReportes,
+    fetchProductosMs,
+    normalizarPiezas
+} from '@/lib/calidad/msCalidad';
+import CalidadFVDashboard from '@/components/calidad/CalidadFVDashboard';
+import {
     ResponsiveContainer,
     LineChart,
     Line,
@@ -118,61 +132,6 @@ const COMPARATIVA_PLANTAS_IFI = [
     { planta: 'MBL', nombre: 'Muebles', calidad: 94.8, meta: 90.0, total: 1450, conformes: 1375, dpu: 0.07 },
     { planta: 'CEFI', nombre: 'CEFI (Zócalos)', calidad: 95.2, meta: 90.0, total: 820, conformes: 781, dpu: 0.05 },
     { planta: 'RMOLD', nombre: 'Reparación Moldes', calidad: 92.0, meta: 90.0, total: 50, conformes: 46, dpu: 0.08 }
-];
-
-// Histórico oficial por mes 2026 (MS)
-const HISTORICO_MESES_2026: { mes: string; calidad: number; total: number; buenos: number; defectuosos: number }[] = [
-    { mes: 'enero', calidad: 74.8, total: 4120, buenos: 3082, defectuosos: 1038 },
-    { mes: 'febrero', calidad: 73.0, total: 3980, buenos: 2905, defectuosos: 1075 },
-    { mes: 'marzo', calidad: 81.8, total: 4450, buenos: 3640, defectuosos: 810 },
-    { mes: 'abril', calidad: 82.6, total: 4380, buenos: 3618, defectuosos: 762 },
-    { mes: 'mayo', calidad: 83.0, total: 4520, buenos: 3752, defectuosos: 768 },
-    { mes: 'junio', calidad: 77.3, total: 4210, buenos: 3254, defectuosos: 956 },
-    { mes: 'julio', calidad: 79.4, total: 4340, buenos: 3446, defectuosos: 894 },
-    { mes: 'agosto', calidad: 81.9, total: 4500, buenos: 3685, defectuosos: 815 },
-    { mes: 'septiembre', calidad: 82.7, total: 4480, buenos: 3705, defectuosos: 775 },
-    { mes: 'octubre', calidad: 79.4, total: 4421, buenos: 3512, defectuosos: 909 },
-    { mes: 'noviembre', calidad: 0.0, total: 0, buenos: 0, defectuosos: 0 },
-    { mes: 'diciembre', calidad: 0.0, total: 0, buenos: 0, defectuosos: 0 }
-];
-
-// Histórico diario de octubre 2026 (MS)
-const HISTORICO_DIAS_OCTUBRE: { dia: number; calidad: number; total: number; buenos: number; defectuosos: number }[] = [
-    { dia: 1, calidad: 77.1, total: 340, buenos: 262, defectuosos: 78 },
-    { dia: 2, calidad: 79.5, total: 356, buenos: 283, defectuosos: 73 },
-    { dia: 3, calidad: 73.9, total: 322, buenos: 238, defectuosos: 84 },
-    { dia: 5, calidad: 75.0, total: 360, buenos: 270, defectuosos: 90 },
-    { dia: 6, calidad: 80.9, total: 372, buenos: 301, defectuosos: 71 },
-    { dia: 7, calidad: 80.1, total: 388, buenos: 311, defectuosos: 77 },
-    { dia: 8, calidad: 77.1, total: 363, buenos: 280, defectuosos: 83 },
-    { dia: 9, calidad: 77.6, total: 375, buenos: 291, defectuosos: 84 },
-    { dia: 10, calidad: 89.8, total: 392, buenos: 352, defectuosos: 40 },
-    { dia: 13, calidad: 84.9, total: 385, buenos: 327, defectuosos: 58 },
-    { dia: 14, calidad: 79.3, total: 368, buenos: 292, defectuosos: 76 }
-];
-
-// Causas oficiales de Pareto MS
-const PARETO_DEFECTOS_BASE = [
-    { name: '22. Pintura contaminada', cantidad: 68, pct: 3.45, esMolde: false },
-    { name: '38. Molde fisurado', cantidad: 68, pct: 3.45, esMolde: true },
-    { name: '15. Despique por mala manipulación', cantidad: 62, pct: 3.15, esMolde: false },
-    { name: '31. Pintura chorreada', cantidad: 62, pct: 3.15, esMolde: false },
-    { name: '45. Molde despicado', cantidad: 62, pct: 3.15, esMolde: true },
-    { name: '2. Rayas en poceso', cantidad: 55, pct: 2.79, esMolde: false },
-    { name: '25. Cera glass', cantidad: 55, pct: 2.79, esMolde: false },
-    { name: '37. Molde Rayado', cantidad: 52, pct: 2.64, esMolde: true },
-    { name: '30. Puntos negros', cantidad: 48, pct: 2.44, esMolde: false },
-    { name: '7. Fogueo', cantidad: 45, pct: 2.28, esMolde: false },
-    { name: '34. Poros', cantidad: 42, pct: 2.13, esMolde: false },
-    { name: '20. Mal lijado', cantidad: 38, pct: 1.93, esMolde: false },
-    { name: '10. Piel de naranja', cantidad: 35, pct: 1.78, esMolde: false },
-    { name: '3. Amarillamiento', cantidad: 30, pct: 1.52, esMolde: false },
-    { name: '4. Burbujas', cantidad: 28, pct: 1.42, esMolde: false },
-    { name: '12. Grietas', cantidad: 25, pct: 1.27, esMolde: false },
-    { name: '16. Manchas de desmoldante', cantidad: 22, pct: 1.12, esMolde: false },
-    { name: '28. Falta de brillo', cantidad: 20, pct: 1.02, esMolde: false },
-    { name: '41. Molde desgastado', cantidad: 18, pct: 0.91, esMolde: true },
-    { name: '9. Ampollas', cantidad: 15, pct: 0.76, esMolde: false }
 ];
 
 // Estructura de eventos para el módulo de Saldos y Destrucciones
@@ -346,8 +305,8 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
     };
 
     // Filtros de fecha MS
-    const [selectedYear, setSelectedYear] = useState<string>('2026');
-    const [selectedMonth, setSelectedMonth] = useState<string>('octubre');
+    const [selectedYear, setSelectedYear] = useState<string>(() => String(new Date().getFullYear()));
+    const [selectedMonth, setSelectedMonth] = useState<string>(() => MESES[new Date().getMonth()].nombre);
     const [selectedDay, setSelectedDay] = useState<string>('All');
 
     // Filtros de defectos MS
@@ -356,13 +315,12 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
 
     // Búsqueda en tabla de referencias MS
     const [refSearch, setRefSearch] = useState<string>('');
-    const [expandedRefs, setExpandedRefs] = useState<Record<string, boolean>>({
-        'LVR ECO 46x51': true
-    });
+    const [expandedRefs, setExpandedRefs] = useState<Record<string, boolean>>({});
 
-    // Registros en vivo desde Supabase MS
-    const [liveReports, setLiveReports] = useState<any[]>([]);
+    // Piezas MS del año seleccionado (Supabase, misma lógica del Power BI "BI Calidad MS")
+    const [msPiezasAnio, setMsPiezasAnio] = useState<MsPiezaNormalizada[]>([]);
     const [hasLiveSupabaseData, setHasLiveSupabaseData] = useState<boolean>(false);
+    const [msLoadError, setMsLoadError] = useState<string | null>(null);
 
     // --- ESTADOS PARA LA PESTAÑA SALDOS Y DESTRUCCIONES ---
     const [saldosReports, setSaldosReports] = useState<SaldoEvento[]>(SALDOS_REAL_DATA);
@@ -381,55 +339,35 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         void checkAuth();
     }, []);
 
-    // Consultar datos de Supabase para MS
+    // Consultar en Supabase todas las piezas MS del año seleccionado.
+    // Mes y día se filtran en memoria para que el cambio de filtro sea inmediato.
     const fetchSupabaseData = useCallback(async () => {
         setIsLoading(true);
+        setMsLoadError(null);
         try {
-            let query = supabase.from('ms_reporte_defectos').select(`
-                id,
-                created_at,
-                producto_id,
-                defecto,
-                Molde,
-                Reparacion,
-                producto:productos_defectos_ms (Referencia)
-            `);
+            const desde = selectedYear === 'All' ? `${MS_FECHA_INICIO_BI}T00:00:00Z` : `${selectedYear}-01-01T00:00:00Z`;
+            const hasta = selectedYear === 'All'
+                ? `${new Date().getUTCFullYear() + 1}-01-01T00:00:00Z`
+                : `${Number(selectedYear) + 1}-01-01T00:00:00Z`;
 
-            if (selectedYear !== 'All') {
-                const monthObj = MESES.find(m => m.nombre === selectedMonth);
-                if (monthObj && selectedMonth !== 'All') {
-                    if (selectedDay !== 'All') {
-                        const dayPadded = selectedDay.padStart(2, '0');
-                        const start = `${selectedYear}-${monthObj.num}-${dayPadded}T00:00:00Z`;
-                        const end = `${selectedYear}-${monthObj.num}-${dayPadded}T23:59:59Z`;
-                        query = query.gte('created_at', start).lte('created_at', end);
-                    } else {
-                        const start = `${selectedYear}-${monthObj.num}-01T00:00:00Z`;
-                        const end = `${selectedYear}-${monthObj.num}-31T23:59:59Z`;
-                        query = query.gte('created_at', start).lte('created_at', end);
-                    }
-                } else {
-                    const start = `${selectedYear}-01-01T00:00:00Z`;
-                    const end = `${selectedYear}-12-31T23:59:59Z`;
-                    query = query.gte('created_at', start).lte('created_at', end);
-                }
-            }
+            const [rows, catalogo, productos] = await Promise.all([
+                fetchMsReportes(supabase, desde, hasta, 'id, created_at, producto_id, defecto, Reparacion'),
+                fetchCatalogoDefectosMs(supabase),
+                fetchProductosMs(supabase)
+            ]);
 
-            const { data, error } = await query;
-            if (!error && data && data.length > 0) {
-                setLiveReports(data);
-                setHasLiveSupabaseData(true);
-            } else {
-                setLiveReports([]);
-                setHasLiveSupabaseData(false);
-            }
-        } catch (err) {
+            const piezas = normalizarPiezas(rows, catalogo, productos);
+            setMsPiezasAnio(piezas);
+            setHasLiveSupabaseData(piezas.length > 0);
+        } catch (err: any) {
             console.warn('Error consultando Supabase para calidad:', err);
+            setMsPiezasAnio([]);
             setHasLiveSupabaseData(false);
+            setMsLoadError(err?.message || 'Error consultando Supabase');
         } finally {
             setIsLoading(false);
         }
-    }, [selectedYear, selectedMonth, selectedDay]);
+    }, [selectedYear]);
 
     // Consultar registros reales de Saldos y Destrucciones desde Supabase
     const fetchSaldosSupabase = useCallback(async () => {
@@ -521,201 +459,45 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         }
     }, [fetchSupabaseData, fetchSaldosSupabase, activeTab]);
 
-    // Cálculo consolidado de KPIs y métricas MS
+    // Piezas MS del periodo seleccionado (mes / día dentro del año cargado)
+    const msMesNum = MESES.find(m => m.nombre === selectedMonth)?.num;
+    const msPiezasMes = useMemo(() => {
+        if (selectedMonth === 'All' || !msMesNum) return msPiezasAnio;
+        return msPiezasAnio.filter(p => p.fecha.slice(5, 7) === msMesNum);
+    }, [msPiezasAnio, selectedMonth, msMesNum]);
+
+    const msPiezasPeriodo = useMemo(() => {
+        if (selectedDay === 'All') return msPiezasMes;
+        const dd = selectedDay.padStart(2, '0');
+        return msPiezasMes.filter(p => p.fecha.slice(8, 10) === dd);
+    }, [msPiezasMes, selectedDay]);
+
+    // KPIs, Pareto y referencias MS (medidas del Power BI "BI Calidad MS")
     const metrics = useMemo(() => {
-        if (hasLiveSupabaseData && liveReports.length > 0) {
-            const total = liveReports.length;
-            let countOpaco = 0;
-            let countMoldes = 0;
-            let countDefectos = 0;
-            let countPiezasDefectuosas = 0;
-
-            const defectFreqMap: Record<string, number> = {};
-            const refMap: Record<string, { defectuosas: number; total: number; subdefectos: Record<string, number> }> = {};
-
-            liveReports.forEach(r => {
-                const defs = Array.isArray(r.defecto) ? r.defecto : [];
-                const ref = r.producto?.Referencia || `ID ${r.producto_id}`;
-
-                if (!refMap[ref]) {
-                    refMap[ref] = { defectuosas: 0, total: 0, subdefectos: {} };
-                }
-                refMap[ref].total += 1;
-
-                const validDefs = defs.filter((d: any) => {
-                    const name = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '');
-                    return name.trim().length > 0;
-                });
-
-                let hasQualityDefect = false;
-                validDefs.forEach((d: any) => {
-                    const name = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '');
-                    const lower = name.toLowerCase();
-
-                    countDefectos += 1;
-                    defectFreqMap[name] = (defectFreqMap[name] || 0) + 1;
-                    refMap[ref].subdefectos[name] = (refMap[ref].subdefectos[name] || 0) + 1;
-
-                    if (lower.includes('opaco')) countOpaco += 1;
-                    if (r.Molde || lower.includes('molde')) countMoldes += 1;
-                    hasQualityDefect = true;
-                });
-
-                if (hasQualityDefect) {
-                    countPiezasDefectuosas += 1;
-                    refMap[ref].defectuosas += 1;
-                }
-            });
-
-            const piezasBuenas = Math.max(0, total - countPiezasDefectuosas);
-            const calidad = total > 0 ? (piezasBuenas / total) * 100 : 80;
-            const dpu = total > 0 ? countDefectos / total : 0;
-            const pctOpaco = total > 0 ? (countOpaco / total) * 100 : 0;
-            const pctMoldes = countDefectos > 0 ? (countMoldes / countDefectos) * 100 : 0;
-
-            const sortedDefects = Object.entries(defectFreqMap)
-                .map(([name, cantidad]) => ({
-                    name,
-                    cantidad,
-                    pct: countDefectos > 0 ? Math.round((cantidad / countDefectos) * 1000) / 10 : 0,
-                    esMolde: name.toLowerCase().includes('molde')
-                }))
-                .sort((a, b) => b.cantidad - a.cantidad);
-
-            const sortedRefs = Object.entries(refMap)
-                .map(([referencia, d]) => ({
-                    referencia,
-                    piezasDefectuosas: d.defectuosas,
-                    reparacion: Math.round(d.defectuosas * 0.55),
-                    subdefectos: Object.entries(d.subdefectos).map(([k, v]) => ({ name: k, cantidad: v }))
-                }))
-                .sort((a, b) => b.piezasDefectuosas - a.piezasDefectuosas);
-
-            return {
-                pctOpaco: pctOpaco.toFixed(1),
-                piezasBuenas,
-                piezasDefectuosas: countPiezasDefectuosas,
-                piezasRevisadas: total,
-                cantidadDefectos: countDefectos,
-                pctMoldes: pctMoldes.toFixed(1),
-                dpu: dpu.toFixed(1),
-                calidad: calidad.toFixed(1),
-                paretoCausas: sortedDefects,
-                totalCausas: sortedDefects.length,
-                referencias: sortedRefs
-            };
-        }
-
-        // Datos oficiales del Power BI (Octubre 2026)
-        const totalPiezas = 4860;
-        const piezasDefectuosas = 1003;
-        const piezasBuenas = 3857;
-        const totalDefectos = 1479;
-
-        const filteredPareto = PARETO_DEFECTOS_BASE.filter(d => {
-            if (filterSoloReparacion && d.esMolde) return false;
-            return true;
-        });
-
-        const referenciasMock = [
-            {
-                referencia: 'LVR ECO 46x51',
-                piezasDefectuosas: 170,
-                reparacion: 95,
-                subdefectos: [
-                    { name: 'Pintura contaminada', cantidad: 45 },
-                    { name: 'Molde fisurado', cantidad: 38 },
-                    { name: 'Poros', cantidad: 30 },
-                    { name: 'Despique por manipulación', cantidad: 25 },
-                    { name: 'Rayas en proceso', cantidad: 20 },
-                    { name: 'Piel de naranja', cantidad: 12 }
-                ]
-            },
-            {
-                referencia: 'LVM Oslo 48x38',
-                piezasDefectuosas: 104,
-                reparacion: 58,
-                subdefectos: [
-                    { name: 'Molde despicado', cantidad: 32 },
-                    { name: 'Pintura chorreada', cantidad: 28 },
-                    { name: 'Cera glass', cantidad: 24 },
-                    { name: 'Puntos negros', cantidad: 20 }
-                ]
-            },
-            {
-                referencia: 'LVM ECO 48x38',
-                piezasDefectuosas: 90,
-                reparacion: 44,
-                subdefectos: [
-                    { name: 'Molde rayado', cantidad: 28 },
-                    { name: 'Fogueo', cantidad: 26 },
-                    { name: 'Amarillamiento', cantidad: 20 },
-                    { name: 'Burbujas', cantidad: 16 }
-                ]
-            },
-            {
-                referencia: 'LVR ECO 48x60',
-                piezasDefectuosas: 57,
-                reparacion: 28,
-                subdefectos: [
-                    { name: 'Mal lijado', cantidad: 22 },
-                    { name: 'Falta de brillo', cantidad: 18 },
-                    { name: 'Poros', cantidad: 17 }
-                ]
-            },
-            {
-                referencia: 'LVM Oslo 48x43',
-                piezasDefectuosas: 43,
-                reparacion: 22,
-                subdefectos: [
-                    { name: 'Pintura contaminada', cantidad: 20 },
-                    { name: 'Grietas', cantidad: 13 },
-                    { name: 'Manchas de desmoldante', cantidad: 10 }
-                ]
-            },
-            {
-                referencia: 'LVR AQUA 80x60 CON FLAUTA',
-                piezasDefectuosas: 41,
-                reparacion: 18,
-                subdefectos: [
-                    { name: 'Molde fisurado', cantidad: 25 },
-                    { name: 'Despique', cantidad: 16 }
-                ]
-            },
-            {
-                referencia: 'LVM Milan 60x45',
-                piezasDefectuosas: 38,
-                reparacion: 16,
-                subdefectos: [
-                    { name: 'Puntos negros', cantidad: 22 },
-                    { name: 'Fogueo', cantidad: 16 }
-                ]
-            },
-            {
-                referencia: 'LVR Siena 94x48',
-                piezasDefectuosas: 34,
-                reparacion: 15,
-                subdefectos: [
-                    { name: 'Cera glass', cantidad: 18 },
-                    { name: 'Rayas', cantidad: 16 }
-                ]
-            }
-        ];
-
+        const r = calcularResumen(msPiezasPeriodo);
+        const pareto = calcularPareto(msPiezasPeriodo);
         return {
-            pctOpaco: '7.7',
-            piezasBuenas,
-            piezasDefectuosas,
-            piezasRevisadas: totalPiezas,
-            cantidadDefectos: totalDefectos,
-            pctMoldes: '52.8',
-            dpu: '0.3',
-            calidad: '79.4',
-            paretoCausas: filteredPareto,
-            totalCausas: 70,
-            referencias: referenciasMock
+            pctOpaco: r.pctOpaco.toFixed(1),
+            piezasBuenas: r.piezasBuenas,
+            piezasDefectuosas: r.piezasDefectuosas,
+            piezasRevisadas: r.piezasRevisadas,
+            cantidadDefectos: r.cantidadDefectos,
+            pctMoldes: r.pctMoldes.toFixed(1),
+            dpu: r.dpu.toFixed(1),
+            calidad: r.calidad.toFixed(1),
+            paretoCausas: pareto,
+            totalCausas: pareto.length,
+            referencias: calcularReferencias(msPiezasPeriodo)
         };
-    }, [hasLiveSupabaseData, liveReports, filterSoloReparacion]);
+    }, [msPiezasPeriodo]);
+
+    // Tendencias IFI: por día del mes seleccionado y por mes del año seleccionado
+    const ifiPorDia = useMemo(() => calcularIfiPorDia(msPiezasMes), [msPiezasMes]);
+    const ifiAnio = selectedYear === 'All' ? String(new Date().getUTCFullYear()) : selectedYear;
+    const ifiPorMes = useMemo(
+        () => calcularIfiPorMes(msPiezasAnio, ifiAnio, MESES.map(m => m.nombre)),
+        [msPiezasAnio, ifiAnio]
+    );
 
     // Filtrar lista de referencias por búsqueda
     const filteredReferencias = useMemo(() => {
@@ -735,8 +517,8 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
     };
 
     const resetFilters = () => {
-        setSelectedYear('2026');
-        setSelectedMonth('octubre');
+        setSelectedYear(String(new Date().getFullYear()));
+        setSelectedMonth(MESES[new Date().getMonth()].nombre);
         setSelectedDay('All');
         setFilterTotalPiezas(true);
         setFilterSoloReparacion(false);
@@ -1070,8 +852,14 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                         <h2 className="text-base sm:text-lg font-black text-[#324354]">
                                             Mármol Sintético (MS)
                                         </h2>
-                                        <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-emerald-300">
-                                            {hasLiveSupabaseData ? 'Supabase En Vivo' : 'Histórico Base'}
+                                        <span className={`px-2.5 py-0.5 font-extrabold rounded-full text-[10px] uppercase tracking-wider border ${
+                                            msLoadError
+                                                ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                                : hasLiveSupabaseData
+                                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                    : 'bg-slate-100 text-slate-600 border-slate-300'
+                                        }`}>
+                                            {isLoading ? 'Cargando…' : msLoadError ? 'Error de conexión' : hasLiveSupabaseData ? 'Supabase En Vivo' : 'Sin registros'}
                                         </span>
                                     </div>
                                     <p className="text-[11px] text-slate-500 mt-0.5">
@@ -1293,7 +1081,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                                                     <Cell key={`cell-${index}`} fill={PARETO_COLORS[index % PARETO_COLORS.length]} />
                                                                 ))}
                                                             </Pie>
-                                                            <Tooltip formatter={(value: any, name: any) => [`${value} defectos`, name]} />
+                                                            <Tooltip formatter={(value: any, name: any) => [`${value} piezas`, name]} />
                                                         </PieChart>
                                                     </ResponsiveContainer>
                                                 </div>
@@ -1322,7 +1110,8 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                                         <tr>
                                                             <th className="py-1 px-1.5">Referencia</th>
                                                             <th className="py-1 px-1.5 text-right">Piezas Def.</th>
-                                                            <th className="py-1 px-1.5 text-right">Reparación</th>
+                                                            {filterTotalPiezas && <th className="py-1 px-1.5 text-right">Total Piezas</th>}
+                                                            {filterSoloReparacion && <th className="py-1 px-1.5 text-right">Reparación</th>}
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
@@ -1343,22 +1132,17 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                                                             <span className="truncate">{ref.referencia}</span>
                                                                         </td>
                                                                         <td className="py-1 px-1.5 text-right font-black text-slate-900">{ref.piezasDefectuosas}</td>
-                                                                        <td className="py-1 px-1.5 text-right text-slate-600">{ref.reparacion}</td>
+                                                                        {filterTotalPiezas && <td className="py-1 px-1.5 text-right text-slate-600">{ref.totalPiezas}</td>}
+                                                                        {filterSoloReparacion && <td className="py-1 px-1.5 text-right text-slate-600">{ref.reparacion}</td>}
                                                                     </tr>
-                                                                    {isExpanded && ref.subdefectos && (
-                                                                        <tr className="bg-slate-50/80">
-                                                                            <td colSpan={3} className="py-1 px-4">
-                                                                                <div className="space-y-0.5 border-l-2 border-blue-400 pl-2">
-                                                                                    {ref.subdefectos.map((s, sIdx) => (
-                                                                                        <div key={sIdx} className="flex justify-between text-[10px] text-slate-600">
-                                                                                            <span>• {s.name}</span>
-                                                                                            <span className="font-bold text-slate-800">{s.cantidad}</span>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            </td>
+                                                                    {isExpanded && ref.subdefectos.map((s, sIdx) => (
+                                                                        <tr key={sIdx} className="bg-slate-50/80 text-[10px] text-slate-600">
+                                                                            <td className="py-0.5 pl-6 pr-1.5 border-l-2 border-blue-400 truncate">• {s.name}</td>
+                                                                            <td className="py-0.5 px-1.5 text-right font-bold text-slate-800">{s.piezasDefectuosas}</td>
+                                                                            {filterTotalPiezas && <td className="py-0.5 px-1.5 text-right">{s.totalPiezas}</td>}
+                                                                            {filterSoloReparacion && <td className="py-0.5 px-1.5 text-right">{s.reparacion}</td>}
                                                                         </tr>
-                                                                    )}
+                                                                    ))}
                                                                 </React.Fragment>
                                                             );
                                                         })}
@@ -1372,7 +1156,9 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
                                         <div className="lg:col-span-8 bg-white rounded-xl p-3 shadow-xs border border-slate-200">
                                             <div className="flex items-center justify-between mb-1.5">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-800">IFI por Día (Octubre 2026)</h3>
+                                                <h3 className="text-xs sm:text-sm font-black text-slate-800 capitalize">
+                                                    IFI por Día ({selectedMonth === 'All' ? 'todos los meses' : selectedMonth} {selectedYear === 'All' ? '' : selectedYear})
+                                                </h3>
                                                 <div className="flex items-center gap-2 text-[10px]">
                                                     <span className="flex items-center gap-1 font-bold text-slate-600">
                                                         <span className="w-2.5 h-0.5 bg-[#0284c7]" /> Calidad Real
@@ -1384,10 +1170,10 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                             </div>
                                             <div className="h-[175px] w-full">
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={HISTORICO_DIAS_OCTUBRE} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                                                    <LineChart data={ifiPorDia} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
                                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis dataKey="dia" tick={{ fontSize: 10 }} />
-                                                        <YAxis domain={[60, 100]} tick={{ fontSize: 10 }} />
+                                                        <XAxis dataKey={selectedMonth === 'All' ? 'fecha' : 'dia'} tick={{ fontSize: 10 }} />
+                                                        <YAxis domain={[(min: number) => Math.max(0, Math.min(60, Math.floor(min / 10) * 10)), 100]} tick={{ fontSize: 10 }} />
                                                         <Tooltip formatter={(val: any) => [`${val} %`, 'Calidad IFI']} />
                                                         <ReferenceLine y={90} stroke="#dc2626" strokeDasharray="4 4" strokeWidth={1.5} />
                                                         <Line type="monotone" dataKey="calidad" stroke="#0284c7" strokeWidth={2} dot={{ r: 2.5, fill: '#0284c7' }} />
@@ -1397,16 +1183,17 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                         </div>
 
                                         <div className="lg:col-span-4 bg-white rounded-xl p-3 shadow-xs border border-slate-200">
-                                            <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5">IFI por Mes (2026)</h3>
+                                            <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5">IFI por Mes ({ifiAnio})</h3>
                                             <div className="h-[175px] w-full">
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={HISTORICO_MESES_2026} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                                                    <BarChart data={ifiPorMes} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
                                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                         <XAxis dataKey="mes" tickFormatter={val => val.substring(0, 3)} tick={{ fontSize: 10 }} />
-                                                        <YAxis domain={[60, 100]} tick={{ fontSize: 10 }} />
+                                                        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
                                                         <Tooltip formatter={(val: any) => [`${val} %`, 'Calidad']} />
+                                                        <ReferenceLine y={90} stroke="#dc2626" strokeDasharray="4 4" strokeWidth={1.5} />
                                                         <Bar dataKey="calidad" radius={[4, 4, 0, 0]}>
-                                                            {HISTORICO_MESES_2026.map((entry, index) => {
+                                                            {ifiPorMes.map((entry, index) => {
                                                                 const isSelected = entry.mes === selectedMonth;
                                                                 const fillColor = isSelected ? '#9a3412' : '#d8b4a6';
                                                                 return <Cell key={`bar-${index}`} fill={fillColor} />;
@@ -1479,54 +1266,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                     />
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                        <div className="p-2.5 px-3 rounded-xl bg-amber-50/80 border border-amber-200 shadow-2xs flex flex-col justify-between">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Calidad Real</span>
-                                                <span className="text-[10px] font-black bg-amber-200 text-amber-800 px-1.5 py-0.2 rounded-full">Meta: 90%</span>
-                                            </div>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-amber-700">85.0 %</p>
-                                                <p className="text-[10px] text-amber-800 font-medium">Alerta preventiva</p>
-                                            </div>
-                                        </div>
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Piezas Inspeccionadas</span>
-                                            <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">320</p>
-                                        </div>
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Piezas Conformes</span>
-                                            <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">272</p>
-                                        </div>
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">DPU Planta</span>
-                                            <p className="text-xl sm:text-2xl font-black text-[#0084d1] mt-1">0.15</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Defectos Típicos FV */}
-                                    <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                        <h4 className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-2">Principales Desviaciones en Planta FV</h4>
-                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                            {[
-                                                { defecto: 'Poros en Gelcoat', cantidad: 22, pct: '45.8%' },
-                                                { defecto: 'Espesor fuera norma', cantidad: 11, pct: '22.9%' },
-                                                { defecto: 'Burbujas en fibra', cantidad: 8, pct: '16.7%' },
-                                                { defecto: 'Rajadura desmolde', cantidad: 4, pct: '8.3%' },
-                                                { defecto: 'Despigmentación', cantidad: 3, pct: '6.3%' }
-                                            ].map((d, idx) => (
-                                                <div key={idx} className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
-                                                    <span className="text-[11px] font-bold text-slate-800 block truncate">{d.defecto}</span>
-                                                    <div className="flex items-center justify-between mt-1">
-                                                        <span className="text-sm font-black text-slate-900">{d.cantidad}</span>
-                                                        <span className="text-[10px] font-black text-slate-400">{d.pct}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
+                                <CalidadFVDashboard />
                             )}
                         </section>
 

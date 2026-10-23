@@ -279,6 +279,14 @@ export default function CriteriosCalidadPage() {
     const matchesDetectarlo = d.detectarlo?.toLowerCase().includes(term);
 
     return matchesDefect || matchesCodigo || matchesResponsable || matchesDetectarlo;
+  }).sort((a, b) => {
+    // Ordenar por código numérico (misma numeración del catálogo de defectos de la planta)
+    const ca = Number(a.codigo);
+    const cb = Number(b.codigo);
+    if (Number.isNaN(ca) && Number.isNaN(cb)) return (a.id ?? 0) - (b.id ?? 0);
+    if (Number.isNaN(ca)) return 1;
+    if (Number.isNaN(cb)) return -1;
+    return ca - cb;
   });
 
   return (

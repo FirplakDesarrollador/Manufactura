@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
+import { supabase } from "@/lib/supabase";
 import IndicadoresCalidadView from "@/components/calidad/IndicadoresCalidadView";
 import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView";
 
@@ -62,7 +63,7 @@ const INITIAL_PLANT_DATA: Record<PlantKey, PlantMetrics> = {
         secondUnitName: "KG",
         secondUnitMeta: 0,
         secondUnitReal: 0,
-        calidadMeta: 90,
+        calidadMeta: 35, // Meta IFI FV del Power BI "BI Calidad FV"
         calidadReal: 25.0,
         totalPersonas: 22,
         ausentismos: 0,
@@ -201,9 +202,14 @@ export default function IndicadoresProductividadPage() {
     const fetchNivelServicio = async (targetFecha: string) => {
         try {
             setLoadingNS(true);
+            // Calidad MS se lee de tablas con RLS: la API necesita el token de la sesión
+            const { data: sessionData } = await supabase.auth.getSession();
+            const accessToken = sessionData?.session?.access_token;
             const [resNS, resCalidad] = await Promise.all([
                 fetch(`/api/indicadores/nivel-servicio?fecha=${targetFecha}`),
-                fetch(`/api/indicadores/calidad?fecha=${targetFecha}`)
+                fetch(`/api/indicadores/calidad?fecha=${targetFecha}`, {
+                    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+                })
             ]);
 
             const jsonNS = resNS.ok ? await resNS.json() : null;
@@ -297,6 +303,7 @@ export default function IndicadoresProductividadPage() {
         if (isNoApplies) return "bg-slate-200 border-slate-300 text-slate-400 opacity-80";
         if (isAccidentes) return valOrPct === 0 ? "bg-[#59a96a]" : "bg-[#d14747]";
 
+        // Umbrales sobre meta 90; para otra meta se desplaza el valor (ej. calidad: real - meta + 90)
         if (valOrPct > 90) return "bg-[#59a96a]";
         if (valOrPct >= 85) return "bg-[#deb841]";
         return "bg-[#d14747]";
@@ -857,7 +864,7 @@ export default function IndicadoresProductividadPage() {
                                         </span>
                                     )}
                                 </div>
-                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.calidadReal)}`}>
+                                <div className={`flex-1 min-h-[175px] flex flex-col justify-between p-4 sm:p-5 rounded-3xl shadow-sm border border-black/5 transition-colors duration-500 ${getCardColor(currentData.calidadReal - currentData.calidadMeta + 90)}`}>
                                     <div className="flex-1 flex items-center justify-center text-slate-950">
                                         {editingKey === "real_calidad" ? (
                                             <div className="flex items-center justify-center gap-0.5">
