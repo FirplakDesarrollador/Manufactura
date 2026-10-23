@@ -3,10 +3,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Maximize2, Pencil, Search, X } from 'lucide-react'
+import { Search } from 'lucide-react'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
-import CriterioEditModal, { getCriterioFotos } from '@/components/calidad/CriterioEditModal'
+import CriterioDetallePanel from '@/components/calidad/CriterioDetallePanel'
 import type { Defecto as CriterioCalidad } from '@/components/calidad/DefectModal'
 import { puedeEditarCalidad } from '@/lib/calidad/permisos'
 
@@ -32,8 +32,6 @@ export default function CriteriosCalidadMsPage() {
     const [expandedId, setExpandedId] = useState<number | null>(null)
     const [zoomedImage, setZoomedImage] = useState<string | null>(null)
     const [canEdit, setCanEdit] = useState(false)
-    const [editingItem, setEditingItem] = useState<{ id: number; defectoId: number; nombre: string; criterio: CriterioCalidad | null } | null>(null)
-    const [selectedFotoIdx, setSelectedFotoIdx] = useState(0)
 
     useEffect(() => {
         const load = async () => {
@@ -147,7 +145,6 @@ export default function CriteriosCalidadMsPage() {
                                     <button
                                         onClick={() => {
                                             setExpandedId(isOpen ? null : item.id)
-                                            setSelectedFotoIdx(0)
                                         }}
                                         className={`p-3 border transition-all duration-200 flex flex-col justify-between w-full text-left min-h-[90px] ${
                                             isOpen
@@ -173,126 +170,24 @@ export default function CriteriosCalidadMsPage() {
                                         </div>
                                     </button>
 
-                                    {/* Panel de detalle a lo ancho de la cuadrícula */}
+                                    {/* Panel de detalle a lo ancho de la cuadrícula (consulta y edición con el mismo diseño) */}
                                     {isOpen && (
-                                        <div className="col-span-full bg-white rounded-2xl p-5 border-2 border-[#324354] shadow-xl my-1">
-                                            <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
-                                                <div>
-                                                    <span className="text-xs font-black text-[#324354] bg-[#324354]/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
-                                                        Defecto {item.id} • Mármol Sintético
-                                                    </span>
-                                                    <h3 className="text-xl font-black text-[#324354] mt-2">{item.nombre}</h3>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {canEdit && (
-                                                        <button
-                                                            onClick={() => setEditingItem(item)}
-                                                            className="px-3 py-1.5 bg-[#324354] hover:bg-[#324354]/90 text-white text-xs font-bold rounded-xl transition flex items-center gap-1"
-                                                        >
-                                                            <Pencil size={14} />
-                                                            <span>{c ? 'Editar Criterio' : 'Crear Criterio'}</span>
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => setExpandedId(null)}
-                                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-[#324354] text-xs font-bold rounded-xl transition flex items-center gap-1"
-                                                    >
-                                                        <X size={14} />
-                                                        <span>Cerrar</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {!c ? (
-                                                <p className="text-sm text-slate-500 font-medium py-6 text-center">
-                                                    Este defecto aún no tiene criterio de calidad registrado.
-                                                    {canEdit ? ' Usa "Crear Criterio" para registrarlo.' : ''}
-                                                </p>
-                                            ) : (
-                                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-4 items-start">
-                                                    <div className="lg:col-span-4 space-y-2">
-                                                        {(() => {
-                                                            const fotos = getCriterioFotos(c)
-                                                            const actual = fotos[Math.min(selectedFotoIdx, fotos.length - 1)]
-                                                            return (
-                                                                <>
-                                                                    <div
-                                                                        onClick={() => actual && setZoomedImage(actual)}
-                                                                        className={`w-full h-56 rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center relative ${
-                                                                            actual ? 'cursor-zoom-in bg-slate-900' : 'bg-slate-50'
-                                                                        }`}
-                                                                    >
-                                                                        {actual ? (
-                                                                            <>
-                                                                                <img src={actual} alt={item.nombre} className="w-full h-full object-contain" />
-                                                                                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
-                                                                                    <Maximize2 size={12} />
-                                                                                    <span>Ampliar</span>
-                                                                                </div>
-                                                                            </>
-                                                                        ) : (
-                                                                            <span className="text-xs font-bold text-slate-400">Sin imagen ilustrativa</span>
-                                                                        )}
-                                                                    </div>
-                                                                    {fotos.length > 1 && (
-                                                                        <div className="grid grid-cols-5 gap-1.5">
-                                                                            {fotos.map((f, idx) => (
-                                                                                <button
-                                                                                    key={idx}
-                                                                                    onClick={() => setSelectedFotoIdx(idx)}
-                                                                                    className={`h-12 rounded-lg overflow-hidden border-2 ${
-                                                                                        f === actual ? 'border-[#324354]' : 'border-slate-200 hover:border-slate-400'
-                                                                                    }`}
-                                                                                >
-                                                                                    <img src={f} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                                                                                </button>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                </>
-                                                            )
-                                                        })()}
-                                                    </div>
-
-                                                    <div className="lg:col-span-8 space-y-4">
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Responsable de la causa</span>
-                                                                <span className="text-sm font-bold text-[#324354] whitespace-pre-line">{c.responsable || 'No especificado'}</span>
-                                                            </div>
-                                                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">¿Cómo detectarlo?</span>
-                                                                <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line">{c.detectarlo || 'No especificado'}</p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">¿Cómo evitarlo / acción correctiva?</span>
-                                                            <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line">{c.evitarlo || 'No especificado'}</p>
-                                                        </div>
-
-                                                        <div className="space-y-2">
-                                                            <span className="text-xs font-black text-[#324354] uppercase tracking-wider block">
-                                                                Máximo permitido por zona
-                                                            </span>
-                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                                                {[
-                                                                    { label: 'Zona Roja', value: c.rojo, cls: 'bg-red-50/70 border-red-500 text-red-700', txt: 'text-red-950' },
-                                                                    { label: 'Zona Naranja', value: c.naranja, cls: 'bg-amber-50/70 border-amber-500 text-amber-700', txt: 'text-amber-950' },
-                                                                    { label: 'Zona Amarilla', value: c.amarillo, cls: 'bg-yellow-50/70 border-yellow-500 text-yellow-700', txt: 'text-yellow-950' },
-                                                                    { label: 'Zona Verde', value: c.verde, cls: 'bg-emerald-50/70 border-emerald-500 text-emerald-700', txt: 'text-emerald-950' }
-                                                                ].map(z => (
-                                                                    <div key={z.label} className={`p-3 border-l-4 rounded-xl space-y-0.5 ${z.cls}`}>
-                                                                        <span className="text-[10px] font-black uppercase">{z.label}</span>
-                                                                        <p className={`text-xs font-bold whitespace-pre-line ${z.txt}`}>{z.value || 'N/A'}</p>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <CriterioDetallePanel
+                                            planta="Ms"
+                                            plantaNombre="Mármol Sintético"
+                                            numero={item.id}
+                                            idDefectoMs={item.defectoId}
+                                            nombreDefecto={item.nombre}
+                                            criterio={c}
+                                            canEdit={canEdit}
+                                            onClose={() => setExpandedId(null)}
+                                            onZoom={setZoomedImage}
+                                            onSaved={saved =>
+                                                setCriterios(prev =>
+                                                    prev.some(x => x.id === saved.id) ? prev.map(x => (x.id === saved.id ? saved : x)) : [...prev, saved]
+                                                )
+                                            }
+                                        />
                                     )}
                                 </React.Fragment>
                             )
@@ -310,21 +205,6 @@ export default function CriteriosCalidadMsPage() {
                 <span>Secure Terminal v4.0.2</span>
             </footer>
 
-            <CriterioEditModal
-                isOpen={!!editingItem}
-                planta="Ms"
-                codigo={String(editingItem?.id ?? '')}
-                idDefectoMs={editingItem?.defectoId ?? null}
-                nombreDefecto={editingItem?.nombre || ''}
-                criterio={editingItem?.criterio || null}
-                onClose={() => setEditingItem(null)}
-                onSaved={saved => {
-                    setCriterios(prev =>
-                        prev.some(c => c.id === saved.id) ? prev.map(c => (c.id === saved.id ? saved : c)) : [...prev, saved]
-                    )
-                    setSelectedFotoIdx(0)
-                }}
-            />
 
             {/* Zoom de imagen */}
             {zoomedImage && (
