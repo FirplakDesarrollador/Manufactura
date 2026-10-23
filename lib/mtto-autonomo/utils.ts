@@ -45,3 +45,17 @@ export async function generateConsecutivo(proceso: string, fecha?: Date): Promis
   
   return `${prefix}-${seqStrFinal}`;
 }
+
+/**
+ * Inserta items de puesta a punto. Si la columna id_maquina aún no existe en la base
+ * (falta correr puestas_a_punto_id_maquina.sql), reintenta sin ella: la máquina se
+ * vuelve a reconocer luego por su nombre del catálogo.
+ */
+export async function insertDetallesPuesta(rows: any[]) {
+  const { error } = await supabase.from('puestas_a_punto_detalle').insert(rows);
+  if (error && /id_maquina/.test(error.message)) {
+    const sinMaquina = rows.map(({ id_maquina, ...r }) => r);
+    return supabase.from('puestas_a_punto_detalle').insert(sinMaquina);
+  }
+  return { error };
+}
