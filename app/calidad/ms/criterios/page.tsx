@@ -8,16 +8,7 @@ import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import CriterioEditModal, { getCriterioFotos } from '@/components/calidad/CriterioEditModal'
 import type { Defecto as CriterioCalidad } from '@/components/calidad/DefectModal'
-
-// Mismas personas/roles que pueden editar en /calidad/criterios
-const ADMIN_NAMES = ['jair alvarez', 'maria isabel escobar', 'carolina escobar', 'hector', 'calidad', 'admin']
-const puedeEditarCriterios = (u: { nombre?: string | null; correo?: string | null; rol?: string | null } | null) => {
-    if (!u) return false
-    const nombre = (u.nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
-    const correo = (u.correo || '').toLowerCase()
-    const rol = (u.rol || '').toLowerCase()
-    return ADMIN_NAMES.some(a => nombre.includes(a) || correo.includes(a)) || rol.includes('admin') || rol.includes('calidad')
-}
+import { puedeEditarCalidad } from '@/lib/calidad/permisos'
 
 interface DefectoMS {
     id: number
@@ -58,7 +49,7 @@ export default function CriteriosCalidadMsPage() {
                 supabase.from('criterios_calidad_plantas').select('*').eq('planta', 'Ms'),
                 supabase.from('usuarios').select('nombre, correo, rol').ilike('correo', user.email || '').maybeSingle()
             ])
-            setCanEdit(puedeEditarCriterios(userRes.data))
+            setCanEdit(puedeEditarCalidad(userRes.data))
             if (defRes.error) console.warn('Error cargando ms_defectos:', defRes.error)
             if (critRes.error) console.warn('Error cargando criterios_calidad_plantas:', critRes.error)
             setDefects(defRes.data || [])
