@@ -2,10 +2,10 @@
 
 import React from 'react'
 import { useRouter } from 'next/navigation'
-import { LayoutGrid, ClipboardList, History, Settings, BarChart2, BookOpenCheck } from 'lucide-react'
+import { Search, ClipboardList, History, Settings, Timer, PieChart, BookOpenCheck } from 'lucide-react'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
 
-export type CalidadMsTab = 'registro' | 'list' | 'historico' | 'saldos' | 'criterios'
+export type CalidadMsTab = 'registro' | 'list' | 'historico' | 'saldos' | 'indicadores' | 'criterios'
 
 interface CalidadMsNavButtonsProps {
     activeTab: CalidadMsTab
@@ -32,6 +32,7 @@ export function CalidadMsNavButtons({
         router.prefetch('/calidad/ms/list')
         router.prefetch('/calidad/ms/historico')
         router.prefetch('/calidad/ms/saldos')
+        router.prefetch('/calidad/ms/indicadores')
         router.prefetch('/calidad/ms/criterios')
     }, [router])
 
@@ -74,6 +75,11 @@ export function CalidadMsNavButtons({
         router.push('/calidad/ms/saldos')
     }
 
+    const handleIndicadoresClick = () => {
+        if (activeTab === 'indicadores') return
+        router.push('/calidad/ms/indicadores')
+    }
+
     const handleCriteriosClick = () => {
         if (activeTab === 'criterios') return
         router.push('/calidad/ms/criterios')
@@ -83,6 +89,7 @@ export function CalidadMsNavButtons({
     const isListActive = activeTab === 'list'
     const isHistoricoActive = activeTab === 'historico'
     const isSaldosActive = activeTab === 'saldos'
+    const isIndicadoresActive = activeTab === 'indicadores'
     const isCriteriosActive = activeTab === 'criterios'
 
     const baseClass = "h-10 w-10 flex items-center justify-center transition-all border shrink-0 text-sm focus:outline-none"
@@ -98,7 +105,7 @@ export function CalidadMsNavButtons({
                 className={`${baseClass} rounded-l ${isRegistroActive ? activeClass : inactiveClass}`}
                 title="Registro de Defectos en Línea (Matriz)"
             >
-                <LayoutGrid className="w-5 h-5" />
+                <Search className="w-5 h-5" />
             </button>
 
             {/* 2. Reportes del Día */}
@@ -121,7 +128,37 @@ export function CalidadMsNavButtons({
                 <History className="w-5 h-5" />
             </button>
 
-            {/* 4. Configurar Defectos */}
+            {/* 4. Saldos y Destrucciones */}
+            <button
+                type="button"
+                onClick={handleSaldosClick}
+                className={`${baseClass} ${isSaldosActive ? activeClass : inactiveClass}`}
+                title="Saldos y Destrucciones"
+            >
+                <BrokenSinkIcon className="w-5 h-5" />
+            </button>
+
+            {/* 5. Indicador Hora a Hora */}
+            <button
+                type="button"
+                onClick={handleChartClick}
+                className={`${baseClass} ${isChartActive ? activeClass : inactiveClass}`}
+                title="Indicador Hora a Hora"
+            >
+                <Timer className="w-5 h-5" />
+            </button>
+
+            {/* 6. Indicadores generales de calidad MS (misma vista del tablero de control) */}
+            <button
+                type="button"
+                onClick={handleIndicadoresClick}
+                className={`${baseClass} ${isIndicadoresActive ? activeClass : inactiveClass}`}
+                title="Indicadores Generales de Calidad MS"
+            >
+                <PieChart className="w-5 h-5" />
+            </button>
+
+            {/* 7. Configurar Defectos */}
             {hasSettingsPermission && (
                 <button
                     type="button"
@@ -133,32 +170,12 @@ export function CalidadMsNavButtons({
                 </button>
             )}
 
-            {/* 5. Indicador Hora a Hora */}
-            <button
-                type="button"
-                onClick={handleChartClick}
-                className={`${baseClass} ${isChartActive ? activeClass : inactiveClass}`}
-                title="Indicador Hora a Hora"
-            >
-                <BarChart2 className="w-5 h-5" />
-            </button>
-
-            {/* 6. Saldos y Destrucciones */}
-            <button
-                type="button"
-                onClick={handleSaldosClick}
-                className={`${baseClass} ${isSaldosActive ? activeClass : inactiveClass}`}
-                title="Saldos y Destrucciones"
-            >
-                <BrokenSinkIcon className="w-5 h-5" />
-            </button>
-
-            {/* 7. Criterios de Calidad (consulta) */}
+            {/* 8. Criterios de Aceptación y Rechazo */}
             <button
                 type="button"
                 onClick={handleCriteriosClick}
                 className={`${baseClass} rounded-r ${isCriteriosActive ? activeClass : inactiveClass}`}
-                title="Criterios de Calidad"
+                title="Criterios de Aceptación y Rechazo"
             >
                 <BookOpenCheck className="w-5 h-5" />
             </button>

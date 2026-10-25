@@ -255,7 +255,7 @@ export default function Header({
                 { label: 'Indicadores Calidad', path: '/calidad' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
                 { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
-                { label: 'Criterios de Calidad', path: '/calidad/criterios' },
+                { label: 'Criterios de Aceptación y Rechazo', path: '/calidad/criterios' },
                 { label: 'Plan de Vigilancia', path: '/calidad/vigilancia' },
                 { label: 'QRQC Quick Response Quality Control', path: '/calidad/qrqc' }
               ]

@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings, Archive, Trash2, History, ClipboardList, BarChart2 } from 'lucide-react'
+import { Camera, X, Settings, Archive, Trash2, History, ClipboardList, BarChart2, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -11,6 +11,8 @@ import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
 import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
+import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import NuevoDefectoMsModal from '@/components/calidad/NuevoDefectoMsModal'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -47,7 +49,8 @@ export default function CalidadMsReportPage() {
         buenos: 0,
         defectuosos: 0,
         total: 0,
-        ifi: 0
+        ifi: 0,
+        saldos: 0
     })
 
     const [selectedProduct, setSelectedProduct] = useState<string>('')
@@ -57,6 +60,7 @@ export default function CalidadMsReportPage() {
     const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [isNuevoDefectoOpen, setIsNuevoDefectoOpen] = useState(false)
     const [showHourlyChart, setShowHourlyChart] = useState(false)
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
     const [hasSaldosPermission, setHasSaldosPermission] = useState(false)
@@ -123,7 +127,9 @@ export default function CalidadMsReportPage() {
             }).length
             const buenos = total - defectuosos
             const ifi = total > 0 ? (buenos / total) * 100 : 0
-            setStats({ buenos, defectuosos, total, ifi })
+            // Saldos y destrucciones del día (mismo criterio de la pantalla de Saldos)
+            const saldos = reportsRes.data.filter(r => /saldo|destrucci/i.test(String(r.defectos_lista || ''))).length
+            setStats({ buenos, defectuosos, total, ifi, saldos })
         }
 
         setLoading(false)
@@ -335,12 +341,12 @@ export default function CalidadMsReportPage() {
                         <button
                             onClick={handleSave}
                             disabled={isUploading}
-                            className={`h-10 flex items-center space-x-2 px-3 sm:px-4 text-white font-black uppercase tracking-widest text-xs transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
+                            className={`h-10 flex items-center space-x-1.5 px-2.5 sm:px-3 text-white font-black uppercase tracking-wider text-[11px] transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
                             {isUploading ? (
                                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                             ) : (
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                 </svg>
                             )}
@@ -379,26 +385,30 @@ export default function CalidadMsReportPage() {
                     />
 
                     {/* Right: Quick Metrics */}
-                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-1 xl:gap-x-4 2xl:gap-x-6 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
-                        <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 rounded-full bg-[#36A284] flex items-center justify-center text-white">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-3 gap-y-1 2xl:gap-x-4 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
+                        <div className="flex items-center space-x-1">
+                            <div className="w-5 h-5 rounded-full bg-[#36A284] flex items-center justify-center text-white">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                             </div>
-                            <span className="text-lg 2xl:text-xl font-bold text-[#36A284]">{stats.buenos}</span>
-                            <span className="text-sm font-medium text-gray-500">Buenos</span>
+                            <span className="text-base 2xl:text-lg font-bold text-[#36A284]">{stats.buenos}</span>
+                            <span className="text-xs font-medium text-gray-500">Buenos</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-sm">
+                        <div className="flex items-center space-x-1">
+                            <div className="w-5 h-5 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-xs">
                                 !
                             </div>
-                            <span className="text-lg 2xl:text-xl font-bold text-[#F24E4E]">{stats.defectuosos}</span>
-                            <span className="text-sm font-medium text-gray-500">Defectuosos</span>
+                            <span className="text-base 2xl:text-lg font-bold text-[#F24E4E]">{stats.defectuosos}</span>
+                            <span className="text-xs font-medium text-gray-500">Defectuosos</span>
+                        </div>
+                        <div className="flex items-center space-x-1" title="Saldos y destrucciones del día">
+                            <BrokenSinkIcon className="w-5 h-5" />
+                            <span className="text-base 2xl:text-lg font-bold text-[#254153]">{stats.saldos}</span>
                         </div>
                         <div className="flex items-center">
-                            <span className="text-lg font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
+                            <span className="text-base 2xl:text-lg font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
                         </div>
                         <div className="flex items-center">
-                            <span className="text-lg font-bold text-gray-800">Total: {stats.total}</span>
+                            <span className="text-base 2xl:text-lg font-bold text-gray-800">Total: {stats.total}</span>
                         </div>
                     </div>
                 </div>
@@ -436,7 +446,29 @@ export default function CalidadMsReportPage() {
                             />
                         )
                     })}
+
+                    {/* Nuevo defecto: queda en el catálogo ms_defectos (registro, reportes y gráficas) */}
+                    {hasSettingsPermission && (
+                        <button
+                            type="button"
+                            onClick={() => setIsNuevoDefectoOpen(true)}
+                            className="min-h-[76px] border-2 border-dashed border-gray-300 hover:border-[#254153] hover:bg-gray-50 rounded text-[#254153] flex flex-col items-center justify-center gap-1 transition-all"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span className="text-xs font-black uppercase tracking-wider">Nuevo defecto</span>
+                        </button>
+                    )}
                 </div>
+                {isNuevoDefectoOpen && (
+                    <NuevoDefectoMsModal
+                        defectos={defects}
+                        onClose={() => setIsNuevoDefectoOpen(false)}
+                        onCreated={(defecto) => {
+                            setDefects(prev => [...prev, defecto as DefectoMS])
+                            setIsNuevoDefectoOpen(false)
+                        }}
+                    />
+                )}
             </main>
 
             <footer className="py-4 px-4 bg-[#254153] text-[9px] font-bold text-white/30 uppercase tracking-[0.5em] flex justify-between items-center">
