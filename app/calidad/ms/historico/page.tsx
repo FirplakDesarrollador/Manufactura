@@ -54,7 +54,7 @@ export default function HistoricoDefectosPage() {
     const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<HistoricoReporte[]>([])
     const [searchTerm, setSearchTerm] = useState('')
-    const [typeFilter, setTypeFilter] = useState<'TODOS' | 'LINEA' | 'SALDO' | 'DESTRUCCION' | 'MOLDE'>('TODOS')
+    const [typeFilter, setTypeFilter] = useState<'TODOS' | 'LINEA' | 'SALDO' | 'DESTRUCCION' | 'SALDO_DESTRUCCION' | 'MOLDE'>('TODOS')
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
     
     // Catalogs for Edit
@@ -219,6 +219,7 @@ export default function HistoricoDefectosPage() {
             if (typeFilter === 'LINEA' && tipo !== 'LINEA') return false
             if (typeFilter === 'SALDO' && tipo !== 'SALDO') return false
             if (typeFilter === 'DESTRUCCION' && tipo !== 'DESTRUCCION') return false
+            if (typeFilter === 'SALDO_DESTRUCCION' && tipo === 'LINEA') return false
             if (typeFilter === 'MOLDE') {
                 const moldeVal = (r.Molde || r.molde || '').toString().trim()
                 if (!moldeVal || moldeVal === '-' || moldeVal.toLowerCase() === 'n/a' || moldeVal === '0') return false
@@ -454,9 +455,9 @@ export default function HistoricoDefectosPage() {
             <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 2xl:py-0 2xl:h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
                 <div className="max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between 2xl:grid 2xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] 2xl:gap-4 relative 2xl:h-full gap-2">
                     {/* Left: Search input & Type Filter - Ampliado para aprovechar el espacio antes de los botones */}
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min 2xl:max-w-[calc(50%-130px)] 2xl:min-w-[340px]">
-                        {/* Search Input */}
-                        <div className="relative flex-1 min-w-[150px]">
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-[320px] 2xl:max-w-[520px]">
+                        {/* Search Input: mismo ancho que el selector de referencia del registro */}
+                        <div className="relative flex-1 min-w-[180px] [contain:inline-size]">
                             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
@@ -470,39 +471,22 @@ export default function HistoricoDefectosPage() {
                             />
                         </div>
 
-                        {/* Filter by Type */}
-                        <div className="flex items-center bg-gray-100 rounded p-0.5 text-[10px] font-bold shrink-0 h-9">
-                            <button
-                                onClick={() => { setTypeFilter('TODOS'); setCurrentPage(1); }}
-                                className={`px-2 py-1 rounded transition-all ${typeFilter === 'TODOS' ? 'bg-[#254153] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                        {/* Filter by Type (lista desplegable) */}
+                        <div className="flex items-center gap-1 h-9 bg-white border border-gray-300 rounded px-2 shrink-0">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">Tipo</span>
+                            <select
+                                value={typeFilter}
+                                onChange={(e) => { setTypeFilter(e.target.value as typeof typeFilter); setCurrentPage(1); }}
+                                className="bg-transparent font-black text-[#254153] text-xs outline-none cursor-pointer"
+                                title="Filtrar por tipo de registro"
                             >
-                                Todos
-                            </button>
-                            <button
-                                onClick={() => { setTypeFilter('LINEA'); setCurrentPage(1); }}
-                                className={`px-2 py-1 rounded transition-all ${typeFilter === 'LINEA' ? 'bg-[#254153] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-                            >
-                                Línea
-                            </button>
-                            <button
-                                onClick={() => { setTypeFilter('SALDO'); setCurrentPage(1); }}
-                                className={`px-2 py-1 rounded transition-all ${typeFilter === 'SALDO' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-                            >
-                                Saldos
-                            </button>
-                            <button
-                                onClick={() => { setTypeFilter('DESTRUCCION'); setCurrentPage(1); }}
-                                className={`px-2 py-1 rounded transition-all ${typeFilter === 'DESTRUCCION' ? 'bg-red-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-                            >
-                                Dest.
-                            </button>
-                            <button
-                                onClick={() => { setTypeFilter('MOLDE'); setCurrentPage(1); }}
-                                className={`px-2 py-1 rounded transition-all ${typeFilter === 'MOLDE' ? 'bg-amber-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-                                title="Filtrar solo registros con Molde asignado"
-                            >
-                                Moldes
-                            </button>
+                                <option value="TODOS">Todos</option>
+                                <option value="LINEA">En línea</option>
+                                <option value="SALDO">Saldos</option>
+                                <option value="DESTRUCCION">Destrucciones</option>
+                                <option value="SALDO_DESTRUCCION">Saldos y destrucciones</option>
+                                <option value="MOLDE">Con molde</option>
+                            </select>
                         </div>
                     </div>
 

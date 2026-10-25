@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Calendar as CalendarIcon, Filter, Pencil, Settings } from 'lucide-react'
+import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Filter, Pencil, Settings } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SaldosDefectsSettingsModal, DefectoSaldoDestruccion } from '@/components/calidad/SaldosDefectsSettingsModal'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
@@ -65,15 +65,19 @@ export default function SaldosYDestruccionesPage() {
         return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date())
     }
 
-    const [selectedDate, setSelectedDate] = useState(getColombiaToday())
+    // Rango de fechas (por defecto, hoy)
+    const [startDate, setStartDate] = useState(getColombiaToday())
+    const [endDate, setEndDate] = useState(getColombiaToday())
     const [searchTerm, setSearchTerm] = useState('')
 
     const fetchData = useCallback(async () => {
         setLoading(true)
         
         // Exact 24-hour range for Colombia date in UTC
-        const startIso = new Date(`${selectedDate}T00:00:00-05:00`).toISOString()
-        const endIso = new Date(`${selectedDate}T23:59:59.999-05:00`).toISOString()
+        const desde = startDate || endDate || getColombiaToday()
+        const hasta = endDate || startDate || getColombiaToday()
+        const startIso = new Date(`${desde <= hasta ? desde : hasta}T00:00:00-05:00`).toISOString()
+        const endIso = new Date(`${desde <= hasta ? hasta : desde}T23:59:59.999-05:00`).toISOString()
 
         // Fetch reports for date
         const { data: reportsRes, error: fetchErr } = await supabase
@@ -121,7 +125,7 @@ export default function SaldosYDestruccionesPage() {
             setReports(filteredReports)
         }
         setLoading(false)
-    }, [selectedDate])
+    }, [startDate, endDate])
 
     useEffect(() => {
         const load = async () => {
@@ -439,19 +443,9 @@ export default function SaldosYDestruccionesPage() {
             {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
             <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
                 <div className="max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 relative xl:h-full gap-2">
-                    {/* Left: Date picker & Search - Ampliado para aprovechar el espacio antes de los botones */}
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min xl:max-w-[calc(50%-130px)] xl:min-w-[340px]">
-                        <div className="w-full sm:w-40 relative shrink-0">
-                            <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
-                            <input
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="w-full h-10 pl-8 pr-2 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153]"
-                            />
-                        </div>
-
-                        <div className="relative flex-1 min-w-[160px]">
+                    {/* Left: buscador (mismo ancho que el selector de referencia del registro) */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-[260px] xl:max-w-[520px]">
+                        <div className="relative flex-1 min-w-[180px] [contain:inline-size]">
                             <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
@@ -473,8 +467,25 @@ export default function SaldosYDestruccionesPage() {
                         />
                     </div>
 
-                    {/* Right: Total & Agregar Evento */}
-                    <div className="order-2 xl:order-none flex items-center justify-center sm:justify-end gap-3 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
+                    {/* Right: rango de fechas (como en Histórico), Total y Agregar Evento */}
+                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
+                        <div className="flex items-center gap-1">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-[116px] px-1.5 py-1 bg-gray-50 border border-gray-300 rounded text-[11px] font-bold text-[#254153] h-10"
+                                title="Fecha inicio"
+                            />
+                            <span className="text-gray-400 text-xs">a</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-[116px] px-1.5 py-1 bg-gray-50 border border-gray-300 rounded text-[11px] font-bold text-[#254153] h-10"
+                                title="Fecha fin"
+                            />
+                        </div>
                         <div className="h-10 bg-[#254153] text-white px-3.5 rounded flex items-center gap-1.5 text-xs font-black">
                             <span className="text-[10px] font-bold text-gray-300 uppercase">Total:</span>
                             <span>{displayedReports.length}</span>

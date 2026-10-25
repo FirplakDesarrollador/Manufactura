@@ -123,7 +123,7 @@ export default function CalidadPage() {
                             </button>
                         </div>
 
-                        {/* 4. Criterios de Calidad */}
+                        {/* 4. Criterios de Aceptación y Rechazo */}
                         <div className="w-full max-w-[290px] aspect-square">
                             <button
                                 onClick={() => router.push('/calidad/criterios')}
@@ -134,7 +134,7 @@ export default function CalidadPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                                     </svg>
                                 </div>
-                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Criterios de<br/>Calidad</span>
+                                <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Criterios de<br/>Aceptación y Rechazo</span>
                             </button>
                         </div>
 

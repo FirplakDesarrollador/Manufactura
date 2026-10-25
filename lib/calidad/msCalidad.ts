@@ -282,6 +282,82 @@ export function calcularIfiPorMes(piezas: MsPiezaNormalizada[], year: string, no
 }
 
 // ---------------------------------------------------------------------------
+// Estadísticas históricas por defecto (para el detalle de criterios de calidad)
+// ---------------------------------------------------------------------------
+
+export interface EstadisticaDefectoMs {
+    ocurrencias: number; // piezas en las que se reportó el defecto
+    diasConDefecto: number;
+    promedioDia: number; // ocurrencias ÷ días con producción
+    pctPiezas: number; // % de piezas revisadas con el defecto
+    ultimaFecha: string | null;
+    ult30: { ocurrencias: number; diasProduccion: number; promedioDia: number };
+    porMes: { mes: string; ocurrencias: number; promedioDia: number }[]; // últimos 12 meses
+}
+
+export interface EstadisticasDefectosMs {
+    desde: string | null;
+    hasta: string | null;
+    diasProduccion: number;
+    piezasRevisadas: number;
+    porDefecto: Map<number, EstadisticaDefectoMs>; // clave: id de ms_defectos
+}
+
+const sumarDias = (fecha: string, dias: number) =>
+    new Date(new Date(`${fecha}T00:00:00Z`).getTime() + dias * 864e5).toISOString().slice(0, 10);
+
+// Una pieza cuenta una vez por defecto (aunque se repita en el arreglo). Promedio por día = sobre días con producción.
+export function calcularEstadisticasDefectos(piezas: MsPiezaNormalizada[]): EstadisticasDefectosMs {
+    const diasProd = new Set<string>();
+    const diasProdPorMes = new Map<string, Set<string>>();
+    const acc = new Map<number, { total: number; dias: Set<string>; fechas: string[]; porMes: Map<string, number> }>();
+    let desde: string | null = null;
+    let hasta: string | null = null;
+
+    for (const p of piezas) {
+        diasProd.add(p.fecha);
+        const mes = p.fecha.slice(0, 7);
+        (diasProdPorMes.get(mes) || diasProdPorMes.set(mes, new Set()).get(mes)!).add(p.fecha);
+        if (!desde || p.fecha < desde) desde = p.fecha;
+        if (!hasta || p.fecha > hasta) hasta = p.fecha;
+
+        new Set(p.defectos.map(d => d.id).filter((id): id is number => id !== null)).forEach(id => {
+            const a = acc.get(id) || { total: 0, dias: new Set<string>(), fechas: [], porMes: new Map<string, number>() };
+            a.total += 1;
+            a.dias.add(p.fecha);
+            a.fechas.push(p.fecha);
+            a.porMes.set(mes, (a.porMes.get(mes) || 0) + 1);
+            acc.set(id, a);
+        });
+    }
+
+    const nDias = diasProd.size;
+    const inicio30 = hasta ? sumarDias(hasta, -29) : null;
+    const dias30 = inicio30 ? [...diasProd].filter(d => d >= inicio30).length : 0;
+    const meses = [...diasProdPorMes.keys()].sort().slice(-12);
+
+    const porDefecto = new Map<number, EstadisticaDefectoMs>();
+    acc.forEach((a, id) => {
+        const oc30 = inicio30 ? a.fechas.filter(f => f >= inicio30).length : 0;
+        porDefecto.set(id, {
+            ocurrencias: a.total,
+            diasConDefecto: a.dias.size,
+            promedioDia: nDias > 0 ? a.total / nDias : 0,
+            pctPiezas: piezas.length > 0 ? (a.total / piezas.length) * 100 : 0,
+            ultimaFecha: [...a.dias].sort().pop() || null,
+            ult30: { ocurrencias: oc30, diasProduccion: dias30, promedioDia: dias30 > 0 ? oc30 / dias30 : 0 },
+            porMes: meses.map(m => {
+                const oc = a.porMes.get(m) || 0;
+                const d = diasProdPorMes.get(m)?.size || 0;
+                return { mes: m, ocurrencias: oc, promedioDia: d > 0 ? oc / d : 0 };
+            })
+        });
+    });
+
+    return { desde, hasta, diasProduccion: nDias, piezasRevisadas: piezas.length, porDefecto };
+}
+
+// ---------------------------------------------------------------------------
 // Consultas a Supabase (requieren un cliente con sesión: la tabla tiene RLS)
 // ---------------------------------------------------------------------------
 
@@ -293,13 +369,16 @@ export async function fetchMsReportes(
     client: SupabaseClient,
     desde: string,
     hasta: string,
-    columnas = 'id, created_at, producto_id, defecto, Reparacion, producto:productos_defectos_ms (Referencia)'
+    columnas = 'id, created_at, producto_id, defecto, Reparacion, producto:productos_defectos_ms (Referencia)',
+    opciones: { soloConFoto?: boolean } = {}
 ): Promise<MsReporteRaw[]> {
-    const { count, error: countErr } = await client
+    let countQuery = client
         .from('ms_reporte_defectos')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', desde)
         .lt('created_at', hasta);
+    if (opciones.soloConFoto) countQuery = countQuery.not('fotoUrl', 'is', null);
+    const { count, error: countErr } = await countQuery;
     if (countErr) throw countErr;
 
     const total = count || 0;
@@ -309,13 +388,13 @@ export async function fetchMsReportes(
     for (let start = 0; start < pages; start += PARALLEL_PAGES) {
         const batch = Array.from({ length: Math.min(PARALLEL_PAGES, pages - start) }, (_, i) => {
             const from = (start + i) * PAGE_SIZE;
-            return client
+            let q = client
                 .from('ms_reporte_defectos')
                 .select(columnas)
                 .gte('created_at', desde)
-                .lt('created_at', hasta)
-                .order('id', { ascending: true })
-                .range(from, from + PAGE_SIZE - 1);
+                .lt('created_at', hasta);
+            if (opciones.soloConFoto) q = q.not('fotoUrl', 'is', null);
+            return q.order('id', { ascending: true }).range(from, from + PAGE_SIZE - 1);
         });
         const results = await Promise.all(batch);
         for (const { data, error } of results) {

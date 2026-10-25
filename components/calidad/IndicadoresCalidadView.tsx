@@ -271,9 +271,11 @@ const UnderConstructionCard = ({
 
 interface IndicadoresCalidadViewProps {
     showMainHeader?: boolean;
+    // Solo la sección de Mármol Sintético (pestaña Indicadores de Calidad MS); misma vista del tablero de control
+    soloMs?: boolean;
 }
 
-export default function IndicadoresCalidadView({ showMainHeader = false }: IndicadoresCalidadViewProps) {
+export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false }: IndicadoresCalidadViewProps) {
     const router = useRouter();
     const [userEmail, setUserEmail] = useState<string>('');
     
@@ -640,7 +642,8 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                 />
             )}
 
-            {/* 2. SubHeader Oficial con Pestañas Agrupadas */}
+            {/* 2. SubHeader Oficial con Pestañas Agrupadas (no aplica en la vista solo MS) */}
+            {!soloMs && (
             <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-2xs relative z-30 w-full font-sans">
                 <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {MAIN_SUBHEADER_TABS.map(tab => {
@@ -662,6 +665,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                     })}
                 </div>
             </div>
+            )}
 
             {/* 3. Contenido Principal */}
             <div className="flex-1 w-full pb-10">
@@ -675,6 +679,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 1: CALIDAD GENERAL PLANTAS - IFI */}
                         {/* ------------------------------------------------------------- */}
+                        {!soloMs && (<>
                         <section id="general-plantas" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
                             <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
                                 <div>
@@ -734,6 +739,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
 
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Mármol Sintético" plantKey="MS" />
+                        </>)}
 
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 2: MÁRMOL SINTÉTICO (MS) */}
@@ -1101,6 +1107,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                             )}
                         </section>
 
+                        {!soloMs && (<>
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Fibra de Vidrio" plantKey="FV" />
 
@@ -1488,6 +1495,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                 </div>
                             )}
                         </section>
+                        </>)}
                     </div>
                 )}
 
