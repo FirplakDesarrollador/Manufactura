@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
+import { BOTONES_CALIDAD_MS, guardarPermisosCalidadMs, permisosCalidadMs, type NivelCalidadMs, type PermisosCalidadMs } from '@/lib/calidad/permisos'
 
 interface Usuario {
     id: number;
@@ -44,7 +45,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     fibra: 'Control de Piso (Fibra)',
     modulos: 'Control de Piso (Mármol)',
     muebles: 'Control de Piso (Muebles)',
-    calidad: 'Calidad',
+    calidad: 'Calidad MS',
     hora_a_hora: 'Hora a Hora',
     ficha_rcc: 'Ficha RRC', // Corrección del nombre solicitada por el usuario
     opt: 'OPT Operativa',
@@ -163,6 +164,99 @@ export default function UsuariosConfiguracionPage() {
             }
             return updated;
         });
+    }
+
+    // Calidad MS: un permiso por botón; Configuración y Criterios con nivel Ver / Editar
+    const calidadEfectiva = (): PermisosCalidadMs =>
+        permisosCalidadMs({ nombre: selectedUser?.nombre, correo: selectedUser?.correo, rol: selectedUser?.rol, permisos: editedPermisos })
+
+    const setCalidad = (cambio: Partial<PermisosCalidadMs>) => {
+        const nuevo = { ...calidadEfectiva(), ...cambio }
+        setEditedPermisos((prev: any) => ({ ...prev, calidad: guardarPermisosCalidadMs(nuevo) }))
+    }
+
+    const casillaCalidad = (checked: boolean, onChange: () => void, label: string) => (
+        <label key={label} className="flex items-center space-x-2 cursor-pointer group">
+            <div className="relative flex items-center justify-center">
+                <input
+                    type="checkbox"
+                    className="peer appearance-none w-5 h-5 border-2 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 checked:bg-blue-600 checked:border-blue-600 transition-all"
+                    checked={checked}
+                    onChange={onChange}
+                />
+                <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <span className="text-sm text-gray-700 group-hover:text-gray-900 transition-colors">{label}</span>
+        </label>
+    )
+
+    const renderCalidadMsEdicion = () => {
+        const p = calidadEfectiva()
+        const niveles: [NivelCalidadMs, string][] = [[null, 'Sin acceso'], ['ver', 'Ver'], ['editar', 'Editar']]
+        const nivelSelector = (key: 'configuracion' | 'criterios', label: string) => (
+            <div key={key} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm text-gray-700">{label}</span>
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-xs font-bold">
+                    {niveles.map(([valor, texto]) => {
+                        const activo = p[key] === valor
+                        const claseActivo = valor === 'editar' ? 'bg-blue-600 text-white' : valor === 'ver' ? 'bg-[#254153] text-white' : 'bg-white text-gray-700 shadow-xs'
+                        return (
+                            <button
+                                key={texto}
+                                type="button"
+                                onClick={() => setCalidad(key === 'configuracion' ? { configuracion: valor } : { criterios: valor })}
+                                className={`px-2.5 py-1 rounded-md transition-all ${activo ? claseActivo : 'text-gray-500 hover:text-gray-800'}`}
+                            >
+                                {texto}
+                            </button>
+                        )
+                    })}
+                </div>
+            </div>
+        )
+        return (
+            <div className="p-4 space-y-4">
+                <div>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Botones del módulo</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {BOTONES_CALIDAD_MS.map(b => casillaCalidad(p[b.key], () => setCalidad({ [b.key]: !p[b.key] } as Partial<PermisosCalidadMs>), b.label))}
+                    </div>
+                </div>
+                <div className="space-y-2 pt-3 border-t border-gray-100">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Ver o editar</p>
+                    {nivelSelector('configuracion', 'Configuración de defectos')}
+                    {nivelSelector('criterios', 'Criterios de aceptación y rechazo')}
+                    <p className="text-[11px] text-gray-500">Con <b>Ver</b> el usuario consulta, pero no puede configurar ni modificar defectos.</p>
+                </div>
+                <div className="pt-3 border-t border-gray-100">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Registros (Reportes del día, Histórico y Saldos)</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {casillaCalidad(p.editarRegistros, () => setCalidad({ editarRegistros: !p.editarRegistros }), 'Editar registros')}
+                        {casillaCalidad(p.eliminarRegistros, () => setCalidad({ eliminarRegistros: !p.eliminarRegistros }), 'Eliminar registros')}
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    const renderCalidadMsConsulta = (permisos: any) => {
+        const p = permisosCalidadMs({ nombre: selectedUser?.nombre, correo: selectedUser?.correo, rol: selectedUser?.rol, permisos })
+        const nombreNivel = (n: NivelCalidadMs) => (n === 'editar' ? 'Editar' : 'Ver')
+        const chips = [
+            ...BOTONES_CALIDAD_MS.filter(b => p[b.key]).map(b => b.label),
+            ...(p.configuracion ? ['Configuración: ' + nombreNivel(p.configuracion)] : []),
+            ...(p.criterios ? ['Criterios: ' + nombreNivel(p.criterios)] : []),
+            ...(p.editarRegistros ? ['Editar registros'] : []),
+            ...(p.eliminarRegistros ? ['Eliminar registros'] : [])
+        ]
+        if (chips.length === 0) return <span className="text-xs text-gray-500 italic">Ningún acceso específico configurado</span>
+        return (
+            <div className="flex flex-wrap gap-2">
+                {chips.map(c => (
+                    <span key={c} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#254153]/5 text-[#254153] border border-[#254153]/10">{c}</span>
+                ))}
+            </div>
+        )
     }
 
     const savePermissions = async () => {
@@ -466,7 +560,9 @@ export default function UsuariosConfiguracionPage() {
                                                             <h5 className="text-sm font-bold text-[#254153] uppercase tracking-wider">{PERMISSION_LABELS[modulo] || modulo}</h5>
                                                         </div>
                                                         <div className="p-4">
-                                                            {typeof accesos === 'boolean' ? (
+                                                            {modulo === 'calidad' ? (
+                                                                renderCalidadMsConsulta(selectedUser.permisos)
+                                                            ) : typeof accesos === 'boolean' ? (
                                                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
                                                                     <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                                                     Acceso Total
@@ -513,7 +609,8 @@ export default function UsuariosConfiguracionPage() {
                                                                     </label>
                                                                 )}
                                                             </div>
-                                                            {!isBooleanModule && (
+                                                            {modulo === 'calidad' && renderCalidadMsEdicion()}
+                                                            {!isBooleanModule && modulo !== 'calidad' && (
                                                                 <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                                     {(subModulos as string[]).map(sub => {
                                                                         const isChecked = editedPermisos[modulo]?.[sub] || false;
