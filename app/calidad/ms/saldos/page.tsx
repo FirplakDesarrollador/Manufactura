@@ -150,7 +150,7 @@ export default function SaldosYDestruccionesPage() {
             if (localUser?.permisos?.calidad) {
                 setHasEditPermission(!!localUser.permisos.calidad.editar)
                 setHasDeletePermission(!!localUser.permisos.calidad.eliminar)
-                setHasSettingsPermission(!!localUser.permisos.calidad.configurar_defectos || !!localUser.permisos.calidad.editar)
+                setHasSettingsPermission(!!localUser.permisos.calidad.configurar_defectos || localUser.permisos.calidad.configuracion === 'editar' || !!localUser.permisos.calidad.editar)
             } else {
                 setHasSettingsPermission(true)
             }

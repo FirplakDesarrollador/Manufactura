@@ -9,7 +9,7 @@ import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import CriterioDetallePanel from '@/components/calidad/CriterioDetallePanel'
 import { CriterioCalidad, PLANTAS_CRITERIOS, plantaCriterios } from '@/lib/calidad/criterios'
-import { puedeEditarCalidad } from '@/lib/calidad/permisos'
+import { puedeEditarCalidad, permisosCalidadMs } from '@/lib/calidad/permisos'
 import {
     EstadisticasDefectosMs,
     MS_FECHA_INICIO_BI,
@@ -70,6 +70,7 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
     const [zoomedImage, setZoomedImage] = useState<string | null>(null)
     const [canEdit, setCanEdit] = useState(false)
     const [canConfig, setCanConfig] = useState(false)
+    const [canEditMs, setCanEditMs] = useState(false)
     // Nuevo defecto de MS (catálogo ms_defectos) y detalle que se abre en edición al crearlo
     const [nuevoMsOpen, setNuevoMsOpen] = useState(false)
     const [editarAlAbrir, setEditarAlAbrir] = useState<string | null>(null)
@@ -109,9 +110,11 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
                 supabase.from('criterios_calidad_plantas').select('*'),
                 supabase.from('usuarios').select('nombre, correo, rol, permisos').ilike('correo', user.email || '').maybeSingle()
             ])
-            setCanEdit(puedeEditarCalidad(userRes.data))
-            // Mismo permiso de la ventana "Configuración de Defectos" del registro en línea
-            setCanConfig(!!(userRes.data as any)?.permisos?.calidad?.configurar_defectos)
+            // Permisos de Calidad MS por botón: Criterios (ver/editar) y Configuración (ver/editar)
+            const permMs = permisosCalidadMs(userRes.data as any)
+            setCanEditMs(permMs.criterios === 'editar')
+            setCanEdit(puedeEditarCalidad(userRes.data) || permMs.criterios === 'editar')
+            setCanConfig(permMs.configuracion === 'editar')
             if (defRes.error) console.warn('Error cargando ms_defectos:', defRes.error)
             if (critRes.error) console.warn('Error cargando criterios_calidad_plantas:', critRes.error)
             setDefects(defRes.data || [])
@@ -208,7 +211,7 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
     const panelComun = {
         planta,
         plantaNombre: plantaInfo.nombre,
-        canEdit,
+        canEdit: esMs ? canEditMs : canEdit,
         onClose: () => setExpandedKey(null),
         onZoom: setZoomedImage,
         onSaved: guardarCriterio,
@@ -248,7 +251,7 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
                     </div>
 
                     <div className="order-2 xl:order-none flex items-center justify-center sm:justify-end gap-3 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end">
-                        {(esMs ? canConfig : canEdit) && (
+                        {(esMs ? canEditMs : canEdit) && (
                             <button
                                 onClick={() => (esMs ? setNuevoMsOpen(true) : setExpandedKey(NUEVO))}
                                 className="h-9 px-3 bg-[#324354] hover:bg-[#324354]/90 text-white rounded text-xs font-bold flex items-center gap-1.5 shrink-0"

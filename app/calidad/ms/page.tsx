@@ -3,16 +3,16 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings, Archive, Trash2, History, ClipboardList, BarChart2, Plus } from 'lucide-react'
+import { Camera, X, Settings, Archive, Trash2, History, ClipboardList, BarChart2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
+import { usePermisosCalidadMs } from '@/lib/calidad/usePermisosCalidadMs'
 import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
-import NuevoDefectoMsModal from '@/components/calidad/NuevoDefectoMsModal'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -60,8 +60,11 @@ export default function CalidadMsReportPage() {
     const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-    const [isNuevoDefectoOpen, setIsNuevoDefectoOpen] = useState(false)
     const [showHourlyChart, setShowHourlyChart] = useState(false)
+    // Permisos por botón: sin "Registro" pero con "Hora a hora" se ve solo la gráfica
+    const { permisos: permisosMs } = usePermisosCalidadMs()
+    const soloHoraAHora = !!permisosMs && !permisosMs.registro
+    const configEditable = permisosMs?.configuracion === 'editar'
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
     const [hasSaldosPermission, setHasSaldosPermission] = useState(false)
     
@@ -268,6 +271,7 @@ export default function CalidadMsReportPage() {
     const moldeRefForUpload = useRef<string | undefined>(undefined)
 
     const handleSaveSettings = async (updatedDefects: DefectoMS[]) => {
+        if (!configEditable) return
         try {
             // Update each defect in supabase.
             // Ideally this would be a bulk upsert.
@@ -322,7 +326,8 @@ export default function CalidadMsReportPage() {
             {/* En pantallas angostas la barra se divide en filas para no desbordar la página */}
             <div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
                 <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 gap-2 relative xl:h-full">
-                    {/* Left: Product Selector & Save button - Ampliado para aprovechar espacio */}
+                    {/* Left: Product Selector & Save button (oculto si el usuario solo ve Hora a hora) */}
+                    {soloHoraAHora ? <div /> : (
                     <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min xl:max-w-[440px] 2xl:max-w-[520px]">
                         <div className="flex-1 min-w-[160px] [contain:inline-size]">
                             <SearchableSelect
@@ -353,15 +358,16 @@ export default function CalidadMsReportPage() {
                             <span>{isUploading ? 'Guardando...' : 'Ejecutar'}</span>
                         </button>
                     </div>
+                    )}
 
                     {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
                     <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center z-20">
                         <CalidadMsNavButtons
                             activeTab="registro"
                             onOpenSettings={() => setIsSettingsOpen(true)}
-                            onToggleChart={() => setShowHourlyChart(prev => !prev)}
+                            onToggleChart={() => !soloHoraAHora && setShowHourlyChart(prev => !prev)}
                             hasSettingsPermission={hasSettingsPermission}
-                            isChartActive={showHourlyChart}
+                            isChartActive={showHourlyChart || soloHoraAHora}
                             isSettingsActive={isSettingsOpen}
                         />
                     </div>
@@ -415,11 +421,12 @@ export default function CalidadMsReportPage() {
             </div>
 
             {/* Hour-by-Hour Indicator */}
-            {showHourlyChart && (
+            {(showHourlyChart || soloHoraAHora) && (
                 <HourlyInspectionChart reports={todaysReports} />
             )}
 
             {/* Grid */}
+            {!soloHoraAHora && (
             <main className="flex-1 w-full bg-white p-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                     {defects.map((defect, index) => {
@@ -446,30 +453,9 @@ export default function CalidadMsReportPage() {
                             />
                         )
                     })}
-
-                    {/* Nuevo defecto: queda en el catálogo ms_defectos (registro, reportes y gráficas) */}
-                    {hasSettingsPermission && (
-                        <button
-                            type="button"
-                            onClick={() => setIsNuevoDefectoOpen(true)}
-                            className="min-h-[76px] border-2 border-dashed border-gray-300 hover:border-[#254153] hover:bg-gray-50 rounded text-[#254153] flex flex-col items-center justify-center gap-1 transition-all"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span className="text-xs font-black uppercase tracking-wider">Nuevo defecto</span>
-                        </button>
-                    )}
                 </div>
-                {isNuevoDefectoOpen && (
-                    <NuevoDefectoMsModal
-                        defectos={defects}
-                        onClose={() => setIsNuevoDefectoOpen(false)}
-                        onCreated={(defecto) => {
-                            setDefects(prev => [...prev, defecto as DefectoMS])
-                            setIsNuevoDefectoOpen(false)
-                        }}
-                    />
-                )}
             </main>
+            )}
 
             <footer className="py-4 px-4 bg-[#254153] text-[9px] font-bold text-white/30 uppercase tracking-[0.5em] flex justify-between items-center">
                 <span>© {new Date().getFullYear()} Firplak Engineering</span>
@@ -477,7 +463,8 @@ export default function CalidadMsReportPage() {
             </footer>
 
             <DefectsSettingsModal 
-                isOpen={isSettingsOpen} 
+                isOpen={isSettingsOpen && !!permisosMs?.configuracion}
+                soloLectura={!configEditable}
                 onClose={() => setIsSettingsOpen(false)} 
                 defects={defects}
                 onSave={handleSaveSettings}
