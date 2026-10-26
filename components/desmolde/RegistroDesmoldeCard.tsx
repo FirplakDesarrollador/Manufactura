@@ -59,7 +59,7 @@ export default function RegistroDesmoldeCard({ registro, usuarioEmail, onRefresh
                             </div>
                             <div>
                                 <p className="text-xs text-slate-400 uppercase font-black tracking-tighter">Molde Desc.</p>
-                                <p className="text-lg font-bold text-slate-900 truncate max-w-[200px]" title={registro.molde_descripcion}>
+                                <p className="text-base font-bold text-slate-900 leading-tight break-words max-w-[320px]" title={registro.molde_descripcion}>
                                     {registro.molde_descripcion}
                                 </p>
                             </div>

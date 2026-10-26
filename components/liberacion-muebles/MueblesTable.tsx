@@ -42,6 +42,12 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
       }
       if (!Array.isArray(componentes)) return null;
 
+      const filteredComponentes = componentes.filter((comp: any) => {
+        const compName = String(comp.componente || '').trim().toUpperCase();
+        const isExcluded = compName.includes("KIT") || compName.includes("INSTRUCTIV") || compName.includes("INSTRUCC");
+        return !isExcluded;
+      });
+
       return (
         <div className="p-4 bg-white border border-blue-100 rounded-lg shadow-inner my-2">
           {mueble.productos_agrupados && mueble.productos_agrupados.length > 1 && (
@@ -68,7 +74,7 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {componentes.map((comp: any, i: number) => (
+                {filteredComponentes.map((comp: any, i: number) => (
                   <tr key={i} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-700 font-medium">{comp.sku}</td>
                     <td className="px-3 py-2 text-gray-700">{comp.componente}</td>
@@ -101,12 +107,17 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
           parsedComponentes = mueble.componentes;
         }
 
-        const cantosAndTableros = parsedComponentes
-          .filter((c: any) => c.componente && (c.componente.toUpperCase().includes("CANTO") || c.componente.toUpperCase().includes("TABLERO")))
+        const cantosTablerosFondos = parsedComponentes
+          .filter((c: any) => {
+            const compName = String(c.componente || '').trim().toUpperCase();
+            const isExcluded = compName.includes("KIT") || compName.includes("INSTRUCTIV") || compName.includes("INSTRUCC");
+            const isTarget = compName.includes("CANTO") || compName.includes("TABLERO") || compName.includes("FONDO");
+            return isTarget && !isExcluded;
+          })
           .map((c: any) => String(c.sku).trim())
           .sort();
-        if (cantosAndTableros.length > 0) {
-          key = cantosAndTableros.join("|");
+        if (cantosTablerosFondos.length > 0) {
+          key = cantosTablerosFondos.join("|");
         }
       }
 
@@ -147,7 +158,7 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
         orden_fabricacion: group.ordenes_fabricacion.join(', '),
         cliente: Array.from(group.clientes).join(' | '),
         producto_sku: isMixed ? 'Múltiples SKUs' : Array.from(group.skus)[0],
-        producto_descripcion: isMixed ? 'Varios productos (Mismos cantos y tableros)' : Array.from(group.descripciones)[0],
+        producto_descripcion: isMixed ? 'Varios productos (Mismos cantos, tableros y fondos)' : Array.from(group.descripciones)[0],
         componentes: JSON.stringify(group.componentes_parsed)
       };
     });
@@ -166,8 +177,9 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
           }
           comps.forEach((comp: any) => {
             const compName = String(comp.componente || '').trim().toUpperCase();
-            const isCantoOrTablero = compName.includes("CANTO") || compName.includes("TABLERO");
-            if (isCantoOrTablero) {
+            const isExcluded = compName.includes("KIT") || compName.includes("INSTRUCTIV") || compName.includes("INSTRUCC");
+            const isTarget = compName.includes("CANTO") || compName.includes("TABLERO") || compName.includes("FONDO");
+            if (isTarget && !isExcluded) {
               const skuKey = String(comp.sku || '').trim();
               if (map.has(skuKey)) {
                 map.get(skuKey).cantidad += comp.cantidad;
@@ -277,7 +289,7 @@ export default function MueblesTable({ muebles, selectedDate }: { muebles: any[]
           <div className="px-6 py-6 border-b border-blue-100 bg-blue-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-blue-900">
-                Resumen Total de Consumo (Cantos y Tableros)
+                Resumen Total de Consumo (Cantos, Tableros y Fondos)
               </h3>
               <p className="text-sm text-blue-700">Sumatoria total requerida para toda la programación mostrada</p>
             </div>
