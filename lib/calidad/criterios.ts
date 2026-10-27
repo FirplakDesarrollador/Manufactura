@@ -25,8 +25,11 @@ export const PLANTAS_CRITERIOS: { codigo: string; sigla: string; nombre: string;
     { codigo: 'Fv', sigla: 'FV', nombre: 'Fibra de Vidrio', titulo: 'Criterios de Aceptación y Rechazo de Fibra de Vidrio (FV)' },
     { codigo: 'R moldes', sigla: 'RM', nombre: 'Revisión de Moldes', titulo: 'Criterios de Aceptación y Rechazo de Revisión de Moldes' },
     { codigo: 'Qznt', sigla: 'QZ', nombre: 'Quarzstone', titulo: 'Criterios de Aceptación y Rechazo de Quarzstone (QZ)' },
-    { codigo: 'Mbles', sigla: 'MBL', nombre: 'Muebles', titulo: 'Criterios de Aceptación y Rechazo de Muebles (MBL)' },
-    { codigo: 'Cefi', sigla: 'CEFI', nombre: 'Zócalos (CEFI)', titulo: 'Criterios de Aceptación y Rechazo de CEFI' }
+    // Muebles y CEFI comparten los mismos criterios (planta 'Mbles/Cefi' en la base)
+    { codigo: 'Mbles/Cefi', sigla: 'MBL-CEFI', nombre: 'Muebles y CEFI', titulo: 'Criterios de Aceptación y Rechazo de Muebles y CEFI (MBL-CEFI)' }
 ];
+
+// Enlaces antiguos (?planta=Mbles o ?planta=Cefi) llevan a la planta unificada
+export const CODIGOS_CRITERIOS_ANTIGUOS: Record<string, string> = { Mbles: 'Mbles/Cefi', Cefi: 'Mbles/Cefi' };
 
 export const plantaCriterios = (codigo: string) => PLANTAS_CRITERIOS.find(p => p.codigo === codigo) || PLANTAS_CRITERIOS[0];
