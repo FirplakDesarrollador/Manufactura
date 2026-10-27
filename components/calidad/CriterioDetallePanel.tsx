@@ -59,6 +59,15 @@ const ZONAS_CRITICAS_MS = [
   { src: '/calidad/zonas-criticas/lavarropas.jpg', mini: '/calidad/zonas-criticas/lavarropas-mini.jpg', label: 'Lavarropas' }
 ];
 
+// Láminas de zonas críticas por planta (iguales para todos los defectos de la planta)
+const ZONAS_CRITICAS_POR_PLANTA: Record<string, { src: string; mini: string; label: string }[]> = {
+  Ms: ZONAS_CRITICAS_MS,
+  'Mbles/Cefi': [
+    { src: '/calidad/zonas-criticas/muebles.jpg', mini: '/calidad/zonas-criticas/muebles-mini.jpg', label: 'Mueble con puertas' },
+    { src: '/calidad/zonas-criticas/mueble-macao.jpg', mini: '/calidad/zonas-criticas/mueble-macao-mini.jpg', label: 'Mueble Macao 155x48' }
+  ]
+};
+
 const TEXTO_ESCALAMIENTO_QRR =
   'Si el porcentaje de piezas con este defecto supera este valor 3 días seguidos, el tema sube de nivel y se abre el tratamiento de problemas en QRR.';
 
@@ -358,6 +367,8 @@ export default function CriterioDetallePanel({
 
   // Configuración del registro en línea (alarmas y requisitos al registrar el defecto)
   const cfg = editConfig ? cfgForm : configRegistro || {};
+  // Plantas sin registro diario vinculado (p. ej. MBL-CEFI): mismas secciones que MS, vacías
+  const sinRegistro = !editConfig && !configRegistro;
   // % máximo de defecto permitido al día (3 días seguidos por encima → escalamiento a QRR)
   const tarjetaPctMax = (
     <div className={`relative h-full p-3 border rounded-xl space-y-1 ${editCriterio ? 'bg-amber-50/40 border-amber-200' : 'bg-white border-slate-200'}`}>
@@ -394,7 +405,7 @@ export default function CriterioDetallePanel({
     </div>
   );
 
-  const seccionConfig = idDefectoMs != null && (
+  const seccionConfig = (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-xs font-black text-[#324354] uppercase tracking-wider">Configuración de alarmas en el registro diario de defectos</span>
@@ -413,7 +424,7 @@ export default function CriterioDetallePanel({
                 className={`${editInput} text-xs font-bold`}
               />
             ) : (
-              <p className={`text-xs font-bold ${a.txt}`}>desde {cfg[a.key] ?? 0} en el día</p>
+              <p className={`text-xs font-bold ${a.txt}`}>{sinRegistro ? '—' : `desde ${cfg[a.key] ?? 0} en el día`}</p>
             )}
           </div>
         ))}
@@ -436,7 +447,7 @@ export default function CriterioDetallePanel({
                 </button>
               ) : (
                 <span className={`inline-block text-[11px] font-black px-2 py-0.5 rounded-full ${activo ? 'bg-[#324354] text-white' : 'bg-slate-200 text-slate-500'}`}>
-                  {activo ? 'Sí' : 'No'}
+                  {sinRegistro ? '—' : activo ? 'Sí' : 'No'}
                 </span>
               )}
             </div>
@@ -708,15 +719,18 @@ export default function CriterioDetallePanel({
               </div>
             </div>
 
-            {/* Sin estadísticas, el % máximo al día se muestra aquí; con estadísticas va junto a ellas */}
-            {!mostrarEstadisticas && tarjetaPctMax}
-
-            {/* Láminas de zonas críticas de acabado: iguales para todos los defectos de MS */}
-            {planta === 'Ms' && (
+            {/* Láminas de zonas críticas de acabado: iguales para todos los defectos de la planta */}
+            {!ZONAS_CRITICAS_POR_PLANTA[planta] && (
+                <div className="p-3 border border-slate-200 bg-slate-50 rounded-xl space-y-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Acabado · zonas críticas</span>
+                  <p className="text-xs font-semibold text-slate-400 py-6 text-center">Sin láminas de zonas críticas para esta planta.</p>
+                </div>
+            )}
+            {ZONAS_CRITICAS_POR_PLANTA[planta] && (
                 <div className="p-3 border border-slate-200 bg-slate-50 rounded-xl space-y-2">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Acabado · zonas críticas</span>
                   <div className="grid grid-cols-3 gap-2">
-                    {ZONAS_CRITICAS_MS.map(z => (
+                    {ZONAS_CRITICAS_POR_PLANTA[planta].map(z => (
                       <button
                         key={z.src}
                         type="button"
@@ -743,14 +757,14 @@ export default function CriterioDetallePanel({
       {/* Sin criterio registrado: la configuración del registro igual se muestra */}
       {!c && !editCriterio && seccionConfig && <div className="mt-2">{seccionConfig}</div>}
 
-      {/* Estadísticas del defecto en los registros diarios de MS */}
-      {mostrarEstadisticas && (
+      {/* Estadísticas del defecto en el registro diario (hoy solo MS tiene registro diario) */}
+      {(
       <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-black text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
-            <BarChart3 size={14} /> Estadísticas del defecto · registro diario MS
+            <BarChart3 size={14} /> Estadísticas del defecto · registro diario {planta === 'Ms' ? 'MS' : plantaNombre}
           </span>
-          {estadisticasInfo && (
+          {mostrarEstadisticas && estadisticasInfo && (
             <span className="text-[10px] font-bold text-slate-400">
               {fmtFecha(estadisticasInfo.desde)} – {fmtFecha(estadisticasInfo.hasta)} · {estadisticasInfo.diasProduccion} días con producción
             </span>
@@ -760,7 +774,9 @@ export default function CriterioDetallePanel({
         <div className="flex flex-col sm:flex-row gap-3 items-stretch">
           <div className="sm:w-48 shrink-0">{tarjetaPctMax}</div>
           <div className="flex-1 min-w-0">
-        {estadisticasLoading ? (
+        {!mostrarEstadisticas ? (
+          <p className="text-xs font-bold text-slate-400 py-3">Esta planta aún no tiene registro diario de defectos vinculado a sus criterios.</p>
+        ) : estadisticasLoading ? (
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400 py-4">
             <Loader2 className="w-4 h-4 animate-spin" /> Calculando estadísticas del histórico…
           </div>
