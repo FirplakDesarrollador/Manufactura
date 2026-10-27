@@ -3,12 +3,14 @@
 import NextImage from 'next/image'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Home, Save, Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Search, X, User, LayoutGrid, Printer, History, Clock, Check, GripVertical, ShieldAlert, RotateCcw, CheckCheck } from 'lucide-react'
+import { ArrowLeft, Home, Save, Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Search, X, User, LayoutGrid, Printer, History, Clock, Check, GripVertical, ShieldAlert, RotateCcw, CheckCheck, ImagePlus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano'
 import { Database } from '@/lib/hdt/database.types'
 import { isAuthorizedEditor, checkUserHdtEditPermission } from '@/lib/hdt/authorized-editors'
 import { moveToTrash } from '@/lib/hdt/papelera'
+import { insertHdtSteps, toStepInserts, uploadStepImage } from '@/lib/hdt/steps'
+import FotoCompleta from '@/components/mtto-autonomo/FotoCompleta'
 
 import {
     DndContext,
@@ -542,6 +544,10 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
         setSteps(newSteps)
     }
 
+    const setStepImage = (index: number, url: string | null) => {
+        setSteps(prev => prev.map((s, i) => i === index ? { ...s, imagen_referencia: url } : s))
+    }
+
     const addStep = () => {
         setSteps([...steps, { 
             acciones_importantes: '', 
@@ -622,19 +628,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                 if (delError) throw delError
             }
 
-            const stepsToInsert = steps.map(step => ({
-                hdt_id: savedHdtId!,
-                acciones_importantes: step.acciones_importantes || '',
-                paso_importante: step.paso_importante || '',
-                punto_clave: step.punto_clave || '',
-                razon_punto_clave: step.razon_punto_clave || '',
-                step_no: step.step_no
-            }))
-
-            const { error: insError } = await (supabase
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                .from('hdt_steps') as any)
-                .insert(stepsToInsert)
+            const { error: insError } = await insertHdtSteps(toStepInserts(steps, savedHdtId!))
 
             if (insError) throw insError
 
@@ -700,19 +694,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
             const newHdtId = (newHdt as any).id
 
             // 3. Clone steps
-            const stepsToInsert = steps.map(step => ({
-                hdt_id: newHdtId,
-                acciones_importantes: step.acciones_importantes || '',
-                paso_importante: step.paso_importante || '',
-                punto_clave: step.punto_clave || '',
-                razon_punto_clave: step.razon_punto_clave || '',
-                step_no: step.step_no
-            }))
-
-            const { error: stepsError } = await (supabase
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                .from('hdt_steps') as any)
-                .insert(stepsToInsert)
+            const { error: stepsError } = await insertHdtSteps(toStepInserts(steps, newHdtId))
 
             if (stepsError) throw stepsError
 
@@ -752,15 +734,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
 
                 // 3. Sincronizar pasos en Supabase
                 await (supabase.from('hdt_steps') as any).delete().eq('hdt_id', hdtId)
-                const stepsToInsert = steps.map(step => ({
-                    hdt_id: hdtId,
-                    acciones_importantes: step.acciones_importantes || '',
-                    paso_importante: step.paso_importante || '',
-                    punto_clave: step.punto_clave || '',
-                    razon_punto_clave: step.razon_punto_clave || '',
-                    step_no: step.step_no
-                }))
-                await (supabase.from('hdt_steps') as any).insert(stepsToInsert)
+                await insertHdtSteps(toStepInserts(steps, hdtId))
             }
 
             const now = new Date()
@@ -1278,13 +1252,14 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                 <div id="hdt-steps-table" className="bg-white border-2 border-brand-primary/20 rounded-3xl overflow-x-auto shadow-sm print:table print:table-fixed print:w-full print:border-collapse print:rounded-none">
                     <div className="min-w-[800px] md:min-w-0 print:min-w-0">
                         <div className="print:table-header-group">
-                            <div className={`grid ${currentMode === 'breakdown' ? 'grid-cols-3' : 'grid-cols-[1.5fr_1fr_1fr_1fr]'} bg-zinc-50 divide-x-2 divide-brand-primary/20 border-b-2 border-brand-primary/20 print:table-row print:bg-transparent print:divide-brand-primary/10`}>
+                            <div className={`grid ${currentMode === 'breakdown' ? 'grid-cols-4' : 'grid-cols-[1.5fr_1fr_1fr_1fr_1fr]'} bg-zinc-50 divide-x-2 divide-brand-primary/20 border-b-2 border-brand-primary/20 print:table-row print:bg-transparent print:divide-brand-primary/10`}>
                             {currentMode !== 'breakdown' && (
                                 <div role="columnheader" className="p-4 text-center font-bold text-brand-primary uppercase text-xs tracking-widest print:p-2 print:text-[8pt] print:border print:border-brand-primary/20">Acción Importante</div>
                             )}
                             <div role="columnheader" className="p-4 text-center font-bold text-brand-primary uppercase text-xs tracking-widest print:p-2 print:text-[8pt] print:border print:border-brand-primary/20">Paso Importante</div>
                             <div role="columnheader" className="p-4 text-center font-bold text-brand-primary uppercase text-xs tracking-widest print:p-2 print:text-[8pt] print:border print:border-brand-primary/20">Punto Clave</div>
                             <div role="columnheader" className="p-4 text-center font-bold text-brand-primary uppercase text-xs tracking-widest print:p-2 print:text-[8pt] print:border print:border-brand-primary/20">Razón Punto Clave</div>
+                            <div role="columnheader" className="p-4 text-center font-bold text-brand-primary uppercase text-xs tracking-widest print:p-2 print:text-[8pt] print:border print:border-brand-primary/20">Imagen de Referencia</div>
                         </div>
                     </div>
 
@@ -1306,6 +1281,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                                         step={step}
                                         currentMode={currentMode}
                                         handleStepChange={handleStepChange}
+                                        setStepImage={setStepImage}
                                         removeStep={removeStep}
                                         stepsCount={steps.length}
                                     />
@@ -1727,11 +1703,78 @@ interface SortableStepRowProps {
     step: Partial<StepRow> & { tempId: string };
     currentMode: 'create' | 'edit' | 'view' | 'breakdown';
     handleStepChange: (index: number, e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    setStepImage: (index: number, url: string | null) => void;
     removeStep: (index: number) => void;
     stepsCount: number;
 }
 
-function SortableStepRow({ index, step, currentMode, handleStepChange, removeStep, stepsCount }: SortableStepRowProps) {
+// Imagen de referencia de un paso: en edición permite subir, cambiar o quitar la foto;
+// en consulta se amplía al hacer clic.
+function StepImageCell({ url, editable, onChange }: { url: string | null | undefined; editable: boolean; onChange: (url: string | null) => void }) {
+    const [uploading, setUploading] = useState(false)
+    const [verFoto, setVerFoto] = useState(false)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        e.target.value = ''
+        if (!file) return
+        setUploading(true)
+        try {
+            onChange(await uploadStepImage(file))
+        } catch (err) {
+            console.error('Error subiendo imagen del paso:', err)
+            alert('No se pudo subir la imagen. Inténtalo de nuevo.')
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    return (
+        <div className="flex flex-col items-center justify-center gap-2 p-3 min-h-[80px] print:p-1">
+            {url ? (
+                <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={url}
+                        alt="Imagen de referencia del paso"
+                        onClick={() => setVerFoto(true)}
+                        className="w-full max-h-48 object-contain rounded-lg border border-zinc-200 cursor-zoom-in print:max-h-[110px] print:border-0 print:rounded-none"
+                    />
+                    {verFoto && <FotoCompleta src={url} alt="Imagen de referencia del paso" onClose={() => setVerFoto(false)} />}
+                </>
+            ) : !editable ? (
+                <span className="text-xs text-zinc-300 italic print:hidden">Sin imagen</span>
+            ) : null}
+            {editable && (
+                <div className="flex gap-2 print:hidden">
+                    <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                    <button
+                        type="button"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={uploading}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold border-2 border-brand-primary/30 text-brand-primary rounded-lg hover:bg-brand-primary hover:text-white transition-all disabled:opacity-50"
+                    >
+                        {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+                        {uploading ? 'Subiendo...' : url ? 'Cambiar' : 'Subir imagen'}
+                    </button>
+                    {url && !uploading && (
+                        <button
+                            type="button"
+                            onClick={() => onChange(null)}
+                            className="p-1.5 bg-red-50 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-all"
+                            aria-label="Quitar imagen"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function SortableStepRow({ index, step, currentMode, handleStepChange, setStepImage, removeStep, stepsCount }: SortableStepRowProps) {
     const {
         attributes,
         listeners,
@@ -1752,7 +1795,7 @@ function SortableStepRow({ index, step, currentMode, handleStepChange, removeSte
         <div
             ref={setNodeRef}
             style={style}
-            className={`grid ${currentMode === 'breakdown' ? 'grid-cols-3' : 'grid-cols-[1.5fr_1fr_1fr_1fr]'} relative group divide-x-2 divide-brand-primary/5 print:table-row bg-white`}
+            className={`grid ${currentMode === 'breakdown' ? 'grid-cols-4' : 'grid-cols-[1.5fr_1fr_1fr_1fr_1fr]'} relative group divide-x-2 divide-brand-primary/5 print:table-row bg-white`}
         >
             {currentMode !== 'breakdown' && (
                 <div className="relative">
@@ -1818,6 +1861,11 @@ function SortableStepRow({ index, step, currentMode, handleStepChange, removeSte
                     </button>
                 )}
             </div>
+            <StepImageCell
+                url={step.imagen_referencia}
+                editable={currentMode === 'create' || currentMode === 'edit'}
+                onChange={(url) => setStepImage(index, url)}
+            />
         </div>
     );
 }
