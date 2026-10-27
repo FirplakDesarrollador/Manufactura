@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
+import FotoCompleta from './FotoCompleta';
 
 // Máquina del catálogo del Gestor de Mantenimiento (mantenimiento_maquinas_equipos)
 export interface MaquinaCatalogo {
@@ -97,6 +98,7 @@ interface MaquinaSelectProps {
 export default function MaquinaSelect({ nombre, idMaquina, catalogo, onChange, placeholder = 'Seleccione una máquina...' }: MaquinaSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const [verFoto, setVerFoto] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -168,9 +170,14 @@ export default function MaquinaSelect({ nombre, idMaquina, catalogo, onChange, p
             {seleccionada?.nombre_equipo || nombre}
           </div>
           {fotoSeleccionada && (
-            <a href={fotoSeleccionada} target="_blank" rel="noopener noreferrer" title="Ver foto de la máquina">
-              <img src={fotoSeleccionada} alt={seleccionada?.nombre_equipo || 'Máquina'} style={{ width: '100%', maxWidth: '140px', height: '90px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #E2E8F0' }} />
-            </a>
+            <img
+              src={fotoSeleccionada} alt={seleccionada?.nombre_equipo || 'Máquina'} title="Ver foto completa"
+              onClick={() => setVerFoto(true)}
+              style={{ width: '100%', maxWidth: '140px', height: '90px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #E2E8F0', cursor: 'zoom-in' }}
+            />
+          )}
+          {verFoto && fotoSeleccionada && (
+            <FotoCompleta src={fotoSeleccionada} alt={seleccionada?.nombre_equipo || nombre} onClose={() => setVerFoto(false)} />
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#105B3A', backgroundColor: '#E7F5EE', borderRadius: '6px', padding: '3px 8px' }}>

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/hdt/database.types'
+import { insertHdtSteps, toStepInserts } from '@/lib/hdt/steps'
 
 export type HdtRow = Database['public']['Tables']['hdts']['Row']
 export type StepRow = Database['public']['Tables']['hdt_steps']['Row']
@@ -140,15 +141,7 @@ export const restoreFromTrash = async (trashId: string): Promise<{ success: bool
         if (insHdtErr) throw insHdtErr
 
         if (v.id === hdt.id && steps && steps.length > 0) {
-          const stepsToInsert = steps.map(s => ({
-            hdt_id: insertedHdt.id,
-            acciones_importantes: s.acciones_importantes || '',
-            paso_importante: s.paso_importante || '',
-            punto_clave: s.punto_clave || '',
-            razon_punto_clave: s.razon_punto_clave || '',
-            step_no: s.step_no
-          }))
-          await (supabase.from('hdt_steps') as any).insert(stepsToInsert)
+          await insertHdtSteps(toStepInserts(steps, insertedHdt.id))
         }
       }
     } else {
@@ -163,15 +156,7 @@ export const restoreFromTrash = async (trashId: string): Promise<{ success: bool
       if (insHdtErr) throw insHdtErr
 
       if (steps && steps.length > 0) {
-        const stepsToInsert = steps.map(s => ({
-          hdt_id: insertedHdt.id,
-          acciones_importantes: s.acciones_importantes || '',
-          paso_importante: s.paso_importante || '',
-          punto_clave: s.punto_clave || '',
-          razon_punto_clave: s.razon_punto_clave || '',
-          step_no: s.step_no
-        }))
-        await (supabase.from('hdt_steps') as any).insert(stepsToInsert)
+        await insertHdtSteps(toStepInserts(steps, insertedHdt.id))
       }
     }
 

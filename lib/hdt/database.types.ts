@@ -77,6 +77,7 @@ export interface Database {
           paso_importante: string | null
           punto_clave: string | null
           razon_punto_clave: string | null
+          imagen_referencia: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -88,6 +89,7 @@ export interface Database {
           paso_importante?: string | null
           punto_clave?: string | null
           razon_punto_clave?: string | null
+          imagen_referencia?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -99,6 +101,7 @@ export interface Database {
           paso_importante?: string | null
           punto_clave?: string | null
           razon_punto_clave?: string | null
+          imagen_referencia?: string | null
           updated_at?: string
           updated_by?: string | null
         }
