@@ -32,8 +32,8 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
         if (sku && (mSku === sku || mSerial === sku)) return true
         if (targetCode && mSerial.split('-')[0].replace(/^0+/, '') === targetCode) return true
         if (targetDesc && mDesc) {
-            const mKeywords = mDesc.replace(/molde|nuevo/gi, '').split(/\s+/).filter(w => w.length > 2)
-            if (mKeywords.length > 0 && mKeywords.every(kw => targetDesc.includes(kw))) return true
+            const mKeywords = mDesc.replace(/molde|nuevo/gi, '').split(/\s+/).filter((w: string) => w.length > 2)
+            if (mKeywords.length > 0 && mKeywords.every((kw: string) => targetDesc.includes(kw))) return true
         }
         return false
     })
@@ -77,14 +77,14 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                 </div>
             )}
             {/* Left Section: Basic Info */}
-            <div className="w-full md:w-1/4 md:pr-2 md:border-r border-gray-300 flex flex-col justify-between overflow-hidden">
-                <div className="overflow-hidden">
+            <div className="w-full md:w-[28%] md:pr-2 md:border-r border-gray-300 flex flex-col justify-between min-w-0">
+                <div className="min-w-0">
                     <div className="flex items-center gap-1 text-cyan-600 mb-1">
                         <Clipboard size={14} className="shrink-0" />
                         <span className="text-xs font-bold text-gray-900 truncate">OF: {orden.orden_fabricacion}</span>
 
                     </div>
-                    <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || orden.numero_pedido || 'Sin pedido'}</div>
+                    <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || (orden as any).numero_pedido || 'Sin pedido'}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
                         {orden.fecha_ideal_produccion ? (
                             <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
@@ -102,11 +102,10 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                         )}
                     </div>
                     {(() => {
-                        const rawDesc = orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'
-                        const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim()
+                        const fullDesc = orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'
                         return (
-                            <div className="text-[11px] font-bold text-gray-800 mt-1 line-clamp-2 leading-tight" title={cleanDesc}>
-                                {cleanDesc}
+                            <div className="text-[11px] font-bold text-gray-800 mt-1 leading-snug break-words" title={fullDesc}>
+                                {fullDesc}
                             </div>
                         )
                     })()}
@@ -119,7 +118,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
             </div>
 
             {/* Middle Section: Mold Status */}
-            <div className="w-full md:w-1/5 md:px-3 md:border-r border-gray-300 flex flex-col justify-center bg-gray-50 md:bg-transparent p-2 md:p-0 rounded">
+            <div className="w-full md:w-[17%] md:px-3 md:border-r border-gray-300 flex flex-col justify-center bg-gray-50 md:bg-transparent p-2 md:p-0 rounded">
                 <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-bold">
                     <div className="text-cyan-600">Totales: <span className="text-gray-900">{orden.moldes_totales || relevantMoldes.length}</span></div>
                     <div className="text-red-500">Reparación: <span className="text-gray-900">{orden.moldes_en_reparacion || enReparacion}</span></div>

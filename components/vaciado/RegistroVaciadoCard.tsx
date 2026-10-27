@@ -83,7 +83,7 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
                             </div>
                             <div>
                                 <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Referencia</p>
-                                <p className="text-sm font-bold text-gray-900 leading-tight line-clamp-2" title={registro.producto_descripcion}>{registro.producto_descripcion || registro.producto_sku}</p>
+                                <p className="text-sm font-bold text-gray-900 leading-tight break-words" title={registro.producto_descripcion}>{registro.producto_descripcion || registro.producto_sku}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">

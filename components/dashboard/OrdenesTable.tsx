@@ -112,10 +112,10 @@ export default function OrdenesTable() {
                                         <td className="px-4 py-2.5 font-semibold text-gray-600">
                                             {row.numeroPedido || row.numero_pedido || '-'}
                                         </td>
-                                        <td className="px-4 py-2.5 text-gray-800 truncate max-w-[150px]">
+                                        <td className="px-4 py-2.5 text-gray-800 truncate max-w-[180px]" title={row.cliente || '-'}>
                                             {row.cliente || '-'}
                                         </td>
-                                        <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]" title={row.productoDescripcion || row.producto_descripcion}>
+                                        <td className="px-4 py-2.5 text-gray-700 whitespace-normal min-w-[240px] max-w-[380px] break-words" title={row.productoDescripcion || row.producto_descripcion}>
                                             {row.productoDescripcion || row.producto_descripcion || '-'}
                                         </td>
 
@@ -124,7 +124,7 @@ export default function OrdenesTable() {
                                                 ? new Date(row.fechaIdealProduccion || row.fecha_ideal_produccion).toLocaleDateString()
                                                 : '-'}
                                         </td>
-                                        <td className="px-4 py-2.5 text-gray-500 truncate max-w-[150px] hidden md:table-cell" title={row.moldeDescripcion || row.molde_descripcion}>
+                                        <td className="px-4 py-2.5 text-gray-600 whitespace-normal min-w-[180px] hidden md:table-cell" title={row.moldeDescripcion || row.molde_descripcion}>
                                             {row.moldeDescripcion || row.molde_descripcion || '-'}
                                         </td>
                                     </tr>
