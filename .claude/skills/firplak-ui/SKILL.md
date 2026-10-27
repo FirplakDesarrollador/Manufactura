@@ -34,16 +34,34 @@ Este skill concentra las reglas visuales de la aplicación. Complementa:
 
 ## 2. Banners y barras
 
-### 2.1 Banner principal (encabezado)
-Componente único: `components/opt-sistemica/Header.tsx`. **No crear encabezados propios.**
+### 2.0 Encabezados por niveles (estándar de toda la app)
+Aplica a todas las pantallas **excepto Control de Piso MS (`/marmol`), FV (`/fibra`) y Muebles (`/muebles`)**, que tienen su propio encabezado de planta.
+
+| Nivel | Qué es | Alto | Componente / clases |
+|---|---|---|---|
+| 1 | Banner | 56 px (`h-14`) | `Header` (siempre estilo compacto) |
+| 2 | Pestañas del módulo | 44 px (`xl:h-11`) | barra de pestañas (§2.3) |
+| 3 | Pestañas de una sección (opcional) | 44 px (`xl:h-11`) | misma barra que el nivel 2, **pegada** a él |
+
+- Los niveles 2 y 3 son **más bajos que el banner**; nunca de su misma altura.
+- Sin espacio entre niveles: cada barra solo lleva `border-b border-[#e2ded5]`.
+- El nivel 3 se despliega/oculta con la flecha (`ChevronDown` / `ChevronUp`, 15 px) dentro del botón del nivel 2 que lo abre (ej. **Calidad** en el Tablero de Control).
+- Fijos al desplazarse (solo en `xl`, cuando cada barra tiene alto fijo): nivel 2 `xl:sticky xl:top-14 z-40`, nivel 3 `xl:sticky xl:top-[100px] z-30`. Barras con `fixed`: nivel 2 `top-14`, nivel 3 `top-[100px]`.
+- Referencia: `app/indicadores-productividad/page.tsx` (3 niveles) y los `components/*/SubHeader*.tsx`.
+
+### 2.1 Banner principal (nivel 1)
+Componente único: `components/opt-sistemica/Header.tsx`. **No crear encabezados propios** (incluye el menú lateral, que así es igual en toda la app).
 
 ```tsx
 <Header title="Calidad MS" subtitle="" compact={true} userEmail={email} showLogout={true}
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
 ```
-- Fondo `bg-[#324354]`, menú hamburguesa a la izquierda, logo FIRPLAK centrado, nombre del usuario a la derecha.
-- `compact` → alto `h-14` y `sticky top-0` (pantallas operativas con barra secundaria). Sin `compact` → `h-20` y `fixed`.
-- Capa `z-[100]`.
+- Fondo `bg-[#324354]`, alto `h-14`, capa `z-[100]`.
+- Izquierda: menú hamburguesa (`w-6 h-6`) + título en mayúsculas `text-lg sm:text-xl font-light tracking-widest`. **Sin subtítulo** (el prop existe por compatibilidad, no se muestra).
+- Centro: logo FIRPLAK `h-11` (blanco, `/logo-firplak-clean.png`).
+- Derecha: solo el primer nombre del usuario `text-base sm:text-lg font-semibold` (sin el texto "Usuario") y, si aplica, cerrar sesión.
+- El estilo es siempre el compacto; `compact` solo decide la posición: `true` → `sticky top-0`; `false` → `fixed` con espaciador `h-14`.
+- Menú lateral: panel oscuro con "FIRPLAK · MANUFACTURA", módulos con submenús (›), sesión activa y "Cerrar sesión". Vive dentro de `Header`; no se duplica en otras pantallas.
 
 ### 2.2 Barra de controles (debajo del banner)
 Patrón de las pestañas de Calidad MS (`app/calidad/ms/page.tsx`): filtros a la izquierda, botones de navegación al centro, indicadores a la derecha.
@@ -79,15 +97,20 @@ Cuando una misma vista sirve para varias plantas, no se crean pantallas distinta
 </div>
 ```
 
-### 2.3 Barra de pestañas (sub-encabezado de módulo)
-Pastillas centradas debajo del banner (ej. `components/mantenimiento/SubHeaderPuestaAPunto.tsx`, Indicadores de Productividad):
+### 2.3 Barra de pestañas (niveles 2 y 3)
+Pastillas centradas debajo del banner (ej. `components/hdt/SubHeader.tsx`, `components/mantenimiento/SubHeaderPuestaAPunto.tsx`, Tablero de Control):
 ```tsx
-<div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm">
-  <div className="max-w-7xl mx-auto flex gap-2 justify-start md:justify-center overflow-x-auto">
-    <button className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs ${activa ? 'bg-[#324354] text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>…</button>
+<div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+  <div className="max-w-7xl w-full mx-auto flex flex-row flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide">
+    <button className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold text-xs sm:text-[13px] whitespace-nowrap ${activa ? 'bg-[#324354] text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+      <Icono size={15} /> <span>Etiqueta</span>
+    </button>
   </div>
 </div>
 ```
+- Botones `h-8`, `rounded-lg`, íconos de 15 px, `whitespace-nowrap shrink-0`.
+- **Siempre una sola fila** (nunca `flex-wrap`: una segunda fila queda tapada por el banner). Si no caben, carrusel con `components/ui/CarruselPestanas.tsx`: centra las pestañas cuando caben y, si no, desplaza en horizontal con flechas ‹ › a los lados. Con una sola fila la barra mide `h-11` en todos los tamaños y puede ir `sticky` (nivel 2 `top-14`, nivel 3 `top-[100px]`).
+- Si un `Suspense` muestra un hueco mientras carga, debe medir `h-11`.
 
 ### 2.4 Botones de navegación con ícono (grupo pegado)
 `components/calidad/CalidadMsNavButtons.tsx`: botones `h-10 w-10` unidos (`-space-x-px`), activo `bg-blue-600 text-white`, inactivo `bg-white text-[#254153] border-gray-300`, primer botón `rounded-l`, último `rounded-r`. Cada botón con `title` descriptivo.
@@ -162,14 +185,57 @@ Una ventana debe quedar **por encima del banner** (más de 100).
 - KPI destacado: fondo navy `bg-[#324354] text-white`, etiqueta `text-[10px] font-black uppercase tracking-wider text-white/70`, valor `text-2xl font-black`.
 - KPI secundario: `bg-slate-50 border border-slate-200 rounded-xl p-2.5`.
 - Tendencia: peor que el histórico → `bg-rose-50 border-rose-200 text-rose-700` + `TrendingUp`; mejor → `bg-emerald-50 border-emerald-200 text-emerald-700` + `TrendingDown` (para defectos, subir es malo).
-- Semáforo del Tablero de Control: verde > meta, amarillo hasta 5 puntos por debajo, rojo más abajo (relativo a la meta de cada planta).
+- Semáforo del Tablero de Control: verde > meta, amarillo hasta 5 puntos por debajo, rojo más abajo (relativo a la meta de cada planta). En gráficas de indicadores con meta (§7.1): verde ≥ meta, amarillo hasta 10 puntos por debajo, rojo.
 - Zonas de criterios de calidad: `border-l-4` roja / naranja (`amber`) / amarilla (`yellow`) / verde (`emerald`) con fondo `-50/70`.
 
 ---
 
 ## 7. Gráficas
 
-Seguir `.agents/skills/visualizacion-graficas/SKILL.md`. Resumen: Recharts, ejes `fontSize` 10–12, alturas 170–340 px según contexto, línea de meta `ReferenceLine` punteada, barras del mes seleccionado resaltadas.
+Seguir `.agents/skills/visualizacion-graficas/SKILL.md` (tamaños para los Dell Pro 14). Resumen: Recharts, ejes `fontSize` 10–12, línea de meta `ReferenceLine` punteada.
+
+### 7.1 Tablero dinámico estilo Power BI (estándar para gráficas nuevas)
+Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → Calidad → Calidad IFI). Toda gráfica de indicadores nueva debe comportarse así.
+
+**Encabezado de la sección (una sola fila)**
+- Izquierda: título `text-base sm:text-lg font-black text-[#324354]` (sin descripción larga) y, debajo, las acciones (`Registrar…` navy, `Configurar…` blanco con borde). Las acciones solo con permiso de edición.
+- Derecha: filtros. En pantallas angostas bajan a su propia línea. Sin botón de recargar: los datos se consultan solos al cambiar filtros.
+
+**Filtros (`FiltroPbi`)**
+- Título pequeño `text-[10px] font-bold text-slate-500` con **borrador** (`Eraser`) encima, visible al pasar el mouse (siempre visible en tablet) cuando hay selección.
+- Lista desplegable de **selección múltiple** con casillas y "Seleccionar todo"; el recuadro dice "Todas", la opción elegida o "Varias selecciones". Nada marcado = "Todas".
+- En cascada: **Año → Mes → Semana → Día**; cada filtro ofrece solo valores con datos según los anteriores, y al cambiar uno se limpian los de abajo.
+- Al abrir la pantalla: **año y mes en curso**. Semanas ISO (lunes a domingo, como Power BI); con varios años, semanas y días muestran el año.
+
+**Granularidad automática de las columnas**
+| Filtros | Columnas | Tarjetas |
+|---|---|---|
+| Un año + un mes | un día por columna | promedio del mes |
+| Varios meses o años | un mes por columna (`oct 25`) | promedio de los meses |
+| Semana o días marcados | los días de esa selección | promedio de esos días |
+| Año sin marcar ("Todas") | **un año por columna** | promedio de todos los meses |
+- La vista por año lee resultados ya guardados (API `?vista=anual`), no recalcula en vivo.
+
+**Tarjetas KPI encima de la gráfica**
+- Primera tarjeta (doble ancho): indicador general con meta en chip ("Meta 90%"). Luego una tarjeta por componente (planta) con peso y meta.
+- Siempre muestran el **promedio de lo filtrado**; si hay una columna resaltada, muestran esa columna.
+- Valor coloreado con el **mismo semáforo que las columnas**.
+- Componente sin dato: borde punteado, "+ Agregar" (si puede editar). "No trabajó": texto gris; su peso se reparte entre los demás.
+- **Clic en una tarjeta de componente** = la gráfica muestra solo ese componente (su meta como línea, su semáforo, título "Calidad <nombre> por Día"); la tarjeta elegida `ring-2 ring-[#324354]`, las otras `opacity-60`, la general `opacity-40`. Clic de nuevo o en la general vuelve al total.
+
+**Gráfica**
+- `BarChart` alto **380 px**, `margin.top` 22 para las etiquetas.
+- **Valor encima de cada columna** (`LabelList position="top"`, 1 decimal, `fontSize 10`, `fontWeight 800`).
+- Línea de meta `ReferenceLine` azul `#2563eb` punteada; la etiqueta "Meta X%" va **en el eje Y** (`position: 'left'`, `offset: 36`, margen izquierdo 62 y `YAxis width={32}`), nunca dentro del área de columnas, para no tapar los valores.
+- Semáforo del indicador general: verde ≥ meta, amarillo hasta 10 puntos por debajo, rojo más abajo (`#59a96a` / `#deb841` / `#d14747`). Por componente, el mismo corte contra su propia meta (`colorPlanta`).
+- **Resaltado tipo Power BI:** clic en una columna la resalta (las demás `fillOpacity 0.3`) y las tarjetas muestran ese periodo; **otro clic en la misma columna o un clic por fuera** la quita (botón "Quitar selección" en la tarjeta general). Las tarjetas, filtros y ventanas no quitan el resaltado (`data-ifi-conservar`).
+- Recharts 3: el clic de la gráfica trae `activeIndex`/`activeLabel` (no `activePayload`). Usar el clic de la gráfica **y** el de la `Bar`, con protección contra doble disparo (≈150 ms).
+- Tooltip: periodo, valor y detalle por componente (calidad, meta, cumplimiento, peso efectivo; "No trabajó: X").
+
+**Datos y configuración**
+- Pesos de los componentes **por año** (ventana "Configurar pesos": deben sumar 100 %; sin pesos del año se usan los vigentes).
+- Registro manual por día con opción **"No trabajó"** (queda fuera del cálculo y su peso se reparte).
+- Consultas por mes en lotes de 3 y guardadas en memoria mientras la página esté abierta.
 
 ---
 
@@ -198,3 +264,12 @@ Seguir `.agents/skills/visualizacion-graficas/SKILL.md`. Resumen: Recharts, ejes
 - 2026-10-24 · **Nuevo defecto MS** (`NuevoDefectoMsModal`): crea el defecto en `ms_defectos` (registro, reportes, histórico, indicadores y Power BI) + su criterio vinculado. Botón "Nuevo defecto" en la barra de Criterios (MS con `configurar_defectos`) y tarjeta punteada al final de la matriz del registro.
 - 2026-10-24 · Barras de Histórico y Saldos: buscador primero y del ancho del selector del registro (`max-w-[520px]`, `[contain:inline-size]`); filtros de tipo como lista desplegable con etiqueta (patrón del selector de planta); fechas como rango "desde a hasta" a la derecha de los botones.
 - 2026-10-24 · Permisos por botón en Calidad MS (`permisosCalidadMs` / `usePermisosCalidadMs`): la barra muestra solo los botones permitidos (esquinas con `first:rounded-l last:rounded-r`); Configuración y Criterios con nivel Sin acceso / Ver / Editar (selector segmentado en Configuración → Usuarios). "Ver" = consulta sin guardar (`DefectsSettingsModal soloLectura`, criterio sin edición).
+- 2026-10-26 · Filtros estilo Power BI (`FiltroPbi` en `CalidadGeneralIFI`): título pequeño con borrador (`Eraser`) encima de cada lista desplegable de **selección múltiple** con casillas y "Seleccionar todo" (texto "Todas" / la opción / "Varias selecciones"), en cascada Año → Mes → Semana → Día (nada marcado = "Todas"). Gráficas con resaltado tipo Power BI: clic en una columna la resalta (las demás al 30 %) y las tarjetas muestran ese periodo; otro clic en la misma columna o por fuera la quita. Valor encima de cada columna con 1 decimal.
+- 2026-10-26 · Tablero de Control: tercer nivel de pestañas (Calidad) pegado al segundo, con la misma altura y clases (`py-1.5 px-4`, botones `px-4 py-1.5 rounded-xl`); se despliega/oculta con la flecha (`ChevronDown`/`ChevronUp`) del botón del segundo nivel.
+- 2026-10-26 · Tablero de Control con banner compacto (`compact`, sin subtítulo) y los niveles 2 y 3 de pestañas más bajos que el banner (`xl:h-11`, botones `h-8 text-[13px] rounded-lg`), fijos al desplazarse en `xl` (`top-14` y `top-[100px]`).
+- 2026-10-26 · Banner (`Header`): logo FIRPLAK más grande (`h-11` compacto, `h-16` normal) y sin el texto "Usuario" bajo el nombre; aplica a toda la app.
+- 2026-10-26 · Encabezados por niveles en toda la app (§2.0): banner siempre compacto (56 px, logo `h-11`, sin subtítulo ni "Usuario") y barras de pestañas de 44 px con botones `h-8` en los 8 `SubHeader` y en Consulta SAP, Máquinas, LILAC, Bitácora, Asistencia, Gestor de Mantenimiento y Calidad; detalle de OPT pasa al `Header` estándar. Excepto Control de Piso MS/FV/Muebles.
+- 2026-10-26 · Tablero de Control: 10 pestañas (Tiempo Real, Tablero de Control, Control de Piso, Nivel de Servicio, Productividad, Calidad, Mantenimiento, Sistema de Producción, Variación, Ausentismo) en una sola fila con `CarruselPestanas`.
+- 2026-10-26 · IFI general: clic en la tarjeta de una planta filtra la gráfica a esa planta (meta y semáforo de la planta; tarjeta con `ring-2 ring-[#324354]`, las demás al 60 % y el IFI general al 40 %); clic en IFI General o de nuevo en la planta vuelve al general. Se quitan la descripción y "Sincronizar histórico".
+- 2026-10-26 · IFI general: botón "Configurar pesos" (ícono `Scale`) con ventana de pesos por año (tabla `calidad_ifi_pesos`, deben sumar 100 %); tarjetas de planta con el mismo semáforo que las columnas (`colorPlanta`: verde ≥ meta, amarillo hasta 10 pts debajo, rojo). Sin botón de recargar.
+- 2026-10-26 · §7.1 Tablero dinámico estilo Power BI (filtros múltiples en cascada con borrador, columnas por día/mes/año, tarjetas que filtran la gráfica, resaltado y semáforo) tomado de Calidad IFI como estándar para gráficas nuevas.

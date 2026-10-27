@@ -33,8 +33,8 @@ export default function SubHeader() {
   }
 
   return (
-    <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans">
-      <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-start overflow-x-auto scrollbar-hide py-0.5">
+    <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+      <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-2 justify-start overflow-x-auto scrollbar-hide py-0.5">
         {categorias.map((cat) => {
           const isActive = activeCategoryId === cat.id;
           return (
@@ -45,7 +45,7 @@ export default function SubHeader() {
               className="flex-shrink-0"
             >
               <button
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 ${
                   isActive
                     ? 'bg-[#324354] text-white shadow-md'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'

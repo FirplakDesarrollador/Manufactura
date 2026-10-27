@@ -68,10 +68,6 @@ import {
 } from 'recharts';
 
 // URLs de Power BI
-const POWERBI_URL_GENERAL =
-    process.env.NEXT_PUBLIC_POWERBI_CALIDAD_GENERAL ||
-    'https://app.powerbi.com/view?r=eyJrIjoiN2MxNmUwZTUtYTY0MC00MmFjLWI2ZjctMDYzNDJlODU4MTk0IiwidCI6ImZhMWRlMDRmLTQ3ODAtNGQ4My1hOTQyLTkzYzdhZThkZWU5ZCIsImMiOjR9';
-
 const POWERBI_URL_MS =
     process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MS ||
     'https://app.powerbi.com/view?r=eyJrIjoiN2ZkMjI1YjAtYmMyYi00ZDQxLWJjZDktZWVkZmFiMGU0NTgzIiwidCI6ImZhMWRlMDRmLTQ3ODAtNGQ4My1hOTQyLTkzYzdhZThkZWU5ZCIsImMiOjR9';
@@ -109,7 +105,7 @@ const MESES = [
 ];
 
 // Pestañas Principales Solicitadas en el SubHeader
-type MainTabKey = 'CALIDAD_IFI' | 'SALDOS' | 'PLAN_VIGILANCIA' | 'RRC' | 'QRQC';
+export type MainTabKey = 'CALIDAD_IFI' | 'SALDOS' | 'PLAN_VIGILANCIA' | 'RRC' | 'QRQC';
 
 interface SubHeaderTab {
     id: MainTabKey;
@@ -117,7 +113,7 @@ interface SubHeaderTab {
     icon: React.ReactNode;
 }
 
-const MAIN_SUBHEADER_TABS: SubHeaderTab[] = [
+export const MAIN_SUBHEADER_TABS: SubHeaderTab[] = [
     { id: 'CALIDAD_IFI', label: 'Calidad IFI', icon: <TrendingUp size={15} /> },
     { id: 'SALDOS', label: 'Saldos y Destrucciones', icon: <Trash2 size={15} /> },
     { id: 'PLAN_VIGILANCIA', label: 'Plan de Vigilancia', icon: <ShieldCheck size={15} /> },
@@ -273,14 +269,20 @@ interface IndicadoresCalidadViewProps {
     showMainHeader?: boolean;
     // Solo la sección de Mármol Sintético (pestaña Indicadores de Calidad MS); misma vista del tablero de control
     soloMs?: boolean;
+    // Pestañas controladas desde la página (el Tablero de Control las muestra como su tercer nivel)
+    tab?: MainTabKey;
+    onTabChange?: (tab: MainTabKey) => void;
+    ocultarPestanas?: boolean;
 }
 
-export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false }: IndicadoresCalidadViewProps) {
+export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false, tab, onTabChange, ocultarPestanas = false }: IndicadoresCalidadViewProps) {
     const router = useRouter();
     const [userEmail, setUserEmail] = useState<string>('');
     
     // Pestaña activa principal
-    const [activeTab, setActiveTab] = useState<MainTabKey>('CALIDAD_IFI');
+    const [tabInterno, setTabInterno] = useState<MainTabKey>('CALIDAD_IFI');
+    const activeTab = tab ?? tabInterno;
+    const setActiveTab = (t: MainTabKey) => (onTabChange ? onTabChange(t) : setTabInterno(t));
     const [isLoading, setIsLoading] = useState(false);
 
     // Vistas individuales por planta (HTML nativo vs Power BI)
@@ -643,16 +645,16 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
             )}
 
             {/* 2. SubHeader Oficial con Pestañas Agrupadas (no aplica en la vista solo MS) */}
-            {!soloMs && (
-            <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-2xs relative z-30 w-full font-sans">
-                <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
+            {!soloMs && !ocultarPestanas && (
+            <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+                <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {MAIN_SUBHEADER_TABS.map(tab => {
                         const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                                className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 ${
                                     isActive
                                         ? 'bg-[#324354] text-white shadow-sm'
                                         : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -681,60 +683,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
                         {/* ------------------------------------------------------------- */}
                         {!soloMs && (<>
                         <section id="general-plantas" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Calidad General Plantas - IFI
-                                        </h2>
-                                        <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-blue-200">
-                                            Consolidado Corporativo
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Cumplimiento ponderado de calidad de las 5 plantas de producción (MS, MBL, CEFI, FV, RTM), cada una con su meta y su peso
-                                    </p>
-                                </div>
-
-                                {/* Botón de alternancia HTML vs Power BI */}
-                                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                    <button
-                                        onClick={() => togglePlantView('general', 'html')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.general === 'html'
-                                                ? 'bg-[#324354] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <BarChart3 className="w-3.5 h-3.5" />
-                                        <span>Tablero Dinámico</span>
-                                    </button>
-                                    <button
-                                        onClick={() => togglePlantView('general', 'powerbi')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.general === 'powerbi'
-                                                ? 'bg-[#0084d1] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                        <span>Power BI</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {plantViews.general === 'powerbi' ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad General"
-                                        src={POWERBI_URL_GENERAL}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <CalidadGeneralIFI />
-                            )}
+                            <CalidadGeneralIFI />
                         </section>
 
                         {/* LINEA DIVISORIA */}

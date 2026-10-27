@@ -42,12 +42,12 @@ function SubHeaderContent({ basePath }: SubHeaderPuestaAPuntoProps) {
   ];
 
   return (
-    <div className="no-print print:hidden bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans">
-      <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
+    <div className="no-print print:hidden bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+      <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
         {menuItems.map((item, idx) => (
           <Link key={idx} href={item.href} style={{ textDecoration: 'none' }} className="flex-shrink-0">
             <button
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 active:scale-95 ${
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 active:scale-95 ${
                 item.isActive
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -69,7 +69,7 @@ function SubHeaderContent({ basePath }: SubHeaderPuestaAPuntoProps) {
 
 export default function SubHeaderPuestaAPunto({ basePath }: SubHeaderPuestaAPuntoProps) {
   return (
-    <Suspense fallback={<div className="no-print print:hidden h-[45px] w-full bg-white border-b border-[#e2ded5]" />}>
+    <Suspense fallback={<div className="no-print print:hidden h-11 w-full bg-white border-b border-[#e2ded5]" />}>
       <SubHeaderContent basePath={basePath} />
     </Suspense>
   );

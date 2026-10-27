@@ -2057,11 +2057,11 @@ export default function LillacModulePage() {
 
       {/* Tabs Menu (Only visible when round is NOT active) */}
       {!isRoundActive && (
-        <div className="bg-white border-b border-[#e2ded5] py-2 px-4 shadow-sm relative z-30">
-          <div className="max-w-7xl mx-auto flex flex-wrap gap-2 sm:gap-4 justify-center">
+        <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+          <div className="max-w-7xl w-full mx-auto flex flex-wrap gap-2 sm:gap-3 justify-center">
             <button
               onClick={() => setActiveTab('estandares')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] ${
                 activeTab === 'estandares'
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -2073,7 +2073,7 @@ export default function LillacModulePage() {
 
             <button
               onClick={() => setActiveTab('historial')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] ${
                 activeTab === 'historial'
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -2085,7 +2085,7 @@ export default function LillacModulePage() {
 
             <button
               onClick={() => setActiveTab('auditoria')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] ${
                 activeTab === 'auditoria'
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -2097,7 +2097,7 @@ export default function LillacModulePage() {
 
             <button
               onClick={() => setActiveTab('indicadores')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] ${
                 activeTab === 'indicadores'
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -2109,7 +2109,7 @@ export default function LillacModulePage() {
 
             <button
               onClick={() => setActiveTab('ejecucion')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm ${
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] ${
                 activeTab === 'ejecucion'
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'

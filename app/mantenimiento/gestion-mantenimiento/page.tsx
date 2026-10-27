@@ -6074,10 +6074,10 @@ export default function GestionMantenimientoPage() {
       />
 
       {/* SubHeader with Main Functions matching FIRPLAK System - Single Row with Lateral Scroll on Mobile & Toggleable Collapse */}
-      <div className={`fixed top-20 left-0 right-0 z-40 bg-white border-b border-[#e2ded5] px-2 font-sans transition-all duration-300 shadow-xs ${
-        isSubHeaderOpen ? 'max-h-16 py-1.5 opacity-100' : 'max-h-0 py-0 opacity-0 overflow-hidden pointer-events-none'
+      <div className={`fixed top-14 left-0 right-0 z-40 bg-white border-b border-[#e2ded5] px-2 font-sans flex items-center transition-all duration-300 shadow-xs ${
+        isSubHeaderOpen ? 'h-11 opacity-100' : 'h-0 opacity-0 overflow-hidden pointer-events-none'
       }`}>
-        <div className="max-w-[1700px] mx-auto flex flex-row items-center justify-start sm:justify-center gap-1.5 py-0.5 overflow-x-auto scrollbar-none flex-nowrap">
+        <div className="max-w-[1700px] mx-auto flex flex-row w-full items-center justify-start sm:justify-center gap-1.5 py-0.5 overflow-x-auto scrollbar-none flex-nowrap">
           {subNavItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -6096,7 +6096,7 @@ export default function GestionMantenimientoPage() {
                     }
                   }
                 }}
-                className={`flex items-center gap-1 px-2.5 lg:px-3 py-1.5 rounded-xl font-bold transition-all text-[11px] lg:text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                className={`flex items-center gap-1 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 ${
                   isActive
                     ? 'bg-[#324354] text-white shadow-md'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -6115,7 +6115,7 @@ export default function GestionMantenimientoPage() {
         type="button"
         onClick={() => setIsSubHeaderOpen(!isSubHeaderOpen)}
         className={`fixed left-1/2 -translate-x-1/2 z-40 bg-slate-200 hover:bg-slate-300 text-slate-700 border-x border-b border-slate-300/80 shadow-xs rounded-b-xl px-2.5 py-0.5 flex items-center justify-center transition-all duration-300 cursor-pointer active:scale-95 opacity-100 ${
-          isSubHeaderOpen ? 'top-[116px]' : 'top-20'
+          isSubHeaderOpen ? 'top-[100px]' : 'top-14'
         }`}
         title={isSubHeaderOpen ? 'Ocultar menú' : 'Mostrar menú'}
       >
@@ -6124,7 +6124,7 @@ export default function GestionMantenimientoPage() {
 
       {/* Main Content Area */}
       <main className={`relative z-10 max-w-[1700px] w-full mx-auto px-2 sm:px-4 lg:px-6 flex-1 flex flex-col gap-1.5 transition-all duration-300 ${
-        isSubHeaderOpen ? 'pt-[124px] sm:pt-[126px]' : 'pt-[88px] sm:pt-[90px]'
+        isSubHeaderOpen ? 'pt-[108px] sm:pt-[110px]' : 'pt-[64px] sm:pt-[66px]'
       }`}>
 
         {/* ========================================================================= */}
