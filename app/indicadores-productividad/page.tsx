@@ -189,6 +189,26 @@ export default function IndicadoresProductividadPage() {
     const [calidadMenuAbierto, setCalidadMenuAbierto] = useState(true);
     const [calidadTab, setCalidadTab] = useState<MainTabKey>("CALIDAD_IFI");
 
+    // La pestaña queda en la dirección (?vista=calidad&sub=CALIDAD_IFI) para que al refrescar o compartir
+    // el enlace se abra la misma vista
+    const [urlLeida, setUrlLeida] = useState(false);
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const vista = params.get("vista");
+        const sub = params.get("sub");
+        if (vista && PESTANAS_TABLERO.some(p => p.id === vista)) setViewMode(vista as VistaTablero);
+        if (sub && MAIN_SUBHEADER_TABS.some(t => t.id === sub)) setCalidadTab(sub as MainTabKey);
+        setUrlLeida(true);
+    }, []);
+    useEffect(() => {
+        if (!urlLeida) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set("vista", viewMode);
+        if (viewMode === "calidad") url.searchParams.set("sub", calidadTab);
+        else url.searchParams.delete("sub");
+        window.history.replaceState(null, "", url.toString());
+    }, [urlLeida, viewMode, calidadTab]);
+
     // Plant selector state
     const [selectedPlant, setSelectedPlant] = useState<PlantKey>("MS");
 
