@@ -1107,12 +1107,12 @@ export default function ConsultaSAPPage() {
             />
 
             {/* SUBHEADER BAR FIXED WITH TABS */}
-            <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans sticky top-0">
-                <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-center overflow-x-auto scrollbar-hide py-0.5">
+            <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center sticky top-0">
+                <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-2 justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {/* 1. Consulta Ordenes */}
                     <button
                         onClick={() => setSubHeaderTab('consulta-ordenes')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'consulta-ordenes'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1125,7 +1125,7 @@ export default function ConsultaSAPPage() {
                     {/* 2. Consulta por Producto */}
                     <button
                         onClick={() => setSubHeaderTab('consulta-producto')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'consulta-producto'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1138,7 +1138,7 @@ export default function ConsultaSAPPage() {
                     {/* 3. Query - Semáforo */}
                     <button
                         onClick={() => setSubHeaderTab('query-semaforo')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'query-semaforo'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1151,7 +1151,7 @@ export default function ConsultaSAPPage() {
                     {/* 4. Query - Ordenes Liberadas (Nuevo) */}
                     <button
                         onClick={() => setSubHeaderTab('query-ordenes-liberadas')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'query-ordenes-liberadas'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1164,7 +1164,7 @@ export default function ConsultaSAPPage() {
                     {/* 5. Query - Entregas Producción (Nuevo) */}
                     <button
                         onClick={() => setSubHeaderTab('query-entregas-produccion')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'query-entregas-produccion'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1177,7 +1177,7 @@ export default function ConsultaSAPPage() {
                     {/* 6. Liberación Muebles */}
                     <button
                         onClick={() => setSubHeaderTab('liberacion-muebles')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'liberacion-muebles'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'

@@ -1235,13 +1235,13 @@ export default function BitacoraPage() {
       />
 
       {/* SubHeader Unificado (Estilo OPT Operativa / FIRPLAK) */}
-      <div className="sticky top-20 bg-white border-b border-[#e2ded5] py-2 px-3 shadow-sm z-40 w-full font-sans">
-        <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-start md:justify-center items-center overflow-x-auto scrollbar-hide py-0.5">
+      <div className="sticky top-14 bg-white border-b border-[#e2ded5] px-3 shadow-2xs z-40 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+        <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-2 justify-start md:justify-center items-center overflow-x-auto scrollbar-hide py-0.5">
           
           {/* Historial Tab */}
           <button
             onClick={() => setActiveTab('historial')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 ${
               activeTab === 'historial'
                 ? 'bg-[#324354] text-white shadow-md'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1267,7 +1267,7 @@ export default function BitacoraPage() {
           {/* Indicadores Tab */}
           <button
             onClick={() => setActiveTab('indicadores')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 ${
               activeTab === 'indicadores'
                 ? 'bg-[#324354] text-white shadow-md'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1281,7 +1281,7 @@ export default function BitacoraPage() {
           {canConfigure && (
             <button
               onClick={() => setActiveTab('configuracion')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'configuracion'
                   ? 'bg-[#324354] text-white shadow-md'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'

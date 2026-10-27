@@ -28,6 +28,9 @@ export default function Header({
   compact = false
 }: HeaderProps) {
   const router = useRouter();
+  // Estándar FIRPLAK: todas las pantallas usan el estilo compacto (banner de 56 px, logo grande, sin subtítulo).
+  // "compact" solo define la posición: pegajoso (true) o fijo con espaciador (false).
+  const estilo = true;
   const [isOpen, setIsOpen] = useState(false);
   const [internalEmail, setInternalEmail] = useState<string | undefined>(undefined);
   const [showUnderConstructionModal, setShowUnderConstructionModal] = useState(false);
@@ -89,36 +92,36 @@ export default function Header({
   return (
     <>
       <header className={`z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full ${compact ? 'sticky top-0' : 'fixed top-0 left-0 right-0'}`}>
-      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${compact ? 'h-14' : 'h-20'}`}>
+      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${estilo ? 'h-14' : 'h-20'}`}>
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
-        <div className={`flex items-center ${compact ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
+        <div className={`flex items-center ${estilo ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
           {onBack && (
             <button
               onClick={onBack}
-              className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${compact ? 'w-8 h-8' : 'w-10 h-10'}`}
+              className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${estilo ? 'w-8 h-8' : 'w-10 h-10'}`}
               title="Volver"
             >
-              <svg className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} group-hover:-translate-x-0.5 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`${estilo ? 'w-5 h-5' : 'w-6 h-6'} group-hover:-translate-x-0.5 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
           )}
           <button
             onClick={() => setIsOpen(true)}
-            className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${compact ? 'w-8 h-8' : 'w-10 h-10'}`}
+            className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${estilo ? 'w-8 h-8' : 'w-10 h-10'}`}
             title="Menú de Navegación"
           >
-            <svg className={`${compact ? 'w-6 h-6' : 'w-8 h-8'} group-hover:scale-110 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`${estilo ? 'w-6 h-6' : 'w-8 h-8'} group-hover:scale-110 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           <div>
-            <h1 className={`${compact ? 'text-lg sm:text-xl font-light text-white tracking-widest uppercase leading-none' : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
+            <h1 className={`${estilo ? 'text-lg sm:text-xl font-light text-white tracking-widest uppercase leading-none' : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
               {title}
             </h1>
-            {subtitle ? (
-              <p className={`${compact ? 'text-[11px] sm:text-xs text-[#F6F3EE]/70 font-medium tracking-wide leading-none mt-0.5' : 'text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none'}`}>
+            {!estilo && subtitle ? (
+              <p className={`${estilo ? 'text-[11px] sm:text-xs text-[#F6F3EE]/70 font-medium tracking-wide leading-none mt-0.5' : 'text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none'}`}>
                 {subtitle}
               </p>
             ) : null}
@@ -130,7 +133,7 @@ export default function Header({
           <img 
             src="/logo-firplak-clean.png" 
             alt="Firplak" 
-            className={`${compact ? 'h-8' : 'h-13'} w-auto object-contain`} 
+            className={`${estilo ? 'h-11' : 'h-16'} w-auto object-contain`}
           />
         </div>
 
@@ -145,11 +148,8 @@ export default function Header({
           {(internalEmail || userEmail) && (
             <div className="flex items-center gap-2">
               <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
-                <p className={`${compact ? 'text-base sm:text-lg font-semibold text-white truncate tracking-wide leading-none mb-0.5' : 'text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1'}`} title={internalEmail || userEmail}>
+                <p className={`${estilo ? 'text-base sm:text-lg font-semibold text-white truncate tracking-wide leading-none' : 'text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none'}`} title={internalEmail || userEmail}>
                   {getFirstName(internalEmail || userEmail || '')}
-                </p>
-                <p className={`${compact ? 'text-[11px]' : 'text-xs sm:text-sm'} italic text-[#7B8E90] tracking-wider leading-none`}>
-                  Usuario
                 </p>
               </div>
               {showLogout && (
@@ -484,7 +484,7 @@ export default function Header({
         </div>
       )}
     </header>
-    {!compact && <div className="h-20 w-full shrink-0"></div>}
+    {!compact && <div className="h-14 w-full shrink-0"></div>}
    </>
   );
 }
