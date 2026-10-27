@@ -8,7 +8,7 @@ import NuevoDefectoMsModal from '@/components/calidad/NuevoDefectoMsModal'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import CriterioDetallePanel from '@/components/calidad/CriterioDetallePanel'
-import { CriterioCalidad, PLANTAS_CRITERIOS, plantaCriterios } from '@/lib/calidad/criterios'
+import { CODIGOS_CRITERIOS_ANTIGUOS, CriterioCalidad, PLANTAS_CRITERIOS, plantaCriterios } from '@/lib/calidad/criterios'
 import { puedeEditarCalidad, permisosCalidadMs } from '@/lib/calidad/permisos'
 import {
     EstadisticasDefectosMs,
@@ -83,7 +83,8 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
 
     // La planta elegida queda en la dirección (?planta=Fv) para compartir o recargar
     useEffect(() => {
-        const desdeUrl = new URLSearchParams(window.location.search).get('planta')
+        const pedida = new URLSearchParams(window.location.search).get('planta')
+        const desdeUrl = pedida ? CODIGOS_CRITERIOS_ANTIGUOS[pedida] || pedida : null
         if (desdeUrl && PLANTAS_CRITERIOS.some(p => p.codigo === desdeUrl)) setPlanta(desdeUrl)
     }, [])
 
