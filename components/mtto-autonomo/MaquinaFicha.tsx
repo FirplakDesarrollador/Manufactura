@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { primeraFoto } from './MaquinaSelect';
+import FotoCompleta from './FotoCompleta';
 
 interface Ficha {
   codigo_equipo: string | null;
@@ -13,6 +14,7 @@ interface Ficha {
 // Es cliente porque el catálogo de máquinas solo se puede leer con la sesión del usuario.
 export default function MaquinaFicha({ idMaquina, nombre, variant = 'screen' }: { idMaquina: number | null; nombre: string; variant?: 'screen' | 'print' }) {
   const [ficha, setFicha] = useState<Ficha | null>(null);
+  const [verFoto, setVerFoto] = useState(false);
 
   useEffect(() => {
     if (!idMaquina && !nombre.trim()) return;
@@ -36,11 +38,14 @@ export default function MaquinaFicha({ idMaquina, nombre, variant = 'screen' }: 
         <img
           src={foto}
           alt={ficha?.nombre_equipo || nombre}
+          onClick={print ? undefined : () => setVerFoto(true)}
+          title={print ? undefined : 'Ver foto completa'}
           style={print
             ? { width: '100%', maxWidth: '110px', maxHeight: '75px', objectFit: 'contain' }
-            : { width: '100%', maxWidth: '170px', height: '110px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #E2E8F0' }}
+            : { width: '100%', maxWidth: '170px', height: '110px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #E2E8F0', cursor: 'zoom-in' }}
         />
       )}
+      {verFoto && foto && <FotoCompleta src={foto} alt={ficha?.nombre_equipo || nombre} onClose={() => setVerFoto(false)} />}
       {ficha?.codigo_equipo && (
         <span style={print
           ? { fontSize: '7.5pt', fontWeight: 700 }
