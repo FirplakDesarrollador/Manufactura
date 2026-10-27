@@ -40,7 +40,7 @@ async function getGraphToken(): Promise<string> {
     return data.access_token;
 }
 
-// Trae los registros FV creados en [desde, hasta) (fechas YYYY-MM-DD, UTC)
+// Trae los registros FV creados en [desde, hasta) (fechas YYYY-MM-DD en hora de Colombia: 00:00 COT = 05:00 UTC)
 export async function fetchRegistrosFv(desde: string, hasta: string): Promise<FvRegistroRaw[]> {
     const token = await getGraphToken();
     const headers = {
@@ -48,7 +48,7 @@ export async function fetchRegistrosFv(desde: string, hasta: string): Promise<Fv
         Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly'
     };
 
-    const filter = `fields/Created ge '${desde}T00:00:00Z' and fields/Created lt '${hasta}T00:00:00Z'`;
+    const filter = `fields/Created ge '${desde}T05:00:00Z' and fields/Created lt '${hasta}T05:00:00Z'`;
     let url: string | undefined =
         `https://graph.microsoft.com/v1.0/sites/${FV_SITE_ID}/lists/${FV_LIST_ID}/items` +
         `?expand=fields(select=Title,Created,Linea,Numerodefactura,Buenestado,Defectos)` +

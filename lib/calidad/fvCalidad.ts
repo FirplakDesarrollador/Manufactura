@@ -2,7 +2,7 @@
 // Replica las medidas y transformaciones del Power BI "BI Calidad FV":
 //  - Fuente: lista SharePoint "Reporte de defectos Fibra de Vidrio" (sitio CalidadMPyTC)
 //  - Solo Linea = "Linea 1", número de factura válido y creados después del 2023-04-01
-//  - Fecha del registro = fecha UTC de Created
+//  - Fecha del registro = fecha de Created en hora de Colombia (UTC-5), igual que el Power BI
 //  - Defectos: texto "38 Pintura chorreada;74 Piel de naranja;..." → se toman hasta 8 (Registros)
 //  - Pieza defectuosa = Buen estado = false con al menos un defecto (de los 5 primeros)
 //    que no sea "Acumulacion de estireno" ni un defecto de molde
@@ -10,6 +10,9 @@
 
 export const FV_META_IFI = 35;
 export const FV_FECHA_INICIO_BI = '2023-04-01';
+
+// Fecha (YYYY-MM-DD) de un instante en hora de Colombia (UTC-5, sin horario de verano)
+export const fechaColombia = (iso: string) => new Date(Date.parse(iso) - 5 * 3600 * 1000).toISOString().slice(0, 10);
 const MAX_DEFECTOS_REGISTROS = 8;
 const MAX_DEFECTOS_DEFECTUOSAS = 5;
 const DEFECTO_ESTIRENO = ' Acumulacion de estireno';
@@ -37,7 +40,7 @@ export interface FvRegistroRaw {
 
 export interface FvPieza {
     id: number;
-    fecha: string; // YYYY-MM-DD (UTC)
+    fecha: string; // YYYY-MM-DD (hora de Colombia)
     producto: string;
     defectos: string[]; // hasta 8 nombres tal como los deja Power Query (con espacio inicial)
     defectosIfi: number; // filas que cuentan en "Piezas defectuosas sin moldes"
@@ -71,7 +74,7 @@ export function normalizarRegistrosFv(rows: FvRegistroRaw[]): FvPieza[] {
     for (const r of rows) {
         if (r.linea !== 'Linea 1') continue;
         if (r.numeroFactura !== null && FACTURAS_INVALIDAS.has(r.numeroFactura)) continue;
-        if (!r.created || r.created.slice(0, 10) <= FV_FECHA_INICIO_BI) continue;
+        if (!r.created || fechaColombia(r.created) <= FV_FECHA_INICIO_BI) continue;
 
         const partes = (r.defectos ?? '').split(';');
         const nombres = (n: number) => partes.slice(0, n).map(nombreDefecto).filter((d): d is string => d !== null);
@@ -83,7 +86,7 @@ export function normalizarRegistrosFv(rows: FvRegistroRaw[]): FvPieza[] {
 
         piezas.push({
             id: r.id,
-            fecha: r.created.slice(0, 10),
+            fecha: fechaColombia(r.created),
             producto: (r.producto || 'Sin producto').trim(),
             defectos,
             defectosIfi,

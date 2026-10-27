@@ -202,6 +202,15 @@ export async function GET(request: Request) {
             const { error: upErr } = await client.from('calidad_ifi_diaria').upsert(snapshot, { onConflict: 'fecha,planta' });
             if (upErr) avisos.push(`No se pudo guardar la instantánea MS/FV: ${upErr.message}`);
         }
+        // FV consultado bien: se quitan días guardados que ya no tienen registros
+        // (p. ej. los guardados con la fecha en UTC antes de pasar a hora de Colombia)
+        if (!avisos.some(a => a.startsWith('FV:'))) {
+            const diasFv = [...fv.keys()];
+            let borrar = client.from('calidad_ifi_diaria').delete().eq('planta', 'FV').eq('fuente', 'sharepoint_fv').gte('fecha', desde).lt('fecha', hasta);
+            if (diasFv.length) borrar = borrar.not('fecha', 'in', `(${diasFv.join(',')})`);
+            const { error: delErr } = await borrar;
+            if (delErr) avisos.push(`No se pudieron limpiar días de FV sin registros: ${delErr.message}`);
+        }
 
         // Unir por día: MS y FV de su fuente; MBL, CEFI y RTM de lo digitado
         const dias = new Map<string, Partial<Record<PlantaIfi, number>>>();
