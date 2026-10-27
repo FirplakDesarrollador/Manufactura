@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
+import { parseDBTimestamp } from '@/lib/utils/date'
 import { registrarEmpaque } from '@/lib/supabase/queries/fibra_empaque'
 import { Hash, Layers, Clock, PackageCheck, Send, Info } from 'lucide-react'
 
@@ -47,7 +48,7 @@ export default function RegistroEmpaqueCard({ registro, usuarioEmail, onRefresh 
                             <div className="flex items-center gap-2 mt-2">
                                 <Clock size={16} className="text-slate-400" />
                                 <p className="text-sm font-bold text-slate-400">
-                                    Finalizado: {new Date(registro.acabado_fecha || '').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                                    Finalizado: {parseDBTimestamp(registro.acabado_fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>
