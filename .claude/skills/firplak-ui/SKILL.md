@@ -224,13 +224,23 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - **Clic en una tarjeta de componente** = la gráfica muestra solo ese componente (su meta como línea, su semáforo, título "Calidad <nombre> por Día"); la tarjeta elegida `ring-2 ring-[#324354]`, las otras `opacity-60`, la general `opacity-40`. Clic de nuevo o en la general vuelve al total.
 
 **Gráfica**
-- `BarChart` alto **380 px**, `margin.top` 22 para las etiquetas.
+- `BarChart` con alto según la pantalla: `h-[max(380px,calc(100dvh-444px))]` (recuadro de ≈ 800 px de pantalla con el zoom habitual de 80 %; se ajusta al alto de la ventana, mínimo 380 px), `margin.top` 22 para las etiquetas.
 - **Valor encima de cada columna** (`LabelList position="top"`, 1 decimal, `fontSize 10`, `fontWeight 800`).
 - Línea de meta `ReferenceLine` azul `#2563eb` punteada; la etiqueta "Meta X%" va **en el eje Y** (`position: 'left'`, `offset: 36`, margen izquierdo 62 y `YAxis width={32}`), nunca dentro del área de columnas, para no tapar los valores.
 - Semáforo del indicador general: verde ≥ meta, amarillo hasta 10 puntos por debajo, rojo más abajo (`#59a96a` / `#deb841` / `#d14747`). Por componente, el mismo corte contra su propia meta (`colorPlanta`).
 - **Resaltado tipo Power BI:** clic en una columna la resalta (las demás `fillOpacity 0.3`) y las tarjetas muestran ese periodo; **otro clic en la misma columna o un clic por fuera** la quita (botón "Quitar selección" en la tarjeta general). Las tarjetas, filtros y ventanas no quitan el resaltado (`data-ifi-conservar`).
 - Recharts 3: el clic de la gráfica trae `activeIndex`/`activeLabel` (no `activePayload`). Usar el clic de la gráfica **y** el de la `Bar`, con protección contra doble disparo (≈150 ms).
 - Tooltip: periodo, valor y detalle por componente (calidad, meta, cumplimiento, peso efectivo; "No trabajó: X").
+
+**Varias gráficas en un mismo tablero (filtro cruzado)** — referencia: `components/calidad/CalidadMsDashboard.tsx` (Mármol Sintético).
+- El tablero completo cabe en la pantalla (≈ 800 px de pantalla con zoom 80 %): cada fila de gráficas usa la variable `--ms-h: max(170px, calc((100dvh - 477px) / 2))`.
+- El filtro va en `components/calidad/FiltroPbi.tsx` (con `semanaIso`): reutilizarlo, no copiarlo.
+- Clic en un elemento (punto, columna, porción del anillo, fila de una lista o tabla) **filtra las demás gráficas** y el elemento queda resaltado (los otros al 25–40 %); otro clic en él o un clic en el fondo de su recuadro lo quita. Encima de las tarjetas, chips "Filtrando por: …" con X y "Quitar todo".
+- **Clic en un mes o un año** de cualquier gráfica de tiempo **cambia los filtros de arriba** (Año/Mes) y todo el tablero pasa a ese periodo; otro clic en el mismo quita ese filtro (mes → año completo; año → todos). Clic en un día solo lo resalta y filtra las demás gráficas. Los periodos fuera de los filtros quedan tenues.
+- Cada gráfica no se filtra a sí misma. Gráficas de tiempo: si el periodo elegido está en la otra (día ↔ mes ↔ año), se resaltan los periodos que lo contienen.
+- Dos gráficas de tendencia: la principal sigue la granularidad automática; la secundaria tiene botones **"Por mes" / "Promedio por año"** (por mes: todos los meses de los años elegidos, los meses fuera del filtro tenues; por año: todos los años, valor = promedio de sus meses). Arranca automática (principal por día → por mes; por mes → por año) y vuelve a automática al cambiar filtros.
+- **Todas las gráficas muestran sus valores**: columnas y líneas con `LabelList position="top"` (1 decimal); puntos de línea con el color del semáforo. Anillo/torta: % en cada porción con espacio (≥ 2,5 %), las causas más allá de 12 se agrupan en "Otras (n)".
+- Al elegir una causa, las tendencias cambian a "% piezas con <causa>" (sin meta) con el color de la causa.
 
 **Datos y configuración**
 - Pesos de los componentes **por año** (ventana "Configurar pesos": deben sumar 100 %; sin pesos del año se usan los vigentes).
@@ -275,3 +285,4 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - 2026-10-26 · §7.1 Tablero dinámico estilo Power BI (filtros múltiples en cascada con borrador, columnas por día/mes/año, tarjetas que filtran la gráfica, resaltado y semáforo) tomado de Calidad IFI como estándar para gráficas nuevas.
 - 2026-10-27 · Pestañas en la dirección: la vista activa se guarda con `?vista=…&sub=…` (`history.replaceState`) para que al refrescar o compartir el enlace se abra la misma pestaña (Tablero de Control; mismo patrón que `?planta=` en Criterios).
 - 2026-10-27 · Láminas de zonas críticas por planta (`ZONAS_CRITICAS_POR_PLANTA`): MS (lavamanos/lavarropas) y MBL-CEFI (mueble con puertas, `/calidad/zonas-criticas/muebles.jpg`, generada con el mismo estilo). Plantas sin lámina muestran el recuadro vacío.
+- 2026-10-27 · Mármol Sintético con el estándar §7.1: filtros Año/Mes/Semana/Día (`FiltroPbi` compartido), valores en líneas, columnas y anillo, filtro cruzado entre Pareto, referencias y tendencias, gráficas por mes/año al quitar filtros. Se quitan el chip "Supabase en vivo", la descripción y el botón de recargar.

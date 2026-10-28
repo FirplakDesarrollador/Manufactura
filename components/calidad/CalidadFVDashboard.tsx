@@ -116,7 +116,8 @@ export default function CalidadFVDashboard() {
     }, []);
 
     return (
-        <div className="space-y-3">
+        // Alto de cada fila de gráficas según la pantalla: el recuadro de FV mide ≈ 800 px de pantalla con el zoom de 80 %
+        <div className="space-y-3" style={{ ["--fv-h" as string]: "max(150px, calc((100dvh - 529px) / 2))" } as React.CSSProperties}>
             {/* Barra de Filtros FV */}
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-50 p-2 sm:p-2.5 rounded-xl border border-slate-200">
                 <div className="flex flex-wrap items-center gap-2">
@@ -225,7 +226,7 @@ export default function CalidadFVDashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
-                        <div className="md:col-span-6 space-y-1 max-h-[195px] overflow-y-auto pr-1 scrollbar-thin">
+                        <div className="md:col-span-6 space-y-1 max-h-[var(--fv-h)] overflow-y-auto pr-1 scrollbar-thin">
                             {pareto.slice(0, 15).map((d, idx) => (
                                 <div key={d.name} className="flex items-center justify-between text-[11px] py-0.5 border-b border-slate-100 hover:bg-slate-50 px-1 rounded">
                                     <div className="flex items-center gap-1.5 truncate mr-1.5">
@@ -240,7 +241,7 @@ export default function CalidadFVDashboard() {
                             ))}
                         </div>
 
-                        <div className="md:col-span-6 h-[195px] flex items-center justify-center relative">
+                        <div className="md:col-span-6 h-[var(--fv-h)] flex items-center justify-center relative">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie data={pareto.slice(0, 15)} dataKey="cantidad" nameKey="name" cx="50%" cy="50%" innerRadius={38} outerRadius={68} paddingAngle={2}>
@@ -270,7 +271,7 @@ export default function CalidadFVDashboard() {
                         </div>
                     </div>
 
-                    <div className="overflow-y-auto max-h-[195px] scrollbar-thin text-xs">
+                    <div className="overflow-y-auto max-h-[var(--fv-h)] scrollbar-thin text-xs">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 text-[10px] border-b border-slate-200">
                                 <tr>
@@ -334,7 +335,7 @@ export default function CalidadFVDashboard() {
                             </span>
                         </div>
                     </div>
-                    <div className="h-[175px] w-full">
+                    <div className="h-[var(--fv-h)] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={ifiPorDia} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -350,7 +351,7 @@ export default function CalidadFVDashboard() {
 
                 <div className="lg:col-span-4 bg-white rounded-xl p-3 shadow-xs border border-slate-200">
                     <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5">IFI por Mes ({selectedYear})</h3>
-                    <div className="h-[175px] w-full">
+                    <div className="h-[var(--fv-h)] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={ifiPorMes} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
