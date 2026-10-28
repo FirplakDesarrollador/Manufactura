@@ -291,15 +291,29 @@ export default function TarjetasAnomaliasPage() {
     }
   };
 
-  // Fetch Maquinas Catalogo
+  // Fetch Maquinas Catalogo: base oficial de Máquinas y Equipos (la misma de Gestor de Mantenimiento).
+  // Se pagina porque Supabase entrega máximo 1000 filas por consulta.
   const fetchMaquinas = async () => {
     try {
-      const { data } = await supabase
-        .from('mantenimiento_maquinas')
-        .select('*')
-        .order('nombre_equipo', { ascending: true });
-      if (data && data.length > 0) {
-        setMaquinasCatalogo(data);
+      let todas: any[] = [];
+      const paso = 1000;
+      for (let desde = 0; ; desde += paso) {
+        const { data, error } = await supabase
+          .from('mantenimiento_maquinas_equipos')
+          .select('id, codigo_equipo, nombre_equipo, nombre_alterno, activo_fijo, marca, modelo, planta, proceso, estado')
+          .order('nombre_equipo', { ascending: true })
+          .range(desde, desde + paso - 1);
+        if (error) throw error;
+        todas = todas.concat(data || []);
+        if (!data || data.length < paso) break;
+      }
+      // Las dadas de baja u obsoletas no se ofrecen para reportar anomalías
+      todas = todas.filter(m => {
+        const est = String(m.estado || '').toUpperCase();
+        return !est.includes('BAJA') && !est.includes('OBSOLET');
+      });
+      if (todas.length > 0) {
+        setMaquinasCatalogo(todas);
       }
     } catch (e) {
       console.warn('Error fetching maquinas:', e);
