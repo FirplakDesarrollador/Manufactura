@@ -8,7 +8,13 @@ export interface MachineItem {
   nombre_equipo: string;
   codigo_equipo?: string;
   planta?: string;
+  nombre_alterno?: string;
+  activo_fijo?: string;
+  proceso?: string;
+  marca?: string;
+  modelo?: string;
   normName?: string;
+  normExtra?: string;
   normCode?: string;
   normPlant?: string;
 }
@@ -92,45 +98,48 @@ export default function MachineSearchAutocomplete({
     const list: MachineItem[] = [];
     const seen = new Set<string>();
 
-    const addMachine = (nombre?: string, codigo?: string, planta?: string, id?: any) => {
-      if (!nombre || !nombre.trim()) return;
-      const cleanName = nombre.trim();
+    const texto = (v: any) => (v === null || v === undefined ? '' : String(v).trim());
+    const addMachine = (m: any) => {
+      const cleanName = texto(m.nombre_equipo || m.nombre || m.equipo);
+      if (!cleanName) return;
       const normName = normalizeStr(cleanName);
       if (seen.has(normName)) return;
       seen.add(normName);
 
-      const normCode = codigo ? normalizeStr(codigo) : '';
-      const normPlant = planta ? normalizeStr(planta) : '';
-
-      list.push({
-        id,
+      const codigo = texto(m.codigo_equipo || m.codigo);
+      const planta = texto(m.planta);
+      const item: MachineItem = {
+        id: m.id,
         nombre_equipo: cleanName,
-        codigo_equipo: codigo?.trim() || undefined,
-        planta: planta?.trim() || undefined,
+        codigo_equipo: codigo || undefined,
+        planta: planta || undefined,
+        nombre_alterno: texto(m.nombre_alterno) || undefined,
+        activo_fijo: texto(m.activo_fijo) || undefined,
+        proceso: texto(m.proceso) || undefined,
+        marca: texto(m.marca) || undefined,
+        modelo: texto(m.modelo) || undefined,
         normName,
-        normCode,
-        normPlant
-      });
+        normCode: normalizeStr(codigo),
+        normPlant: normalizeStr(planta)
+      };
+      // Descripción, activo fijo, proceso, marca y modelo también sirven para buscar
+      item.normExtra = normalizeStr([item.nombre_alterno, item.activo_fijo, item.proceso, item.marca, item.modelo].filter(Boolean).join(' '));
+      list.push(item);
     };
 
-    // 1. Database catalog machines
-    if (Array.isArray(maquinasCatalogo)) {
-      maquinasCatalogo.forEach((m: any) => {
-        addMachine(m.nombre_equipo || m.nombre || m.equipo, m.codigo_equipo || m.codigo, m.planta, m.id);
-      });
+    // 1. Base oficial de Máquinas y Equipos (Gestor de Mantenimiento)
+    if (Array.isArray(maquinasCatalogo) && maquinasCatalogo.length > 0) {
+      maquinasCatalogo.forEach(addMachine);
+      return list;
     }
 
-    // 2. Existing cards machines
+    // 2. Sin conexión a la base: equipos de tarjetas existentes y catálogo de respaldo
     if (Array.isArray(existingTarjetas)) {
       existingTarjetas.forEach(t => {
-        if (t.maquina) addMachine(t.maquina, undefined, t.planta);
+        if (t.maquina) addMachine({ nombre_equipo: t.maquina, planta: t.planta });
       });
     }
-
-    // 3. Fallback FIRPLAK standard machines
-    DEFAULT_FIRPLAK_MACHINES.forEach(m => {
-      addMachine(m.nombre_equipo, m.codigo_equipo, m.planta);
-    });
+    DEFAULT_FIRPLAK_MACHINES.forEach(addMachine);
 
     return list;
   }, [maquinasCatalogo, existingTarjetas]);
@@ -146,7 +155,8 @@ export default function MachineSearchAutocomplete({
       if (
         (item.normName && item.normName.includes(query)) ||
         (item.normCode && item.normCode.includes(query)) ||
-        (item.normPlant && item.normPlant.includes(query))
+        (item.normPlant && item.normPlant.includes(query)) ||
+        (item.normExtra && item.normExtra.includes(query))
       ) {
         matches.push(item);
         if (matches.length >= 50) break;
@@ -222,42 +232,48 @@ export default function MachineSearchAutocomplete({
         )}
       </div>
 
-      {/* Floating Autocomplete Dropdown List */}
+      {/* Lista desplegable: nombre, descripción, código / activo fijo, planta y proceso (legible en celular) */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-64 overflow-y-auto scrollbar-thin divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-[60vh] sm:max-h-80 overflow-y-auto overscroll-contain scrollbar-thin divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-150">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((item, idx) => {
               const isSelected = item.normName === normalizeStr(inputValue);
+              const marcaModelo = [item.marca, item.modelo].filter(Boolean).join(' · ');
               return (
                 <div
                   key={item.id || `${item.nombre_equipo}-${idx}`}
                   onClick={() => handleSelectOption(item)}
-                  className={`px-3.5 py-2.5 cursor-pointer flex items-center justify-between text-xs transition-colors ${
-                    isSelected ? 'bg-amber-50/80 text-[#324354] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                  className={`px-3 sm:px-3.5 py-3 sm:py-2.5 cursor-pointer flex items-start justify-between gap-2 transition-colors ${
+                    isSelected ? 'bg-amber-50/80' : 'hover:bg-slate-50 active:bg-slate-100'
                   }`}
                 >
-                  <div className="flex flex-col gap-0.5 min-w-0 pr-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {item.codigo_equipo && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-100 text-slate-600 rounded border border-slate-200 shrink-0">
-                          [{item.codigo_equipo}]
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className={`text-[13px] sm:text-sm leading-snug text-[#324354] break-words ${isSelected ? 'font-black' : 'font-bold'}`}>
+                      {item.nombre_equipo}
+                    </p>
+                    {item.nombre_alterno && item.nombre_alterno !== item.nombre_equipo && (
+                      <p className="text-[11px] sm:text-xs leading-snug text-slate-500 break-words">{item.nombre_alterno}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {item.planta && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100/70 text-amber-900 rounded-md inline-flex items-center gap-1">
+                          <Building2 className="w-2.5 h-2.5 opacity-70" />
+                          {item.planta}
                         </span>
                       )}
-                      <span className="font-semibold truncate text-[#324354]">
-                        {item.nombre_equipo}
-                      </span>
+                      {item.proceso && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600 rounded-md">{item.proceso}</span>
+                      )}
+                      {item.codigo_equipo && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white text-slate-600 rounded-md border border-slate-200">{item.codigo_equipo}</span>
+                      )}
+                      {item.activo_fijo && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200">AF: {item.activo_fijo}</span>
+                      )}
+                      {marcaModelo && <span className="text-[10px] text-slate-400">{marcaModelo}</span>}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {item.planta && (
-                      <span className="px-2 py-0.5 text-[9.5px] font-medium bg-amber-100/70 text-amber-900 rounded-full flex items-center gap-1">
-                        <Building2 className="w-2.5 h-2.5 opacity-70" />
-                        {item.planta}
-                      </span>
-                    )}
-                    {isSelected && <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                  </div>
+                  {isSelected && <Check className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
                 </div>
               );
             })
