@@ -17,9 +17,8 @@ import {
   Cpu, 
   Layers, 
   ShieldAlert, 
-  Sparkles, 
-  Eye, 
-  Trash2, 
+  Sparkles,
+  Trash2,
   Loader2,
   ChevronRight,
   ArrowLeft,
@@ -219,6 +218,33 @@ export default function TarjetasAnomaliasPage() {
     }
 
     return '';
+  };
+
+  // Fecha de reporte comparable "AAAA-MM-DD HH:mm": fecha de apertura (ISO o DD/MM/AAAA) o, si falta, la de creación
+  const claveFechaReporte = (t: TarjetaTpm): string => {
+    const f = String(t.fecha_apertura || '').trim();
+    if (f.length >= 10 && f[4] === '-' && f[7] === '-') return f.replace('T', ' ').slice(0, 16);
+    const dmy = f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+    if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')} ${(dmy[4] || '00').padStart(2, '0')}:${dmy[5] || '00'}`;
+    return t.created_at ? t.created_at.replace('T', ' ').slice(0, 16) : '';
+  };
+
+  // Nombre completo de quien reportó: el guardado en la tarjeta, completado con Talento Humano
+  // cuando es un correo, un nombre parcial o un genérico ("Operador")
+  const nombreReportante = (t: TarjetaTpm): string => {
+    const guardado = (t.detectada_por || '').trim();
+    const generico = !guardado || ['operador', 'operario'].includes(guardado.toLowerCase());
+    if (guardado.includes('@')) return resolveUserFullName(null, guardado, empleadosList);
+    if (generico) {
+      const correo = t.created_by && t.created_by.includes('@') ? t.created_by : '';
+      return correo ? resolveUserFullName(null, correo, empleadosList) : '';
+    }
+    const exacto = empleadosList.find(e => e.nombreCompleto.toLowerCase() === guardado.toLowerCase());
+    if (exacto) return exacto.nombreCompleto;
+    // Nombre parcial (p. ej. "Hector Chinchilla"): si coincide con un solo empleado, se usa su nombre completo
+    const partes = guardado.toLowerCase().split(/\s+/).filter(p => p.length > 2);
+    const candidatos = partes.length >= 2 ? empleadosList.filter(e => partes.every(p => e.nombreCompleto.toLowerCase().includes(p))) : [];
+    return candidatos.length === 1 ? candidatos[0].nombreCompleto : guardado;
   };
 
   // New TPM Form State
@@ -1063,8 +1089,9 @@ export default function TarjetasAnomaliasPage() {
         valA = a.fotos && a.fotos.length > 0 ? 1 : 0;
         valB = b.fotos && b.fotos.length > 0 ? 1 : 0;
       } else if (sortField === 'fecha_apertura') {
-        valA = a.fecha_apertura ? a.fecha_apertura.slice(0, 10) : (a.created_at?.slice(0, 10) || '');
-        valB = b.fecha_apertura ? b.fecha_apertura.slice(0, 10) : (b.created_at?.slice(0, 10) || '');
+        // Fecha y hora completas: dentro del mismo día también queda primero la más reciente
+        valA = claveFechaReporte(a);
+        valB = claveFechaReporte(b);
       } else if (sortField === 'prioridad') {
         const priorityWeight: Record<string, number> = { 'Alta': 3, 'Media': 2, 'Baja': 1 };
         valA = priorityWeight[a.prioridad] || 0;
@@ -1735,7 +1762,17 @@ export default function TarjetasAnomaliasPage() {
                       {renderSortIcon('prioridad')}
                     </div>
                   </th>
-                  <th 
+                  <th
+                    onClick={() => handleSort('fecha_apertura')}
+                    className="py-3 px-2 font-bold text-center w-[100px] min-w-[90px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    title="Ordenar por fecha de reporte"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Fecha reporte</span>
+                      {renderSortIcon('fecha_apertura')}
+                    </div>
+                  </th>
+                  <th
                     onClick={() => handleSort('plazo')}
                     className="py-3 px-2 font-bold text-center w-[110px] min-w-[100px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
                     title="Ordenar por plazo"
@@ -1766,13 +1803,22 @@ export default function TarjetasAnomaliasPage() {
                     </div>
                   </th>
                   <th className="py-3 px-3 font-bold min-w-[150px] max-w-[240px]">Acción / Solución</th>
-                  <th className="py-3 px-2 font-bold text-center w-[70px] min-w-[60px]">Detalle</th>
+                  <th
+                    onClick={() => handleSort('detectada_por')}
+                    className="py-3 px-3 font-bold min-w-[150px] max-w-[200px] cursor-pointer hover:bg-[#253341] select-none transition-colors"
+                    title="Ordenar por quien reportó"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Reportado por</span>
+                      {renderSortIcon('detectada_por')}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredTarjetas.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-12 text-center text-gray-400">
+                    <td colSpan={13} className="py-12 text-center text-gray-400">
                       No se encontraron tarjetas de anomalías TPM con los filtros aplicados.
                     </td>
                   </tr>
@@ -1856,12 +1902,6 @@ export default function TarjetasAnomaliasPage() {
                           <div className="whitespace-normal break-words font-medium leading-snug text-[11px]" title={item.sintoma || item.descripcion_que}>
                             {item.sintoma || item.descripcion_que}
                           </div>
-                          <div className="text-[9.5px] text-gray-400 mt-1 font-medium flex items-center gap-2 flex-wrap">
-                            <span>📅 {formatFechaDDMMAAAA(item.fecha_apertura)}</span>
-                            {item.detectada_por && (
-                              <span>👤 {item.detectada_por}</span>
-                            )}
-                          </div>
                         </td>
 
                         {/* Prioridad */}
@@ -1872,6 +1912,21 @@ export default function TarjetasAnomaliasPage() {
                           }`}>
                             {item.prioridad}
                           </span>
+                        </td>
+
+                        {/* Fecha reporte (con la hora si se registró) */}
+                        <td className="py-2.5 px-2 text-center whitespace-nowrap text-[#324354]">
+                          {(() => {
+                            const clave = claveFechaReporte(item);
+                            if (!clave) return <span className="text-gray-400 italic text-[10.5px]">—</span>;
+                            const hora = clave.slice(11, 16);
+                            return (
+                              <div className="leading-tight">
+                                <div className="text-[10.5px] font-bold">{formatFechaDDMMAAAA(clave)}</div>
+                                {hora && hora !== '00:00' && <div className="text-[9.5px] text-gray-400 font-medium">{hora}</div>}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Plazo */}
@@ -1929,20 +1984,19 @@ export default function TarjetasAnomaliasPage() {
                           )}
                         </td>
 
-                        {/* Detalle */}
-                        <td className="py-2.5 px-2 text-center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTarjetaDetail(item);
-                            }}
-                            className="px-2.5 py-1.5 bg-[#324354] text-white hover:bg-[#324354]/90 rounded-xl text-[10.5px] font-bold transition-all shadow-2xs flex items-center gap-1 mx-auto cursor-pointer hover:scale-105"
-                            title="Abrir ficha y gestionar tarjeta TPM"
-                          >
-                            <Eye className="w-3 h-3" />
-                            <span>Ver</span>
-                          </button>
+                        {/* Reportado por (nombre completo; el detalle se abre con clic en la fila) */}
+                        <td className="py-2.5 px-3 text-[#324354]">
+                          {(() => {
+                            const nombre = nombreReportante(item);
+                            return nombre ? (
+                              <div className="flex items-start gap-1.5 text-[10.5px] font-semibold leading-tight" title={nombre}>
+                                <User className="w-3.5 h-3.5 text-[#7B8E90] shrink-0 mt-px" />
+                                <span className="whitespace-normal break-words">{nombre}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic text-[10.5px]">Sin registrar</span>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );
