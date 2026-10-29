@@ -6073,17 +6073,22 @@ export default function GestionMantenimientoPage() {
         }}
       />
 
-      {/* SubHeader with Main Functions matching FIRPLAK System - Single Row with Lateral Scroll on Mobile & Toggleable Collapse */}
-      <div className={`fixed top-14 left-0 right-0 z-40 bg-white border-b border-[#e2ded5] px-2 font-sans flex items-center transition-all duration-300 shadow-xs ${
-        isSubHeaderOpen ? 'h-11 opacity-100' : 'h-0 opacity-0 overflow-hidden pointer-events-none'
-      }`}>
+      {/* Nivel 2: pestañas del Gestor. "Planificador" despliega u oculta con su flecha el nivel 3 (barra del planificador) */}
+      <div className="fixed top-12 left-0 right-0 z-40 h-10 bg-white border-b border-[#e2ded5] px-2 font-sans flex items-center shadow-xs">
         <div className="max-w-[1700px] mx-auto flex flex-row w-full items-center justify-start sm:justify-center gap-1.5 py-0.5 overflow-x-auto scrollbar-none flex-nowrap">
           {subNavItems.map((item) => {
             const isActive = activeTab === item.id;
+            const esPlanificador = item.id === 'planificador';
             return (
               <button
                 key={item.id}
+                title={esPlanificador && isActive ? (isSubHeaderOpen ? 'Ocultar la barra del planificador' : 'Mostrar la barra del planificador') : item.label}
                 onClick={() => {
+                  if (esPlanificador && isActive) {
+                    setIsSubHeaderOpen(v => !v);
+                    return;
+                  }
+                  if (esPlanificador) setIsSubHeaderOpen(true);
                   setActiveTab(item.id);
                   if (item.id === 'historial') {
                     if (historyRows.length === 0) {
@@ -6096,7 +6101,7 @@ export default function GestionMantenimientoPage() {
                     }
                   }
                 }}
-                className={`flex items-center gap-1 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                className={`flex items-center gap-1 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
                   isActive
                     ? 'bg-[#324354] text-white shadow-md'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -6104,27 +6109,16 @@ export default function GestionMantenimientoPage() {
               >
                 {item.icon}
                 <span>{item.label}</span>
+                {esPlanificador && (isActive && isSubHeaderOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Toggle pill button for SubHeader navigation */}
-      <button
-        type="button"
-        onClick={() => setIsSubHeaderOpen(!isSubHeaderOpen)}
-        className={`fixed left-1/2 -translate-x-1/2 z-40 bg-slate-200 hover:bg-slate-300 text-slate-700 border-x border-b border-slate-300/80 shadow-xs rounded-b-xl px-2.5 py-0.5 flex items-center justify-center transition-all duration-300 cursor-pointer active:scale-95 opacity-100 ${
-          isSubHeaderOpen ? 'top-[100px]' : 'top-14'
-        }`}
-        title={isSubHeaderOpen ? 'Ocultar menú' : 'Mostrar menú'}
-      >
-        {isSubHeaderOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-700 stroke-[2.5]" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-700 stroke-[2.5]" />}
-      </button>
-
-      {/* Main Content Area */}
+      {/* Main Content Area: el Header ya deja su espacio (48); aquí se suman el nivel 2 (40) y, en el planificador, el nivel 3 (40) */}
       <main className={`relative z-10 max-w-[1700px] w-full mx-auto px-2 sm:px-4 lg:px-6 flex-1 flex flex-col gap-1.5 transition-all duration-300 ${
-        isSubHeaderOpen ? 'pt-[108px] sm:pt-[110px]' : 'pt-[64px] sm:pt-[66px]'
+        activeTab === 'planificador' && isSubHeaderOpen ? 'pt-[88px]' : 'pt-[48px]'
       }`}>
 
         {/* ========================================================================= */}

@@ -163,16 +163,16 @@ const POWERBI_URLS = {
 // Pestañas del Tablero de Control (segundo nivel), en este orden
 type VistaTablero = "hora-a-hora" | "tablero" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "mantenimiento" | "sistema-produccion" | "variacion" | "ausentismo";
 const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode }[] = [
-    { id: "hora-a-hora", label: "Tiempo Real", icon: <Clock size={15} /> },
-    { id: "tablero", label: "Tablero de Control", icon: <SlidersHorizontal size={15} /> },
-    { id: "bi", label: "Control de Piso", icon: <LayoutGrid size={15} /> },
-    { id: "nivel-servicio", label: "Nivel de Servicio", icon: <BarChart3 size={15} /> },
-    { id: "productividad", label: "Productividad", icon: <TrendingUp size={15} /> },
-    { id: "calidad", label: "Calidad", icon: <ShieldCheck size={15} /> },
-    { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={15} /> },
-    { id: "sistema-produccion", label: "Sistema de Producción", icon: <Building2 size={15} /> },
-    { id: "variacion", label: "Variación", icon: <Activity size={15} /> },
-    { id: "ausentismo", label: "Ausentismo", icon: <UserX size={15} /> }
+    { id: "hora-a-hora", label: "Tiempo Real", icon: <Clock size={14} /> },
+    { id: "tablero", label: "Tablero de Control", icon: <SlidersHorizontal size={14} /> },
+    { id: "bi", label: "Control de Piso", icon: <LayoutGrid size={14} /> },
+    { id: "nivel-servicio", label: "Nivel de Servicio", icon: <BarChart3 size={14} /> },
+    { id: "productividad", label: "Productividad", icon: <TrendingUp size={14} /> },
+    { id: "calidad", label: "Calidad", icon: <ShieldCheck size={14} /> },
+    { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={14} /> },
+    { id: "sistema-produccion", label: "Sistema de Producción", icon: <Building2 size={14} /> },
+    { id: "variacion", label: "Variación", icon: <Activity size={14} /> },
+    { id: "ausentismo", label: "Ausentismo", icon: <UserX size={14} /> }
 ];
 
 // Pestañas nuevas que aún no tienen tablero
@@ -366,8 +366,8 @@ export default function IndicadoresProductividadPage() {
                 showLogout={false}
             />
 
-            {/* Sub-Header Actions (segundo nivel): misma altura del banner compacto (h-14) */}
-            <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-11 flex items-center sticky top-14 z-40">
+            {/* Sub-Header Actions (segundo nivel): pegado debajo del banner (h-12) */}
+            <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-12 z-40">
                 <CarruselPestanas className="max-w-[1800px] mx-auto">
                     {PESTANAS_TABLERO.map(p => {
                         const activa = viewMode === p.id;
@@ -384,13 +384,13 @@ export default function IndicadoresProductividadPage() {
                                     }
                                 }}
                                 title={esCalidad && activa ? (calidadMenuAbierto ? "Ocultar pestañas de Calidad" : "Mostrar pestañas de Calidad") : p.label}
-                                className={`flex items-center gap-1.5 h-8 px-3.5 font-bold text-xs sm:text-[13px] rounded-lg transition duration-200 cursor-pointer whitespace-nowrap shrink-0 ${
+                                className={`flex items-center gap-1.5 h-7 px-3 font-bold text-[11px] sm:text-xs rounded-lg transition duration-200 cursor-pointer whitespace-nowrap shrink-0 ${
                                     activa ? "bg-[#324354] text-white shadow-md" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                                 }`}
                             >
                                 {p.icon}
                                 <span>{p.label}</span>
-                                {esCalidad && (activa && calidadMenuAbierto ? <ChevronUp size={15} /> : <ChevronDown size={15} />)}
+                                {esCalidad && (activa && calidadMenuAbierto ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                             </button>
                         );
                     })}
@@ -399,13 +399,13 @@ export default function IndicadoresProductividadPage() {
 
             {/* Tercer nivel: pestañas de Calidad, pegado al segundo y con su misma altura */}
             {viewMode === "calidad" && calidadMenuAbierto && (
-                <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-11 flex items-center sticky top-[100px] z-30">
+                <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-[88px] z-30">
                     <CarruselPestanas className="max-w-[1800px] mx-auto">
                         {MAIN_SUBHEADER_TABS.map(t => (
                             <button
                                 key={t.id}
                                 onClick={() => setCalidadTab(t.id)}
-                                className={`flex items-center gap-1.5 h-8 px-3.5 font-bold text-xs sm:text-[13px] rounded-lg transition duration-200 cursor-pointer whitespace-nowrap shrink-0 ${
+                                className={`flex items-center gap-1.5 h-7 px-3 font-bold text-[11px] sm:text-xs rounded-lg transition duration-200 cursor-pointer whitespace-nowrap shrink-0 ${
                                     calidadTab === t.id
                                         ? "bg-[#324354] text-white shadow-md"
                                         : "bg-slate-100 hover:bg-slate-200 text-slate-700"

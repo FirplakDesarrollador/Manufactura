@@ -107,7 +107,7 @@ function useClicUnico() {
 const etiquetaPorcion = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
     if (!percent || percent < 0.025) return null;
     const rad = Math.PI / 180;
-    const r = outerRadius + 14;
+    const r = outerRadius + 10;
     const x = cx + r * Math.cos(-midAngle * rad);
     const y = cy + r * Math.sin(-midAngle * rad);
     return (
@@ -314,6 +314,10 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
     const cambiarMeses = (v: string[]) => { setMeses(v.map(Number)); setSemanas([]); setDiasSel([]); limpiarSelecciones(); };
     const cambiarSemanas = (v: string[]) => { setSemanas(v); setDiasSel([]); limpiarSelecciones(); };
     const cambiarDias = (v: string[]) => { setDiasSel(v); limpiarSelecciones(); };
+    // Día elegido en la gráfica: se refleja en los filtros Semana y Día (al quitarlo vuelven a lo filtrado)
+    const diaSel = selPeriodo?.gran === 'dia' ? selPeriodo.key : null;
+    const semanasVista = diaSel ? [semanaIso(diaSel).clave] : semanas;
+    const diasVista = diaSel ? [diaSel] : diasSel;
 
     const opcionesSemana = useMemo(() => {
         const mapa = new Map<string, { anio: number; semana: number }>();
@@ -402,11 +406,12 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
     ].filter(Boolean) as { texto: string; quitar: () => void }[];
 
     return (
-        // Alto de cada fila de gráficas según la pantalla: el recuadro de MS mide ≈ 800 px de pantalla con el zoom de 80 %
-        <div className="space-y-3" style={{ ["--ms-h" as string]: "max(170px, calc((100dvh - 477px) / 2))" } as React.CSSProperties}>
-            {/* Encabezado: título y vista a la izquierda; filtros estilo Power BI a la derecha */}
-            <div className="flex flex-wrap items-end justify-between gap-3 pb-3 border-b border-slate-100 text-xs">
-                <div className="min-w-0 space-y-2">
+        // Alto de cada fila de gráficas según la pantalla: el recuadro de MS mide ≈ 810 px de pantalla con el zoom de 100 %
+        <div className="space-y-2" style={{ ["--ms-h" as string]: "max(120px, calc((100dvh - 382px) / 2 - 12px))", ["--ms-h2" as string]: "max(140px, calc((100dvh - 382px) / 2 + 12px))" } as React.CSSProperties}>
+            {/* Encabezado: título y vista a la izquierda; filtros estilo Power BI arriba a la derecha */}
+            <div className="flex flex-wrap items-start justify-between gap-3 pb-2 border-b border-slate-100 text-xs">
+                {/* Título y selector de vista en la misma línea (compacto) */}
+                <div className="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <h2 className="text-base sm:text-lg font-black text-[#324354]">Mármol Sintético (MS)</h2>
                     <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 w-fit">
                         <button
@@ -428,11 +433,11 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                     </div>
                 </div>
                 {vista === 'html' && (
-                    <div className="flex flex-wrap items-end gap-2 w-full lg:w-auto">
+                    <div className="flex flex-wrap items-start gap-2 w-full lg:w-auto">
                         <FiltroPbi titulo="Año" seleccion={anios.map(String)} opciones={aniosDisponibles.map(a => ({ value: String(a), label: String(a) }))} onChange={cambiarAnios} onBorrar={() => cambiarAnios([])} puedeBorrar={anios.length > 0} />
                         <FiltroPbi titulo="Mes" seleccion={meses.map(String)} opciones={MESES.map((m, i) => ({ value: String(i + 1), label: m }))} onChange={cambiarMeses} onBorrar={() => cambiarMeses([])} puedeBorrar={meses.length > 0} />
-                        <FiltroPbi titulo="Semana" seleccion={semanas} opciones={opcionesSemana} onChange={cambiarSemanas} onBorrar={() => cambiarSemanas([])} puedeBorrar={semanas.length > 0} />
-                        <FiltroPbi titulo="Día" seleccion={diasSel} opciones={opcionesDia} onChange={cambiarDias} onBorrar={() => cambiarDias([])} puedeBorrar={diasSel.length > 0} />
+                        <FiltroPbi titulo="Semana" seleccion={semanasVista} opciones={opcionesSemana} onChange={cambiarSemanas} onBorrar={() => cambiarSemanas([])} puedeBorrar={semanasVista.length > 0} />
+                        <FiltroPbi titulo="Día" seleccion={diasVista} opciones={opcionesDia} onChange={cambiarDias} onBorrar={() => cambiarDias([])} puedeBorrar={diasVista.length > 0} />
                     </div>
                 )}
             </div>
@@ -463,22 +468,21 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                     {/* Tarjetas KPI */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                         {kpis.map(k => (
-                            <div key={k.titulo} className={`p-2 rounded-xl border shadow-2xs flex flex-col justify-between ${k.estilo}`}>
-                                <span className={`text-[10px] font-bold uppercase truncate ${k.tit}`}>{k.titulo}</span>
-                                <span className="text-base sm:text-lg font-black mt-0.5">{cargandoInicial ? '…' : k.valor}</span>
+                            <div key={k.titulo} className={`px-2.5 py-1.5 rounded-xl border shadow-2xs flex flex-col justify-between ${k.estilo}`}>
+                                <span className={`text-[8px] font-bold uppercase truncate ${k.tit}`}>{k.titulo}</span>
+                                <span className="text-sm sm:text-base font-black leading-tight mt-0.5">{cargandoInicial ? '…' : k.valor}</span>
                             </div>
                         ))}
                     </div>
 
                     {/* Pareto (lista + anillo) y detalle por referencia */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-                        <div className="lg:col-span-7 bg-white rounded-xl p-3 shadow-xs border border-slate-200 flex flex-col">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+                        <div className="lg:col-span-7 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200 flex flex-col">
                             <div className="flex items-center justify-between mb-1.5">
                                 <h3 className="text-xs sm:text-sm font-black text-slate-800">Pareto de causas</h3>
-                                <span className="text-[10px] text-slate-400 font-bold">{pareto.length} causas · clic para filtrar</span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
-                                <div className="md:col-span-6 space-y-0.5 max-h-[var(--ms-h)] overflow-y-auto pr-1 scrollbar-thin">
+                                <div className="md:col-span-5 space-y-0.5 max-h-[var(--ms-h)] overflow-y-auto pr-1 scrollbar-thin">
                                     {pareto.map(d => {
                                         const activa = selCausa === d.name;
                                         return (
@@ -500,20 +504,21 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                     })}
                                     {!pareto.length && <p className="text-xs text-slate-400 py-6 text-center">{cargandoInicial ? 'Cargando…' : 'Sin defectos en el periodo.'}</p>}
                                 </div>
+                                {/* Anillo grande: sube hasta la línea del título para usar todo el alto del recuadro */}
                                 <div
-                                    className="md:col-span-6 h-[var(--ms-h)]"
+                                    className="md:col-span-7 h-[var(--ms-h)] md:h-[calc(var(--ms-h)+28px)] md:-mt-7"
                                     onClick={() => { if (!clicAnillo.consumir()) setSelCausa(null); }}
                                 >
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
+                                        <PieChart margin={{ top: 14, right: 40, bottom: 14, left: 40 }}>
                                             <Pie
                                                 data={anillo}
                                                 dataKey="cantidad"
                                                 nameKey="name"
                                                 cx="50%"
                                                 cy="50%"
-                                                innerRadius="45%"
-                                                outerRadius="75%"
+                                                innerRadius="55%"
+                                                outerRadius="100%"
                                                 paddingAngle={1.5}
                                                 label={etiquetaPorcion}
                                                 labelLine={false}
@@ -536,26 +541,28 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                             </div>
                         </div>
 
-                        <div className="lg:col-span-5 bg-white rounded-xl p-3 shadow-xs border border-slate-200 flex flex-col">
-                            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                <h3 className="text-xs sm:text-sm font-black text-slate-800">Detalle por Referencia</h3>
-                                <div className="flex items-center gap-2.5">
-                                    <label className="flex items-center gap-1 font-bold text-slate-600 cursor-pointer text-[11px]">
-                                        <input type="checkbox" checked={verTotal} onChange={e => setVerTotal(e.target.checked)} className="w-3.5 h-3.5 rounded cursor-pointer" />
+                        <div className="lg:col-span-5 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200 flex flex-col">
+                            {/* Título y controles en una sola línea (compacto) */}
+                            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 mb-1.5">
+                                <h3 className="text-xs sm:text-sm font-black text-slate-800 whitespace-nowrap shrink-0">Detalle por Referencia</h3>
+                                {/* El buscador toma el ancho que sobra en la línea del título */}
+                                <div className="flex items-center justify-end gap-2 min-w-0 flex-1">
+                                    <label className="flex items-center gap-1 font-bold text-slate-600 cursor-pointer text-[9px] whitespace-nowrap shrink-0">
+                                        <input type="checkbox" checked={verTotal} onChange={e => setVerTotal(e.target.checked)} className="w-3 h-3 rounded cursor-pointer" />
                                         Total piezas
                                     </label>
-                                    <label className="flex items-center gap-1 font-bold text-slate-600 cursor-pointer text-[11px]">
-                                        <input type="checkbox" checked={verReparacion} onChange={e => setVerReparacion(e.target.checked)} className="w-3.5 h-3.5 rounded cursor-pointer" />
+                                    <label className="flex items-center gap-1 font-bold text-slate-600 cursor-pointer text-[9px] whitespace-nowrap shrink-0">
+                                        <input type="checkbox" checked={verReparacion} onChange={e => setVerReparacion(e.target.checked)} className="w-3 h-3 rounded cursor-pointer" />
                                         Reparación
                                     </label>
-                                    <div className="relative w-32">
-                                        <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <div className="relative flex-1 min-w-[80px] max-w-[160px]">
+                                        <Search className="w-2.5 h-2.5 absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
                                             type="text"
                                             placeholder="Buscar..."
                                             value={refSearch}
                                             onChange={e => setRefSearch(e.target.value)}
-                                            className="w-full pl-6 pr-2 py-0.5 text-xs bg-slate-50 border border-slate-300 rounded-md outline-none focus:border-[#324354]"
+                                            className="w-full pl-5 pr-1.5 py-0.5 text-[9px] bg-slate-50 border border-slate-300 rounded-md outline-none focus:border-[#324354]"
                                         />
                                     </div>
                                 </div>
@@ -617,18 +624,15 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                     </div>
 
                     {/* Tendencias: clic en un punto o columna filtra las demás gráficas; otro clic o clic por fuera lo quita */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
                         <div
-                            className="lg:col-span-7 bg-white rounded-xl p-3 shadow-xs border border-slate-200"
+                            className="lg:col-span-7 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200"
                             onClick={() => { if (!clicPrincipal.consumir() && selPeriodo?.gran === granPrincipal) setSelPeriodo(null); }}
                         >
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                                 <h3 className="text-xs sm:text-sm font-black text-slate-800 first-letter:uppercase">{tituloTendencia(granPrincipal)}</h3>
-                                <span className="text-[10px] font-bold text-slate-500">
-                                    {selCausa ? 'Clic en un punto para filtrar' : 'Semáforo: Verde ≥90% | Amarillo 80–89,9% | Rojo <80% · Clic en un punto para filtrar'}
-                                </span>
                             </div>
-                            <div className="h-[var(--ms-h)] w-full">
+                            <div className="h-[var(--ms-h2)] w-full">
                                 {cargandoInicial ? (
                                     <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
                                 ) : columnasPrincipal.length === 0 ? (
@@ -653,7 +657,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                             />
                                             <Tooltip content={<TooltipTendencia gran={granPrincipal} causa={selCausa} />} />
                                             {!selCausa && (
-                                                <ReferenceLine y={META_MS} stroke="#2563eb" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: `Meta ${META_MS}%`, fill: '#2563eb', fontSize: 10, fontWeight: 800, position: 'left', offset: 36 }} />
+                                                <ReferenceLine y={META_MS} stroke="#3b8f50" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: `Meta ${META_MS}%`, fill: '#3b8f50', fontSize: 10, fontWeight: 800, position: 'left', offset: 36 }} />
                                             )}
                                             <Line
                                                 type="monotone"
@@ -671,12 +675,18 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                                 }}
                                                 activeDot={{ r: 6 }}
                                             >
+                                                {/* Con muchos puntos los valores se alternan arriba y abajo para no superponerse */}
                                                 <LabelList
                                                     dataKey="valor"
-                                                    position="top"
-                                                    offset={8}
-                                                    formatter={(v: any) => `${Number(v).toFixed(1)}%`}
-                                                    style={{ fontSize: 10, fontWeight: 800, fill: '#334155' }}
+                                                    content={(p: any) => {
+                                                        if (p.value == null) return null;
+                                                        const abajo = columnasPrincipal.length > 12 && p.index % 2 === 1;
+                                                        return (
+                                                            <text x={p.x} y={abajo ? p.y + 14 : p.y - 8} textAnchor="middle" fontSize={9} fontWeight={800} fill="#334155">
+                                                                {`${Number(p.value).toFixed(1)}%`}
+                                                            </text>
+                                                        );
+                                                    }}
                                                 />
                                             </Line>
                                         </LineChart>
@@ -686,7 +696,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                         </div>
 
                         <div
-                            className="lg:col-span-5 bg-white rounded-xl p-3 shadow-xs border border-slate-200"
+                            className="lg:col-span-5 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200"
                             onClick={() => { if (!clicSecundaria.consumir() && selPeriodo?.gran === granSecundaria) setSelPeriodo(null); }}
                         >
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
@@ -703,7 +713,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                     ))}
                                 </div>
                             </div>
-                            <div className="h-[var(--ms-h)] w-full">
+                            <div className="h-[var(--ms-h2)] w-full">
                                 {cargandoInicial ? (
                                     <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
                                 ) : columnasSecundaria.length === 0 ? (
@@ -721,10 +731,10 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                         >
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                             <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                                            <YAxis domain={selCausa ? [0, (max: number) => Math.min(100, Math.ceil((max * 1.2) / 5) * 5 || 5)] : [0, 100]} tick={{ fontSize: 10 }} width={32} />
+                                            <YAxis domain={selCausa ? [0, (max: number) => Math.min(100, Math.ceil((max * 1.2) / 5) * 5 || 5)] : [(min: number) => Math.max(0, Math.min(60, Math.floor(min / 10) * 10)), 100]} tick={{ fontSize: 10 }} width={32} />
                                             <Tooltip content={<TooltipTendencia gran={granSecundaria} causa={selCausa} />} cursor={{ fill: '#f1f5f9' }} />
                                             {!selCausa && (
-                                                <ReferenceLine y={META_MS} stroke="#2563eb" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: `Meta ${META_MS}%`, fill: '#2563eb', fontSize: 10, fontWeight: 800, position: 'left', offset: 36 }} />
+                                                <ReferenceLine y={META_MS} stroke="#3b8f50" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: `Meta ${META_MS}%`, fill: '#3b8f50', fontSize: 10, fontWeight: 800, position: 'left', offset: 36 }} />
                                             )}
                                             <Bar
                                                 dataKey="valor"

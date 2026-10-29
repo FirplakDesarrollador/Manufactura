@@ -283,11 +283,11 @@ export default function AsistenciaPage() {
       `}} />
 
       {/* Subheader Toggler (Pills layout matching Hora a Hora) */}
-      <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-10 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+      <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-10 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center">
         <div className="max-w-4xl w-full mx-auto px-3 flex justify-center gap-2 sm:gap-3">
           <button
             onClick={() => setActiveTab('assistant')}
-            className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-lg text-xs sm:text-[13px] font-bold transition-all cursor-pointer border ${
+            className={`inline-flex items-center gap-2 h-7 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer border ${
               activeTab === 'assistant'
                 ? 'bg-[#324354] text-white border-[#324354] shadow-sm'
                 : 'bg-white text-slate-600 border-[#e2ded5] hover:bg-slate-50'
@@ -298,7 +298,7 @@ export default function AsistenciaPage() {
           </button>
           <button
             onClick={() => setActiveTab('glossary')}
-            className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-lg text-xs sm:text-[13px] font-bold transition-all cursor-pointer border ${
+            className={`inline-flex items-center gap-2 h-7 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer border ${
               activeTab === 'glossary'
                 ? 'bg-[#324354] text-white border-[#324354] shadow-sm'
                 : 'bg-white text-slate-600 border-[#e2ded5] hover:bg-slate-50'

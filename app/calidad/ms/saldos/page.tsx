@@ -440,25 +440,25 @@ export default function SaldosYDestruccionesPage() {
                 onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
             />
             
-            {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
-            <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
-                <div className="max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 relative xl:h-full gap-2">
+            {/* Barra de filtros (nivel 2): 40 px, una sola fila desde 1200 px (zoom 100 %) */}
+            <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-1.5 min-[1200px]:py-0 min-[1200px]:h-10 sticky top-[48px] z-40 shadow-xs flex items-center">
+                <div className="max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between min-[1200px]:grid min-[1200px]:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] min-[1200px]:gap-4 relative min-[1200px]:h-full gap-2">
                     {/* Left: buscador (mismo ancho que el selector de referencia del registro) */}
-                    <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-[260px] xl:max-w-[520px]">
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-[200px] min-[1200px]:max-w-[340px] 2xl:max-w-[480px]">
                         <div className="relative flex-1 min-w-[180px] [contain:inline-size]">
-                            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <Search className="w-3 h-3 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
                                 placeholder="BUSCAR REFERENCIA, DEFECTO..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full h-10 pl-8 pr-3 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
+                                className="w-full h-7 pl-7 pr-2.5 bg-gray-50 border border-gray-300 rounded text-[11px] font-bold text-[#254153] focus:outline-none focus:border-[#254153] uppercase placeholder-gray-400"
                             />
                         </div>
                     </div>
 
                     {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
-                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center z-20">
+                    <div className="order-3 min-[1200px]:order-none w-full min-[1200px]:w-auto flex justify-center z-20">
                         <CalidadMsNavButtons
                             activeTab="saldos"
                             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -468,26 +468,26 @@ export default function SaldosYDestruccionesPage() {
                     </div>
 
                     {/* Right: rango de fechas (como en Histórico), Total y Agregar Evento */}
-                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
+                    <div className="order-2 min-[1200px]:order-none flex flex-wrap items-center justify-center sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto sm:ml-auto min-[1200px]:ml-0 min-[1200px]:justify-self-end min-w-0">
                         <div className="flex items-center gap-1">
                             <input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-[116px] px-1.5 py-1 bg-gray-50 border border-gray-300 rounded text-[11px] font-bold text-[#254153] h-10"
+                                className="w-[108px] px-1.5 py-0.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-[#254153] h-7"
                                 title="Fecha inicio"
                             />
-                            <span className="text-gray-400 text-xs">a</span>
+                            <span className="text-gray-400 text-[10px]">a</span>
                             <input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-[116px] px-1.5 py-1 bg-gray-50 border border-gray-300 rounded text-[11px] font-bold text-[#254153] h-10"
+                                className="w-[108px] px-1.5 py-0.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-[#254153] h-7"
                                 title="Fecha fin"
                             />
                         </div>
-                        <div className="h-10 bg-[#254153] text-white px-3.5 rounded flex items-center gap-1.5 text-xs font-black">
-                            <span className="text-[10px] font-bold text-gray-300 uppercase">Total:</span>
+                        <div className="h-7 bg-[#254153] text-white px-2.5 rounded flex items-center gap-1 text-[11px] font-black">
+                            <span className="text-[9px] font-bold text-gray-300 uppercase">Total:</span>
                             <span>{displayedReports.length}</span>
                         </div>
 
@@ -499,9 +499,9 @@ export default function SaldosYDestruccionesPage() {
                                 setMoldeInputValue('')
                                 setIsModalOpen(true)
                             }}
-                            className="h-10 bg-red-600 hover:bg-red-700 text-white px-4 rounded font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all"
+                            className="h-7 bg-red-600 hover:bg-red-700 text-white px-2.5 rounded font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all"
                         >
-                            <Plus className="w-4 h-4" />
+                            <Plus className="w-3.5 h-3.5" />
                             <span>Agregar Evento</span>
                         </button>
                     </div>

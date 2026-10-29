@@ -28,7 +28,7 @@ export default function Header({
   compact = false
 }: HeaderProps) {
   const router = useRouter();
-  // Estándar FIRPLAK: todas las pantallas usan el estilo compacto (banner de 56 px, logo grande, sin subtítulo).
+  // Estándar FIRPLAK: todas las pantallas usan el estilo compacto (banner de 48 px, logo h-9, sin subtítulo).
   // "compact" solo define la posición: pegajoso (true) o fijo con espaciador (false).
   const estilo = true;
   const [isOpen, setIsOpen] = useState(false);
@@ -92,7 +92,7 @@ export default function Header({
   return (
     <>
       <header className={`z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full ${compact ? 'sticky top-0' : 'fixed top-0 left-0 right-0'}`}>
-      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${estilo ? 'h-14' : 'h-20'}`}>
+      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${estilo ? 'h-12' : 'h-20'}`}>
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
         <div className={`flex items-center ${estilo ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
@@ -117,7 +117,7 @@ export default function Header({
             </svg>
           </button>
           <div>
-            <h1 className={`${estilo ? 'text-lg sm:text-xl font-light text-white tracking-widest uppercase leading-none' : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
+            <h1 className={`${estilo ? `text-base sm:text-lg font-light text-white tracking-widest uppercase leading-none` : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
               {title}
             </h1>
             {!estilo && subtitle ? (
@@ -133,7 +133,7 @@ export default function Header({
           <img 
             src="/logo-firplak-clean.png" 
             alt="Firplak" 
-            className={`${estilo ? 'h-11' : 'h-16'} w-auto object-contain`}
+            className={`${estilo ? 'h-9' : 'h-16'} w-auto object-contain`}
           />
         </div>
 
@@ -148,21 +148,11 @@ export default function Header({
           {(internalEmail || userEmail) && (
             <div className="flex items-center gap-2">
               <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
-                <p className={`${estilo ? 'text-base sm:text-lg font-semibold text-white truncate tracking-wide leading-none' : 'text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none'}`} title={internalEmail || userEmail}>
+                <p className={`${estilo ? `text-sm sm:text-base font-semibold text-white truncate tracking-wide leading-none` : 'text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none'}`} title={internalEmail || userEmail}>
                   {getFirstName(internalEmail || userEmail || '')}
                 </p>
               </div>
-              {showLogout && (
-                <button
-                  onClick={handleSignOut}
-                  className="p-1.5 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
-                  title="Cerrar sesión"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </button>
-              )}
+              {/* Sin botón de cerrar sesión en el banner: se cierra desde el menú lateral */}
             </div>
           )}
         </div>
@@ -484,7 +474,7 @@ export default function Header({
         </div>
       )}
     </header>
-    {!compact && <div className="h-14 w-full shrink-0"></div>}
+    {!compact && <div className={`h-12 w-full shrink-0`}></div>}
    </>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Users,
   Search,
@@ -87,7 +88,7 @@ interface PlannerTecnicosColumnasProps {
   technicians: Technician[];
   tasks: MaintenanceTask[];
   correctiveRecords: CorrectiveRecord[];
-  isSubHeaderOpen?: boolean;
+  isSubHeaderOpen?: boolean; // Nivel 3 (barra de búsqueda y acciones) visible
   onUpdateTaskTech: (taskId: number, newTechId: number) => void;
   onUpdateCorrectivoTech: (correctivoId: number | string, newTechName: string, newTechId?: number | null) => void;
   onRefreshData?: () => void;
@@ -148,6 +149,9 @@ export default function PlannerTecnicosColumnas({
   onOpenCorrectivoDetail,
 }: PlannerTecnicosColumnasProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  // El portal del nivel 3 solo se monta en el navegador (document.body)
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
   const [animatingCardId, setAnimatingCardId] = useState<string | number | null>(null);
   const [sectionsOpenState, setSectionsOpenState] = useState<Record<string, boolean>>({});
   const [areAllOpen, setAreAllOpen] = useState(false);
@@ -634,13 +638,16 @@ export default function PlannerTecnicosColumnas({
   };
 
   return (
-    <div className="flex flex-col gap-2.5 animate-in fade-in duration-300 -mt-1">
+    <div className="flex flex-col gap-2.5 animate-in fade-in duration-300">
       
       {/* --------------------------------------------------------------------- */}
-      {/* COMPACT STICKY TOP SUBHEADER: SEARCH, ACTION BUTTONS (+ Correctivo, + TPM) & STATS */}
+      {/* NIVEL 3 DE ENCABEZADO: búsqueda, + Correctivo, + TPM e indicadores. Fijo debajo de las pestañas */}
+      {/* (nivel 2); se despliega u oculta con la flecha del botón "Planificador". Va en un portal al <body> */}
+      {/* porque la animación del contenedor desubica los elementos "fixed". */}
       {/* --------------------------------------------------------------------- */}
-      <div className={`sticky ${isSubHeaderOpen ? 'top-[122px]' : 'top-[84px]'} z-30 bg-[#F6F3EE] pt-0.5 pb-1 font-sans transition-all duration-300`}>
-        <div className="bg-white rounded-xl px-2.5 py-1 border border-[#e2ded5] shadow-2xs flex flex-row items-center gap-2 w-full">
+      {isSubHeaderOpen && montado && createPortal(
+      <div className="fixed top-[88px] left-0 right-0 z-40 h-10 bg-white border-b border-[#e2ded5] shadow-2xs px-2 sm:px-4 font-sans flex items-center">
+        <div className="max-w-[1700px] mx-auto flex flex-row items-center gap-2 w-full overflow-x-auto scrollbar-none">
           
           {/* Left Group: Search Bar (grows to fill space) + Toggle All Accordions Button */}
           <div className="flex flex-row items-center gap-1.5 flex-1 min-w-0 flex-nowrap">
@@ -730,7 +737,9 @@ export default function PlannerTecnicosColumnas({
           </div>
 
         </div>
-      </div>
+      </div>,
+      document.body
+      )}
 
       {/* --------------------------------------------------------------------- */}
       {/* HORIZONTAL PLANNER BOARD COLUMNS (WITH COLLAPSIBLE SUBTITLE ACCORDIONS) */}
@@ -742,7 +751,7 @@ export default function PlannerTecnicosColumnas({
         {/* =================================================================== */}
         <div
           className="w-[235px] sm:w-[245px] flex-shrink-0 flex flex-col rounded-2xl border-2 border-dashed border-amber-300 overflow-hidden shadow-2xs"
-          style={{ height: isSubHeaderOpen ? 'calc(100vh - 172px)' : 'calc(100vh - 132px)' }}
+          style={{ height: isSubHeaderOpen ? 'calc(100vh - 150px)' : 'calc(100vh - 110px)' }}
         >
           
           {/* Column Header - fixed at top, cards scroll below */}
@@ -873,7 +882,7 @@ export default function PlannerTecnicosColumnas({
               className={`w-[235px] sm:w-[245px] flex-shrink-0 flex flex-col ${palette.border} border rounded-2xl overflow-hidden shadow-2xs ${
                 isInactive ? 'opacity-85 hover:opacity-100 transition-opacity' : ''
               }`}
-              style={{ height: isSubHeaderOpen ? 'calc(100vh - 172px)' : 'calc(100vh - 132px)' }}
+              style={{ height: isSubHeaderOpen ? 'calc(100vh - 150px)' : 'calc(100vh - 110px)' }}
             >
               
               {/* Column Header - fixed at top */}

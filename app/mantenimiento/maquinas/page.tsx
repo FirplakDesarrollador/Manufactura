@@ -875,18 +875,18 @@ export default function MaquinasPage() {
       />
 
       {/* Navigation SubHeader */}
-      <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+      <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center">
         <div className="max-w-[1700px] mx-auto flex flex-row w-full flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
           <button
             onClick={() => router.push("/mantenimiento/gestion-mantenimiento")}
-            className="flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap flex-shrink-0"
+            className="flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap flex-shrink-0"
           >
             <ArrowLeft size={16} />
             <span>Gestor de Mantenimiento</span>
           </button>
           <button
             onClick={() => setActiveTab("inventario")}
-            className="flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold transition-all text-xs sm:text-[13px] bg-[#324354] text-white shadow-md whitespace-nowrap flex-shrink-0 cursor-default"
+            className="flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs bg-[#324354] text-white shadow-md whitespace-nowrap flex-shrink-0 cursor-default"
           >
             <FolderOpen size={16} />
             <span>Inventario de Equipos</span>

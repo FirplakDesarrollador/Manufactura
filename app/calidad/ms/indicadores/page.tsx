@@ -50,7 +50,7 @@ export default function IndicadoresCalidadMsPage() {
             />
 
             {/* Barra de controles: solo los botones de navegación, centrados */}
-            <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 shadow-xs flex items-center">
+            <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 xl:py-0 xl:h-14 sticky top-[48px] z-40 shadow-xs flex items-center">
                 <div className="max-w-[1800px] w-full mx-auto flex justify-center">
                     <CalidadMsNavButtons activeTab="indicadores" hasSettingsPermission={hasSettingsPermission} />
                 </div>

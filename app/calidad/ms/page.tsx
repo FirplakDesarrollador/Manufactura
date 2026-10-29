@@ -322,13 +322,13 @@ export default function CalidadMsReportPage() {
                 onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
             />
 
-            {/* Control Bar - Full Width - Same height (h-14 / 56px) as main blue header */}
+            {/* Barra de controles (nivel 2): una sola fila desde 1200 px (pantallas a zoom 100 % ≈ 1266 px) */}
             {/* En pantallas angostas la barra se divide en filas para no desbordar la página */}
-            <div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
-                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 gap-2 relative xl:h-full">
+            <div className="bg-gray-50 border-b border-gray-200 py-1.5 min-[1200px]:py-0 min-[1200px]:h-10 sticky top-[48px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between min-[1200px]:grid min-[1200px]:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] min-[1200px]:gap-4 gap-2 relative min-[1200px]:h-full">
                     {/* Left: Product Selector & Save button (oculto si el usuario solo ve Hora a hora) */}
                     {soloHoraAHora ? <div /> : (
-                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min xl:max-w-[440px] 2xl:max-w-[520px]">
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min min-[1200px]:max-w-[520px] 2xl:max-w-[600px]">
                         <div className="flex-1 min-w-[160px] [contain:inline-size]">
                             <SearchableSelect
                                 name="producto"
@@ -339,19 +339,19 @@ export default function CalidadMsReportPage() {
                                     const product = products.find(p => p.Referencia === val)
                                     setSelectedProduct(product ? product.id.toString() : '')
                                 }}
-                                className="w-full h-10 bg-white border border-gray-300 rounded px-3 text-[#254153] font-bold text-xs md:text-sm focus:border-[#254153] outline-none transition-all flex items-center"
+                                className="w-full h-7 bg-white border border-gray-300 rounded px-2.5 text-[#254153] font-bold text-[11px] focus:border-[#254153] outline-none transition-all flex items-center"
                             />
                         </div>
 
                         <button
                             onClick={handleSave}
                             disabled={isUploading}
-                            className={`h-10 flex items-center space-x-1.5 px-2.5 sm:px-3 text-white font-black uppercase tracking-wider text-[11px] transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
+                            className={`h-7 flex items-center space-x-1.5 px-2.5 text-white font-black uppercase tracking-wider text-[10px] transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
                             {isUploading ? (
                                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                             ) : (
-                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                 </svg>
                             )}
@@ -361,7 +361,7 @@ export default function CalidadMsReportPage() {
                     )}
 
                     {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
-                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center z-20">
+                    <div className="order-3 min-[1200px]:order-none w-full min-[1200px]:w-auto flex justify-center z-20">
                         <CalidadMsNavButtons
                             activeTab="registro"
                             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -391,30 +391,30 @@ export default function CalidadMsReportPage() {
                     />
 
                     {/* Right: Quick Metrics */}
-                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-3 gap-y-1 2xl:gap-x-4 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
+                    <div className="order-2 min-[1200px]:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-2.5 gap-y-1 2xl:gap-x-4 w-full sm:w-auto sm:ml-auto min-[1200px]:ml-0 min-[1200px]:justify-self-end min-w-0">
                         <div className="flex items-center space-x-1">
-                            <div className="w-5 h-5 rounded-full bg-[#36A284] flex items-center justify-center text-white">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                            <div className="w-4 h-4 rounded-full bg-[#36A284] flex items-center justify-center text-white">
+                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                             </div>
-                            <span className="text-base 2xl:text-lg font-bold text-[#36A284]">{stats.buenos}</span>
-                            <span className="text-xs font-medium text-gray-500">Buenos</span>
+                            <span className="text-sm 2xl:text-base font-bold text-[#36A284]">{stats.buenos}</span>
+                            <span className="text-[10px] font-medium text-gray-500">Buenos</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                            <div className="w-5 h-5 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-xs">
+                            <div className="w-4 h-4 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-[10px]">
                                 !
                             </div>
-                            <span className="text-base 2xl:text-lg font-bold text-[#F24E4E]">{stats.defectuosos}</span>
-                            <span className="text-xs font-medium text-gray-500">Defectuosos</span>
+                            <span className="text-sm 2xl:text-base font-bold text-[#F24E4E]">{stats.defectuosos}</span>
+                            <span className="text-[10px] font-medium text-gray-500">Defectuosos</span>
                         </div>
                         <div className="flex items-center space-x-1" title="Saldos y destrucciones del día">
-                            <BrokenSinkIcon className="w-5 h-5" />
-                            <span className="text-base 2xl:text-lg font-bold text-[#254153]">{stats.saldos}</span>
+                            <BrokenSinkIcon className="w-4 h-4" />
+                            <span className="text-sm 2xl:text-base font-bold text-[#254153]">{stats.saldos}</span>
                         </div>
                         <div className="flex items-center">
-                            <span className="text-base 2xl:text-lg font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
+                            <span className="text-sm 2xl:text-base font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
                         </div>
                         <div className="flex items-center">
-                            <span className="text-base 2xl:text-lg font-bold text-gray-800">Total: {stats.total}</span>
+                            <span className="text-sm 2xl:text-base font-bold text-gray-800">Total: {stats.total}</span>
                         </div>
                     </div>
                 </div>

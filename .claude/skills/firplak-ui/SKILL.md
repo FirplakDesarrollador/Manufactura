@@ -39,14 +39,17 @@ Aplica a todas las pantallas **excepto Control de Piso MS (`/marmol`), FV (`/fib
 
 | Nivel | Qué es | Alto | Componente / clases |
 |---|---|---|---|
-| 1 | Banner | 56 px (`h-14`) | `Header` (siempre estilo compacto) |
-| 2 | Pestañas del módulo | 44 px (`xl:h-11`) | barra de pestañas (§2.3) |
-| 3 | Pestañas de una sección (opcional) | 44 px (`xl:h-11`) | misma barra que el nivel 2, **pegada** a él |
+| 1 | Banner | 48 px (`h-12`) | `Header` (siempre estilo compacto) |
+| 2 | Pestañas del módulo | 40 px (`h-10` / `xl:h-10`) | barra de pestañas (§2.3); botones `h-7 px-3 text-[11px] sm:text-xs`, íconos 14 |
+| 3 | Pestañas de una sección (opcional) | 40 px (`h-10` / `xl:h-10`) | misma barra que el nivel 2, **pegada** a él |
+
+- Medidas pensadas para el **zoom normal de los equipos: 100 %** (1 px CSS ≈ 1,5 px de pantalla). Las alturas "en px" que pide el usuario son px de pantalla medidos en sus capturas.
 
 - Los niveles 2 y 3 son **más bajos que el banner**; nunca de su misma altura.
+- El nivel 3 también puede ser una **barra de herramientas** de la pestaña activa (ej. Gestor de Mantenimiento → **Planificador**: buscador, Desplegar Todo, + Correctivo, + TPM e indicadores en `fixed top-[88px] h-10 bg-white border-b`), con el mismo despliegue por la flecha del botón del nivel 2. El nivel 2 **siempre visible**: no usar pestañitas sueltas para ocultarlo. Si la barra vive dentro de un contenedor con animación (`animate-in`), renderizarla con `createPortal(…, document.body)`: un ancestro con transform desubica los `fixed`. Con `Header` no compacto (ya deja su espaciador de 48 px) el contenido lleva `pt-[88px]` con nivel 3 abierto y `pt-[48px]` sin él.
 - Sin espacio entre niveles: cada barra solo lleva `border-b border-[#e2ded5]`.
 - El nivel 3 se despliega/oculta con la flecha (`ChevronDown` / `ChevronUp`, 15 px) dentro del botón del nivel 2 que lo abre (ej. **Calidad** en el Tablero de Control).
-- Fijos al desplazarse (solo en `xl`, cuando cada barra tiene alto fijo): nivel 2 `xl:sticky xl:top-14 z-40`, nivel 3 `xl:sticky xl:top-[100px] z-30`. Barras con `fixed`: nivel 2 `top-14`, nivel 3 `top-[100px]`.
+- Fijos al desplazarse: nivel 2 `sticky top-12 z-40` (o `top-[48px]`), nivel 3 `sticky top-[88px] z-30`. Barras con `fixed`: nivel 2 `top-12`, nivel 3 `top-[88px]`; el contenido debajo de barras `fixed` lleva `pt-[56px]` (solo banner + nivel 2 cerrado) o `pt-[96px]` (banner + nivel 2).
 - Referencia: `app/indicadores-productividad/page.tsx` (3 niveles) y los `components/*/SubHeader*.tsx`.
 
 ### 2.1 Banner principal (nivel 1)
@@ -56,18 +59,18 @@ Componente único: `components/opt-sistemica/Header.tsx`. **No crear encabezados
 <Header title="Calidad MS" subtitle="" compact={true} userEmail={email} showLogout={true}
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
 ```
-- Fondo `bg-[#324354]`, alto `h-14`, capa `z-[100]`.
-- Izquierda: menú hamburguesa (`w-6 h-6`) + título en mayúsculas `text-lg sm:text-xl font-light tracking-widest`. **Sin subtítulo** (el prop existe por compatibilidad, no se muestra).
-- Centro: logo FIRPLAK `h-11` (blanco, `/logo-firplak-clean.png`).
-- Derecha: solo el primer nombre del usuario `text-base sm:text-lg font-semibold` (sin el texto "Usuario") y, si aplica, cerrar sesión.
-- El estilo es siempre el compacto; `compact` solo decide la posición: `true` → `sticky top-0`; `false` → `fixed` con espaciador `h-14`.
+- Fondo `bg-[#324354]`, alto `h-12` (48 px), capa `z-[100]`.
+- Izquierda: menú hamburguesa (`w-6 h-6`) + título en mayúsculas `text-base sm:text-lg font-light tracking-widest`. **Sin subtítulo** (el prop existe por compatibilidad, no se muestra).
+- Centro: logo FIRPLAK `h-9` (blanco, `/logo-firplak-clean.png`).
+- Derecha: solo el primer nombre del usuario `text-sm sm:text-base font-semibold` (sin el texto "Usuario"). **Sin ícono de cerrar sesión en el banner**: se cierra sesión solo desde el menú lateral.
+- El estilo es siempre el compacto; `compact` solo decide la posición: `true` → `sticky top-0`; `false` → `fixed` con espaciador `h-12`.
 - Menú lateral: panel oscuro con "FIRPLAK · MANUFACTURA", módulos con submenús (›), sesión activa y "Cerrar sesión". Vive dentro de `Header`; no se duplica en otras pantallas.
 
 ### 2.2 Barra de controles (debajo del banner)
 Patrón de las pestañas de Calidad MS (`app/calidad/ms/page.tsx`): filtros a la izquierda, botones de navegación al centro, indicadores a la derecha.
 
 ```tsx
-<div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
+<div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[48px] z-40 flex items-center shadow-xs">
   <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between gap-2
                   xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 relative xl:h-full">
     {/* Izquierda: filtros */}
@@ -81,7 +84,7 @@ Patrón de las pestañas de Calidad MS (`app/calidad/ms/page.tsx`): filtros a la
 ```
 Reglas aprendidas (no repetir los errores):
 - **Nunca** centrar la navegación con `absolute left-1/2 -translate-x-1/2`: se monta sobre los botones vecinos. Usar las 3 columnas reales del grid.
-- Una sola línea solo desde el ancho donde todo cabe (normalmente `xl`); por debajo, filas con `flex-wrap`.
+- Una sola línea solo desde el ancho donde todo cabe; por debajo, filas con `flex-wrap`. **A zoom 100 % la pantalla mide ≈ 1266 px CSS (menos que `xl`)**: el usuario no quiere dos renglones ahí, así que usar `min-[1200px]:` en lugar de `xl:`. Barra de Registro MS como nivel 2: alto `min-[1200px]:h-10` (40 px), selector `h-7 text-[11px]` con `min-[1200px]:max-w-[520px]`, botón Ejecutar `h-7 text-[10px]`, métricas `text-sm` (`2xl:text-base`) con etiquetas `text-[10px]` e íconos `w-4`. Referencia: `app/calidad/ms/page.tsx`; igual en Reportes (`list`), Saldos y Criterios: buscadores `h-7 text-[11px]` con `min-[1200px]:max-w-[340px]` (`2xl:max-w-[480px]`), fechas `h-7 text-[10px] w-[108px]`, botones `h-7 text-[10px]`.
 - Las listas desplegables (`SearchableSelect`) llevan `flex-1 min-w-[160px] [contain:inline-size]` para que el texto largo no fije el ancho mínimo; el texto se corta con "…".
 - Si una barra tiene muchos filtros o un título largo (ej. Histórico, Criterios MS), pasar a una línea en `2xl`.
 - Reutilizar exactamente la plantilla `grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)]`; no inventar variantes (`1.4fr`, etc.). Una barra con alto fijo (`h-14`) cuyo grid no aplica se apila y se monta sobre el contenido.
@@ -100,20 +103,20 @@ Cuando una misma vista sirve para varias plantas, no se crean pantallas distinta
 ### 2.3 Barra de pestañas (niveles 2 y 3)
 Pastillas centradas debajo del banner (ej. `components/hdt/SubHeader.tsx`, `components/mantenimiento/SubHeaderPuestaAPunto.tsx`, Tablero de Control):
 ```tsx
-<div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-11 flex items-center">
+<div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center">
   <div className="max-w-7xl w-full mx-auto flex flex-row flex-nowrap gap-2 justify-start md:justify-center overflow-x-auto scrollbar-hide">
-    <button className={`flex items-center gap-1.5 h-8 px-3.5 rounded-lg font-bold text-xs sm:text-[13px] whitespace-nowrap ${activa ? 'bg-[#324354] text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
-      <Icono size={15} /> <span>Etiqueta</span>
+    <button className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold text-[11px] sm:text-xs whitespace-nowrap ${activa ? 'bg-[#324354] text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+      <Icono size={14} /> <span>Etiqueta</span>
     </button>
   </div>
 </div>
 ```
-- Botones `h-8`, `rounded-lg`, íconos de 15 px, `whitespace-nowrap shrink-0`.
-- **Siempre una sola fila** (nunca `flex-wrap`: una segunda fila queda tapada por el banner). Si no caben, carrusel con `components/ui/CarruselPestanas.tsx`: centra las pestañas cuando caben y, si no, desplaza en horizontal con flechas ‹ › a los lados. Con una sola fila la barra mide `h-11` en todos los tamaños y puede ir `sticky` (nivel 2 `top-14`, nivel 3 `top-[100px]`).
-- Si un `Suspense` muestra un hueco mientras carga, debe medir `h-11`.
+- Botones `h-7`, `rounded-lg`, letra `text-[11px] sm:text-xs`, íconos de 14 px, `whitespace-nowrap shrink-0`.
+- **Siempre una sola fila** (nunca `flex-wrap`: una segunda fila queda tapada por el banner). Si no caben, carrusel con `components/ui/CarruselPestanas.tsx`: centra las pestañas cuando caben y, si no, desplaza en horizontal con flechas ‹ › a los lados. Con una sola fila la barra mide `h-10` en todos los tamaños y puede ir `sticky` (nivel 2 `top-12`, nivel 3 `top-[88px]`).
+- Si un `Suspense` muestra un hueco mientras carga, debe medir `h-10`.
 
 ### 2.4 Botones de navegación con ícono (grupo pegado)
-`components/calidad/CalidadMsNavButtons.tsx`: botones `h-10 w-10` unidos (`-space-x-px`), activo `bg-blue-600 text-white`, inactivo `bg-white text-[#254153] border-gray-300`, primer botón `rounded-l`, último `rounded-r`. Cada botón con `title` descriptivo.
+`components/calidad/CalidadMsNavButtons.tsx`: botones `h-7 w-8` (íconos `w-4`) unidos (`-space-x-px`), activo `bg-blue-600 text-white`, inactivo `bg-white text-[#254153] border-gray-300`, primer botón `rounded-l`, último `rounded-r`. Cada botón con `title` descriptivo.
 
 Orden en Calidad MS: Registro / inspección (`Search`, lupa sola, mismo `w-5 h-5` que los demás) · Reportes del día (`ClipboardList`) · Histórico (`History`) · Saldos y destrucciones (`BrokenSinkIcon`) · Hora a hora (`Timer`) · Indicadores (`PieChart`) · Configuración (`Settings`) · Criterios (`BookOpenCheck`). No repetir íconos de gráfica entre botones.
 
@@ -201,8 +204,15 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - Izquierda: título `text-base sm:text-lg font-black text-[#324354]` (sin descripción larga) y, debajo, las acciones (`Registrar…` navy, `Configurar…` blanco con borde). Las acciones solo con permiso de edición.
 - Derecha: filtros. En pantallas angostas bajan a su propia línea. Sin botón de recargar: los datos se consultan solos al cambiar filtros.
 
+**Recuadro modelo (Calidad General Plantas - IFI, aprobado 2026-10-28)** — referencia: `components/calidad/CalidadGeneralIFI.tsx` dentro de `<section className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">`.
+- **Encabezado** (`flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100 text-xs`): a la izquierda título `text-base sm:text-lg font-black text-[#324354]` y debajo los botones de acción (`px-3 py-1.5 rounded-lg font-bold`, íconos `w-3.5`); a la derecha los 4 `FiltroPbi` **alineados arriba** (`items-start`), al ras del borde superior del recuadro.
+- **Tarjetas compactas** (`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2`, `px-2 py-1.5` / `px-2.5 py-1.5 rounded-xl border shadow-2xs`): fila 1 nombre `text-[10px] font-black uppercase` + peso o chip de meta a la derecha; fila 2 **valor y dato secundario en la misma línea** (`flex items-baseline justify-between`): valor `text-lg`/`text-2xl font-black leading-tight` con semáforo y a la derecha "meta X%" `text-[9px]` (en la general, "Promedio de N día(s) con dato" `text-[10px]` al lado del valor). Nunca una tercera línea.
+- **Gráfica** en `bg-white rounded-xl p-3 shadow-xs border border-slate-200`: solo el título `text-xs sm:text-sm font-black` (**sin leyenda de semáforo** ni textos de ayuda a la derecha). Alto `h-[max(200px,calc(100dvh-375px))]` → recuadro completo ≈ **810 px de pantalla a zoom 100 %**.
+- Meta: `ReferenceLine` **verde `#3b8f50`** punteada `4 4`, `strokeWidth 1.5`, etiqueta "Meta X%" verde en el eje Y.
+- **Clic en una columna de día** la resalta y la **refleja en los filtros Semana y Día** (la semana ISO y el día); al quitar el resaltado los filtros vuelven a lo que había. Cambiar esos filtros con el día reflejado aplica el filtro real.
+
 **Filtros (`FiltroPbi`)**
-- Título pequeño `text-[10px] font-bold text-slate-500` con **borrador** (`Eraser`) encima, visible al pasar el mouse (siempre visible en tablet) cuando hay selección.
+- Tamaño compacto: `sm:w-28 min-w-[96px]`, botón `h-6 text-[9px] font-semibold`, flecha `w-3`; título `text-[8px] font-bold text-slate-500` con **borrador** (`Eraser`) encima, visible al pasar el mouse (siempre visible en tablet) cuando hay selección.
 - Lista desplegable de **selección múltiple** con casillas y "Seleccionar todo"; el recuadro dice "Todas", la opción elegida o "Varias selecciones". Nada marcado = "Todas".
 - En cascada: **Año → Mes → Semana → Día**; cada filtro ofrece solo valores con datos según los anteriores, y al cambiar uno se limpian los de abajo.
 - Al abrir la pantalla: **año y mes en curso**. Semanas ISO (lunes a domingo, como Power BI); con varios años, semanas y días muestran el año.
@@ -224,16 +234,18 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - **Clic en una tarjeta de componente** = la gráfica muestra solo ese componente (su meta como línea, su semáforo, título "Calidad <nombre> por Día"); la tarjeta elegida `ring-2 ring-[#324354]`, las otras `opacity-60`, la general `opacity-40`. Clic de nuevo o en la general vuelve al total.
 
 **Gráfica**
-- `BarChart` con alto según la pantalla: `h-[max(380px,calc(100dvh-444px))]` (recuadro de ≈ 800 px de pantalla con el zoom habitual de 80 %; se ajusta al alto de la ventana, mínimo 380 px), `margin.top` 22 para las etiquetas.
+- `BarChart` con alto según la pantalla: `h-[max(200px,calc(100dvh-375px))]` (recuadro de ≈ 810 px de pantalla con el zoom habitual de 100 %; se ajusta al alto de la ventana, mínimo 200 px), `margin.top` 22 para las etiquetas.
 - **Valor encima de cada columna** (`LabelList position="top"`, 1 decimal, `fontSize 10`, `fontWeight 800`).
-- Línea de meta `ReferenceLine` azul `#2563eb` punteada; la etiqueta "Meta X%" va **en el eje Y** (`position: 'left'`, `offset: 36`, margen izquierdo 62 y `YAxis width={32}`), nunca dentro del área de columnas, para no tapar los valores.
+- Línea de meta `ReferenceLine` verde `#3b8f50` punteada; la etiqueta "Meta X%" va **en el eje Y** (`position: 'left'`, `offset: 36`, margen izquierdo 62 y `YAxis width={32}`), nunca dentro del área de columnas, para no tapar los valores.
 - Semáforo del indicador general: verde ≥ meta, amarillo hasta 10 puntos por debajo, rojo más abajo (`#59a96a` / `#deb841` / `#d14747`). Por componente, el mismo corte contra su propia meta (`colorPlanta`).
 - **Resaltado tipo Power BI:** clic en una columna la resalta (las demás `fillOpacity 0.3`) y las tarjetas muestran ese periodo; **otro clic en la misma columna o un clic por fuera** la quita (botón "Quitar selección" en la tarjeta general). Las tarjetas, filtros y ventanas no quitan el resaltado (`data-ifi-conservar`).
 - Recharts 3: el clic de la gráfica trae `activeIndex`/`activeLabel` (no `activePayload`). Usar el clic de la gráfica **y** el de la `Bar`, con protección contra doble disparo (≈150 ms).
 - Tooltip: periodo, valor y detalle por componente (calidad, meta, cumplimiento, peso efectivo; "No trabajó: X").
 
-**Varias gráficas en un mismo tablero (filtro cruzado)** — referencia: `components/calidad/CalidadMsDashboard.tsx` (Mármol Sintético).
-- El tablero completo cabe en la pantalla (≈ 800 px de pantalla con zoom 80 %): cada fila de gráficas usa la variable `--ms-h: max(170px, calc((100dvh - 477px) / 2))`.
+**Varias gráficas en un mismo tablero (filtro cruzado)** — referencia: `components/calidad/CalidadMsDashboard.tsx` (Mármol Sintético). **Fibra de Vidrio (`CalidadFVDashboard.tsx`) es idéntico en apariencia**: mismo encabezado (título + Tablero Dinámico/Power BI + 4 filtros), 8 tarjetas, Pareto con anillo, "Detalle por Producto", IFI por día y por mes; cambia solo la fuente (SharePoint), la meta (35 %, eje Y ajustado a los datos mostrando la meta) y que la tabla es por producto (casilla "Revisadas", sin reparación). Toda planta nueva con tablero de calidad sigue este mismo diseño. **Saldos y Destrucciones** (`CalidadSaldosDashboard.tsx`) también: mismo encabezado con selector **$ Costo / Piezas** y **Todos / Saldos / Destrucciones**, 8 tarjetas, fila 1 = por día (barras apiladas verde saldo `#10b981` / rojo destrucción `#ef4444` + línea **acumulado** naranja `#f59e0b` en eje derecho) y por mes / promedio por año; fila 2 = Pareto de causas (lista + anillo) y detalle de piezas (tabla con Fecha, Tipo S/D, Referencia, Causa, Pzs, Costo). Pesos compactos en etiquetas (`$7,6 M`, `$352 mil`).
+- Mismo encabezado, filtros arriba, tarjetas compactas, meta verde, sin leyenda de semáforo y día reflejado en Semana/Día que el **recuadro modelo** de arriba.
+- Tarjetas KPI de una fila de 8: nombre `text-[8px] font-bold uppercase`, valor `text-sm sm:text-base font-black leading-tight`, `px-2.5 py-1.5`.
+- Alto por fila: `--ms-h: max(120px, calc((100dvh - 382px) / 2 - 12px))` (Pareto y referencias) y `--ms-h2: max(140px, calc((100dvh - 382px) / 2 + 12px))` (tendencias, más altas para que los valores no se monten) → recuadro completo ≈ 810 px de pantalla a zoom 100 %. Espacios mínimos: raíz `space-y-2`, encabezado `pb-2`, tarjetas de gráfica `p-2.5`, filas `gap-2.5`. Línea con más de 12 puntos: valores alternados arriba/abajo (`LabelList content`, 9 px). Columnas de tendencia con eje Y desde 60 (o el mínimo redondeado), no desde 0. Para que quepa se compacta: selector de vista (Tablero Dinámico / Power BI) **en la misma línea del título**; controles de una tarjeta (casillas `shrink-0` y buscador que toma el ancho sobrante `flex-1 min-w-[80px] max-w-[160px]`, contenedor `flex-1 min-w-0 justify-end`, título `whitespace-nowrap shrink-0`; letra `text-[9px]`, casillas `w-3 h-3`) **en la línea de su título** (`lg:flex-nowrap`: a zoom 100 % con escala de Windows 150 % la pantalla mide ≈ 1266 px CSS, por debajo de `xl`); anillo del Pareto grande: columna `md:col-span-7`, sube hasta la línea del título (`md:-mt-7`, alto `calc(var(--ms-h)+28px)`), `innerRadius 55%` / `outerRadius 100%`, márgenes 14/40 y etiquetas a `outerRadius + 10`; sin textos de ayuda tipo "N causas · clic para filtrar".
 - El filtro va en `components/calidad/FiltroPbi.tsx` (con `semanaIso`): reutilizarlo, no copiarlo.
 - Clic en un elemento (punto, columna, porción del anillo, fila de una lista o tabla) **filtra las demás gráficas** y el elemento queda resaltado (los otros al 25–40 %); otro clic en él o un clic en el fondo de su recuadro lo quita. Encima de las tarjetas, chips "Filtrando por: …" con X y "Quitar todo".
 - **Clic en un mes o un año** de cualquier gráfica de tiempo **cambia los filtros de arriba** (Año/Mes) y todo el tablero pasa a ese periodo; otro clic en el mismo quita ese filtro (mes → año completo; año → todos). Clic en un día solo lo resalta y filtra las demás gráficas. Los periodos fuera de los filtros quedan tenues.
@@ -286,3 +298,5 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - 2026-10-27 · Pestañas en la dirección: la vista activa se guarda con `?vista=…&sub=…` (`history.replaceState`) para que al refrescar o compartir el enlace se abra la misma pestaña (Tablero de Control; mismo patrón que `?planta=` en Criterios).
 - 2026-10-27 · Láminas de zonas críticas por planta (`ZONAS_CRITICAS_POR_PLANTA`): MS (lavamanos/lavarropas) y MBL-CEFI (mueble con puertas, `/calidad/zonas-criticas/muebles.jpg`, generada con el mismo estilo). Plantas sin lámina muestran el recuadro vacío.
 - 2026-10-27 · Mármol Sintético con el estándar §7.1: filtros Año/Mes/Semana/Día (`FiltroPbi` compartido), valores en líneas, columnas y anillo, filtro cruzado entre Pareto, referencias y tendencias, gráficas por mes/año al quitar filtros. Se quitan el chip "Supabase en vivo", la descripción y el botón de recargar.
+- 2026-10-28 · **Encabezados delgados en toda la app** (menos Control de Piso MS/FV/Muebles): banner 48 px (`h-12`, título `text-base sm:text-lg`, logo `h-9`, nombre `text-sm sm:text-base`), niveles 2 y 3 de 40 px con botones `h-7 text-[11px] sm:text-xs`; barras fijas en `top-12` / `top-[48px]` y `top-[88px]`. Recuadro IFI guardado como **recuadro modelo** (§7.1) y replicado en Mármol Sintético.
+- 2026-10-28 · El zoom normal de los equipos es 100 %: Tablero de Control con `Header slim` (48 px, letra un tamaño menor) y pestañas de 40 px; recuadro IFI a ≈ 800 px de pantalla (`calc(100dvh-383px)`), sin la leyenda del semáforo junto al título de la gráfica. `FiltroPbi` más pequeño: `sm:w-32`, botón `h-7 text-[10px]`, título `text-[9px]`. Clic en una columna de día la refleja en los filtros Semana y Día (al quitar el resaltado vuelven). Línea y etiqueta de meta en verde `#3b8f50` (punteada `4 4`). Tarjetas KPI compactas (`py-1.5`): la meta (o el detalle "Promedio de…") va al lado del valor, no en otra línea; filtros alineados arriba (`items-start`) junto al título.
