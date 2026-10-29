@@ -19,7 +19,8 @@ export async function GET() {
             }
             const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
             if (match) {
-                return `${match[1]}-${match[2]}-${match[3]}T00:00:00`;
+                // Se conserva la descripción completa de SAP (incluye sufijos como "(CAJA CERRADA)")
+                const cleanDesc = rawDesc;
             }
             const parsed = new Date(str);
             if (!isNaN(parsed.getTime())) {
@@ -219,7 +220,8 @@ export async function GET() {
         if (marmolRawRows.length > 0) {
             msUpsertBatch = marmolRawRows.map(item => {
                 const rawDesc = (item.producto_descripcion || item.ItemName || '').trim();
-                const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
+                // Se conserva la descripción completa de SAP (incluye sufijos como "(CAJA CERRADA)")
+                const cleanDesc = rawDesc;
 
                 const rawIdeal = item.U_FRealLiberacion ||
                                  item.fecha_ideal_produccion ||
@@ -258,7 +260,8 @@ export async function GET() {
                 .filter(r => !isNonMarmolSku(r.producto_sku, r.producto_descripcion))
                 .map(r => {
                     const rawDesc = (r.producto_descripcion || r.itemName || '').trim();
-                    const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim();
+                    // Se conserva la descripción completa de SAP (incluye sufijos como "(CAJA CERRADA)")
+                    const cleanDesc = rawDesc;
                     return {
                         orden_fabricacion: r.orden_fabricacion,
                         numero_pedido: r.numero_pedido,
