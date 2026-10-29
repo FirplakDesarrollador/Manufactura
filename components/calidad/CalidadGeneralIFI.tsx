@@ -433,6 +433,11 @@ export default function CalidadGeneralIFI() {
     }, [todosLosDias, variosAnios]);
     const opcionesDia = diasSemana.map(d => ({ value: d.fecha, label: unSoloMes ? String(d.dia) : fechaCorta(d.fecha).slice(0, variosAnios ? 10 : 5) }));
 
+    // Día resaltado en la gráfica: se refleja en los filtros Semana y Día (al quitarlo vuelven a lo filtrado)
+    const colDiaSel = sel ? columnas.find(c => c.key === sel && c.tipo === 'dia') : undefined;
+    const semanasVista = colDiaSel ? [semanaIso(colDiaSel.fecha!).clave] : semanas;
+    const diasVista = colDiaSel ? [colDiaSel.fecha!] : diasSel;
+
     const cambiarAnios = (v: string[]) => { setAnios(v.map(Number)); setSemanas([]); setDiasSel([]); setSel(null); };
     const cambiarMeses = (v: string[]) => { setMeses(v.map(Number)); setSemanas([]); setDiasSel([]); setSel(null); };
     const cambiarSemanas = (v: string[]) => { setSemanas(v); setDiasSel([]); setSel(null); };
@@ -497,8 +502,8 @@ export default function CalidadGeneralIFI() {
 
     return (
         <div className="space-y-3">
-            {/* Encabezado: título a la izquierda (con acciones) y filtros estilo Power BI a la derecha */}
-            <div data-ifi-conservar className="flex flex-wrap items-end justify-between gap-3 pb-3 border-b border-slate-100 text-xs">
+            {/* Encabezado: título a la izquierda (con acciones) y filtros estilo Power BI arriba a la derecha */}
+            <div data-ifi-conservar className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100 text-xs">
                 <div className="min-w-0 space-y-2">
                     <div>
                         <h2 className="text-base sm:text-lg font-black text-[#324354]">Calidad General Plantas - IFI</h2>
@@ -523,7 +528,7 @@ export default function CalidadGeneralIFI() {
                         </div>
                     )}
                 </div>
-                <div className="flex flex-wrap items-end gap-2 w-full lg:w-auto">
+                <div className="flex flex-wrap items-start gap-2 w-full lg:w-auto">
                     <FiltroPbi
                         titulo="Año"
                         seleccion={anios.map(String)}
@@ -542,19 +547,19 @@ export default function CalidadGeneralIFI() {
                     />
                     <FiltroPbi
                         titulo="Semana"
-                        seleccion={semanas}
+                        seleccion={semanasVista}
                         opciones={opcionesSemana}
                         onChange={cambiarSemanas}
                         onBorrar={() => cambiarSemanas([])}
-                        puedeBorrar={semanas.length > 0}
+                        puedeBorrar={semanasVista.length > 0}
                     />
                     <FiltroPbi
                         titulo="Día"
-                        seleccion={diasSel}
+                        seleccion={diasVista}
                         opciones={opcionesDia}
                         onChange={cambiarDias}
                         onBorrar={() => cambiarDias([])}
-                        puedeBorrar={diasSel.length > 0}
+                        puedeBorrar={diasVista.length > 0}
                     />
                 </div>
             </div>
@@ -566,7 +571,7 @@ export default function CalidadGeneralIFI() {
             <div data-ifi-conservar className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
                 <div
                     onClick={() => setPlantaSel(null)}
-                    className={`col-span-2 p-2.5 rounded-xl border shadow-2xs flex flex-col justify-between transition-opacity ${plantaSel ? 'opacity-40 cursor-pointer hover:opacity-70' : ''}`}
+                    className={`col-span-2 px-2.5 py-1.5 rounded-xl border shadow-2xs flex flex-col justify-between transition-opacity ${plantaSel ? 'opacity-40 cursor-pointer hover:opacity-70' : ''}`}
                     style={{ borderColor: colorIfi(resumen?.ifi), background: `${colorIfi(resumen?.ifi)}14` }}
                     title={plantaSel ? 'Ver el IFI general de todas las plantas' : undefined}
                 >
@@ -587,8 +592,11 @@ export default function CalidadGeneralIFI() {
                             <span className="text-[10px] font-black bg-white/80 text-slate-700 px-1.5 rounded-full border border-slate-200">Meta 90%</span>
                         )}
                     </div>
-                    <p className="text-2xl font-black mt-1" style={{ color: colorIfi(resumen?.ifi) }}>{pct(resumen?.ifi)}</p>
-                    <p className="text-[10px] text-slate-500 font-medium">{resumen?.detalle || (loading ? 'Cargando…' : 'Sin datos')}</p>
+                    {/* Valor con el detalle del periodo al lado (tarjeta compacta) */}
+                    <div className="flex items-baseline gap-2 mt-0.5 min-w-0">
+                        <span className="text-2xl font-black leading-tight" style={{ color: colorIfi(resumen?.ifi) }}>{pct(resumen?.ifi)}</span>
+                        <span className="text-[10px] text-slate-500 font-medium truncate">{resumen?.detalle || (loading ? 'Cargando…' : 'Sin datos')}</span>
+                    </div>
                 </div>
                 {plantas.map(p => {
                     const cal = resumen?.valores[p.codigo] ?? null;
@@ -600,14 +608,16 @@ export default function CalidadGeneralIFI() {
                             key={p.codigo}
                             onClick={() => setPlantaSel(prev => (prev === p.codigo ? null : p.codigo))}
                             title={plantaSel === p.codigo ? 'Volver al IFI general' : `Ver solo ${p.nombre} en la gráfica`}
-                            className={`p-2 rounded-xl border shadow-2xs flex flex-col justify-between cursor-pointer transition-all ${cal === null ? 'bg-slate-50 border-dashed border-slate-300' : 'bg-white border-slate-200'} ${plantaSel === p.codigo ? 'ring-2 ring-[#324354] border-[#324354]' : plantaSel ? 'opacity-60 hover:opacity-100' : 'hover:border-[#324354]'}`}
+                            className={`px-2 py-1.5 rounded-xl border shadow-2xs flex flex-col justify-between cursor-pointer transition-all ${cal === null ? 'bg-slate-50 border-dashed border-slate-300' : 'bg-white border-slate-200'} ${plantaSel === p.codigo ? 'ring-2 ring-[#324354] border-[#324354]' : plantaSel ? 'opacity-60 hover:opacity-100' : 'hover:border-[#324354]'}`}
                         >
                             <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-black text-slate-600 uppercase" title={p.nombre}>{p.codigo}</span>
                                 <span className="text-[9px] font-bold text-slate-400">peso {pct(p.peso, 0)}</span>
                             </div>
+                            {/* Valor con la meta al lado (tarjeta compacta) */}
+                            <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
                             {resumen?.noTrabajo?.includes(p.codigo) ? (
-                                <span className="flex items-center gap-1 my-0.5">
+                                <span className="flex items-center gap-1">
                                     <span className="text-[13px] font-black text-slate-500" title="Ese día su peso se repartió entre las plantas que trabajaron">No trabajó</span>
                                 </span>
                             ) : cal === null ? (
@@ -615,20 +625,19 @@ export default function CalidadGeneralIFI() {
                                     <button
                                         type="button"
                                         onClick={e => { e.stopPropagation(); abrirRegistro(fechaAgregar); }}
-                                        className="self-start my-0.5 px-2 py-1 rounded-lg bg-white border border-slate-300 hover:border-[#324354] hover:bg-slate-100 text-[#324354] text-[11px] font-black flex items-center gap-1"
+                                        className="self-center px-2 py-0.5 rounded-lg bg-white border border-slate-300 hover:border-[#324354] hover:bg-slate-100 text-[#324354] text-[11px] font-black flex items-center gap-1"
                                         title={`Registrar la calidad de ${p.nombre} del ${fechaCorta(fechaAgregar)}`}
                                     >
                                         <Plus className="w-3 h-3" /> Agregar
                                     </button>
                                 ) : (
-                                    <span className="text-[11px] font-bold text-slate-400 italic my-1">Sin dato</span>
+                                    <span className="text-[11px] font-bold text-slate-400 italic">Sin dato</span>
                                 )
                             ) : (
-                                <span className="flex items-center gap-1">
-                                    <span className="text-lg font-black" style={{ color: colorPlanta(cal, p.meta) }}>{pct(cal)}</span>
-                                </span>
+                                <span className="text-lg font-black leading-tight" style={{ color: colorPlanta(cal, p.meta) }}>{pct(cal)}</span>
                             )}
-                            <span className="text-[9px] font-bold text-slate-400">meta {pct(p.meta, 0)}</span>
+                                <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">meta {pct(p.meta, 0)}</span>
+                            </div>
                         </div>
                     );
                 })}
@@ -646,14 +655,9 @@ export default function CalidadGeneralIFI() {
             >
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                     <h3 className="text-xs sm:text-sm font-black text-slate-800 capitalize">{tituloGrafica}</h3>
-                    <span className="text-[10px] font-bold text-slate-500">
-                        {cfgSel
-                            ? `Semáforo vs. meta ${pct(cfgSel.meta, 0)}: Verde ≥ meta | Amarillo hasta 10 pts debajo | Rojo · Clic en otra tarjeta o en IFI General para cambiar`
-                            : 'Semáforo: Verde ≥90% | Amarillo 80–89,9% | Rojo <80% · Clic en una columna para resaltarla'}
-                    </span>
                 </div>
-                {/* Alto según la pantalla: la sección llena la ventana debajo de las pestañas (mínimo 380 px) */}
-                <div className="h-[max(380px,calc(100dvh-444px))] w-full">
+                {/* Alto según la pantalla: el recuadro de IFI mide ≈ 810 px de pantalla con el zoom de 100 % (mínimo 200 px) */}
+                <div className="h-[max(200px,calc(100dvh-375px))] w-full">
                     {loading && columnas.length === 0 ? (
                         <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
                     ) : sinColumnas ? (
@@ -683,7 +687,7 @@ export default function CalidadGeneralIFI() {
                                 <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                                 <YAxis domain={[(min: number) => Math.max(0, Math.min(70, Math.floor(min / 10) * 10)), 100]} tick={{ fontSize: 10 }} width={32} />
                                 <Tooltip content={<TooltipColumna plantas={plantas} etiqueta={cfgSel ? cfgSel.codigo : 'IFI'} />} cursor={{ fill: '#f1f5f9' }} />
-                                <ReferenceLine y={metaGrafica * 100} stroke="#2563eb" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: `Meta ${pct(metaGrafica, 0)}`, fill: '#2563eb', fontSize: 10, fontWeight: 800, position: 'left', offset: 36 }} />
+                                <ReferenceLine y={metaGrafica * 100} stroke="#3b8f50" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: `Meta ${pct(metaGrafica, 0)}`, fill: '#3b8f50', fontSize: 10, fontWeight: 800, position: 'left', offset: 36 }} />
                                 <Bar
                                     dataKey="ifiPct"
                                     radius={[4, 4, 0, 0]}

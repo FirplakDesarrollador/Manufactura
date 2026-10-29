@@ -50,9 +50,9 @@ export default function FiltroPbi({ titulo, seleccion, opciones, onChange, onBor
     };
 
     return (
-        <div ref={ref} className="group relative min-w-[120px] flex-1 sm:flex-none sm:w-40">
-            <div className="flex items-center justify-between h-4 mb-0.5">
-                <span className="text-[10px] font-bold text-slate-500">{titulo}</span>
+        <div ref={ref} className="group relative min-w-[96px] flex-1 sm:flex-none sm:w-28">
+            <div className="flex items-center justify-between h-3 mb-0.5">
+                <span className="text-[8px] font-bold text-slate-500">{titulo}</span>
                 <button
                     type="button"
                     onClick={onBorrar}
@@ -67,10 +67,10 @@ export default function FiltroPbi({ titulo, seleccion, opciones, onChange, onBor
             <button
                 type="button"
                 onClick={() => setAbierto(v => !v)}
-                className={`w-full h-8 bg-white border rounded px-2 text-xs font-semibold text-slate-800 flex items-center justify-between gap-1 ${abierto ? 'border-[#324354]' : 'border-slate-300'}`}
+                className={`w-full h-6 bg-white border rounded px-2 text-[9px] font-semibold text-slate-800 flex items-center justify-between gap-1 ${abierto ? 'border-[#324354]' : 'border-slate-300'}`}
             >
                 <span className="truncate capitalize">{texto}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-500 shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
             </button>
             {abierto && (
                 <div className="absolute left-0 top-full mt-1 z-40 w-full min-w-[170px] max-h-64 overflow-y-auto bg-white border border-slate-300 rounded shadow-lg py-1">

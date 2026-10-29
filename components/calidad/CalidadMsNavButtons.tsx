@@ -54,7 +54,7 @@ export function CalidadMsNavButtons({
         }
     }, [cargando, permisos, activeTab, router])
 
-    if (cargando || !permisos) return <div className="h-10" />
+    if (cargando || !permisos) return <div className="h-7" />
 
     const ir = (tab: CalidadMsTab, ruta: string) => {
         if (activeTab === tab) return
@@ -80,18 +80,18 @@ export function CalidadMsNavButtons({
     }
 
     const botones: { key: string; visible: boolean; activo: boolean; onClick: () => void; title: string; icon: React.ReactNode }[] = [
-        { key: 'registro', visible: permisos.registro, activo: activeTab === 'registro' && !isChartActive && !isSettingsActive, onClick: handleRegistroClick, title: 'Registro de Defectos en Línea (Matriz)', icon: <Search className="w-5 h-5" /> },
-        { key: 'list', visible: permisos.reportes, activo: activeTab === 'list', onClick: () => ir('list', '/calidad/ms/list'), title: 'Ver Reportes del Día', icon: <ClipboardList className="w-5 h-5" /> },
-        { key: 'historico', visible: permisos.historico, activo: activeTab === 'historico', onClick: () => ir('historico', '/calidad/ms/historico'), title: 'Histórico General de Defectos', icon: <History className="w-5 h-5" /> },
-        { key: 'saldos', visible: permisos.saldos, activo: activeTab === 'saldos', onClick: () => ir('saldos', '/calidad/ms/saldos'), title: 'Saldos y Destrucciones', icon: <BrokenSinkIcon className="w-5 h-5" /> },
-        { key: 'hora', visible: permisos.hora_a_hora, activo: isChartActive, onClick: handleChartClick, title: 'Indicador Hora a Hora', icon: <Timer className="w-5 h-5" /> },
-        { key: 'indicadores', visible: permisos.indicadores, activo: activeTab === 'indicadores', onClick: () => ir('indicadores', '/calidad/ms/indicadores'), title: 'Indicadores Generales de Calidad MS', icon: <PieChart className="w-5 h-5" /> },
-        { key: 'config', visible: !!permisos.configuracion, activo: isSettingsActive, onClick: handleSettingsClick, title: permisos.configuracion === 'editar' ? 'Configuración de Defectos' : 'Configuración de Defectos (solo consulta)', icon: <Settings className="w-5 h-5" /> },
-        { key: 'criterios', visible: !!permisos.criterios, activo: activeTab === 'criterios', onClick: () => ir('criterios', '/calidad/ms/criterios'), title: 'Criterios de Aceptación y Rechazo', icon: <BookOpenCheck className="w-5 h-5" /> }
+        { key: 'registro', visible: permisos.registro, activo: activeTab === 'registro' && !isChartActive && !isSettingsActive, onClick: handleRegistroClick, title: 'Registro de Defectos en Línea (Matriz)', icon: <Search className="w-4 h-4" /> },
+        { key: 'list', visible: permisos.reportes, activo: activeTab === 'list', onClick: () => ir('list', '/calidad/ms/list'), title: 'Ver Reportes del Día', icon: <ClipboardList className="w-4 h-4" /> },
+        { key: 'historico', visible: permisos.historico, activo: activeTab === 'historico', onClick: () => ir('historico', '/calidad/ms/historico'), title: 'Histórico General de Defectos', icon: <History className="w-4 h-4" /> },
+        { key: 'saldos', visible: permisos.saldos, activo: activeTab === 'saldos', onClick: () => ir('saldos', '/calidad/ms/saldos'), title: 'Saldos y Destrucciones', icon: <BrokenSinkIcon className="w-4 h-4" /> },
+        { key: 'hora', visible: permisos.hora_a_hora, activo: isChartActive, onClick: handleChartClick, title: 'Indicador Hora a Hora', icon: <Timer className="w-4 h-4" /> },
+        { key: 'indicadores', visible: permisos.indicadores, activo: activeTab === 'indicadores', onClick: () => ir('indicadores', '/calidad/ms/indicadores'), title: 'Indicadores Generales de Calidad MS', icon: <PieChart className="w-4 h-4" /> },
+        { key: 'config', visible: !!permisos.configuracion, activo: isSettingsActive, onClick: handleSettingsClick, title: permisos.configuracion === 'editar' ? 'Configuración de Defectos' : 'Configuración de Defectos (solo consulta)', icon: <Settings className="w-4 h-4" /> },
+        { key: 'criterios', visible: !!permisos.criterios, activo: activeTab === 'criterios', onClick: () => ir('criterios', '/calidad/ms/criterios'), title: 'Criterios de Aceptación y Rechazo', icon: <BookOpenCheck className="w-4 h-4" /> }
     ]
 
     // Botones unidos; las esquinas redondeadas van en el primero y el último visibles
-    const baseClass = "h-10 w-10 flex items-center justify-center transition-all border shrink-0 text-sm focus:outline-none first:rounded-l last:rounded-r"
+    const baseClass = "h-7 w-8 flex items-center justify-center transition-all border shrink-0 text-sm focus:outline-none first:rounded-l last:rounded-r"
     const activeClass = "bg-blue-600 text-white border-blue-600 shadow-md relative z-10"
     const inactiveClass = "bg-white text-[#254153] hover:bg-slate-100 border-gray-300"
 

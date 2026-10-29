@@ -232,41 +232,41 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
             />
 
             {/* Barra de controles: buscador | botones de Calidad MS (solo en MS y si se entró desde Calidad MS) | planta y contador */}
-            <div className="bg-gray-50 border-b border-gray-200 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
-                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 gap-2 relative xl:h-full">
-                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min xl:max-w-[440px] 2xl:max-w-[520px]">
+            <div className="bg-gray-50 border-b border-gray-200 py-1.5 min-[1200px]:py-0 min-[1200px]:h-10 sticky top-[48px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between min-[1200px]:grid min-[1200px]:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] min-[1200px]:gap-4 gap-2 relative min-[1200px]:h-full">
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min min-[1200px]:max-w-[340px] 2xl:max-w-[480px]">
                         <div className="relative flex-1 min-w-[150px] [contain:inline-size]">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 placeholder="BUSCAR DEFECTO, NÚMERO O RESPONSABLE"
-                                className="w-full h-10 bg-white border border-gray-300 rounded pl-9 pr-3 text-[#254153] font-bold text-xs md:text-sm focus:border-[#254153] outline-none transition-all"
+                                className="w-full h-7 bg-white border border-gray-300 rounded pl-7 pr-2.5 text-[#254153] font-bold text-[11px] focus:border-[#254153] outline-none transition-all"
                             />
                         </div>
                     </div>
 
-                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center z-20">
+                    <div className="order-3 min-[1200px]:order-none w-full min-[1200px]:w-auto flex justify-center z-20">
                         {esMs && mostrarBotonesMs && <CalidadMsNavButtons activeTab="criterios" hasSettingsPermission={true} />}
                     </div>
 
-                    <div className="order-2 xl:order-none flex items-center justify-center sm:justify-end gap-3 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end">
+                    <div className="order-2 min-[1200px]:order-none flex items-center justify-center sm:justify-end gap-2 w-full sm:w-auto sm:ml-auto min-[1200px]:ml-0 min-[1200px]:justify-self-end">
                         {(esMs ? canEditMs : canEdit) && (
                             <button
                                 onClick={() => (esMs ? setNuevoMsOpen(true) : setExpandedKey(NUEVO))}
-                                className="h-9 px-3 bg-[#324354] hover:bg-[#324354]/90 text-white rounded text-xs font-bold flex items-center gap-1.5 shrink-0"
+                                className="h-7 px-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white rounded text-[11px] font-bold flex items-center gap-1.5 shrink-0"
                             >
-                                <Plus className="w-4 h-4" />
+                                <Plus className="w-3.5 h-3.5" />
                                 <span>Nuevo defecto</span>
                             </button>
                         )}
-                        <div className="flex items-center gap-1 h-9 bg-white border border-gray-300 rounded px-2 shrink-0" title={plantaInfo.titulo}>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">Planta</span>
+                        <div className="flex items-center gap-1 h-7 bg-white border border-gray-300 rounded px-2 shrink-0" title={plantaInfo.titulo}>
+                            <span className="text-[9px] font-bold text-gray-400 uppercase">Planta</span>
                             <select
                                 value={planta}
                                 onChange={e => cambiarPlanta(e.target.value)}
-                                className="bg-transparent font-black text-[#254153] text-sm outline-none cursor-pointer"
+                                className="bg-transparent font-black text-[#254153] text-xs outline-none cursor-pointer"
                             >
                                 {PLANTAS_CRITERIOS.map(p => (
                                     <option key={p.codigo} value={p.codigo} title={p.nombre}>
@@ -275,7 +275,7 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
                                 ))}
                             </select>
                         </div>
-                        <span className="text-sm font-bold text-gray-800 shrink-0 whitespace-nowrap">
+                        <span className="text-xs font-bold text-gray-800 shrink-0 whitespace-nowrap">
                             {esMs ? `Criterios: ${conCriterio} / ${items.length}` : `Defectos: ${items.length}`}
                         </span>
                     </div>
