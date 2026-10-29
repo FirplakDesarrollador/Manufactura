@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Plus, Search, X } from 'lucide-react';
 import {
     ResponsiveContainer,
     ComposedChart,
@@ -17,8 +17,10 @@ import {
     PieChart,
     Pie
 } from 'recharts';
+import { supabase } from '@/lib/supabase';
 import FiltroPbi, { semanaIso } from '@/components/calidad/FiltroPbi';
-import { COLOR_TIPO_SD, EventoSD, NOMBRE_TIPO_SD, TipoSD, cargarEventosSD } from '@/lib/calidad/saldosDestrucciones';
+import RegistrarSaldoModal from '@/components/calidad/RegistrarSaldoModal';
+import { COLOR_TIPO_SD, CostoSku, EventoSD, NOMBRE_TIPO_SD, PLANTAS_SD, TipoSD, cargarEventosSD } from '@/lib/calidad/saldosDestrucciones';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -132,18 +134,24 @@ export default function CalidadSaldosDashboard() {
     const [selRef, setSelRef] = useState<string | null>(null);
     const [busqueda, setBusqueda] = useState('');
 
+    const [plantasSel, setPlantasSel] = useState<string[]>([]);
     const [eventos, setEventos] = useState<EventoSD[]>([]);
+    const [costos, setCostos] = useState<CostoSku[]>([]);
+    const [avisos, setAvisos] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [registrando, setRegistrando] = useState(false);
+    const [recarga, setRecarga] = useState(0);
 
     useEffect(() => {
         let vivo = true;
-        cargarEventosSD()
-            .then(d => { if (vivo) setEventos(d); })
+        setLoading(true);
+        cargarEventosSD(supabase)
+            .then(d => { if (vivo) { setEventos(d.eventos); setCostos(d.costos); setAvisos(d.avisos); setError(null); } })
             .catch(e => { if (vivo) setError(e?.message || 'No se pudieron cargar los saldos y destrucciones'); })
             .finally(() => { if (vivo) setLoading(false); });
         return () => { vivo = false; };
-    }, []);
+    }, [recarga]);
 
     const valor = (e: EventoSD) => (medida === 'costo' ? e.costo : e.cantidad);
     const fmt = (n: number) => compacto(n, medida);
@@ -159,8 +167,12 @@ export default function CalidadSaldosDashboard() {
     const filtroDiario = semanas.length > 0 || diasSel.length > 0;
     const granPrincipal: Gran = todosLosAnios && !filtroDiario ? 'anio' : unSoloMes || filtroDiario ? 'dia' : 'mes';
 
-    // Eventos en cascada: Tipo → Año → Mes → Semana → Día
-    const porTipo = useMemo(() => (filtroTipo === 'todos' ? eventos : eventos.filter(e => e.tipo === filtroTipo)), [eventos, filtroTipo]);
+    // Eventos en cascada: Planta y Tipo → Año → Mes → Semana → Día
+    const plantasConDatos = useMemo(() => PLANTAS_SD.filter(p => eventos.some(e => e.planta === p.codigo)), [eventos]);
+    const porTipo = useMemo(
+        () => eventos.filter(e => (filtroTipo === 'todos' || e.tipo === filtroTipo) && (!plantasSel.length || plantasSel.includes(e.planta))),
+        [eventos, filtroTipo, plantasSel]
+    );
     const eventosAnios = useMemo(() => (todosLosAnios ? porTipo : porTipo.filter(e => anios.includes(Number(e.fecha.slice(0, 4))))), [porTipo, anios, todosLosAnios]);
     const eventosMes = useMemo(() => (meses.length ? eventosAnios.filter(e => meses.includes(Number(e.fecha.slice(5, 7)))) : eventosAnios), [eventosAnios, meses]);
     const eventosSemana = useMemo(() => (semanas.length ? eventosMes.filter(e => semanas.includes(semanaIso(e.fecha).clave)) : eventosMes), [eventosMes, semanas]);
@@ -360,9 +372,11 @@ export default function CalidadSaldosDashboard() {
 
     // Barras apiladas de saldo y destrucción (con el tipo filtrado, solo una)
     const tiposVisibles: TipoSD[] = filtroTipo === 'todos' ? ['saldo', 'destruccion'] : [filtroTipo];
+    // Con muchas columnas el valor va en una de cada dos para que no se monten
     const etiquetaTotal = (cols: Columna[]) => (p: any) => {
         const c = cols[p.index];
         if (!c || !c.total) return null;
+        if (cols.length > 16 && p.index % 2 === 1) return null;
         return <text x={p.x + p.width / 2} y={p.y - 5} textAnchor="middle" fontSize={9} fontWeight={800} fill="#334155">{fmt(c.total)}</text>;
     };
     // Barras: la de arriba de la pila lleva la etiqueta del total
@@ -416,8 +430,16 @@ export default function CalidadSaldosDashboard() {
                             </button>
                         ))}
                     </div>
+                    <button
+                        onClick={() => setRegistrando(true)}
+                        className="px-2.5 py-1 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-lg text-xs font-bold flex items-center gap-1"
+                        title="Registrar un saldo o destrucción de FV, Muebles, CEFI, Cuarzo o RTM (MS llega automático desde Calidad MS)"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Registrar
+                    </button>
                 </div>
                 <div className="flex flex-wrap items-start gap-2 w-full lg:w-auto">
+                    <FiltroPbi titulo="Planta" seleccion={plantasSel} opciones={plantasConDatos.map(p => ({ value: p.codigo, label: `${p.codigo} · ${p.nombre}` }))} onChange={v => { setPlantasSel(v); limpiarSelecciones(); }} onBorrar={() => setPlantasSel([])} puedeBorrar={plantasSel.length > 0} />
                     <FiltroPbi titulo="Año" seleccion={anios.map(String)} opciones={aniosDisponibles.map(a => ({ value: String(a), label: String(a) }))} onChange={cambiarAnios} onBorrar={() => cambiarAnios([])} puedeBorrar={anios.length > 0} />
                     <FiltroPbi titulo="Mes" seleccion={meses.map(String)} opciones={MESES.map((m, i) => ({ value: String(i + 1), label: m }))} onChange={cambiarMeses} onBorrar={() => cambiarMeses([])} puedeBorrar={meses.length > 0} />
                     <FiltroPbi titulo="Semana" seleccion={semanasVista} opciones={opcionesSemana} onChange={cambiarSemanas} onBorrar={() => cambiarSemanas([])} puedeBorrar={semanasVista.length > 0} />
@@ -426,6 +448,16 @@ export default function CalidadSaldosDashboard() {
             </div>
 
             {error && <div className="text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</div>}
+            {avisos.map(a => <div key={a} className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">{a}</div>)}
+
+            {registrando && (
+                <RegistrarSaldoModal
+                    costos={costos}
+                    causasConocidas={[...new Set(eventos.map(e => e.causa))].sort()}
+                    onCerrar={() => setRegistrando(false)}
+                    onGuardado={() => { setRegistrando(false); setRecarga(n => n + 1); }}
+                />
+            )}
 
             {chips.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -479,17 +511,19 @@ export default function CalidadSaldosDashboard() {
                                 >
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                                    <YAxis yAxisId="izq" tick={{ fontSize: 9 }} width={44} tickFormatter={v => fmt(Number(v))} />
-                                    <YAxis yAxisId="der" orientation="right" tick={{ fontSize: 9, fill: COLOR_ACUMULADO }} width={44} tickFormatter={v => fmt(Number(v))} />
+                                    <YAxis yAxisId="izq" tick={{ fontSize: 9 }} width={54} tickFormatter={v => fmt(Number(v))} />
+                                    <YAxis yAxisId="der" orientation="right" tick={{ fontSize: 9, fill: COLOR_ACUMULADO }} width={50} tickFormatter={v => fmt(Number(v))} />
                                     <Tooltip content={<TooltipPeriodo gran={granPrincipal} medida={medida} />} cursor={{ fill: '#f1f5f9' }} />
                                     {barras(columnasPrincipal, granPrincipal, clicPrincipal).map(b => React.cloneElement(b, { yAxisId: 'izq' }))}
                                     <Line yAxisId="der" type="monotone" dataKey="acumulado" stroke={COLOR_ACUMULADO} strokeWidth={2} dot={{ r: 2.5, fill: COLOR_ACUMULADO }} isAnimationActive={false}>
-                                        {/* Con muchos puntos, solo cada dos lleva valor para que no se monten */}
+                                        {/* Con muchos puntos, el acumulado lleva valor cada 3 puntos y en el último (arriba de la línea) */}
                                         <LabelList
                                             dataKey="acumulado"
-                                            content={(p: any) => (p.value == null || (columnasPrincipal.length > 12 && p.index % 2 === 1 && p.index !== columnasPrincipal.length - 1)) ? null : (
-                                                <text x={p.x} y={p.y - 7} textAnchor="middle" fontSize={8} fontWeight={800} fill="#b45309">{fmt(Number(p.value))}</text>
-                                            )}
+                                            content={(p: any) => {
+                                                const ultimo = p.index === columnasPrincipal.length - 1;
+                                                if (p.value == null || (columnasPrincipal.length > 12 && p.index % 3 !== 2 && !ultimo)) return null;
+                                                return <text x={p.x} y={p.y - 8} textAnchor={ultimo ? 'end' : 'middle'} fontSize={8} fontWeight={800} fill="#b45309">{fmt(Number(p.value))}</text>;
+                                            }}
                                         />
                                     </Line>
                                 </ComposedChart>
@@ -534,7 +568,7 @@ export default function CalidadSaldosDashboard() {
                                 >
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                                    <YAxis tick={{ fontSize: 9 }} width={44} tickFormatter={v => fmt(Number(v))} />
+                                    <YAxis tick={{ fontSize: 9 }} width={54} tickFormatter={v => fmt(Number(v))} />
                                     <Tooltip content={<TooltipPeriodo gran={granSecundaria} medida={medida} />} cursor={{ fill: '#f1f5f9' }} />
                                     {barras(columnasSecundaria, granSecundaria, clicSecundaria, c => (granSecundaria === 'mes'
                                         ? meses.length > 0 && !meses.includes(Number(c.key.slice(5, 7)))
@@ -631,7 +665,7 @@ export default function CalidadSaldosDashboard() {
                                     <th className="py-1 px-1.5">Referencia</th>
                                     <th className="py-1 px-1.5">Causa</th>
                                     <th className="py-1 px-1.5 text-right">Pzs</th>
-                                    <th className="py-1 px-1.5 text-right">Costo</th>
+                                    <th className="py-1 px-1.5 text-right pr-2">Costo</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -642,16 +676,17 @@ export default function CalidadSaldosDashboard() {
                                             key={`${e.fecha}-${e.sku}-${i}`}
                                             onClick={() => setSelRef(prev => (prev === e.referencia ? null : e.referencia))}
                                             className={`cursor-pointer text-slate-700 transition-all ${activa ? 'bg-slate-100 outline outline-1 outline-[#324354]' : 'hover:bg-slate-50'} ${selRef && !activa ? 'opacity-40' : ''}`}
-                                            title={`${e.sku} · ${e.referencia} · Responsable: ${e.responsable}`}
+                                            title={`${e.planta} · ${e.sku ? `${e.sku} · ` : ''}${e.referencia} · ${e.causa} · Responsable: ${e.responsable}${e.sinCosto ? ' · sin costo en el catálogo' : ''}`}
                                         >
                                             <td className="py-1 px-1.5 whitespace-nowrap">{fechaCorta(e.fecha).slice(0, 5)}</td>
                                             <td className="py-1 px-1.5">
                                                 <span className="px-1.5 py-px rounded-full text-[9px] font-black text-white" style={{ backgroundColor: COLOR_TIPO_SD[e.tipo] }}>{e.tipo === 'saldo' ? 'S' : 'D'}</span>
+                                                <span className="block text-[8px] font-bold text-slate-400 mt-px">{e.planta}</span>
                                             </td>
-                                            <td className="py-1 px-1.5 font-bold text-slate-800 truncate max-w-[150px] capitalize">{e.referencia.toLowerCase()}</td>
-                                            <td className="py-1 px-1.5 truncate max-w-[120px] capitalize">{e.causa.toLowerCase()}</td>
+                                            <td className="py-1 px-1.5 font-bold text-slate-800 truncate max-w-[110px] capitalize">{e.referencia.toLowerCase()}</td>
+                                            <td className="py-1 px-1.5 truncate max-w-[90px] capitalize">{e.causa.toLowerCase()}</td>
                                             <td className="py-1 px-1.5 text-right font-bold">{e.cantidad}</td>
-                                            <td className="py-1 px-1.5 text-right font-black text-slate-900 whitespace-nowrap">{pesos(e.costo)}</td>
+                                            <td className={`py-1 px-1.5 pr-2 text-right font-black whitespace-nowrap ${e.sinCosto ? 'text-amber-600' : 'text-slate-900'}`}>{e.sinCosto ? '—' : pesos(e.costo)}</td>
                                         </tr>
                                     );
                                 })}

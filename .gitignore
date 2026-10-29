@@ -54,3 +54,4 @@ gestor-tareas-tecnicos 1/
 
 # Datos provisionales exportados de Excel de Calidad (con costos): solo locales, no se suben
 /public/datos-locales/
+/datos-locales/
