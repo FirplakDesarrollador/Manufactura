@@ -19,8 +19,7 @@ export async function GET() {
             }
             const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
             if (match) {
-                // Se conserva la descripción completa de SAP (incluye sufijos como "(CAJA CERRADA)")
-                const cleanDesc = rawDesc;
+                return `${match[1]}-${match[2]}-${match[3]}T00:00:00`;
             }
             const parsed = new Date(str);
             if (!isNaN(parsed.getTime())) {
