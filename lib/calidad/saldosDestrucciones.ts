@@ -165,6 +165,27 @@ async function fetchArchivoLocal(): Promise<EventoSD[]> {
     return ((await resp.json()) as EventoSD[]).map(e => ({ ...e, origen: 'excel' as const }));
 }
 
+// Piezas fabricadas de MS por mes = piezas entregadas a CEDI en el Control de Piso de Mármol (trazabilidad_ms.cedi_fecha).
+// Devuelve { 'YYYY-MM': piezas } solo para los meses con entregas.
+export async function fetchFabricadasMsPorMes(sb: SupabaseClient, anios: number[]): Promise<Record<string, number>> {
+    const meses = anios.flatMap(a => Array.from({ length: 12 }, (_, i) => `${a}-${String(i + 1).padStart(2, '0')}`));
+    const inicio = (clave: string) => new Date(`${clave}-01T00:00:00-05:00`).toISOString();
+    const siguiente = (clave: string) => {
+        const [a, m] = clave.split('-').map(Number);
+        return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, '0')}`;
+    };
+    const conteos = await Promise.all(meses.map(async clave => {
+        const { count, error } = await sb
+            .from('trazabilidad_ms')
+            .select('id', { count: 'exact', head: true })
+            .gte('cedi_fecha', inicio(clave))
+            .lt('cedi_fecha', inicio(siguiente(clave)));
+        if (error) throw error;
+        return [clave, count || 0] as const;
+    }));
+    return Object.fromEntries(conteos.filter(([, n]) => n > 0));
+}
+
 export interface CargaSD { eventos: EventoSD[]; costos: CostoSku[]; avisos: string[] }
 
 // Carga todo: tabla (histórico + manuales) + MS automático. Si las tablas no existen aún, usa el archivo local.
@@ -175,9 +196,13 @@ export async function cargarEventosSD(sb: SupabaseClient): Promise<CargaSD> {
     let tablasListas = true;
     try {
         [costos, tabla] = await Promise.all([fetchCostosSku(sb), fetchEventosTabla(sb)]);
-    } catch {
+    } catch (e: any) {
         tablasListas = false;
-        avisos.push('Faltan las tablas de saldos y destrucciones en la base (ejecutar calidad_saldos_destrucciones.sql y el archivo de datos).');
+        // Se muestra el error real de la base para distinguir "no existe la tabla" de permisos o tiempo de espera
+        const detalle = e?.message || e?.code || String(e);
+        avisos.push(/does not exist|schema cache|42P01|PGRST205/i.test(detalle)
+            ? 'Faltan las tablas de saldos y destrucciones en la base (ejecutar calidad_saldos_destrucciones.sql y el archivo de datos).'
+            : `No se pudieron leer las tablas de saldos y destrucciones: ${detalle}`);
         tabla = await fetchArchivoLocal();
     }
     let automaticos: EventoSD[] = [];
