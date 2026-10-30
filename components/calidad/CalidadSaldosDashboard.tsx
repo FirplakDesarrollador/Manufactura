@@ -5,7 +5,6 @@ import { Loader2, Plus, Search, X } from 'lucide-react';
 import {
     ResponsiveContainer,
     ComposedChart,
-    BarChart,
     Bar,
     Line,
     XAxis,
@@ -20,7 +19,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import FiltroPbi, { semanaIso } from '@/components/calidad/FiltroPbi';
 import RegistrarSaldoModal from '@/components/calidad/RegistrarSaldoModal';
-import { COLOR_TIPO_SD, CostoSku, EventoSD, NOMBRE_TIPO_SD, PLANTAS_SD, TipoSD, cargarEventosSD } from '@/lib/calidad/saldosDestrucciones';
+import { COLOR_TIPO_SD, CostoSku, EventoSD, NOMBRE_TIPO_SD, PLANTAS_SD, TipoSD, cargarEventosSD, fetchFabricadasMsPorMes } from '@/lib/calidad/saldosDestrucciones';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -32,6 +31,8 @@ const PARETO_COLORS = [
 const COLOR_OTROS = '#cbd5e1';
 const CAUSAS_EN_ANILLO = 12;
 const COLOR_ACUMULADO = '#f59e0b';
+const COLOR_PCT = '#7c3aed'; // % de saldos y destrucciones de MS sobre las piezas fabricadas (entregadas a CEDI)
+const pctTexto = (n: number) => `${n.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 
 const hoyBogota = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
 const fechaCorta = (f: string) => f.split('-').reverse().join('/');
@@ -39,7 +40,7 @@ const fechaCorta = (f: string) => f.split('-').reverse().join('/');
 type Gran = 'dia' | 'mes' | 'anio';
 type Medida = 'costo' | 'pzs';
 type FiltroTipo = 'todos' | TipoSD;
-interface Columna { key: string; label: string; saldo: number; destruccion: number; total: number; acumulado: number; meses?: number }
+interface Columna { key: string; label: string; saldo: number; destruccion: number; total: number; acumulado: number; meses?: number; pct?: number | null; pzsMs?: number; fabricadas?: number }
 interface SelPeriodo { gran: Gran; key: string }
 
 const clavePeriodo = (e: EventoSD, gran: Gran) => (gran === 'dia' ? e.fecha : gran === 'mes' ? e.fecha.slice(0, 7) : e.fecha.slice(0, 4));
@@ -59,16 +60,21 @@ const compacto = (n: number, medida: Medida) => {
     return `$${Math.round(n)}`;
 };
 
-// Clic en una gráfica de Recharts: puede llegar por la barra y por la gráfica a la vez; se procesa una sola vez
+// Clic en una gráfica de Recharts: puede llegar por la barra y por la gráfica a la vez; se procesa una sola vez.
+// El de la gráfica puede llegar tarde (después de redibujar el tablero), por eso con clave se ignora el mismo
+// periodo repetido durante 1 s en lugar de 150 ms; si no, el segundo aviso deshacía la selección.
 function useClicUnico() {
     const ultimo = useRef(0);
+    const ultimaClave = useRef<string | null>(null);
     const marcado = useRef(false);
     return {
-        tomar: () => {
+        tomar: (clave?: string) => {
             marcado.current = true;
             const ahora = Date.now();
-            if (ahora - ultimo.current < 150) return false;
+            const ventana = clave ? 1000 : 150;
+            if (ahora - ultimo.current < ventana && (!clave || clave === ultimaClave.current)) return false;
             ultimo.current = ahora;
+            ultimaClave.current = clave ?? null;
             return true;
         },
         consumir: () => {
@@ -78,6 +84,9 @@ function useClicUnico() {
         }
     };
 }
+
+// Clic dentro del dibujo de la gráfica: lo resuelve la gráfica (puede llegar tarde), el recuadro no debe quitar la selección
+const dentroDeGrafica = (e: React.MouseEvent) => !!(e.target as Element | null)?.closest?.('.recharts-wrapper');
 
 // Etiqueta con el % de cada porción del anillo (solo porciones con espacio suficiente)
 const etiquetaPorcion = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
@@ -102,6 +111,11 @@ const TooltipPeriodo = ({ active, payload, gran, medida }: any) => {
             <p className="font-bold" style={{ color: COLOR_TIPO_SD.saldo }}>Saldos: {medida === 'costo' ? pesos(c.saldo) : `${c.saldo} pzs`}</p>
             <p className="font-bold" style={{ color: COLOR_TIPO_SD.destruccion }}>Destrucciones: {medida === 'costo' ? pesos(c.destruccion) : `${c.destruccion} pzs`}</p>
             <p className="font-black text-slate-800">Total: {medida === 'costo' ? pesos(c.total) : `${c.total} pzs`}</p>
+            {c.pct != null && (
+                <p className="font-bold" style={{ color: COLOR_PCT }}>
+                    % sobre fabricadas MS: {pctTexto(c.pct)} <span className="font-normal text-slate-500">({c.pzsMs} de {c.fabricadas?.toLocaleString('es-CO')} pzs)</span>
+                </p>
+            )}
             {c.meses != null ? (
                 <p className="text-slate-500">Promedio de {c.meses} mes(es) con dato</p>
             ) : (
@@ -152,6 +166,18 @@ export default function CalidadSaldosDashboard() {
             .finally(() => { if (vivo) setLoading(false); });
         return () => { vivo = false; };
     }, [recarga]);
+
+    // Piezas fabricadas de MS por mes (entregadas a CEDI) para el % sobre fabricadas
+    const [fabricadas, setFabricadas] = useState<Record<string, number>>({});
+    const aniosConEventos = useMemo(() => [...new Set(eventos.map(e => Number(e.fecha.slice(0, 4))))].sort().join(','), [eventos]);
+    useEffect(() => {
+        if (!aniosConEventos) return;
+        let vivo = true;
+        fetchFabricadasMsPorMes(supabase, aniosConEventos.split(',').map(Number))
+            .then(f => { if (vivo) setFabricadas(f); })
+            .catch(() => { if (vivo) setFabricadas({}); });
+        return () => { vivo = false; };
+    }, [aniosConEventos]);
 
     const valor = (e: EventoSD) => (medida === 'costo' ? e.costo : e.cantidad);
     const fmt = (n: number) => compacto(n, medida);
@@ -264,11 +290,28 @@ export default function CalidadSaldosDashboard() {
     const columnasPrincipal = useMemo(() => columnasDe(filtrados.filter(e => conCausa(e) && enRef(e)), granPrincipal),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [filtrados, selCausa, selRef, granPrincipal, medida, unSoloMes]);
+    // % sobre fabricadas: piezas de saldos y destrucciones de MS ÷ piezas de MS entregadas a CEDI (solo meses con entregas)
+    const msVisible = !plantasSel.length || plantasSel.includes('MS');
+    const pzsMsPorMes = (lista: EventoSD[]) => {
+        const m = new Map<string, number>();
+        lista.filter(e => e.planta === 'MS').forEach(e => m.set(e.fecha.slice(0, 7), (m.get(e.fecha.slice(0, 7)) || 0) + e.cantidad));
+        return m;
+    };
     const columnasSecundaria = useMemo(() => {
         const base = (vistaSec === 'anio' ? porTipo : eventosAnios).filter(e => conCausa(e) && enRef(e));
-        return vistaSec === 'anio' ? promedioAnual(base) : columnasDe(base, 'mes');
+        const cols = vistaSec === 'anio' ? promedioAnual(base) : columnasDe(base, 'mes');
+        if (!msVisible) return cols;
+        const pzs = pzsMsPorMes(base);
+        return cols.map(c => {
+            const mesesConDato = Object.keys(fabricadas).filter(k => (vistaSec === 'anio' ? k.startsWith(c.key) : k === c.key));
+            const fab = mesesConDato.reduce((a, k) => a + fabricadas[k], 0);
+            if (!fab) return { ...c, pct: null };
+            const pzsMs = mesesConDato.reduce((a, k) => a + (pzs.get(k) || 0), 0);
+            return { ...c, pct: (pzsMs / fab) * 100, pzsMs, fabricadas: fab };
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [porTipo, eventosAnios, selCausa, selRef, vistaSec, medida]);
+    }, [porTipo, eventosAnios, selCausa, selRef, vistaSec, medida, fabricadas, msVisible]);
+    const hayPct = columnasSecundaria.some(c => c.pct != null);
     const granSecundaria: Gran = vistaSec;
 
     // Las selecciones que dejan de existir al cambiar filtros se quitan
@@ -322,6 +365,10 @@ export default function CalidadSaldosDashboard() {
         const idx = e?.activeIndex != null ? Number(e.activeIndex) : NaN;
         return Number.isInteger(idx) ? cols[idx] : cols.find(c => c.label === String(e?.activeLabel));
     };
+    const clicEje = (t: any, cols: Columna[], gran: Gran, clic: ReturnType<typeof useClicUnico>) => {
+        const col = cols.find(c => c.label === String(t?.value ?? t?.payload?.value));
+        if (col && clic.tomar(col.key)) alternarPeriodo(gran, col.key);
+    };
     const atenuar = (gran: Gran, key: string) => {
         if (!selPeriodo) return false;
         if (selPeriodo.gran === gran) return selPeriodo.key !== key;
@@ -352,6 +399,16 @@ export default function CalidadSaldosDashboard() {
         eventosKpi.forEach(e => m.set(e.causa, (m.get(e.causa) || 0) + valor(e)));
         return [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
     })();
+    // % sobre fabricadas del periodo (año y mes elegidos; las fabricadas se cuentan por mes completo)
+    const kpiPct = (() => {
+        if (!msVisible) return null;
+        const mesesPeriodo = Object.keys(fabricadas).filter(k => (todosLosAnios || anios.includes(Number(k.slice(0, 4)))) && (!meses.length || meses.includes(Number(k.slice(5, 7)))));
+        const fab = mesesPeriodo.reduce((a, k) => a + fabricadas[k], 0);
+        if (!fab) return null;
+        const pzs = pzsMsPorMes(eventosMes.filter(e => conCausa(e) && enRef(e)));
+        const pzsMs = mesesPeriodo.reduce((a, k) => a + (pzs.get(k) || 0), 0);
+        return { pct: (pzsMs / fab) * 100, pzsMs, fab };
+    })();
     const cargandoInicial = loading && eventos.length === 0;
     const kpis = [
         { titulo: 'Piezas', valor: pzsTotal.toLocaleString('es-CO'), estilo: 'bg-white border-slate-200 text-slate-900', tit: 'text-slate-500' },
@@ -360,6 +417,14 @@ export default function CalidadSaldosDashboard() {
         { titulo: 'Saldos ($)', valor: pesos(suma(saldos, e => e.costo)), estilo: 'bg-emerald-50/70 border-emerald-200 text-emerald-900', tit: 'text-emerald-800' },
         { titulo: 'Destrucciones (pzs)', valor: suma(destrucciones, e => e.cantidad).toLocaleString('es-CO'), estilo: 'bg-rose-50/70 border-rose-200 text-rose-900', tit: 'text-rose-800' },
         { titulo: 'Destrucciones ($)', valor: pesos(suma(destrucciones, e => e.costo)), estilo: 'bg-rose-50/70 border-rose-200 text-rose-900', tit: 'text-rose-800' },
+        {
+            titulo: '% S+D / fabricadas MS',
+            valor: kpiPct ? pctTexto(kpiPct.pct) : '—',
+            detalle: kpiPct ? `${kpiPct.pzsMs} de ${kpiPct.fab.toLocaleString('es-CO')} pzs` : msVisible ? 'sin entregas a CEDI' : 'solo para MS',
+            ayuda: 'Piezas de saldos y destrucciones de MS sobre las piezas de MS entregadas a CEDI en el Control de Piso de Mármol (meses completos del año y mes elegidos)',
+            estilo: 'bg-violet-50/70 border-violet-200 text-violet-900',
+            tit: 'text-violet-800'
+        },
         { titulo: '% Destrucción', valor: `${(medida === 'costo' ? (costoTotal ? (suma(destrucciones, e => e.costo) / costoTotal) * 100 : 0) : (pzsTotal ? (suma(destrucciones, e => e.cantidad) / pzsTotal) * 100 : 0)).toFixed(1)} %`, estilo: 'bg-sky-600 border-sky-600 text-white', tit: 'text-sky-100' },
         { titulo: 'Causa principal', valor: causaPrincipal, estilo: 'bg-[#0084d1] border-[#0084d1] text-white', tit: 'text-sky-100', largo: true }
     ];
@@ -391,9 +456,11 @@ export default function CalidadSaldosDashboard() {
                 radius={i === tiposVisibles.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                 isAnimationActive={false}
                 cursor="pointer"
-                onClick={(item: any) => {
-                    const key = item?.payload?.key || item?.key;
-                    if (key && clic.tomar()) alternarPeriodo(gran, key);
+                onClick={(item: any, index: number) => {
+                    // Se ubica la columna por posición: item.key en Recharts 3 es la llave interna del rectángulo, no la fecha
+                    // (tomarla seleccionaba un periodo inexistente que se borraba enseguida y el clic "se devolvía")
+                    const col = (Number.isInteger(index) ? cols[index] : undefined) || cols.find(c => c.key === item?.payload?.key);
+                    if (col && clic.tomar(col.key)) alternarPeriodo(gran, col.key);
                 }}
             >
                 {cols.map(c => {
@@ -407,48 +474,55 @@ export default function CalidadSaldosDashboard() {
     return (
         // Alto de cada fila según la pantalla: el recuadro mide ≈ 810 px de pantalla con el zoom de 100 % (como Mármol Sintético)
         <div className="space-y-2" style={{ ["--sd-h" as string]: "max(120px, calc((100dvh - 382px) / 2 - 12px))", ["--sd-h2" as string]: "max(140px, calc((100dvh - 382px) / 2 + 12px))" } as React.CSSProperties}>
-            {/* Encabezado: título, medida y tipo a la izquierda; filtros estilo Power BI arriba a la derecha */}
-            <div className="flex flex-wrap items-start justify-between gap-3 pb-2 border-b border-slate-100 text-xs">
-                <div className="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <h2 className="text-base sm:text-lg font-black text-[#324354]">Saldos y Destrucciones</h2>
-                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 w-fit">
-                        {([['costo', '$ Costo'], ['pzs', 'Piezas']] as const).map(([m, txt]) => (
-                            <button key={m} onClick={() => setMedida(m)} className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${medida === m ? 'bg-[#324354] text-white shadow-xs' : 'text-slate-600 hover:text-black'}`}>
+            {/* Encabezado en un solo renglón (como MS): título, medida, tipo y registrar a la izquierda; filtros a la derecha.
+                Controles en tamaño compacto para que quepan al 100 % de zoom y el recuadro mida ≈ 810 px como Calidad General. */}
+            <div className="flex flex-wrap items-start justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
+                <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-2">
+                    <h2 className="text-base font-black text-[#324354] whitespace-nowrap">Saldos y Destrucciones</h2>
+                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 w-fit">
+                        {([['costo', '$', 'Ver en costo'], ['pzs', 'Pzs', 'Ver en piezas']] as const).map(([m, txt, ayuda]) => (
+                            <button key={m} onClick={() => setMedida(m)} title={ayuda} className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${medida === m ? 'bg-[#324354] text-white shadow-xs' : 'text-slate-600 hover:text-black'}`}>
                                 {txt}
                             </button>
                         ))}
                     </div>
-                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 w-fit">
+                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 w-fit">
                         {([['todos', 'Todos'], ['saldo', 'Saldos'], ['destruccion', 'Destrucciones']] as const).map(([t, txt]) => (
                             <button
                                 key={t}
                                 onClick={() => { setFiltroTipo(t); limpiarSelecciones(); }}
-                                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer flex items-center gap-1 ${filtroTipo === t ? 'bg-white text-[#324354] shadow-xs' : 'text-slate-600 hover:text-black'}`}
+                                className={`px-1.5 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer flex items-center gap-1 ${filtroTipo === t ? 'bg-white text-[#324354] shadow-xs' : 'text-slate-600 hover:text-black'}`}
                             >
-                                {t !== 'todos' && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLOR_TIPO_SD[t] }} />}
+                                {t !== 'todos' && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLOR_TIPO_SD[t] }} />}
                                 {txt}
                             </button>
                         ))}
                     </div>
                     <button
                         onClick={() => setRegistrando(true)}
-                        className="px-2.5 py-1 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-lg text-xs font-bold flex items-center gap-1"
+                        className="px-2 py-0.5 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 whitespace-nowrap"
                         title="Registrar un saldo o destrucción de FV, Muebles, CEFI, Cuarzo o RTM (MS llega automático desde Calidad MS)"
                     >
-                        <Plus className="w-3.5 h-3.5" /> Registrar
+                        <Plus className="w-3 h-3" /> Registrar
                     </button>
+                    {/* Avisos como ícono para no quitarle alto al recuadro */}
+                    {(error || avisos.length > 0) && (
+                        <span
+                            className={`flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-black cursor-help ${error ? 'bg-rose-100 text-rose-700 border border-rose-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}
+                            title={[error, ...avisos].filter(Boolean).join('\n')}
+                        >
+                            !
+                        </span>
+                    )}
                 </div>
-                <div className="flex flex-wrap items-start gap-2 w-full lg:w-auto">
-                    <FiltroPbi titulo="Planta" seleccion={plantasSel} opciones={plantasConDatos.map(p => ({ value: p.codigo, label: `${p.codigo} · ${p.nombre}` }))} onChange={v => { setPlantasSel(v); limpiarSelecciones(); }} onBorrar={() => setPlantasSel([])} puedeBorrar={plantasSel.length > 0} />
-                    <FiltroPbi titulo="Año" seleccion={anios.map(String)} opciones={aniosDisponibles.map(a => ({ value: String(a), label: String(a) }))} onChange={cambiarAnios} onBorrar={() => cambiarAnios([])} puedeBorrar={anios.length > 0} />
-                    <FiltroPbi titulo="Mes" seleccion={meses.map(String)} opciones={MESES.map((m, i) => ({ value: String(i + 1), label: m }))} onChange={cambiarMeses} onBorrar={() => cambiarMeses([])} puedeBorrar={meses.length > 0} />
-                    <FiltroPbi titulo="Semana" seleccion={semanasVista} opciones={opcionesSemana} onChange={cambiarSemanas} onBorrar={() => cambiarSemanas([])} puedeBorrar={semanasVista.length > 0} />
-                    <FiltroPbi titulo="Día" seleccion={diasVista} opciones={opcionesDia} onChange={cambiarDias} onBorrar={() => cambiarDias([])} puedeBorrar={diasVista.length > 0} />
+                <div className="flex flex-wrap items-start gap-1.5 w-full lg:w-auto">
+                    <FiltroPbi compacto titulo="Planta" seleccion={plantasSel} opciones={plantasConDatos.map(p => ({ value: p.codigo, label: `${p.codigo} · ${p.nombre}` }))} onChange={v => { setPlantasSel(v); limpiarSelecciones(); }} onBorrar={() => setPlantasSel([])} puedeBorrar={plantasSel.length > 0} />
+                    <FiltroPbi compacto titulo="Año" seleccion={anios.map(String)} opciones={aniosDisponibles.map(a => ({ value: String(a), label: String(a) }))} onChange={cambiarAnios} onBorrar={() => cambiarAnios([])} puedeBorrar={anios.length > 0} />
+                    <FiltroPbi compacto titulo="Mes" seleccion={meses.map(String)} opciones={MESES.map((m, i) => ({ value: String(i + 1), label: m }))} onChange={cambiarMeses} onBorrar={() => cambiarMeses([])} puedeBorrar={meses.length > 0} />
+                    <FiltroPbi compacto titulo="Semana" seleccion={semanasVista} opciones={opcionesSemana} onChange={cambiarSemanas} onBorrar={() => cambiarSemanas([])} puedeBorrar={semanasVista.length > 0} />
+                    <FiltroPbi compacto titulo="Día" seleccion={diasVista} opciones={opcionesDia} onChange={cambiarDias} onBorrar={() => cambiarDias([])} puedeBorrar={diasVista.length > 0} />
                 </div>
             </div>
-
-            {error && <div className="text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</div>}
-            {avisos.map(a => <div key={a} className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">{a}</div>)}
 
             {registrando && (
                 <RegistrarSaldoModal
@@ -472,12 +546,13 @@ export default function CalidadSaldosDashboard() {
             )}
 
             {/* Tarjetas KPI */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-9 gap-2">
                 {kpis.map(k => (
-                    <div key={k.titulo} className={`px-2.5 py-1.5 rounded-xl border shadow-2xs flex flex-col justify-between min-w-0 ${k.estilo}`}>
+                    <div key={k.titulo} className={`px-2.5 py-1.5 rounded-xl border shadow-2xs flex flex-col justify-between min-w-0 ${k.estilo}`} title={k.ayuda}>
                         <span className={`text-[8px] font-bold uppercase truncate ${k.tit}`}>{k.titulo}</span>
                         <span className={`font-black leading-tight mt-0.5 truncate ${k.largo ? 'text-[11px] capitalize' : 'text-sm sm:text-base'}`} title={k.largo ? k.valor : undefined}>
                             {cargandoInicial ? '…' : k.largo ? k.valor.toLowerCase() : k.valor}
+                            {k.detalle && !cargandoInicial && <span className="ml-1 text-[8px] font-bold opacity-70">{k.detalle}</span>}
                         </span>
                     </div>
                 ))}
@@ -487,7 +562,7 @@ export default function CalidadSaldosDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
                 <div
                     className="lg:col-span-7 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200"
-                    onClick={() => { if (!clicPrincipal.consumir() && selPeriodo?.gran === granPrincipal) setSelPeriodo(null); }}
+                    onClick={e => { if (!clicPrincipal.consumir() && !dentroDeGrafica(e) && selPeriodo?.gran === granPrincipal) setSelPeriodo(null); }}
                 >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                         <h3 className="text-xs sm:text-sm font-black text-slate-800 first-letter:uppercase">{tituloTiempo(granPrincipal)}</h3>
@@ -505,12 +580,13 @@ export default function CalidadSaldosDashboard() {
                                     margin={{ top: 18, right: 4, left: 0, bottom: 0 }}
                                     onClick={(e: any) => {
                                         const col = columnaDeClic(e, columnasPrincipal);
-                                        if (col && clicPrincipal.tomar()) alternarPeriodo(granPrincipal, col.key);
+                                        if (col && clicPrincipal.tomar(col.key)) alternarPeriodo(granPrincipal, col.key);
                                     }}
                                     style={{ cursor: 'pointer' }}
                                 >
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                                    {/* El número del día también se puede clicar (queda fuera del área de las barras) */}
+                                    <XAxis dataKey="label" tick={{ fontSize: 10, cursor: 'pointer' }} onClick={(t: any) => clicEje(t, columnasPrincipal, granPrincipal, clicPrincipal)} />
                                     <YAxis yAxisId="izq" tick={{ fontSize: 9 }} width={54} tickFormatter={v => fmt(Number(v))} />
                                     <YAxis yAxisId="der" orientation="right" tick={{ fontSize: 9, fill: COLOR_ACUMULADO }} width={50} tickFormatter={v => fmt(Number(v))} />
                                     <Tooltip content={<TooltipPeriodo gran={granPrincipal} medida={medida} />} cursor={{ fill: '#f1f5f9' }} />
@@ -534,16 +610,22 @@ export default function CalidadSaldosDashboard() {
 
                 <div
                     className="lg:col-span-5 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200"
-                    onClick={() => { if (!clicSecundaria.consumir() && selPeriodo?.gran === granSecundaria) setSelPeriodo(null); }}
+                    onClick={e => { if (!clicSecundaria.consumir() && !dentroDeGrafica(e) && selPeriodo?.gran === granSecundaria) setSelPeriodo(null); }}
                 >
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                        <h3 className="text-xs sm:text-sm font-black text-slate-800 first-letter:uppercase">{tituloTiempo(granSecundaria)}</h3>
-                        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]" onClick={e => e.stopPropagation()}>
-                            {([['mes', 'Por mes'], ['anio', 'Promedio por año']] as const).map(([g, txt]) => (
+                    {/* Título y selector en un solo renglón: así la fila mide igual que la gráfica diaria */}
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <h3 className="min-w-0 truncate text-xs sm:text-sm font-black text-slate-800 first-letter:uppercase">{tituloTiempo(granSecundaria)}</h3>
+                        {hayPct && (
+                            <span className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-slate-500" title="Piezas de saldos y destrucciones de MS sobre las piezas de MS entregadas a CEDI">
+                                <span className="w-3 h-0.5" style={{ backgroundColor: COLOR_PCT }} /> % fabricadas MS
+                            </span>
+                        )}
+                        <div className="shrink-0 flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]" onClick={e => e.stopPropagation()}>
+                            {([['mes', 'Mes'], ['anio', 'Prom. año']] as const).map(([g, txt]) => (
                                 <button
                                     key={g}
                                     onClick={() => { setVistaSec(g); if (selPeriodo?.gran === granSecundaria) setSelPeriodo(null); }}
-                                    className={`px-2 py-0.5 rounded-md font-bold transition-all ${vistaSec === g ? 'bg-[#324354] text-white shadow-xs' : 'text-slate-600 hover:text-black'}`}
+                                    className={`px-1.5 py-0.5 rounded-md font-bold transition-all ${vistaSec === g ? 'bg-[#324354] text-white shadow-xs' : 'text-slate-600 hover:text-black'}`}
                                 >
                                     {txt}
                                 </button>
@@ -557,23 +639,36 @@ export default function CalidadSaldosDashboard() {
                             <div className="h-full flex items-center justify-center text-sm font-bold text-slate-500">Sin datos.</div>
                         ) : (
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
+                                <ComposedChart
                                     data={columnasSecundaria}
                                     margin={{ top: 18, right: 4, left: 0, bottom: 0 }}
                                     onClick={(e: any) => {
                                         const col = columnaDeClic(e, columnasSecundaria);
-                                        if (col && clicSecundaria.tomar()) alternarPeriodo(granSecundaria, col.key);
+                                        if (col && clicSecundaria.tomar(col.key)) alternarPeriodo(granSecundaria, col.key);
                                     }}
                                     style={{ cursor: 'pointer' }}
                                 >
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                                    <YAxis tick={{ fontSize: 9 }} width={54} tickFormatter={v => fmt(Number(v))} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 10, cursor: 'pointer' }} onClick={(t: any) => clicEje(t, columnasSecundaria, granSecundaria, clicSecundaria)} />
+                                    <YAxis yAxisId="izq" tick={{ fontSize: 9 }} width={54} tickFormatter={v => fmt(Number(v))} />
+                                    {hayPct && (
+                                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fill: COLOR_PCT }} width={36} domain={[0, (max: number) => Math.max(1, Math.ceil(max * 1.4))]} tickFormatter={v => `${v}%`} />
+                                    )}
                                     <Tooltip content={<TooltipPeriodo gran={granSecundaria} medida={medida} />} cursor={{ fill: '#f1f5f9' }} />
                                     {barras(columnasSecundaria, granSecundaria, clicSecundaria, c => (granSecundaria === 'mes'
                                         ? meses.length > 0 && !meses.includes(Number(c.key.slice(5, 7)))
-                                        : anios.length > 0 && !anios.includes(Number(c.key))))}
-                                </BarChart>
+                                        : anios.length > 0 && !anios.includes(Number(c.key)))).map(b => React.cloneElement(b, { yAxisId: 'izq' }))}
+                                    {hayPct && (
+                                        <Line yAxisId="pct" type="monotone" dataKey="pct" stroke={COLOR_PCT} strokeWidth={2} dot={{ r: 2.5, fill: COLOR_PCT }} connectNulls isAnimationActive={false}>
+                                            <LabelList
+                                                dataKey="pct"
+                                                content={(p: any) => (p.value == null ? null : (
+                                                    <text x={p.x} y={p.y - 7} textAnchor="middle" fontSize={8} fontWeight={800} fill={COLOR_PCT}>{pctTexto(Number(p.value))}</text>
+                                                ))}
+                                            />
+                                        </Line>
+                                    )}
+                                </ComposedChart>
                             </ResponsiveContainer>
                         )}
                     </div>

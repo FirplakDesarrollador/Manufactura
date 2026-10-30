@@ -17,7 +17,7 @@ export function semanaIso(fecha: string): { anio: number; semana: number; clave:
 
 // Filtro estilo Power BI: título con borrador encima y lista desplegable de selección múltiple.
 // Sin nada marcado equivale a "Todas".
-export default function FiltroPbi({ titulo, seleccion, opciones, onChange, onBorrar, puedeBorrar, minimoUno = false }: {
+export default function FiltroPbi({ titulo, seleccion, opciones, onChange, onBorrar, puedeBorrar, minimoUno = false, compacto = false }: {
     titulo: string;
     seleccion: string[];
     opciones: { value: string; label: string }[];
@@ -25,6 +25,7 @@ export default function FiltroPbi({ titulo, seleccion, opciones, onChange, onBor
     onBorrar: () => void;
     puedeBorrar: boolean;
     minimoUno?: boolean; // Año: siempre debe quedar al menos uno
+    compacto?: boolean; // Más angosto, para encabezados con muchos controles (Saldos y Destrucciones)
 }) {
     const [abierto, setAbierto] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export default function FiltroPbi({ titulo, seleccion, opciones, onChange, onBor
     };
 
     return (
-        <div ref={ref} className="group relative min-w-[96px] flex-1 sm:flex-none sm:w-28">
+        <div ref={ref} className={`group relative flex-1 sm:flex-none ${compacto ? 'min-w-[84px] sm:w-24' : 'min-w-[96px] sm:w-28'}`}>
             <div className="flex items-center justify-between h-3 mb-0.5">
                 <span className="text-[8px] font-bold text-slate-500">{titulo}</span>
                 <button
