@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import { loginToSAP } from '@/lib/sap';
+import { crearFaltantes, nombreSap } from '@/lib/sapFaltantes';
 
+type Faltantes = ReturnType<typeof crearFaltantes>;
+
+const CLASES: Record<string, string> = { itcMaterial: 'Artículos', itcService: 'Servicio' };
+const EMISIONES: Record<string, string> = { im_Manual: 'Manual', im_Backflush: 'Notificación' };
+const TIPOS_LINEA: Record<string, string> = { pit_Item: 'Artículo', pit_Resource: 'Recurso', pit_Text: 'Texto' };
+const pesos = (n: number) => `$ ${n.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Consulta por producto (datos maestros, almacenes y lista de materiales). Lo que SAP no entregue o no se
+// reconozca va en `faltantes` (la pantalla lo muestra como error) en lugar de completarse con valores por defecto.
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
@@ -12,95 +22,61 @@ export async function GET(request: Request) {
         }
 
         const loginData = await loginToSAP();
-        const baseUrl = process.env.SAP_API_URL?.replace('/Login', '');
+        const baseUrl = process.env.SAP_API_URL?.replace('/Login', '') || '';
+        const cookie = loginData.cookieHeader;
+        const sap = (ruta: string) => fetch(`${baseUrl}${ruta}`, { headers: { 'Cookie': cookie, 'Content-Type': 'application/json' } });
 
-        let url = '';
-
+        // 1) Artículo principal y coincidencias
+        let primario: any = null;
+        let coincidencias: any[] = [];
         if (code) {
-            // Búsqueda por código exacto o directo
-            const encodedCode = encodeURIComponent(code);
-            url = `${baseUrl}/Items('${encodedCode}')`;
-        } else if (query) {
-            // Búsqueda parcial por ItemCode o ItemName
-            const encodedQuery = encodeURIComponent(query.trim());
-            url = `${baseUrl}/Items?$filter=contains(ItemCode, '${encodedQuery}') or contains(ItemName, '${encodedQuery}')&$top=20`;
+            const r = await sap(`/Items('${encodeURIComponent(code.replace(/'/g, "''"))}')`);
+            if (r.ok) primario = await r.json();
+            else if (r.status === 404) {
+                const alt = await sap(`/Items?$filter=ItemCode eq '${encodeURIComponent(code.replace(/'/g, "''"))}'`);
+                if (alt.ok) primario = (await alt.json()).value?.[0] || null;
+                else return NextResponse.json({ error: `Error SAP: ${alt.status}` }, { status: alt.status });
+            } else {
+                return NextResponse.json({ error: `Error SAP: ${r.status}` }, { status: r.status });
+            }
+            if (!primario) return NextResponse.json({ error: `Artículo ${code} no encontrado en SAP` }, { status: 404 });
+        } else {
+            const q = encodeURIComponent(query!.trim().replace(/'/g, "''"));
+            const r = await sap(`/Items?$filter=contains(ItemCode, '${q}') or contains(ItemName, '${q}')&$top=20`);
+            if (!r.ok) return NextResponse.json({ error: `Error SAP: ${r.status}` }, { status: r.status });
+            coincidencias = (await r.json()).value || [];
+            if (!coincidencias.length) return NextResponse.json({ error: `Ningún artículo coincide con "${query}" en SAP` }, { status: 404 });
+            primario = coincidencias[0];
         }
 
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Cookie': loginData.cookieHeader,
-                'Content-Type': 'application/json'
-            }
+        const f = crearFaltantes();
+
+        // 2) Lista de materiales y nombres de grupo, fabricante y lista de precios (en paralelo)
+        const precio = (primario.ItemPrices || [])[0];
+        const [arbol, nombreGrupo, nombreFabricante, nombreLista] = await Promise.all([
+            sap(`/ProductTrees('${encodeURIComponent(primario.ItemCode.replace(/'/g, "''"))}')`).then(async r => ({ status: r.status, data: r.ok ? await r.json() : null })).catch(() => ({ status: 0, data: null })),
+            primario.ItemsGroupCode != null ? nombreSap(baseUrl, cookie, `ItemGroups(${primario.ItemsGroupCode})`, 'GroupName') : Promise.resolve(null),
+            primario.Manufacturer != null && primario.Manufacturer !== -1 ? nombreSap(baseUrl, cookie, `Manufacturers(${primario.Manufacturer})`, 'ManufacturerName') : Promise.resolve(null),
+            precio?.PriceList != null ? nombreSap(baseUrl, cookie, `PriceLists(${precio.PriceList})`, 'PriceListName') : Promise.resolve(null)
+        ]);
+
+        // 404 = el artículo no tiene lista de materiales (normal); cualquier otro error se informa
+        let bomComponents: any[] = [];
+        if (arbol.data) bomComponents = mapearLdm(arbol.data, f);
+        else if (arbol.status !== 404) f.agregar(`Lista de materiales (SAP respondió ${arbol.status || 'sin conexión'})`);
+
+        const item = mapSapItem(primario, f, {
+            grupo: nombreGrupo,
+            fabricante: nombreFabricante,
+            listaPrecios: nombreLista,
+            bomComponents
         });
 
-        if (!response.ok) {
-            // Si dio 404 buscando por clave directa, intentar con filtro eq
-            if (response.status === 404 && code) {
-                const altUrl = `${baseUrl}/Items?$filter=ItemCode eq '${encodeURIComponent(code)}'`;
-                const altRes = await fetch(altUrl, {
-                    headers: { 'Cookie': loginData.cookieHeader, 'Content-Type': 'application/json' }
-                });
-                if (altRes.ok) {
-                    const altData = await altRes.json();
-                    if (altData.value && altData.value.length > 0) {
-                        return NextResponse.json({ item: mapSapItem(altData.value[0]), matches: [] });
-                    }
-                }
-            }
-            return NextResponse.json({ error: `Error SAP: ${response.status}` }, { status: response.status });
-        }
-
-        const data = await response.json();
-        let primaryItemRaw = data.value ? data.value[0] : data;
-        let bomComponents: any[] = [];
-
-        if (primaryItemRaw && primaryItemRaw.ItemCode) {
-            try {
-                const treeUrl = `${baseUrl}/ProductTrees('${encodeURIComponent(primaryItemRaw.ItemCode)}')`;
-                const treeRes = await fetch(treeUrl, {
-                    headers: { 'Cookie': loginData.cookieHeader, 'Content-Type': 'application/json' }
-                });
-                if (treeRes.ok) {
-                    const treeData = await treeRes.json();
-                    const lines = treeData.ProductTreeLines || treeData.ProductTreeItems || [];
-                    bomComponents = lines.map((line: any, index: number) => ({
-                        id: index + 1,
-                        tipo: line.ItemType === 'pit_Resource' ? 'Recurso' : 'Artículo',
-                        no: line.ItemCode,
-                        descripcion: line.ItemName || line.ItemCode,
-                        cantidad: String(line.Quantity || 1),
-                        uom: line.UoMCode || 'UN',
-                        almacen: line.Warehouse || 'MP-10',
-                        metodoEmision: line.IssueMethod === 'im_Manual' ? 'Manual' : 'Notificación',
-                        costoEst: "****",
-                        listaPrecios: "****",
-                        costoEstTotal: "****",
-                        precioUnitario: line.Price ? `$ ${line.Price.toLocaleString('es-CO')}` : '',
-                        total: line.Price ? `$ ${(line.Price * (line.Quantity || 1)).toLocaleString('es-CO')}` : '',
-                        ctaWip: "0"
-                    }));
-                }
-            } catch (e) {
-                console.log("Artículo no tiene Lista de Materiales en SAP:", primaryItemRaw.ItemCode);
-            }
-        }
-
-        // Si la respuesta es un arreglo de coincidencias (cuando se usa $filter)
-        if (data.value) {
-            if (data.value.length === 0) {
-                return NextResponse.json({ error: 'Artículo no encontrado en SAP' }, { status: 404 });
-            }
-            const matches = data.value.map((item: any) => mapSapItem(item, item.ItemCode === primaryItemRaw.ItemCode ? bomComponents : []));
-            return NextResponse.json({
-                item: matches[0],
-                matches: matches.map(m => ({ itemCode: m.itemCode, itemName: m.itemName }))
-            });
-        }
-
-        // Si la respuesta es un objeto único (búsqueda directa por ID)
-        const mappedItem = mapSapItem(data, bomComponents);
-        return NextResponse.json({ item: mappedItem, matches: [] });
+        return NextResponse.json({
+            item,
+            matches: coincidencias.map(c => ({ itemCode: c.ItemCode, itemName: c.ItemName })),
+            faltantes: f.lista
+        });
 
     } catch (error: any) {
         console.error("Error en endpoint /api/sap/items:", error);
@@ -108,67 +84,101 @@ export async function GET(request: Request) {
     }
 }
 
-function mapSapItem(sapItem: any, bomComponents: any[] = []) {
-    const mainPrice = sapItem.ItemPrices && sapItem.ItemPrices.length > 0
-        ? sapItem.ItemPrices[0].Price
-        : 0;
+function mapearLdm(arbol: any, f: Faltantes) {
+    const lineas: any[] = arbol.ProductTreeLines || [];
+    return lineas.map((line: any, index: number) => {
+        const n = index + 1;
+        const cantidad = line.Quantity;
+        if (cantidad == null) f.agregar(`Cantidad del componente ${n} de la lista de materiales`);
+        const total = line.Price != null && cantidad != null ? line.Price * cantidad : null;
+        return {
+            id: n,
+            tipo: f.traducir(line.ItemType, TIPOS_LINEA, 'Tipo de componente (lista de materiales)'),
+            no: f.requerido(line.ItemCode, `Nº del componente ${n} de la lista de materiales`),
+            descripcion: line.ItemName || '',
+            cantidad: cantidad != null ? String(cantidad) : '',
+            // ProductTrees no trae la unidad de medida de la línea (en SAP sale del dato maestro del componente)
+            uom: line.InventoryUOM || '',
+            almacen: f.requerido(line.Warehouse, `Almacén del componente ${n} de la lista de materiales`),
+            metodoEmision: f.traducir(line.IssueMethod, EMISIONES, 'Método de emisión (lista de materiales)'),
+            costoEst: "****",
+            listaPrecios: line.PriceList != null ? `Lista ${line.PriceList}` : '',
+            costoEstTotal: "****",
+            precioUnitario: line.Price ? pesos(line.Price) : '',
+            total: total ? pesos(total) : '',
+            totalNum: total || 0,
+            comentarios: line.Comment || '',
+            ctaWip: line.WipAccount || ''
+        };
+    });
+}
+
+function mapSapItem(sapItem: any, f: Faltantes, extra: { grupo: string | null; fabricante: string | null; listaPrecios: string | null; bomComponents: any[] }) {
+    const precio = (sapItem.ItemPrices || [])[0];
+    if (!precio) f.agregar('Lista de precios');
+    else if (!extra.listaPrecios) f.agregar(`Nombre de la lista de precios ${precio.PriceList}`);
+    if (sapItem.ItemsGroupCode != null && !extra.grupo) f.agregar(`Nombre del grupo de artículos ${sapItem.ItemsGroupCode}`);
+    // El nombre del fabricante no se marca como faltante: el usuario de integración no tiene permiso para leer
+    // Manufacturers (SAP responde 403) y se muestra el código real ("Fabricante 16"), que sí es dato de SAP
+    const esInventario = sapItem.InventoryItem === 'tYES';
 
     return {
-        itemCode: sapItem.ItemCode || '',
-        itemName: sapItem.ItemName || '',
+        itemCode: f.requerido(sapItem.ItemCode, 'Nº de artículo'),
+        itemName: f.requerido(sapItem.ItemName, 'Descripción'),
         foreignName: sapItem.ForeignName || '',
-        itemClass: sapItem.ItemClass || 'Artículos',
-        itemsGroupCode: sapItem.ItemsGroupCode ? `Grupo ${sapItem.ItemsGroupCode}` : '',
-        uomGroup: sapItem.UoMGroupEntry ? 'Manual' : 'Manual',
-        priceList: '1. Lista Base 2020',
-        price: mainPrice ? `$ ${mainPrice.toLocaleString('es-CO')}` : '$ 0.00',
+        itemClass: f.traducir(sapItem.ItemClass, CLASES, 'Clase de artículo'),
+        itemsGroupCode: sapItem.ItemsGroupCode == null ? String(f.requerido(null, 'Grupo de artículos')) : extra.grupo || `Grupo ${sapItem.ItemsGroupCode}`,
+        // UoMGroupEntry -1 = grupo de unidades "Manual" en SAP
+        uomGroup: sapItem.UoMGroupEntry == null ? String(f.requerido(null, 'Grupo de unidades de medida')) : sapItem.UoMGroupEntry === -1 ? 'Manual' : `Grupo ${sapItem.UoMGroupEntry}`,
+        priceList: precio ? extra.listaPrecios || `Lista ${precio.PriceList}` : '',
+        price: precio ? `${precio.Currency && precio.Currency !== '$' ? `${precio.Currency} ` : '$ '}${Number(precio.Price || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '',
         barCode: sapItem.BarCode || '',
-        
+
         // Indicadores tipo checkbox de SAP
-        inventoryItem: sapItem.InventoryItem === 'tYES',
+        inventoryItem: esInventario,
         salesItem: sapItem.SalesItem === 'tYES',
         purchaseItem: sapItem.PurchaseItem === 'tYES',
         assetItem: sapItem.AssetItem === 'tYES',
 
         // General
-        manufacturer: sapItem.Manufacturer ? `Fabricante ${sapItem.Manufacturer}` : 'FIRPLAK',
+        manufacturer: sapItem.Manufacturer == null ? String(f.requerido(null, 'Fabricante')) : sapItem.Manufacturer === -1 ? '- Sin fabricante -' : extra.fabricante || `Fabricante ${sapItem.Manufacturer}`,
         valid: sapItem.Valid === 'tYES',
         frozen: sapItem.Frozen === 'tYES',
-        activeStatus: sapItem.Frozen === 'tYES' ? 'Inactivo' : 'Activo',
+        activeStatus: sapItem.Frozen == null ? String(f.requerido(null, 'Estado activo/inactivo')) : sapItem.Frozen === 'tYES' ? 'Inactivo' : 'Activo',
         vatLiable: sapItem.VatLiable === 'tYES',
         taxSubject: sapItem.VatLiable === 'tYES',
 
         // Inventario y Unidades
-        defaultWarehouse: sapItem.DefaultWarehouse || 'PT-02',
-        salesUnit: sapItem.SalesUnit || 'UN',
-        purchaseUnit: sapItem.PurchaseUnit || 'UN',
-        inventoryUOM: sapItem.InventoryUOM || sapItem.SalesUnit || 'UN',
-        quantityOnStock: sapItem.QuantityOnStock || 0,
-        quantityOrderedFromVendors: sapItem.QuantityOrderedFromVendors || 0,
-        quantityOrderedByCustomers: sapItem.QuantityOrderedByCustomers || 0,
+        defaultWarehouse: esInventario ? f.requerido(sapItem.DefaultWarehouse, 'Almacén por defecto') : sapItem.DefaultWarehouse || '',
+        salesUnit: sapItem.SalesUnit || '',
+        purchaseUnit: sapItem.PurchaseUnit || '',
+        inventoryUOM: esInventario ? f.requerido(sapItem.InventoryUOM, 'Unidad de medida de inventario') : sapItem.InventoryUOM || '',
+        quantityOnStock: f.requerido(sapItem.QuantityOnStock, 'Cantidad en stock'),
+        quantityOrderedFromVendors: f.requerido(sapItem.QuantityOrderedFromVendors, 'Cantidad pedida a proveedores'),
+        quantityOrderedByCustomers: f.requerido(sapItem.QuantityOrderedByCustomers, 'Cantidad comprometida con clientes'),
 
         // Lista de Materiales (BOM)
-        bomComponents: bomComponents,
+        bomComponents: extra.bomComponents,
 
-        // Lista de almacenes (ItemWarehouseInfoCollection)
+        // Lista de almacenes (ItemWarehouseInfoCollection). Campos de usuario con su nombre real en SAP.
         warehouses: (sapItem.ItemWarehouseInfoCollection || []).map((wh: any) => ({
             warehouseCode: wh.WarehouseCode,
             warehouseName: wh.WarehouseName || wh.WarehouseCode,
             locked: wh.Locked === 'tYES',
-            inStock: wh.InStock || 0,
-            committed: wh.Committed || 0,
-            ordered: wh.Ordered || 0,
-            available: (wh.InStock || 0) - (wh.Committed || 0) + (wh.Ordered || 0),
-            minStock: wh.MinimalStock || 0,
-            maxStock: wh.MaximalStock || 0,
-            requiredStock: wh.RequiredStock || 0,
-            itemCost: wh.StandardAveragePrice || wh.ItemCost || 0,
-            dispReal: (wh.InStock || 0) - (wh.Committed || 0) + (wh.Ordered || 0),
-            amortiguadorToc: wh.U_AmortiguadorTOC || wh.AmortiguadorTOC || '',
-            minOrderQty: wh.U_MINORDRQTY || wh.MinOrderQty || 0,
-            leadTime: wh.U_TiempoLead || wh.LeadTime || 0,
-            reabastecimientoMin: wh.U_ReabastecimientoMinimo || wh.MinReorderQty || 0,
-            tiempoReabastecimiento: wh.U_TiempoReabastecimiento || wh.ReorderLeadTime || ''
+            inStock: wh.InStock ?? 0,
+            committed: wh.Committed ?? 0,
+            ordered: wh.Ordered ?? 0,
+            available: (wh.InStock ?? 0) - (wh.Committed ?? 0) + (wh.Ordered ?? 0),
+            minStock: wh.MinimalStock ?? 0,
+            maxStock: wh.MaximalStock ?? 0,
+            requiredStock: wh.MinimalOrder ?? 0,
+            itemCost: wh.StandardAveragePrice ?? 0,
+            dispReal: wh.U_DispReal != null ? Number(wh.U_DispReal) : undefined,
+            amortiguadorToc: wh.U_AmoTOC ?? '',
+            minOrderQty: wh.U_MINORDRQTY ?? 0,
+            leadTime: wh.U_LEADTIME ?? 0,
+            reabastecimientoMin: wh.U_Reabastecimiento ?? 0,
+            tiempoReabastecimiento: wh.U_tiempo_reab ?? ''
         }))
     };
 }

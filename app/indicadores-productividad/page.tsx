@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Edit3, Wrench, Building2, Activity, Users, RefreshCw, CheckCircle2, Clock } from "lucide-react";
+import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Edit3, Wrench, Building2, Activity, Users, RefreshCw, CheckCircle2, Clock, Hammer } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
 import CarruselPestanas from "@/components/ui/CarruselPestanas";
 import { supabase } from "@/lib/supabase";
 import IndicadoresCalidadView, { MAIN_SUBHEADER_TABS, type MainTabKey } from "@/components/calidad/IndicadoresCalidadView";
 import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView";
+import RmoldDashboard from "@/components/indicadores/RmoldDashboard";
 
 // Plant keys supported
 type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
@@ -161,7 +162,7 @@ const POWERBI_URLS = {
 };
 
 // Pestañas del Tablero de Control (segundo nivel), en este orden
-type VistaTablero = "hora-a-hora" | "tablero" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "mantenimiento" | "sistema-produccion" | "variacion" | "ausentismo";
+type VistaTablero = "hora-a-hora" | "tablero" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "mantenimiento" | "sistema-produccion" | "rmold" | "variacion" | "ausentismo";
 const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode }[] = [
     { id: "hora-a-hora", label: "Tiempo Real", icon: <Clock size={14} /> },
     { id: "tablero", label: "Tablero de Control", icon: <SlidersHorizontal size={14} /> },
@@ -171,6 +172,7 @@ const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode
     { id: "calidad", label: "Calidad", icon: <ShieldCheck size={14} /> },
     { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={14} /> },
     { id: "sistema-produccion", label: "Sistema de Producción", icon: <Building2 size={14} /> },
+    { id: "rmold", label: "RMOLD", icon: <Hammer size={14} /> },
     { id: "variacion", label: "Variación", icon: <Activity size={14} /> },
     { id: "ausentismo", label: "Ausentismo", icon: <UserX size={14} /> }
 ];
@@ -420,7 +422,7 @@ export default function IndicadoresProductividadPage() {
             )}
 
             {/* Main Area */}
-            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" ? "max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
+            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" || viewMode === "rmold" ? "max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
                 {viewMode === "hora-a-hora" ? (
                     <div className="w-full animate-in fade-in duration-300">
                         <HoraAHoraPlantasView fecha={fechaISO} />
@@ -478,6 +480,10 @@ export default function IndicadoresProductividadPage() {
                         <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">En construcción</span>
                         <h2 className="text-lg font-black text-[#324354]">{PESTANAS_TABLERO.find(p => p.id === viewMode)?.label}</h2>
                         <p className="text-sm text-slate-500 max-w-md">{VISTAS_EN_CONSTRUCCION[viewMode]}</p>
+                    </div>
+                ) : viewMode === "rmold" ? (
+                    <div className="w-full animate-in fade-in duration-300">
+                        <RmoldDashboard />
                     </div>
                 ) : viewMode === "calidad" ? (
                     <div className="w-full animate-in fade-in duration-300">
