@@ -403,6 +403,21 @@ const generateMockOrder = (no: string): OrderData => {
     };
 };
 
+// Aviso en rojo con los datos que SAP no entregó o no se reconocen (evita falsos positivos)
+const AvisoFaltantesSap = ({ faltantes }: { faltantes: string[] }) => faltantes.length ? (
+    <div className="mx-2 mt-1 px-2.5 py-1.5 bg-red-50 border border-red-400 text-red-800 text-[11px] font-semibold flex items-start gap-1.5 select-text" role="alert">
+        <span className="shrink-0 w-4 h-4 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">!</span>
+        <span>SAP no entregó o no se reconoce: {faltantes.join(' · ')}. Verifique en SAP antes de usar estos datos.</span>
+    </div>
+) : null;
+
+// Estado de la última consulta a SAP (el distintivo verde solo aparece si la consulta respondió)
+const EstadoConsultaSap = ({ estado }: { estado: 'sin-consulta' | 'ok' | 'error' }) => estado === 'sin-consulta' ? null : (
+    <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${estado === 'ok' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-red-100 text-red-800 border-red-300'}`}>
+        {estado === 'ok' ? 'SAP respondió' : 'Error al consultar SAP'}
+    </span>
+);
+
 const SapLinkArrow = () => (
     <span title="Navegar en SAP" className="inline-flex items-center">
         <svg
@@ -430,6 +445,8 @@ export default function ConsultaSAPPage() {
     const [itemLoading, setItemLoading] = useState(false)
     const [itemInnerTab, setItemInnerTab] = useState<'inventario' | 'lista-materiales'>('inventario')
     const [itemMatches, setItemMatches] = useState<Array<{ itemCode: string; itemName: string }>>([])
+    const [itemFaltantes, setItemFaltantes] = useState<string[]>([])
+    const [itemEstadoSap, setItemEstadoSap] = useState<'sin-consulta' | 'ok' | 'error'>('sin-consulta')
 
     const handleItemSearch = async (byField: 'code' | 'name', searchTermOverride?: string) => {
         const val = searchTermOverride || (byField === 'code' ? itemCodeInput.trim() : itemNameInput.trim());
@@ -444,16 +461,27 @@ export default function ConsultaSAPPage() {
             const res = await fetch(`/api/sap/items?${param}`);
             const data = await res.json();
             if (res.ok && data.item) {
+                const faltantes: string[] = data.faltantes || [];
                 setActiveItem(data.item);
                 setItemCodeInput(data.item.itemCode);
                 setItemNameInput(data.item.itemName);
                 setItemMatches(data.matches || []);
-                toast.success(`Artículo ${data.item.itemCode} cargado desde SAP B1`);
+                setItemFaltantes(faltantes);
+                setItemEstadoSap('ok');
+                if (faltantes.length) toast.error(`Artículo ${data.item.itemCode}: SAP no entregó ${faltantes.length} dato(s). Revise el aviso en rojo.`);
+                else toast.success(`Artículo ${data.item.itemCode} cargado desde SAP B1`);
             } else {
+                // No se deja en pantalla el artículo anterior: parecería el consultado
+                setActiveItem(EMPTY_ITEM);
+                setItemFaltantes([]);
+                setItemEstadoSap('error');
                 toast.error(data.error || "No se encontró el artículo en SAP B1");
             }
         } catch (err: any) {
             console.error("Error al consultar artículo SAP:", err);
+            setActiveItem(EMPTY_ITEM);
+            setItemFaltantes([]);
+            setItemEstadoSap('error');
             toast.error("Error al conectar con SAP B1");
         } finally {
             setItemLoading(false);
@@ -463,6 +491,8 @@ export default function ConsultaSAPPage() {
     // Estados de búsqueda e interfaz SAP (Consulta Ordenes) - Inicialmente Vacíos
     const [searchQuery, setSearchQuery] = useState("")
     const [activeOrder, setActiveOrder] = useState<OrderData>(EMPTY_ORDER)
+    const [orderFaltantes, setOrderFaltantes] = useState<string[]>([])
+    const [orderEstadoSap, setOrderEstadoSap] = useState<'sin-consulta' | 'ok' | 'error'>('sin-consulta')
     const [tabActive, setTabActive] = useState<'componentes' | 'resumen' | 'anexos'>('componentes')
     const [currentTime, setCurrentTime] = useState("")
 
@@ -581,15 +611,26 @@ export default function ConsultaSAPPage() {
             const res = await fetch(`/api/sap/production-orders/${orderNum}`);
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
+                // No se deja en pantalla la orden anterior: parecería la consultada
+                setActiveOrder(EMPTY_ORDER);
+                setOrderFaltantes([]);
+                setOrderEstadoSap('error');
                 toast.error(errData.error || "Orden no encontrada en SAP", { id: loadingId });
                 return;
             }
             const data = await res.json();
+            const faltantes: string[] = data.faltantes || [];
             setActiveOrder(data);
+            setOrderFaltantes(faltantes);
+            setOrderEstadoSap('ok');
             setCompSortCol(null);
-            toast.success(`Orden ${orderNum} cargada correctamente`, { id: loadingId });
+            if (faltantes.length) toast.error(`Orden ${orderNum}: SAP no entregó ${faltantes.length} dato(s). Revise el aviso en rojo.`, { id: loadingId });
+            else toast.success(`Orden ${orderNum} cargada correctamente`, { id: loadingId });
         } catch (error) {
             console.error(error);
+            setActiveOrder(EMPTY_ORDER);
+            setOrderFaltantes([]);
+            setOrderEstadoSap('error');
             toast.error("Error de conexión con SAP", { id: loadingId });
         }
     }
@@ -1207,6 +1248,7 @@ export default function ConsultaSAPPage() {
                                 <span className="font-semibold text-gray-800 text-[11px] tracking-wide">
                                     Orden de fabricación{activeOrder.noOrden ? ` - ${activeOrder.noOrden}` : ''}
                                 </span>
+                                <EstadoConsultaSap estado={orderEstadoSap} />
                             </div>
                             
                             {/* Search container con botón Buscar estilizado */}
@@ -1241,6 +1283,7 @@ export default function ConsultaSAPPage() {
 
                         {/* SAP GOLD SHARP ACCENT BORDER */}
                         <div className="h-[3px] bg-[#f4b000] w-full"></div>
+                        <AvisoFaltantesSap faltantes={orderFaltantes} />
 
                         {/* SAP WINDOW BODY */}
                         <div className="py-0.5 px-2 bg-[#f3f0ea] flex flex-col gap-0.5">
@@ -1270,11 +1313,10 @@ export default function ConsultaSAPPage() {
                                         <select 
                                             value={activeOrder.estado} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd] font-semibold text-emerald-800"
+                                            className={`bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd] font-semibold ${activeOrder.estado === 'Cancelado' ? 'text-red-700' : 'text-emerald-800'}`}
                                         >
-                                            <option>Liberado</option>
-                                            <option>Planificado</option>
-                                            <option>Cerrado</option>
+                                            {/* Si SAP trae un estado que no está en la lista se muestra tal cual (antes caía en "Liberado") */}
+                                            {[...new Set(['Liberado', 'Planificado', 'Cerrado', 'Cancelado', activeOrder.estado].filter(Boolean))].map(e => <option key={e}>{e}</option>)}
                                         </select>
                                     </div>
 
@@ -2211,14 +2253,13 @@ export default function ConsultaSAPPage() {
                                         Consultando SAP B1...
                                     </span>
                                 )}
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold border border-emerald-300">
-                                    SAP Conectado Live
-                                </span>
+                                <EstadoConsultaSap estado={itemEstadoSap} />
                             </div>
                         </div>
 
                         {/* SAP GOLD SHARP ACCENT BORDER */}
                         <div className="h-[3px] bg-[#f4b000] w-full"></div>
+                        <AvisoFaltantesSap faltantes={itemFaltantes} />
 
                         {/* SAP WINDOW BODY */}
                         <div className="py-2 px-3 bg-[#f3f0ea] flex flex-col gap-2">
@@ -2378,7 +2419,7 @@ export default function ConsultaSAPPage() {
                                                         {activeItem.warehouses && activeItem.warehouses.length > 0 ? (
                                                             activeItem.warehouses.map((wh, idx) => {
                                                                 const disp = wh.available !== undefined ? wh.available : (wh.inStock - wh.committed + wh.ordered);
-                                                                const dispReal = wh.dispReal !== undefined ? wh.dispReal : disp;
+                                                                const dispReal = wh.dispReal;
                                                                 const isHighlight = wh.warehouseCode === 'PT-02';
                                                                 return (
                                                                     <tr 
@@ -2407,7 +2448,7 @@ export default function ConsultaSAPPage() {
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
-                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black font-semibold">{dispReal.toFixed(2)}</td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black font-semibold">{dispReal != null ? dispReal.toFixed(2) : ''}</td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono">{wh.amortiguadorToc || ''}</td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono">{wh.minOrderQty && wh.minOrderQty > 0 ? wh.minOrderQty : ''}</td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono">{wh.leadTime && wh.leadTime > 0 ? wh.leadTime : ''}</td>
@@ -2512,7 +2553,7 @@ export default function ConsultaSAPPage() {
                                                                     <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500 select-text">{row.costoEstTotal}</td>
                                                                     <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-semibold select-text">{row.precioUnitario}</td>
                                                                     <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-bold select-text">{row.total}</td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] select-text"></td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] select-text">{row.comentarios}</td>
                                                                     <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono text-gray-600 select-text">{row.ctaWip}</td>
                                                                     <td className="px-2 py-0.5 text-center select-text"></td>
                                                                 </tr>
@@ -2544,10 +2585,10 @@ export default function ConsultaSAPPage() {
                                                     <tfoot className="sticky bottom-0 bg-[#eceae6] border-t-2 border-[#a3a3a3] font-bold font-mono text-[11px] z-10 text-black">
                                                         <tr>
                                                             <td colSpan={10} className="px-2 py-1 border-r border-[#c2c0bb] text-right text-gray-600 font-sans">Totales:</td>
-                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono">{activeItem.itemCode ? '$ 0.00' : ''}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono"></td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right"></td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono text-emerald-800">
-                                                                {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? '$ 10,723.40' : (activeItem.itemCode ? '$ 0.00' : '')}
+                                                                {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? `$ ${activeItem.bomComponents.reduce((a: number, r: any) => a + (Number(r.totalNum) || 0), 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                                                             </td>
                                                             <td colSpan={3} className="px-2 py-1"></td>
                                                         </tr>
