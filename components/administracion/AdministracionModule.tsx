@@ -20,9 +20,11 @@ import {
     Trash2,
     X,
     ChevronsUpDown,
-    ArrowRightLeft
+    ArrowRightLeft,
+    FileText
 } from 'lucide-react'
 import { toast } from 'sonner'
+import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
 
 export default function AdministracionModule({ userEmail }: { userEmail?: string }) {
     // userEmail available for future use
@@ -36,6 +38,8 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [expandedRegistros, setExpandedRegistros] = useState<Set<number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
+    // Orden cuyo detalle de SAP (lista de materiales, comentarios…) está abierto
+    const [detalleOf, setDetalleOf] = useState<string | number | null>(null)
 
     // Modal State
     const [editModal, setEditModal] = useState<{
@@ -446,6 +450,13 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                             <ChevronsUpDown size={18} />
                                         </button>
                                         <button
+                                            onClick={() => setDetalleOf(item.orden_fabricacion)}
+                                            className="p-2 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50"
+                                            title="Detalle de la orden en SAP (lista de materiales, comentarios)"
+                                        >
+                                            <FileText size={18} />
+                                        </button>
+                                        <button
                                             onClick={() => setEditModal({ type: 'of', item })}
                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50"
                                             title="Editar Orden"
@@ -733,6 +744,9 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                         </div>
                     </div>
                 </div>
+            )}
+            {detalleOf != null && (
+                <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)} />
             )}
         </div>
     )

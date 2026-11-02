@@ -35,7 +35,8 @@ Este skill concentra las reglas visuales de la aplicación. Complementa:
 ## 2. Banners y barras
 
 ### 2.0 Encabezados por niveles (estándar de toda la app)
-Aplica a todas las pantallas **excepto Control de Piso MS (`/marmol`), FV (`/fibra`) y Muebles (`/muebles`)**, que tienen su propio encabezado de planta.
+Aplica a todas las pantallas **excepto Control de Piso MS (`/marmol`) y Muebles (`/muebles`)**, que aún tienen su propio encabezado de planta.
+- **Control de Piso FV (`/fibra`) ya usa el `Header` estándar** (título "Control de Piso Fibra (FV)"). Su menú de módulos de planta vive en un panel lateral propio (`w-52`, `sticky top-12`) que se recoge a una **barra de íconos** (`w-12`, nombre en `title`) con el botón **«/» "Módulos FV"** arriba del panel (reemplaza el botón ≡ del encabezado viejo; el ≡ del banner es solo el menú general). En celular arranca recogido y flota sobre el contenido al abrirlo. Referencia: `app/fibra/page.tsx`; aplicar igual a MS y Muebles cuando se migren.
 
 | Nivel | Qué es | Alto | Componente / clases |
 |---|---|---|---|
@@ -193,6 +194,13 @@ Una ventana debe quedar **por encima del banner** (más de 100).
 
 ---
 
+### 6.1 Menús de módulos (tarjetas cuadradas)
+Inicio, Control de piso, Calidad, Sistema de Producción, Mantenimiento y Nueva OPT: los 15 módulos del inicio (3 filas de 5) deben verse completos a **zoom 100 %** (≈ 1266 × 640 px CSS útiles).
+- Tarjeta: `w-full max-w-[165px] 2xl:max-w-[220px] aspect-square`, botón `p-2 sm:p-3 rounded-2xl`.
+- Círculo del ícono `w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 mb-2 2xl:mb-3` con `[&_svg]:w-6 md:[&_svg]:w-7 2xl:[&_svg]:w-8` (mismo alto).
+- Nombre `text-[13px] sm:text-sm 2xl:text-base font-bold`; "(Atajo)" `text-[10px] md:text-xs italic`.
+- Cuadrícula `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4`; `<main>` con `px-4 py-4 md:py-6` (sin `pt-28`/`pt-32`: el `Header` ya deja su espacio); pie `py-2 text-xs`.
+
 ## 7. Gráficas
 
 Seguir `.agents/skills/visualizacion-graficas/SKILL.md` (tamaños para los Dell Pro 14). Resumen: Recharts, ejes `fontSize` 10–12, línea de meta `ReferenceLine` punteada.
@@ -305,3 +313,5 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - 2026-10-28 · **Encabezados delgados en toda la app** (menos Control de Piso MS/FV/Muebles): banner 48 px (`h-12`, título `text-base sm:text-lg`, logo `h-9`, nombre `text-sm sm:text-base`), niveles 2 y 3 de 40 px con botones `h-7 text-[11px] sm:text-xs`; barras fijas en `top-12` / `top-[48px]` y `top-[88px]`. Recuadro IFI guardado como **recuadro modelo** (§7.1) y replicado en Mármol Sintético.
 - 2026-10-28 · El zoom normal de los equipos es 100 %: Tablero de Control con `Header slim` (48 px, letra un tamaño menor) y pestañas de 40 px; recuadro IFI a ≈ 800 px de pantalla (`calc(100dvh-383px)`), sin la leyenda del semáforo junto al título de la gráfica. `FiltroPbi` más pequeño: `sm:w-32`, botón `h-7 text-[10px]`, título `text-[9px]`. Clic en una columna de día la refleja en los filtros Semana y Día (al quitar el resaltado vuelven). Línea y etiqueta de meta en verde `#3b8f50` (punteada `4 4`). Tarjetas KPI compactas (`py-1.5`): la meta (o el detalle "Promedio de…") va al lado del valor, no en otra línea; filtros alineados arriba (`items-start`) junto al título.
 - 2026-10-31 · **Informe de Turno** (`/informe-turno`, deja de estar en construcción) con la primera planta: **RMOLD** (Reparación de Moldes), formulario de cierre diario que reemplaza el Excel Productividad Moldes. Tablero de Control → pestaña **RMOLD** (entre Sistema de Producción y Variación) con productividad, nivel de servicio y paros.
+- 2026-11-02 · Menús de módulos más pequeños (§6.1) para que los 15 módulos del inicio se vean completos a zoom 100 %: tarjetas de 165 px (220 px en 2xl), ícono, letra y espacios reducidos en Inicio, Control de piso, Calidad, Sistema de Producción, Mantenimiento y Nueva OPT.
+- 2026-11-02 · Control de Piso FV pasa al `Header` estándar; menú de módulos de planta recogible a barra de íconos (§2.0).

@@ -20,9 +20,11 @@ import {
     Trash2,
     X,
     ChevronsUpDown,
-    ArrowRightLeft
+    ArrowRightLeft,
+    FileText
 } from 'lucide-react'
 import { toast } from 'sonner'
+import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
 
 export default function AdministracionFibraModule({ userEmail }: { userEmail?: string }) {
     // userEmail available for future use
@@ -36,6 +38,8 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [expandedRegistros, setExpandedRegistros] = useState<Set<string | number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
+    // Orden cuyo detalle de SAP (lista de materiales, comentarios…) está abierto
+    const [detalleOf, setDetalleOf] = useState<string | number | null>(null)
 
     // Modal State
     const [editModal, setEditModal] = useState<{
@@ -310,8 +314,8 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     return (
         <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
             {/* Summary Cards */}
-            <div className="p-4 bg-white border-b border-slate-200">
-                <div className="flex flex-wrap gap-3 overflow-x-auto pb-2 no-scrollbar">
+            <div className="px-4 py-2 bg-white border-b border-slate-200">
+                <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
                     <StatCard label="Cantidad" value={stats.cantidad} color="bg-blue-50 text-blue-600" />
                     <StatCard label="Programado" value={stats.programado} color="bg-indigo-50 text-indigo-600" />
                     <StatCard label="Pintura Hoy" value={stats.pintura} color="bg-orange-50 text-orange-600" />
@@ -443,6 +447,13 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
                                         >
                                             <ChevronsUpDown size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => setDetalleOf(item.orden_fabricacion)}
+                                            className="p-2 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50"
+                                            title="Detalle de la orden en SAP (lista de materiales, comentarios)"
+                                        >
+                                            <FileText size={18} />
                                         </button>
                                         <button
                                             onClick={() => setEditModal({ type: 'of', item })}
@@ -733,14 +744,17 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     </div>
                 </div>
             )}
+            {detalleOf != null && (
+                <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)} />
+            )}
         </div>
     )
 }
 
 function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
     return (
-        <div className={`shrink-0 p-3 rounded-xl border border-slate-100 shadow-sm min-w-[100px] flex flex-col items-center justify-center ${color}`}>
-            <span className="text-[9px] font-black uppercase opacity-70 mb-1">{label}</span>
+        <div className={`flex-1 min-w-[76px] px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
+            <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
             <span className="text-sm font-black tracking-tight">{value}</span>
         </div>
     )
@@ -778,7 +792,8 @@ const TRACE_STAGES: Array<{
     { label: 'Destruccion', dateKey: 'destruccion_fecha', userKey: 'destruccion_user_name' }
 ]
 
-function OrderProcessesPanel({
+// También lo usa el Buscador de órdenes FV en modo solo consulta (sin onEdit/onDelete/onTransfer)
+export function OrderProcessesPanel({
     orden,
     registros: parentRegistros,
     onEdit,
@@ -787,9 +802,9 @@ function OrderProcessesPanel({
 }: {
     orden: OrdenFabricacion
     registros: RegistroTrazabilidad[]
-    onEdit: (registro: RegistroTrazabilidad) => void
-    onDelete: (registro: RegistroTrazabilidad) => void
-    onTransfer: (registro: RegistroTrazabilidad) => void
+    onEdit?: (registro: RegistroTrazabilidad) => void
+    onDelete?: (registro: RegistroTrazabilidad) => void
+    onTransfer?: (registro: RegistroTrazabilidad) => void
 }) {
     const [fetchedRegistros, setFetchedRegistros] = useState<RegistroTrazabilidad[] | null>(parentRegistros && parentRegistros.length > 0 ? parentRegistros : null)
     const [loadingRecords, setLoadingRecords] = useState(false)
@@ -822,7 +837,7 @@ function OrderProcessesPanel({
     const registros = fetchedRegistros !== null ? fetchedRegistros : parentRegistros
 
     const handleDeleteRecord = (registro: RegistroTrazabilidad) => {
-        onDelete(registro)
+        onDelete?.(registro)
         if (fetchedRegistros) {
             setFetchedRegistros(prev => prev ? prev.filter(r => (r.registrer || r.id) !== (registro.registrer || registro.id)) : null)
         }
@@ -862,17 +877,17 @@ function OrderProcessesPanel({
                                     <InfoPill label="Pedido" value={registro.numero_pedido || registro.pedido || '-'} />
                                     <InfoPill label="Molde" value={registro.molde_serial || '-'} />
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => onEdit(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
+                                {(onEdit || onTransfer || onDelete) && <div className="flex gap-2">
+                                    <button onClick={() => onEdit?.(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
                                         <Edit2 size={16} />
                                     </button>
-                                    <button onClick={() => onTransfer(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
+                                    <button onClick={() => onTransfer?.(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
                                         <ArrowRightLeft size={16} />
                                     </button>
                                     <button onClick={() => handleDeleteRecord(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
                                         <Trash2 size={16} />
                                     </button>
-                                </div>
+                                </div>}
                             </div>
                             <TraceProcessTimeline registro={registro} />
                         </div>

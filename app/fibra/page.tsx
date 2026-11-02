@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Header from '@/components/opt-sistemica/Header'
 import { useEffect, useState, useCallback } from 'react'
 import PinturaFibraModule from '@/components/fibra/PinturaFibraModule'
 import DashboardFibraModule from '@/components/fibra/dashboard/DashboardFibraModule'
@@ -16,6 +17,7 @@ import DigitadoFibraModule from '@/components/fibra/digitado/DigitadoFibraModule
 import CediFibraModule from '@/components/fibra/cedi/CediFibraModule'
 import ParametrosFibraModule from '@/components/fibra/parametros/ParametrosFibraModule'
 import AdministracionFibraModule from '@/components/fibra/administracion/AdministracionFibraModule'
+import BuscadorOrdenesFibraModule from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 
 
 
@@ -95,6 +97,9 @@ export default function FibraPage() {
                     setActiveModule(firstAllowed);
                 } else if (checkPerm('dashboard')) {
                     setActiveModule('dashboard');
+                } else {
+                    // El buscador es solo consulta: lo ve cualquier usuario de la planta
+                    setActiveModule('buscador');
                 }
             } else {
                 setActiveModule('pintura');
@@ -107,6 +112,10 @@ export default function FibraPage() {
     useEffect(() => {
         getUserData()
     }, [getUserData])
+
+    useEffect(() => {
+        if (window.innerWidth < 768) setSidebarOpen(false)
+    }, [])
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
@@ -129,72 +138,56 @@ export default function FibraPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <header className="bg-[#254153] border-b border-[#1a2e3b] sticky top-0 z-50 shadow-md">
-                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-12">
-                        <div className="flex items-center space-x-3">
-                            <button
-                                onClick={() => router.push('/home/selection')}
-                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
-                                title="Volver a Selección"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                </svg>
-                            </button>
-                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                                <svg className="w-5 h-5 text-[#254153]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </div>
-                            <h1 className="text-lg font-bold text-white">Manufactura - Fibra</h1>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-[10px] text-gray-200">Bienvenido</p>
-                                <p className="text-white font-semibold text-xs">{user?.email || 'Usuario'}</p>
-                            </div>
-                            <button
-                                onClick={handleSignOut}
-                                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 px-3 rounded-lg transition text-[10px]"
-                            >
-                                Cerrar Sesión
-                            </button>
-                            <button
-                                onClick={() => setSidebarOpen(!sidebarOpen)}
-                                className="text-white hover:bg-[#1a2e3b] p-2 rounded-lg transition-colors border border-white/20"
-                                title="Toggle Sidebar"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <Header title="Control de Piso Fibra (FV)" subtitle="" compact={true} userEmail={user?.email} showLogout={true} onLogout={handleSignOut} />
 
             <div className="flex min-h-[calc(100vh-3rem)] relative">
                 {/* Sidebar Backdrop (Mobile only) */}
                 {sidebarOpen && (
                     <div
-                        className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300"
+                        className="fixed inset-0 top-12 bg-black/50 z-40 md:hidden transition-opacity duration-300"
                         onClick={() => setSidebarOpen(false)}
                     />
                 )}
 
                 {/* Sidebar */}
+                {/* Espacio que ocupa la barra de íconos en celular (el menú abierto flota encima) */}
+                <div className="w-12 shrink-0 md:hidden" />
                 <aside
-                    className={`fixed md:relative inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out bg-white border-r border-gray-200 shadow-lg
-                        ${sidebarOpen ? 'translate-x-0 w-52' : '-translate-x-full md:translate-x-0 md:w-0'}
-                        overflow-hidden`}
+                    className={`fixed md:sticky top-12 bottom-0 md:h-[calc(100vh-3rem)] left-0 z-50 md:z-30 shrink-0 transition-all duration-300 ease-in-out bg-white border-r border-[#e2ded5] shadow-sm overflow-hidden
+                        ${sidebarOpen ? 'w-52' : 'w-12'}`}
                 >
-                    <nav className="p-2 space-y-1 overflow-y-auto h-[calc(100vh-3rem)]">
+                    <nav onClick={e => { if (window.innerWidth < 768 && (e.target as HTMLElement).closest('button') && !(e.target as HTMLElement).closest('[title$="menú de módulos"]')) setSidebarOpen(false) }} className={`p-2 space-y-1 overflow-y-auto h-full ${sidebarOpen ? '' : '[&_button>span]:hidden [&_button]:justify-center [&_button]:px-0'}`}>
+                        {/* Abrir / recoger el menú de módulos (antes era el botón ≡ del encabezado propio de Fibra) */}
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            className="flex items-center space-x-2 px-3 h-8 mb-1 rounded-lg w-full text-[10px] font-black uppercase tracking-wider text-[#324354] bg-[#F6F3EE] hover:bg-[#e2ded5] transition-colors"
+                            title={sidebarOpen ? 'Recoger menú de módulos' : 'Abrir menú de módulos'}
+                        >
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? 'M11 19l-7-7 7-7m8 14l-7-7 7-7' : 'M13 5l7 7-7 7M5 5l7 7-7 7'} />
+                            </svg>
+                            <span className="flex-1 text-left">Módulos FV</span>
+                        </button>
+
+                        {/* Buscador de órdenes: solo consulta, sin permiso propio */}
+                        <button
+                            onClick={() => setActiveModule('buscador')}
+                            title={sidebarOpen ? undefined : 'Buscador'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'buscador'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <span>Buscador</span>
+                        </button>
 
                         {hasPermission('pintura') && (
                             <button
                                 onClick={() => setActiveModule('pintura')}
+                                title={sidebarOpen ? undefined : 'Pintura'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'pintura'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -210,6 +203,7 @@ export default function FibraPage() {
                         {hasPermission('contramoldes') && (
                             <button
                                 onClick={() => setActiveModule('contramoldes')}
+                                title={sidebarOpen ? undefined : 'Contramoldes'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'contramoldes'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -225,6 +219,7 @@ export default function FibraPage() {
                         {hasPermission('vaciado') && (
                             <button
                                 onClick={() => setActiveModule('vaciado')}
+                                title={sidebarOpen ? undefined : 'Vaciado'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'vaciado'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -240,6 +235,7 @@ export default function FibraPage() {
                         {hasPermission('desmolde') && (
                             <button
                                 onClick={() => setActiveModule('desmolde')}
+                                title={sidebarOpen ? undefined : 'Desmolde'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'desmolde'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -255,6 +251,7 @@ export default function FibraPage() {
                         {hasPermission('pulido') && (
                             <button
                                 onClick={() => setActiveModule('pulido')}
+                                title={sidebarOpen ? undefined : 'Pulido'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'pulido'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -270,6 +267,7 @@ export default function FibraPage() {
                         {hasPermission('acabado') && (
                             <button
                                 onClick={() => setActiveModule('acabado')}
+                                title={sidebarOpen ? undefined : 'Acabado'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'acabado'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -285,6 +283,7 @@ export default function FibraPage() {
                         {hasPermission('reparacion') && (
                             <button
                                 onClick={() => setActiveModule('reparacion')}
+                                title={sidebarOpen ? undefined : 'Reparación'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'reparacion'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -300,6 +299,7 @@ export default function FibraPage() {
                         {hasPermission('empaque') && (
                             <button
                                 onClick={() => setActiveModule('empaque')}
+                                title={sidebarOpen ? undefined : 'Empaque'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'empaque'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -315,6 +315,7 @@ export default function FibraPage() {
                         {hasPermission('digitado') && (
                             <button
                                 onClick={() => setActiveModule('digitado')}
+                                title={sidebarOpen ? undefined : 'Digitado'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'digitado'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -330,6 +331,7 @@ export default function FibraPage() {
                         {hasPermission('cedi') && (
                             <button
                                 onClick={() => setActiveModule('cedi')}
+                                title={sidebarOpen ? undefined : 'CEDI'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'cedi'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -345,6 +347,7 @@ export default function FibraPage() {
                         {hasPermission('dashboard') && (
                             <button
                                 onClick={() => setActiveModule('dashboard')}
+                                title={sidebarOpen ? undefined : 'Dashboard'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'dashboard'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -360,6 +363,7 @@ export default function FibraPage() {
                         {hasPermission('parametros') && (
                             <button
                                 onClick={() => setActiveModule('parametros')}
+                                title={sidebarOpen ? undefined : 'Parámetros'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'parametros'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -375,6 +379,7 @@ export default function FibraPage() {
                         {hasPermission('administracion') && (
                             <button
                                 onClick={() => setActiveModule('administracion')}
+                                title={sidebarOpen ? undefined : 'Administración'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'administracion'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -391,6 +396,7 @@ export default function FibraPage() {
                         {hasPermission('prensado') && (
                             <button
                                 onClick={() => setActiveModule('tvprensado')}
+                                title={sidebarOpen ? undefined : 'TV Prensado'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'tvprensado'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -418,9 +424,11 @@ export default function FibraPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 h-[calc(100vh-4rem)] bg-white overflow-hidden relative">
+                <main className="flex-1 min-w-0 h-[calc(100vh-3rem)] bg-white overflow-hidden relative">
                     <div className="h-full overflow-y-auto">
-                        {activeModule === 'pintura' && hasPermission('pintura') ? (
+                        {activeModule === 'buscador' ? (
+                            <BuscadorOrdenesFibraModule />
+                        ) : activeModule === 'pintura' && hasPermission('pintura') ? (
                             <PinturaFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'contramoldes' && hasPermission('contramoldes') ? (
                             <ContramoldeFibraModule userEmail={user?.email || ''} />
