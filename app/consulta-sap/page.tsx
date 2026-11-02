@@ -7,7 +7,7 @@ import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer, Calendar } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer, Calendar, AlertTriangle, Camera } from 'lucide-react'
 import LiberacionMueblesView from '@/components/liberacion-muebles/LiberacionMueblesView'
 
 interface ComponentItem {
@@ -418,6 +418,31 @@ const EstadoConsultaSap = ({ estado }: { estado: 'sin-consulta' | 'ok' | 'error'
     </span>
 );
 
+// Aviso rojo del Semáforo: información crítica, se pide enviar captura al Director de Manufactura
+const AvisoErrorSemaforo = ({ titulo, lineas, detalle, hora }: { titulo: string; lineas: string[]; detalle?: string; hora?: string }) => (
+    <div role="alert" className="w-full max-w-3xl bg-red-50 border-2 border-red-500 rounded-2xl p-4 sm:p-5 text-left space-y-3 select-text shadow-sm">
+        <div className="flex items-start gap-3">
+            <AlertTriangle size={26} className="text-red-600 shrink-0 mt-0.5" />
+            <div className="min-w-0 space-y-1">
+                <h3 className="text-sm sm:text-base font-black text-red-800">{titulo}</h3>
+                {lineas.length === 1 ? (
+                    <p className="text-sm font-semibold text-red-800">{lineas[0]}</p>
+                ) : (
+                    <ul className="list-disc pl-5 text-xs sm:text-sm font-semibold text-red-800 space-y-0.5">
+                        {lineas.map((l, i) => <li key={i}>{l}</li>)}
+                    </ul>
+                )}
+                {detalle && <p className="text-[11px] font-mono text-red-700/80 break-all">Detalle técnico: {detalle}</p>}
+                <p className="text-[11px] text-red-700">Fecha y hora: {hora || new Date().toLocaleString('es-CO')}</p>
+            </div>
+        </div>
+        <div className="bg-red-600 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-bold flex items-center gap-2">
+            <Camera size={18} className="shrink-0" />
+            <span>Tome un pantallazo (captura de pantalla) de este mensaje y envíelo al Director de Manufactura para corregirlo.</span>
+        </div>
+    </div>
+);
+
 const SapLinkArrow = () => (
     <span title="Navegar en SAP" className="inline-flex items-center">
         <svg
@@ -543,6 +568,10 @@ export default function ConsultaSAPPage() {
     const [semaforoDataList, setSemaforoDataList] = useState<SemaforoItem[]>([])
     const [semaforoHasLoaded, setSemaforoHasLoaded] = useState<boolean>(false)
     const [semaforoDataSource, setSemaforoDataSource] = useState<string>('')
+    // Error de la última consulta (se muestra en rojo; nunca se dejan en pantalla datos de una consulta anterior)
+    const [semaforoError, setSemaforoError] = useState<{ mensaje: string; detalle?: string; hora: string } | null>(null)
+    // Datos faltantes o no reconocidos que informa /api/sap/semaforo aunque la consulta haya respondido
+    const [semaforoAdvertencias, setSemaforoAdvertencias] = useState<string[]>([])
 
     // Estados para pestaña Query - Órdenes Liberadas (FPK - Ordenes de fabricación liberadas)
     const [releasedOrdersList, setReleasedOrdersList] = useState<ReleasedOrderItem[]>([])
@@ -769,42 +798,61 @@ export default function ConsultaSAPPage() {
         if (!res.ok || !contentType.includes('application/json')) {
             const text = await res.text();
             let errorMsg = `Error HTTP ${res.status}`;
+            let detalle: string | undefined;
             try {
                 const json = JSON.parse(text);
-                errorMsg = json.details || json.error || errorMsg;
+                errorMsg = json.error || json.details || errorMsg;
+                detalle = json.details && json.details !== errorMsg ? json.details : undefined;
             } catch {
                 if (text.startsWith('<')) {
-                    errorMsg = `El servidor respondió con HTML (${res.status}). Verifique la conexión a Cloudflare.`;
+                    errorMsg = `El servidor de la app respondió con una página HTML (HTTP ${res.status}) en lugar de datos. Puede que la consulta haya tardado demasiado o que el servidor haya fallado.`;
                 } else if (text) {
                     errorMsg = text.slice(0, 150);
                 }
             }
-            throw new Error(errorMsg);
+            throw Object.assign(new Error(errorMsg), { detalle });
         }
         return await res.json();
     };
 
+    // Consulta el Semáforo y deja en pantalla el resultado real: si falla, se borran los datos
+    // anteriores y se muestra el error en rojo (con instrucción de enviar captura al Director de Manufactura)
+    const consultarSemaforo = async (): Promise<SemaforoItem[] | null> => {
+        const hora = new Date().toLocaleString('es-CO');
+        try {
+            const result = await fetchSemaforoApi();
+            if (!result.success || !Array.isArray(result.data) || result.data.length === 0) {
+                throw Object.assign(new Error(result.error || 'La consulta del Semáforo respondió sin registros.'), { detalle: result.details });
+            }
+            setSemaforoDataList(result.data);
+            setSemaforoDataSource(result.source || 'Fuente no informada');
+            setSemaforoHasLoaded(true);
+            setSemaforoAdvertencias(Array.isArray(result.advertencias) ? result.advertencias : []);
+            setSemaforoError(null);
+            return result.data;
+        } catch (err: any) {
+            setSemaforoDataList([]);
+            setSemaforoHasLoaded(false);
+            setSemaforoAdvertencias([]);
+            setSemaforoError({ mensaje: err?.message || 'Error de red al consultar el Semáforo.', detalle: err?.detalle, hora });
+            return null;
+        }
+    };
+
     // Exportar Query FPK - Semaforo - DJP a Excel con TODAS las 39 columnas
     const handleExportExcel = async () => {
+        setSemaforoError(null);
         try {
             let dataToExport = semaforoDataList;
             if (dataToExport.length === 0) {
                 const toastId = toast.loading("Consultando datos del Semáforo para generar Excel...");
-                try {
-                    const result = await fetchSemaforoApi();
-                    if (result.success && result.data) {
-                        dataToExport = result.data;
-                        setSemaforoDataList(result.data);
-                        setSemaforoHasLoaded(true);
-                        toast.dismiss(toastId);
-                    } else {
-                        toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-                        return;
-                    }
-                } catch (err: any) {
-                    toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+                const datos = await consultarSemaforo();
+                if (!datos) {
+                    toast.error("No se pudo consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
                     return;
                 }
+                dataToExport = datos;
+                toast.dismiss(toastId);
             }
 
             const exportRows = dataToExport.map(item => ({
@@ -858,30 +906,24 @@ export default function ConsultaSAPPage() {
         } catch (err) {
             console.error(err);
             toast.error("Error al generar el archivo Excel");
+            setSemaforoError({ mensaje: 'Error al generar el archivo Excel del Semáforo.', detalle: (err as any)?.message, hora: new Date().toLocaleString('es-CO') });
         }
     };
 
     // Exportar "Prioridades Diarias Plantas" con todas las 10 pestañas procesadas
     const handleDownloadPrioridades = async () => {
+        setSemaforoError(null);
         try {
             let dataToExport = semaforoDataList;
             if (dataToExport.length === 0) {
                 const toastId = toast.loading("Consultando datos del Semáforo para generar Prioridades...");
-                try {
-                    const result = await fetchSemaforoApi();
-                    if (result.success && result.data) {
-                        dataToExport = result.data;
-                        setSemaforoDataList(result.data);
-                        setSemaforoHasLoaded(true);
-                        toast.dismiss(toastId);
-                    } else {
-                        toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-                        return;
-                    }
-                } catch (err: any) {
-                    toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+                const datos = await consultarSemaforo();
+                if (!datos) {
+                    toast.error("No se pudo consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
                     return;
                 }
+                dataToExport = datos;
+                toast.dismiss(toastId);
             }
 
             const toastId = toast.loading("Generando archivo 'Prioridades Diarias de Plantas'...");
@@ -891,6 +933,7 @@ export default function ConsultaSAPPage() {
         } catch (err: any) {
             console.error("Error al generar Prioridades Diarias:", err);
             toast.error(`Error al generar el archivo: ${err.message || 'error desconocido'}`);
+            setSemaforoError({ mensaje: "Error al generar el archivo 'Prioridades diarias de Plantas'.", detalle: err?.message, hora: new Date().toLocaleString('es-CO') });
         }
     };
 
@@ -899,17 +942,9 @@ export default function ConsultaSAPPage() {
         setIsExecuting(true);
         const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP'...");
         try {
-            const result = await fetchSemaforoApi();
-            if (result.success && result.data) {
-                setSemaforoDataList(result.data);
-                setSemaforoDataSource(result.source || 'Desconocido');
-                setSemaforoHasLoaded(true);
-                toast.success(`Semáforo actualizado correctamente (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
-            } else {
-                toast.error(`Error al actualizar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-            }
-        } catch (err: any) {
-            toast.error(`Error al actualizar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+            const datos = await consultarSemaforo();
+            if (!datos) toast.error("Error al consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
+            else toast.success(`Semáforo actualizado (${datos.length.toLocaleString('es-CO')} registros)`, { id: toastId });
         } finally {
             setIsExecuting(false);
         }
@@ -922,32 +957,31 @@ export default function ConsultaSAPPage() {
 
     // Copiar tabla completa al portapapeles
     const handleCopyData = async () => {
+        setSemaforoError(null);
         let dataToCopy = semaforoDataList;
         if (dataToCopy.length === 0) {
             const toastId = toast.loading("Consultando datos del Semáforo para copiar...");
-            try {
-                const result = await fetchSemaforoApi();
-                if (result.success && result.data) {
-                    dataToCopy = result.data;
-                    setSemaforoDataList(dataToCopy);
-                    setSemaforoHasLoaded(true);
-                    toast.dismiss(toastId);
-                } else {
-                    toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-                    return;
-                }
-            } catch (err: any) {
-                toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+            const datos = await consultarSemaforo();
+            if (!datos) {
+                toast.error("No se pudo consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
                 return;
             }
+            dataToCopy = datos;
+            toast.dismiss(toastId);
         }
 
         const headerText = "Originnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\tDisponible PT01\tFecha Creación OP\tEstado\tFecha Recomendada Liberación\tFecha Real Liberación\tConsumo Para Liberar\tColor Liberación Txt\tColor Liberación\tCumplimiento Liberación\tFecha Entrega Lote\tFecha Recomendada de Entrega\tFecha Cierre OP\tFecha Ideal Entrega Producción\tConsumo Amortiguador Planta\tColor Producción Txt\tColor Producción\tCumplimiento Planta\tDias Retrazo Firplak\tColor Firplak Txt\tColor Firplak\tCumplimiento Firplak\tFecha Prometida Entrega Item\tDestino\tNumLote\tMolde\tCapacidad Molde\tFecha Carga Molde\tAmortiguador\tCliente\n";
-        const rowsText = dataToCopy.map(item => 
-            `${item.originnum}\t${item.nroOp}\t${item.sku}\t${item.descripcion}\t${item.planta}\t${item.familia}\t${item.tipoOrden}\t${item.cantPendiente}\t${item.cantPendItem}\t${item.cantTotal}\t${item.disponiblePt01}\t${item.fechaCreacionOp}\t${item.estado}\t${item.fechaRecomendadaLiberacion}\t${item.fechaRealLiberacion}\t${item.consumoParaLiberar}\t${item.colorLiberacionTxt}\t${item.colorLiberacion}\t${item.cumplimientoLiberacion}\t${item.fechaEntregaLote}\t${item.fechaRecomendadaEntrega}\t${item.fechaCierreOp}\t${item.fechaIdealEntregaProduccion}\t${item.consumoAmortiguadorPlanta}\t${item.colorProduccionTxt}\t${item.colorProduccion}\t${item.cumplimientoPlanta}\t${item.diasRetrazoFirplak}\t${item.colorFirplakTxt}\t${item.colorFirplak}\t${item.cumplimientoFirplak}\t${item.fechaPrometidaEntregaItem}\t${item.destino}\t${item.numLote}\t${item.molde}\t${item.capacidadMolde}\t${item.fechaCargaMolde}\t${item.amortiguador}\t${item.cliente}`
-        ).join('\n');
-        
-        navigator.clipboard.writeText(headerText + rowsText);
+        // Celdas sin dato se copian vacías (antes salía el texto "null")
+        const columnas: Array<keyof SemaforoItem> = ['originnum', 'nroOp', 'sku', 'descripcion', 'planta', 'familia', 'tipoOrden', 'cantPendiente', 'cantPendItem', 'cantTotal', 'disponiblePt01', 'fechaCreacionOp', 'estado', 'fechaRecomendadaLiberacion', 'fechaRealLiberacion', 'consumoParaLiberar', 'colorLiberacionTxt', 'colorLiberacion', 'cumplimientoLiberacion', 'fechaEntregaLote', 'fechaRecomendadaEntrega', 'fechaCierreOp', 'fechaIdealEntregaProduccion', 'consumoAmortiguadorPlanta', 'colorProduccionTxt', 'colorProduccion', 'cumplimientoPlanta', 'diasRetrazoFirplak', 'colorFirplakTxt', 'colorFirplak', 'cumplimientoFirplak', 'fechaPrometidaEntregaItem', 'destino', 'numLote', 'molde', 'capacidadMolde', 'fechaCargaMolde', 'amortiguador', 'cliente'];
+        const rowsText = dataToCopy.map(item => columnas.map(c => item[c] ?? '').join('\t')).join('\n');
+
+        try {
+            await navigator.clipboard.writeText(headerText + rowsText);
+        } catch (err: any) {
+            toast.error("No se pudieron copiar los datos al portapapeles");
+            setSemaforoError({ mensaje: 'No se pudieron copiar los datos del Semáforo al portapapeles.', detalle: err?.message, hora: new Date().toLocaleString('es-CO') });
+            return;
+        }
         setCopiedData(true);
         toast.success(`Datos de la consulta SAP (${dataToCopy.length.toLocaleString('es-CO')} registros) copiados al portapapeles`);
         setTimeout(() => setCopiedData(false), 2000);
@@ -2173,9 +2207,34 @@ export default function ConsultaSAPPage() {
                                 </div>
                             )}
 
+                            {/* ERROR DE CONSULTA: siempre visible y en rojo */}
+                            {semaforoError && (
+                                <AvisoErrorSemaforo
+                                    titulo={semaforoHasLoaded ? 'Error al generar el archivo' : 'Error en la consulta del Semáforo: no hay datos válidos para usar'}
+                                    lineas={[semaforoError.mensaje]}
+                                    detalle={semaforoError.detalle}
+                                    hora={semaforoError.hora}
+                                />
+                            )}
+                            {/* La consulta respondió, pero con datos faltantes o no reconocidos */}
+                            {semaforoHasLoaded && semaforoAdvertencias.length > 0 && (
+                                <AvisoErrorSemaforo
+                                    titulo={`La consulta respondió, pero con ${semaforoAdvertencias.length} problema(s) en los datos. Úselos con precaución.`}
+                                    lineas={semaforoAdvertencias}
+                                />
+                            )}
+
                             {/* MENSAJE CENTRAL CON REGISTROS ENCONTRADOS / ESTADO */}
                             <div className="w-full max-w-lg bg-white border border-[#a3a3a3] rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-3">
-                                {!semaforoHasLoaded ? (
+                                {semaforoError && !semaforoHasLoaded ? (
+                                    <div className="space-y-2">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-red-100 text-red-700 rounded-full mb-1">
+                                            <AlertTriangle size={28} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-red-700">Consulta fallida: 0 registros válidos</h3>
+                                        <p className="text-xs text-slate-500">Intente de nuevo con <strong>"Actualizar Semáforo"</strong>. Si el error continúa, envíe la captura del aviso en rojo.</p>
+                                    </div>
+                                ) : !semaforoHasLoaded ? (
                                     <div className="space-y-2">
                                         <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 text-amber-800 rounded-full mb-1">
                                             <FileSpreadsheet size={28} />
@@ -2187,15 +2246,21 @@ export default function ConsultaSAPPage() {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full mb-1">
-                                            <Check size={28} />
+                                        <div className={`inline-flex items-center justify-center w-14 h-14 rounded-full mb-1 ${semaforoAdvertencias.length ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                                            {semaforoAdvertencias.length ? <AlertTriangle size={28} /> : <Check size={28} />}
                                         </div>
                                         <h3 className="text-2xl font-extrabold text-[#324354]">
                                             {semaforoDataList.length.toLocaleString('es-CO')} Registros Encontrados
                                         </h3>
-                                        <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
-                                            ✓ Consulta completada exitosamente desde: <strong>{semaforoDataSource}</strong>
-                                        </div>
+                                        {semaforoAdvertencias.length ? (
+                                            <div className="inline-block text-xs text-red-800 font-semibold bg-red-50 py-1.5 px-4 rounded-xl border border-red-300">
+                                                ⚠ Consulta con {semaforoAdvertencias.length} problema(s) en los datos ({semaforoDataSource}). Revise el aviso en rojo.
+                                            </div>
+                                        ) : (
+                                            <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
+                                                ✓ Consulta completada y validada desde: <strong>{semaforoDataSource}</strong>
+                                            </div>
+                                        )}
                                         <p className="text-xs text-slate-500 pt-1">
                                             Los datos están listos para ser descargados directamente en Excel o copiados al portapapeles.
                                         </p>
@@ -2214,11 +2279,13 @@ export default function ConsultaSAPPage() {
                                     }
                                 </span>
                                 <span className="text-gray-400">|</span>
-                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                    <span className={`w-2 h-2 rounded-full inline-block ${semaforoHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                                    {semaforoHasLoaded 
-                                        ? "Consulta ejecutada con éxito [200 OK]"
-                                        : "Estado: Listo para actualización u orden de descarga"
+                                <span className={`font-semibold flex items-center gap-1 ${semaforoError || semaforoAdvertencias.length ? 'text-red-700' : 'text-emerald-700'}`}>
+                                    <span className={`w-2 h-2 rounded-full inline-block ${semaforoError || semaforoAdvertencias.length ? 'bg-red-600' : semaforoHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                    {semaforoError
+                                        ? "Error (ver aviso en rojo)"
+                                        : semaforoHasLoaded
+                                            ? semaforoAdvertencias.length ? `Consulta con ${semaforoAdvertencias.length} problema(s) en los datos` : "Consulta ejecutada y validada"
+                                            : "Estado: Listo para actualización u orden de descarga"
                                     }
                                 </span>
                             </div>
