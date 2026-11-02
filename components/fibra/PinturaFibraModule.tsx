@@ -351,8 +351,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
     return (
         <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
             {/* Summary Cards */}
-            <div className="p-4 bg-white border-b border-slate-200">
-                <div className="flex flex-nowrap gap-3 overflow-x-auto pb-2 no-scrollbar">
+            <div className="px-4 py-2 bg-white border-b border-slate-200">
+                <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
                     <StatCard label="Cantidad" value={metrics.cantidad} color="bg-blue-50 text-blue-600" />
                     <StatCard label="Programado" value={metrics.programado} color="bg-indigo-50 text-indigo-600" />
                     <StatCard label="Pintura Hoy" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
@@ -591,8 +591,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
 
 function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
     return (
-        <div className={`shrink-0 p-3 rounded-xl border border-slate-100 shadow-sm min-w-[100px] flex flex-col items-center justify-center ${color}`}>
-            <span className="text-[9px] font-black uppercase opacity-70 mb-1">{label}</span>
+        <div className={`flex-1 min-w-[76px] px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
+            <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
             <span className="text-sm font-black tracking-tight">{value}</span>
         </div>
     )
