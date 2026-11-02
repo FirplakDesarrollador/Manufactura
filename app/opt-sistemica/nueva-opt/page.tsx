@@ -80,20 +80,20 @@ export default function NuevaOptPage() {
       <SubHeader />
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-12 md:py-16 lg:py-20 pt-28">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-4 md:py-6">
         <div className="w-full max-w-[1700px] mx-auto px-4 md:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 justify-items-center w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 justify-items-center w-full">
             {subModules.map((module) => (
-              <div key={module.id} className="w-full max-w-[290px] aspect-square">
+              <div key={module.id} className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
                 <button 
                   onClick={() => router.push(`/opt-sistemica/nueva-opt/${module.id}`)}
-                  className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 bg-white rounded-3xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                  className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
                 >
-                  <div className="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 bg-[#324354]/5 rounded-full flex items-center justify-center mb-3 lg:mb-6 group-hover:bg-[#324354] transition-all duration-300 shadow-sm">
+                  <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300 shadow-sm">
                     {getModuleIcon(module.id, "text-[#324354] group-hover:text-white transition-colors duration-300")}
                   </div>
                   
-                  <span className="text-[15px] sm:text-lg lg:text-xl font-bold text-[#324354] transition-colors duration-300 text-center leading-tight">
+                  <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] transition-colors duration-300 text-center leading-tight">
                     {module.name}
                   </span>
                 </button>
@@ -103,7 +103,7 @@ export default function NuevaOptPage() {
         </div>
       </main>
 
-      <footer style={{ textAlign: 'center', padding: '40px 0', color: '#999', fontSize: '0.9rem' }}>
+      <footer className="py-2 text-center text-gray-400 text-xs">
         <p>Desarrollado para Firplak S.A. &copy; {new Date().getFullYear()}</p>
       </footer>
     </div>
