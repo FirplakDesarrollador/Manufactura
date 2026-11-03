@@ -6,7 +6,7 @@ import { OrdenFabricacion } from '@/types/pintura'
 import { parseDBDate } from '@/lib/utils/date'
 import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
-import { Search, Eraser, RefreshCw, ChevronDown, ChevronUp, FileText, Clipboard, Users, AlertTriangle } from 'lucide-react'
+import { Search, Eraser, RefreshCw, ChevronsUpDown, FileText, Clipboard, Users, AlertTriangle } from 'lucide-react'
 
 // Buscador de órdenes FV (solo consulta): en qué proceso están las piezas de cada orden,
 // su historial por pieza y el detalle de la orden en SAP.
@@ -193,7 +193,8 @@ export default function BuscadorOrdenesFibraModule() {
                                 const avance = cantidad > 0 ? Math.min(100, Math.round((piezas.cedi / cantidad) * 100)) : 0
                                 return (
                                     <div key={o.id} className="space-y-2">
-                                        <div className={`bg-white rounded-xl border shadow-sm p-3 flex flex-col lg:flex-row gap-3 ${excedida ? 'border-red-400' : 'border-[#e2ded5]'}`}>
+                                        <div className="flex gap-3 items-stretch">
+                                        <div className={`flex-1 min-w-0 bg-white rounded-xl border shadow-sm p-3 flex flex-col lg:flex-row gap-3 ${excedida ? 'border-red-400' : 'border-[#e2ded5]'}`}>
                                             {/* Datos de la orden */}
                                             <div className="lg:w-[30%] min-w-0 lg:pr-3 lg:border-r border-[#e2ded5]">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -230,20 +231,21 @@ export default function BuscadorOrdenesFibraModule() {
                                                     })}
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            {/* Acciones */}
-                                            <div className="flex lg:flex-col gap-2 justify-center shrink-0">
-                                                <button onClick={() => alternar(o.id)}
-                                                    className={`flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-bold border ${abierta ? 'bg-[#324354] text-white border-[#324354]' : 'bg-white text-[#324354] border-slate-300 hover:bg-slate-50'}`}
-                                                    title="Historial de procesos por pieza">
-                                                    {abierta ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Piezas
-                                                </button>
-                                                <button onClick={() => setDetalleOf(o.orden_fabricacion)}
-                                                    className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-bold bg-white text-[#324354] border border-slate-300 hover:bg-slate-50"
-                                                    title="Detalle de la orden en SAP (lista de materiales, comentarios)">
-                                                    <FileText size={14} /> Detalle
-                                                </button>
-                                            </div>
+                                        {/* Acciones: mismos botones y posición que Administración */}
+                                        <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center shrink-0">
+                                            <button onClick={() => alternar(o.id)}
+                                                className={`p-2 rounded-lg transition-colors ${abierta ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'}`}
+                                                title={abierta ? 'Ocultar procesos por pieza' : 'Ver procesos por pieza'}>
+                                                <ChevronsUpDown size={18} />
+                                            </button>
+                                            <button onClick={() => setDetalleOf(o.orden_fabricacion)}
+                                                className="p-2 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50"
+                                                title="Detalle de la orden en SAP (lista de materiales, comentarios)">
+                                                <FileText size={18} />
+                                            </button>
+                                        </div>
                                         </div>
                                         {abierta && <OrderProcessesPanel orden={o} registros={[]} />}
                                     </div>
