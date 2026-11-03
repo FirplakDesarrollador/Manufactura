@@ -159,13 +159,14 @@ export async function GET() {
     }
     if (plantasRaras.size) advertencias.push(`Plantas no reconocidas (esas filas NO entran en Prioridades diarias de Plantas): ${[...plantasRaras].map(([p, n]) => `${p} (${n})`).join(', ')}.`);
 
+    // Estados válidos de una OP en SAP: Planificado, Liberado, Cerrado y Cancelado. Solo se avisa lo que no sea ninguno
     const estadosRaros = new Map<string, number>();
     for (const f of mapped) {
         if (vacio(f.estado)) continue;
         const e = String(f.estado).trim().toUpperCase();
-        if (e !== 'LIBERADO' && !e.includes('PLANIFICADO')) estadosRaros.set(e, (estadosRaros.get(e) || 0) + 1);
+        if (e !== 'LIBERADO' && !e.includes('PLANIFICADO') && e !== 'CERRADO' && e !== 'CANCELADO') estadosRaros.set(e, (estadosRaros.get(e) || 0) + 1);
     }
-    if (estadosRaros.size) advertencias.push(`Estados no reconocidos (esas filas no se cuentan como Liberado ni Planificado): ${[...estadosRaros].map(([e, n]) => `${e} (${n})`).join(', ')}.`);
+    if (estadosRaros.size) advertencias.push(`Estados no reconocidos (no son Planificado, Liberado, Cerrado ni Cancelado; esas filas no se cuentan como Liberado ni Planificado): ${[...estadosRaros].map(([e, n]) => `${e} (${n})`).join(', ')}.`);
 
     for (const campo of FECHAS) {
         const filas = mapped.filter(f => !vacio(f[campo]) && !parseFecha(String(f[campo]))).map(f => f.id);

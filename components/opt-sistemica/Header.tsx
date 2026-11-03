@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { URL_CALIDAD_FV_POWERAPPS } from '@/lib/calidad/enlaces';
 
 interface HeaderProps {
   title: string;
@@ -243,6 +244,7 @@ export default function Header({
               subItems: [
                 { label: 'Indicadores Calidad', path: '/calidad' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
+                { label: 'Calidad FV (Atajo)', path: URL_CALIDAD_FV_POWERAPPS },
                 { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
                 { label: 'Criterios de Aceptación y Rechazo', path: '/calidad/criterios' },
                 { label: 'Plan de Vigilancia', path: '/calidad/vigilancia' },
@@ -403,7 +405,9 @@ export default function Header({
                         key={sIdx}
                         onClick={() => {
                           setIsOpen(false);
-                          router.push(sub.path);
+                          // Atajos a aplicaciones externas (Power Apps) se abren en otra pestaña
+                          if (sub.path.startsWith('http')) window.open(sub.path, '_blank', 'noopener,noreferrer');
+                          else router.push(sub.path);
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-all duration-300 text-slate-300 hover:text-white font-medium text-xs text-left cursor-pointer"
                       >

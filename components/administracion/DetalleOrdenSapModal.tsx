@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Boxes, MessageSquareText, ArrowRightLeft, FileImage, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { X, Boxes, MessageSquareText, ArrowRightLeft, FileImage, Loader2, RefreshCw, AlertTriangle, List, Layers } from 'lucide-react'
 
 // Detalle de una orden de fabricación consultado en SAP (misma ruta que Consulta SAP).
 // Lo que SAP no entregue llega en `faltantes` y se muestra como error, nunca con valores por defecto.
@@ -36,6 +36,7 @@ type OrdenSap = {
 }
 
 type Pestana = 'ldm' | 'comentarios' | 'traslados' | 'planos'
+type VistaLdm = 'lista' | 'grupos'
 
 const PESTANAS: { id: Pestana; label: string; icon: React.ElementType; pronto?: boolean }[] = [
     { id: 'ldm', label: 'Lista de materiales', icon: Boxes },
@@ -44,13 +45,83 @@ const PESTANAS: { id: Pestana; label: string; icon: React.ElementType; pronto?: 
     { id: 'planos', label: 'Planos', icon: FileImage, pronto: true }
 ]
 
+// Clasificación por la descripción del artículo (SAP no trae este grupo).
+// Mano de obra: mano de obra y todo lo que diga CIF.
+// Materias primas pesadas: resinas, peróxido, gelcoat, cargas minerales, refuerzos de fibra, ceras y similares.
+// Lo demás: accesorios y equipos.
+type Grupo = 'mp' | 'acc' | 'mo'
+const GRUPOS: { id: Grupo; label: string; color: string }[] = [
+    { id: 'acc', label: 'Accesorios y Equipos', color: 'border-l-sky-500' },
+    { id: 'mp', label: 'Materias Primas Pesadas', color: 'border-l-amber-500' },
+    { id: 'mo', label: 'Mano de Obra', color: 'border-l-emerald-500' }
+]
+const RE_MANO_OBRA = /\bMANO\s+(DE\s+)?OBRA\b|\bCIF\b/
+const RE_MATERIA_PESADA = new RegExp('\\b(' + [
+    'RESINAS?', 'PEROXIDOS?', 'GEL\\s?COAT', 'GRANICALCIO', 'OMYA', 'CARBONATOS?', 'ROVING', 'WOVEN', 'WOVING',
+    'CERAS?', 'ESTIRENO', 'CATALIZADOR', 'MEKP', 'COBALTO', 'ACELERANTE', 'PIGMENTOS?', 'PASTA\\s+PIGMENT\\w*',
+    'MASILLA', 'TALCO', 'MICROESFERAS?', 'SILICE', 'ARENA', 'DESMOLDANTE', 'ALCOHOL\\s+POLIVINILICO', 'ACETONA',
+    'MATT?', 'FIBRA\\s+(DE\\s+)?VIDRIO', 'TRIHIDRATO', 'ALUMINA', 'CARGA\\s+MINERAL'
+].join('|') + ')\\b')
+
+const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+function grupoDe(c: ComponenteSap): Grupo {
+    const d = sinTildes(c.descripcion || '')
+    if (RE_MANO_OBRA.test(d)) return 'mo'
+    if (RE_MATERIA_PESADA.test(d)) return 'mp'
+    return 'acc'
+}
+
 const num = (v: number | string) => {
     const n = Number(v)
     return Number.isFinite(n) && v !== '' ? n.toLocaleString('es-CO', { maximumFractionDigits: 4 }) : String(v ?? '')
 }
 
+function TablaComponentes({ filas }: { filas: ComponenteSap[] }) {
+    return (
+        <table className="w-full text-xs border-collapse">
+            <thead className="sticky top-0 z-10 bg-[#324354] text-white">
+                <tr className="text-[10px] uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-2 py-2 text-center">#</th>
+                    <th className="px-2 py-2 text-left">Tipo</th>
+                    <th className="px-2 py-2 text-left">Nº artículo</th>
+                    <th className="px-2 py-2 text-left">Descripción</th>
+                    <th className="px-2 py-2 text-right">Cant. base</th>
+                    <th className="px-2 py-2 text-right">Cant. requerida</th>
+                    <th className="px-2 py-2 text-right">Consumido</th>
+                    <th className="px-2 py-2 text-right">Pendiente</th>
+                    <th className="px-2 py-2 text-center">UM</th>
+                    <th className="px-2 py-2 text-center">Almacén</th>
+                    <th className="px-2 py-2 text-left">Emisión</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+                {filas.map(c => {
+                    const req = Number(c.cantRequerida), cons = Number(c.consumido)
+                    const pendiente = Number.isFinite(req) && Number.isFinite(cons) && c.cantRequerida !== '' && c.consumido !== '' ? req - cons : null
+                    return (
+                        <tr key={c.id} className="hover:bg-slate-50">
+                            <td className="px-2 py-1.5 text-center text-slate-400 font-bold">{c.id}</td>
+                            <td className="px-2 py-1.5 text-slate-600">{c.tipo}</td>
+                            <td className="px-2 py-1.5 font-mono font-bold text-[#324354] whitespace-nowrap select-text">{c.no}</td>
+                            <td className="px-2 py-1.5 font-semibold text-slate-800 select-text">{c.descripcion}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{num(c.cantBase)}</td>
+                            <td className="px-2 py-1.5 text-right font-mono font-bold">{num(c.cantRequerida)}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{num(c.consumido)}</td>
+                            <td className={`px-2 py-1.5 text-right font-mono font-bold ${pendiente != null && pendiente > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{pendiente != null ? num(pendiente) : ''}</td>
+                            <td className="px-2 py-1.5 text-center">{c.unidadMedida}</td>
+                            <td className="px-2 py-1.5 text-center font-mono">{c.almacen}</td>
+                            <td className="px-2 py-1.5 text-slate-600">{c.metodoEmision}</td>
+                        </tr>
+                    )
+                })}
+            </tbody>
+        </table>
+    )
+}
+
 export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { ordenFabricacion: string | number; onClose: () => void }) {
     const [pestana, setPestana] = useState<Pestana>('ldm')
+    const [vista, setVista] = useState<VistaLdm>('lista')
     const [orden, setOrden] = useState<OrdenSap | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [cargando, setCargando] = useState(true)
@@ -85,14 +156,22 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { or
         return () => { vigente = false }
     }, [ordenFabricacion, recarga])
 
-    const articulos = useMemo(() => (orden?.componentes || []), [orden])
+    // Siempre en orden alfabético por descripción (en la lista y dentro de cada grupo); # conserva la línea de SAP
+    const articulos = useMemo(() => [...(orden?.componentes || [])].sort((a, b) =>
+        (a.descripcion || '').localeCompare(b.descripcion || '', 'es', { sensitivity: 'base', numeric: true }) || a.id - b.id), [orden])
+    const porGrupo = useMemo(() => {
+        const m: Record<Grupo, ComponenteSap[]> = { acc: [], mp: [], mo: [] }
+        articulos.forEach(c => m[grupoDe(c)].push(c))
+        return m
+    }, [articulos])
 
     return (
         <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-5 overflow-y-auto"
             onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-[#324354] shadow-2xl w-full max-w-6xl min-h-[80vh] max-h-[94vh] overflow-y-auto flex flex-col gap-3">
+            {/* Encabezado, datos y pestañas fijos; solo el contenido se desplaza */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-[#324354] shadow-2xl w-full max-w-6xl min-h-[80vh] h-[94vh] overflow-hidden flex flex-col gap-3">
                 {/* Encabezado */}
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3 shrink-0">
                     <div className="min-w-0">
                         <span className="text-xs font-black uppercase bg-[#324354]/10 text-[#324354] px-2.5 py-1 rounded-md">Detalle de la orden · SAP</span>
                         <h2 className="text-xl font-black text-[#324354] mt-2">OF {ordenFabricacion}</h2>
@@ -114,7 +193,7 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { or
 
                 {/* Datos generales */}
                 {orden && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 shrink-0">
                         {[
                             ['Estado', orden.estado],
                             ['Tipo', orden.tipo],
@@ -124,8 +203,8 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { or
                             ['Inicio / Fin', `${orden.fechaInicio} – ${orden.fechaFinalizacion}`],
                             ['Pedido vinculado', orden.pedidoVinculado || '—']
                         ].map(([label, valor]) => (
-                            <div key={label} className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 min-w-0">
-                                <div className="text-[10px] font-black uppercase text-slate-500">{label}</div>
+                            <div key={label} className={`bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 min-w-0 ${label === 'Inicio / Fin' ? 'col-span-2' : ''}`}>
+                                <div className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap">{label}</div>
                                 <div className={`text-sm font-black truncate ${label === 'Estado' && valor === 'Cancelado' ? 'text-red-600' : 'text-[#324354]'}`} title={String(valor)}>{valor}</div>
                             </div>
                         ))}
@@ -133,30 +212,43 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { or
                 )}
 
                 {orden && orden.faltantes?.length > 0 && (
-                    <div className="px-3 py-2 bg-red-50 border border-red-400 text-red-800 text-xs font-semibold rounded-lg flex items-start gap-2" role="alert">
+                    <div className="px-3 py-2 bg-red-50 border border-red-400 text-red-800 text-xs font-semibold rounded-lg flex items-start gap-2 shrink-0" role="alert">
                         <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
                         <span>SAP no entregó o no se reconoce: {orden.faltantes.join(' · ')}. Verifique en SAP antes de usar estos datos.</span>
                     </div>
                 )}
 
                 {/* Pestañas */}
-                <div className="flex gap-2 overflow-x-auto scrollbar-hide border-b border-[#e2ded5] pb-2">
-                    {PESTANAS.map(p => {
-                        const Icono = p.icon
-                        const activa = pestana === p.id
-                        return (
-                            <button key={p.id} onClick={() => !p.pronto && setPestana(p.id)} disabled={p.pronto}
-                                title={p.pronto ? 'Disponible pronto' : p.label}
-                                className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold text-[11px] sm:text-xs whitespace-nowrap shrink-0 ${activa ? 'bg-[#324354] text-white shadow-md' : p.pronto ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
-                                <Icono size={14} /> <span>{p.label}{p.pronto ? ' · pronto' : ''}</span>
-                                {p.id === 'ldm' && orden && <span className={`ml-1 px-1.5 rounded text-[10px] ${activa ? 'bg-white/20' : 'bg-slate-200'}`}>{articulos.length}</span>}
-                            </button>
-                        )
-                    })}
+                <div className="flex items-center gap-2 border-b border-[#e2ded5] pb-2 shrink-0">
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide min-w-0">
+                        {PESTANAS.map(p => {
+                            const Icono = p.icon
+                            const activa = pestana === p.id
+                            return (
+                                <button key={p.id} onClick={() => !p.pronto && setPestana(p.id)} disabled={p.pronto}
+                                    title={p.pronto ? 'Disponible pronto' : p.label}
+                                    className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold text-[11px] sm:text-xs whitespace-nowrap shrink-0 ${activa ? 'bg-[#324354] text-white shadow-md' : p.pronto ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+                                    <Icono size={14} /> <span>{p.label}{p.pronto ? ' · pronto' : ''}</span>
+                                    {p.id === 'ldm' && orden && <span className={`ml-1 px-1.5 rounded text-[10px] ${activa ? 'bg-white/20' : 'bg-slate-200'}`}>{articulos.length}</span>}
+                                </button>
+                            )
+                        })}
+                    </div>
+                    {/* Vista de la lista de materiales: completa o por grupos */}
+                    {orden && pestana === 'ldm' && articulos.length > 0 && (
+                        <div className="ml-auto flex -space-x-px shrink-0">
+                            {([['lista', 'Lista', List], ['grupos', 'Por grupos', Layers]] as const).map(([id, label, Icono], i) => (
+                                <button key={id} onClick={() => setVista(id)} title={id === 'grupos' ? 'Accesorios y Equipos · Materias Primas Pesadas · Mano de Obra' : 'Lista completa'}
+                                    className={`flex items-center gap-1.5 h-7 px-3 text-[11px] font-bold border whitespace-nowrap ${i === 0 ? 'rounded-l-lg' : 'rounded-r-lg'} ${vista === id ? 'bg-[#324354] text-white border-[#324354]' : 'bg-white text-[#324354] border-slate-300 hover:bg-slate-50'}`}>
+                                    <Icono size={14} /> {label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                {/* Contenido */}
-                <div className="flex-1 min-h-0">
+                {/* Contenido (única zona con desplazamiento) */}
+                <div className="flex-1 min-h-0 overflow-auto">
                     {cargando ? (
                         <div className="h-full min-h-[200px] flex items-center justify-center gap-2 text-slate-500 font-bold text-sm">
                             <Loader2 className="w-5 h-5 animate-spin" /> Consultando la orden en SAP...
@@ -168,46 +260,26 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { or
                     ) : orden && pestana === 'ldm' ? (
                         articulos.length === 0 ? (
                             <div className="p-10 text-center text-slate-400 font-bold italic bg-slate-50 rounded-xl border border-slate-200">SAP no devolvió componentes para esta orden</div>
+                        ) : vista === 'lista' ? (
+                            <div className="rounded-xl border border-slate-200">
+                                <TablaComponentes filas={articulos} />
+                            </div>
                         ) : (
-                            <div className="overflow-auto rounded-xl border border-slate-200">
-                                <table className="w-full text-xs border-collapse">
-                                    <thead className="sticky top-0 bg-[#324354] text-white">
-                                        <tr className="text-[10px] uppercase tracking-wider">
-                                            <th className="px-2 py-2 text-center">#</th>
-                                            <th className="px-2 py-2 text-left">Tipo</th>
-                                            <th className="px-2 py-2 text-left">Nº artículo</th>
-                                            <th className="px-2 py-2 text-left">Descripción</th>
-                                            <th className="px-2 py-2 text-right">Cant. base</th>
-                                            <th className="px-2 py-2 text-right">Cant. requerida</th>
-                                            <th className="px-2 py-2 text-right">Consumido</th>
-                                            <th className="px-2 py-2 text-right">Pendiente</th>
-                                            <th className="px-2 py-2 text-center">UM</th>
-                                            <th className="px-2 py-2 text-center">Almacén</th>
-                                            <th className="px-2 py-2 text-left">Emisión</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {articulos.map(c => {
-                                            const req = Number(c.cantRequerida), cons = Number(c.consumido)
-                                            const pendiente = Number.isFinite(req) && Number.isFinite(cons) && c.cantRequerida !== '' && c.consumido !== '' ? req - cons : null
-                                            return (
-                                                <tr key={c.id} className="hover:bg-slate-50">
-                                                    <td className="px-2 py-1.5 text-center text-slate-400 font-bold">{c.id}</td>
-                                                    <td className="px-2 py-1.5 text-slate-600">{c.tipo}</td>
-                                                    <td className="px-2 py-1.5 font-mono font-bold text-[#324354] whitespace-nowrap select-text">{c.no}</td>
-                                                    <td className="px-2 py-1.5 font-semibold text-slate-800 select-text">{c.descripcion}</td>
-                                                    <td className="px-2 py-1.5 text-right font-mono">{num(c.cantBase)}</td>
-                                                    <td className="px-2 py-1.5 text-right font-mono font-bold">{num(c.cantRequerida)}</td>
-                                                    <td className="px-2 py-1.5 text-right font-mono">{num(c.consumido)}</td>
-                                                    <td className={`px-2 py-1.5 text-right font-mono font-bold ${pendiente != null && pendiente > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{pendiente != null ? num(pendiente) : ''}</td>
-                                                    <td className="px-2 py-1.5 text-center">{c.unidadMedida}</td>
-                                                    <td className="px-2 py-1.5 text-center font-mono">{c.almacen}</td>
-                                                    <td className="px-2 py-1.5 text-slate-600">{c.metodoEmision}</td>
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
+                            <div className="space-y-3">
+                                {GRUPOS.map(g => (
+                                    <section key={g.id} className={`rounded-xl border border-slate-200 border-l-4 ${g.color}`}>
+                                        <div className="flex items-center justify-between px-3 py-2 bg-[#F6F3EE] rounded-tr-xl">
+                                            <h3 className="text-sm font-black text-[#324354]">{g.label}</h3>
+                                            <span className="text-[11px] font-bold text-slate-500">{porGrupo[g.id].length} artículo(s)</span>
+                                        </div>
+                                        {porGrupo[g.id].length === 0 ? (
+                                            <div className="px-3 py-3 text-xs italic text-slate-400">Sin artículos en este grupo</div>
+                                        ) : (
+                                            <TablaComponentes filas={porGrupo[g.id]} />
+                                        )}
+                                    </section>
+                                ))}
+                                <p className="text-[10px] text-slate-400 italic">Grupos asignados por la descripción del artículo (SAP no trae esta clasificación).</p>
                             </div>
                         )
                     ) : orden && pestana === 'comentarios' ? (
