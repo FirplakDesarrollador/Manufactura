@@ -419,7 +419,7 @@ const EstadoConsultaSap = ({ estado }: { estado: 'sin-consulta' | 'ok' | 'error'
 );
 
 // Aviso rojo del Semáforo: información crítica, se pide enviar captura al Director de Manufactura
-const AvisoErrorSemaforo = ({ titulo, lineas, detalle, hora }: { titulo: string; lineas: string[]; detalle?: string; hora?: string }) => (
+const AvisoErrorSemaforo = ({ titulo, lineas, detalle, hora }: { titulo: string; lineas: string[]; detalle?: string; hora: string }) => (
     <div role="alert" className="w-full max-w-3xl bg-red-50 border-2 border-red-500 rounded-2xl p-4 sm:p-5 text-left space-y-3 select-text shadow-sm">
         <div className="flex items-start gap-3">
             <AlertTriangle size={26} className="text-red-600 shrink-0 mt-0.5" />
@@ -433,12 +433,12 @@ const AvisoErrorSemaforo = ({ titulo, lineas, detalle, hora }: { titulo: string;
                     </ul>
                 )}
                 {detalle && <p className="text-[11px] font-mono text-red-700/80 break-all">Detalle técnico: {detalle}</p>}
-                <p className="text-[11px] text-red-700">Fecha y hora: {hora || new Date().toLocaleString('es-CO')}</p>
+                <p className="text-[11px] text-red-700">Fecha y hora: {hora}</p>
             </div>
         </div>
         <div className="bg-red-600 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-bold flex items-center gap-2">
             <Camera size={18} className="shrink-0" />
-            <span>Tome un pantallazo (captura de pantalla) de este mensaje y envíelo al Director de Manufactura para corregirlo.</span>
+            <span>Toma una captura de pantalla de este mensaje y envíalo al Director de Manufactura para corregirlo.</span>
         </div>
     </div>
 );
@@ -572,6 +572,7 @@ export default function ConsultaSAPPage() {
     const [semaforoError, setSemaforoError] = useState<{ mensaje: string; detalle?: string; hora: string } | null>(null)
     // Datos faltantes o no reconocidos que informa /api/sap/semaforo aunque la consulta haya respondido
     const [semaforoAdvertencias, setSemaforoAdvertencias] = useState<string[]>([])
+    const [semaforoConsultaHora, setSemaforoConsultaHora] = useState<string>("") // hora fija de la consulta (no un reloj)
 
     // Estados para pestaña Query - Órdenes Liberadas (FPK - Ordenes de fabricación liberadas)
     const [releasedOrdersList, setReleasedOrdersList] = useState<ReleasedOrderItem[]>([])
@@ -828,6 +829,7 @@ export default function ConsultaSAPPage() {
             setSemaforoDataSource(result.source || 'Fuente no informada');
             setSemaforoHasLoaded(true);
             setSemaforoAdvertencias(Array.isArray(result.advertencias) ? result.advertencias : []);
+            setSemaforoConsultaHora(hora);
             setSemaforoError(null);
             return result.data;
         } catch (err: any) {
@@ -2221,6 +2223,7 @@ export default function ConsultaSAPPage() {
                                 <AvisoErrorSemaforo
                                     titulo={`La consulta respondió, pero con ${semaforoAdvertencias.length} problema(s) en los datos. Úselos con precaución.`}
                                     lineas={semaforoAdvertencias}
+                                    hora={semaforoConsultaHora}
                                 />
                             )}
 
