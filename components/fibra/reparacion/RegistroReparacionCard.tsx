@@ -121,14 +121,14 @@ export default function RegistroReparacionCard({ registro, usuarioEmail, onRefre
                             <option value="">Seleccione estado...</option>
                             {isReparacion && (
                                 <>
-                                    <option value="Acabado">Liberar a Acabado</option>
+                                    <option value="Ensayo">Liberar a Ensayo</option>
                                     <option value="Saldo">Mover a Saldo</option>
                                     <option value="Destruccion">Mover a Destrucción</option>
                                 </>
                             )}
                             {isSaldo && (
                                 <>
-                                    <option value="Empaque">Liberar a Empaque</option>
+                                    <option value="Guacales">Liberar a Guacales</option>
                                     <option value="Reparacion">Volver a Reparación</option>
                                     <option value="Destruccion">Mover a Destrucción</option>
                                 </>

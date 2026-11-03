@@ -16,16 +16,16 @@ export default function RegistroEmpaqueCard({ registro, usuarioEmail, onRefresh 
     const [loading, setLoading] = useState(false)
 
     const handleRegister = async () => {
-        if (!confirm('¿Desea registrar el empaque de esta pieza?')) return
+        if (!confirm('¿Desea registrar esta pieza en guacales?')) return
 
         setLoading(true)
         try {
             await registrarEmpaque(registro.registrer || '', usuarioEmail)
-            alert('¡Empaque registrado exitosamente!')
+            alert('¡Guacal registrado exitosamente!')
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
-            alert('Hubo un error al registrar el empaque.')
+            alert('Hubo un error al registrar el guacal.')
         } finally {
             setLoading(false)
         }
@@ -48,7 +48,7 @@ export default function RegistroEmpaqueCard({ registro, usuarioEmail, onRefresh 
                             <div className="flex items-center gap-2 mt-2">
                                 <Clock size={16} className="text-slate-400" />
                                 <p className="text-sm font-bold text-slate-400">
-                                    Finalizado: {parseDBTimestamp(registro.acabado_fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                                    Ensayo: {parseDBTimestamp(registro.acabado_fecha || registro.pulido_fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>
@@ -102,7 +102,7 @@ export default function RegistroEmpaqueCard({ registro, usuarioEmail, onRefresh 
                         ) : (
                             <Send size={28} />
                         )}
-                        Registrar Empaque
+                        Registrar guacal
                     </button>
                 </div>
             </div>

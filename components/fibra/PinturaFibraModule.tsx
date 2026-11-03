@@ -358,7 +358,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                     <StatCard label="Pintura Hoy" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
                     <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-yellow-50 text-yellow-600" />
                     <StatCard label="Vaciado Hoy" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard label="Acabado Hoy" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
+                    <StatCard label="Ensayo Hoy" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
                     <StatCard label="Saldo" value={metrics.saldo} color="bg-rose-50 text-rose-600" />
                     <StatCard label="Digitado" value={metrics.digitado} color="bg-slate-50 text-slate-600" />
                     <StatCard label="Transito" value={metrics.transito} color="bg-amber-50 text-amber-600" />

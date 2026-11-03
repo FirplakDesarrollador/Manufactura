@@ -10,17 +10,16 @@ interface RegistroVaciadoCardProps {
     registro: RegistroTrazabilidad
     usuarioEmail: string
     onRefresh: () => void
-    selectedMaquina: string
 }
 
-export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh, selectedMaquina }: RegistroVaciadoCardProps) {
+export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh }: RegistroVaciadoCardProps) {
     const [loading, setLoading] = useState(false)
     const [confirmingDesgelcar, setConfirmingDesgelcar] = useState(false)
 
     const handleRegister = async () => {
         setLoading(true)
         try {
-            await registrarVaciado(registro.registrer || '', usuarioEmail, selectedMaquina)
+            await registrarVaciado(registro.registrer || '', usuarioEmail)
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -115,8 +114,8 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh,
                 <div className="pt-2 xl:pt-0 shrink-0 flex flex-col gap-2 min-w-[280px]">
                     <button
                         onClick={handleRegister}
-                        disabled={loading || !selectedMaquina || confirmingDesgelcar}
-                        className={`w-full text-white px-8 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all uppercase tracking-widest ${!selectedMaquina || confirmingDesgelcar
+                        disabled={loading || confirmingDesgelcar}
+                        className={`w-full text-white px-8 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all uppercase tracking-widest ${confirmingDesgelcar
                             ? 'bg-gray-300 cursor-not-allowed grayscale'
                             : 'bg-[#254153] hover:bg-[#1a2e3b] active:scale-95 shadow-amber-900/10'
                             } disabled:opacity-50`}

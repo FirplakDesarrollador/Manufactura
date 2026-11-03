@@ -95,7 +95,7 @@ export default function RegistroPulidoCard({ registro, usuarioEmail, onRefresh }
                             className={`w-full appearance-none bg-slate-50 border-2 ${selectedStatus ? 'border-cyan-500 bg-white' : 'border-slate-200'} rounded-lg px-2 py-1 pr-6 font-bold text-slate-700 outline-none transition-all cursor-pointer text-[10px]`}
                         >
                             <option value="">Seleccione estado...</option>
-                            <option value="Acabado">Acabado</option>
+                            <option value="Ensayo">Ensayo</option>
                             <option value="Reparacion">Reparación</option>
                             <option value="Destruccion">Destrucción</option>
                         </select>

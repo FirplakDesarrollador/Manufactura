@@ -113,7 +113,7 @@ export default function PulidoFibraModule({ userEmail }: { userEmail: string }) 
                             <p className="text-base text-slate-500 max-w-sm mt-3 font-semibold">
                                 {searchText
                                     ? "No hay coincidencias con los criterios de búsqueda actuales."
-                                    : "No hay piezas en estado 'Pulido' pendientes."}
+                                    : "No hay piezas de vaciado pendientes por pulir."}
                             </p>
                         </div>
                     ) : (

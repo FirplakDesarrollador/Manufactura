@@ -64,7 +64,7 @@ export default function CediFibraModule({ userEmail }: { userEmail: string }) {
     }
 
     const getReportData = () => {
-        const headers = ['OF', 'Pedido', 'Producto', 'SKU', 'Cliente', 'Cantidad', 'Saldo', 'Vaciado', 'Pintura', 'Desgelcada', 'Pulido', 'Empaque', 'Acabado', 'Digitado', 'Transito', 'Cedi']
+        const headers = ['OF', 'Pedido', 'Producto', 'SKU', 'Cliente', 'Cantidad', 'Saldo', 'Vaciado', 'Pintura', 'Desgelcada', 'Pulido', 'Guacales', 'Acabado', 'Digitado', 'Transito', 'Cedi']
         const rows = filteredOrdenes.map(o => [
             o.orden_fabricacion || '',
             o.pedido || '',

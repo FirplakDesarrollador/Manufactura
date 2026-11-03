@@ -99,7 +99,7 @@ export default function DigitadoFibraModule({ userEmail }: { userEmail: string }
     const filteredRegistrosGlobales = registrosGlobales.filter(r => validOrderIds.has(r.orden_fabricacion))
 
     const countAcabado = filteredRegistrosGlobales.filter(r =>
-        ['Pulido', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || '') &&
+        ['Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || '') &&
         (r.pintura_fecha && new Date(r.pintura_fecha).toLocaleDateString('es-ES') === todayStr)
     ).length
 
@@ -133,7 +133,7 @@ export default function DigitadoFibraModule({ userEmail }: { userEmail: string }
                     <SummaryCard label="Vaciado" value={totalVaciado} color="blue" />
                     <SummaryCard label="Pulido" value={totalPulido} color="blue" />
                     <SummaryCard label="Saldo" value={totalSaldo} color="blue" />
-                    <SummaryCard label="Acabado" value={countAcabado} color="blue" />
+                    <SummaryCard label="Ensayo" value={countAcabado} color="blue" />
                     <SummaryCard label="Digitado" value={totalDigitado} color="blue" isPrimary />
                     <SummaryCard label="Transito" value={totalTransito} color="orange" isPrimary />
                     <SummaryCard label="Cedi" value={countCediHoy} color="green" isPrimary />

@@ -12,18 +12,6 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
-    const [selectedMaquina, setSelectedMaquina] = useState<string>(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('vaciado_maquina') || ''
-        }
-        return ''
-    })
-
-    useEffect(() => {
-        if (selectedMaquina) {
-            localStorage.setItem('vaciado_maquina', selectedMaquina)
-        }
-    }, [selectedMaquina])
 
     const loadRegistros = async () => {
         setLoading(true)
@@ -112,26 +100,6 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
                                     />
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2">
-                                    <div className="flex flex-col min-w-[200px]">
-                                        <select
-                                            value={selectedMaquina}
-                                            onChange={(e) => setSelectedMaquina(e.target.value)}
-                                            className={`h-full px-3 py-2.5 rounded-xl border-2 font-black uppercase tracking-widest text-xs transition-all outline-none ${!selectedMaquina
-                                                ? 'border-red-300 bg-red-50 text-red-500 animate-pulse'
-                                                : 'border-amber-200 bg-amber-50 text-amber-700'
-                                                }`}
-                                        >
-                                            <option value="" disabled>-- SELECCIONAR MÁQUINA --</option>
-                                            <option value="ADM">ADM</option>
-                                            <option value="Ultracaster">ULTRACASTER</option>
-                                        </select>
-                                        {!selectedMaquina && (
-                                            <span className="text-[10px] font-black text-red-500 mt-1 ml-1 uppercase animate-bounce">
-                                                * Máquina obligatoria
-                                            </span>
-                                        )}
-                                    </div>
-
                                     <button
                                         onClick={() => setSearchText('')}
                                         className="bg-orange-500 hover:bg-orange-600 text-white px-6 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
@@ -178,7 +146,6 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
                                             registro={registro}
                                             usuarioEmail={userEmail}
                                             onRefresh={loadRegistros}
-                                            selectedMaquina={selectedMaquina}
                                         />
                                     ))}
                                 </div>

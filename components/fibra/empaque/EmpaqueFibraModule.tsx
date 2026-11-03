@@ -51,9 +51,9 @@ export default function EmpaqueFibraModule({ userEmail }: { userEmail: string })
                             <Package size={32} />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase">Módulo Empaque</h1>
+                            <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase">Módulo Guacales</h1>
                             <p className="text-base text-slate-500 font-bold mt-1 uppercase tracking-widest opacity-80">
-                                Despacho y salida de productos terminados.
+                                Registro de piezas listas para guacal.
                             </p>
                         </div>
                     </div>
@@ -100,11 +100,11 @@ export default function EmpaqueFibraModule({ userEmail }: { userEmail: string })
                             <div className="bg-slate-50 p-12 rounded-full mb-8">
                                 <ClipboardList size={80} className="text-slate-200" />
                             </div>
-                            <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Sin piezas para empacar</h3>
+                            <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Sin piezas para guacal</h3>
                             <p className="text-lg text-slate-500 max-w-sm mt-3 font-semibold">
                                 {searchText
                                     ? "No hay coincidencias con los criterios de búsqueda actuales."
-                                    : "No hay piezas en estado 'Acabado' pendientes por empacar."}
+                                    : "No hay piezas de ensayo pendientes por pasar a guacales."}
                             </p>
                         </div>
                     ) : (

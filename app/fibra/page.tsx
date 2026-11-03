@@ -6,11 +6,9 @@ import Header from '@/components/opt-sistemica/Header'
 import { useEffect, useState, useCallback } from 'react'
 import PinturaFibraModule from '@/components/fibra/PinturaFibraModule'
 import DashboardFibraModule from '@/components/fibra/dashboard/DashboardFibraModule'
-import ContramoldeFibraModule from '@/components/fibra/contramoldes/ContramoldeFibraModule'
 import VaciadoFibraModule from '@/components/fibra/vaciado/VaciadoFibraModule'
-import DesmoldeFibraModule from '@/components/fibra/desmolde/DesmoldeFibraModule'
 import PulidoFibraModule from '@/components/fibra/pulido/PulidoFibraModule'
-import AcabadoFibraModule from '@/components/fibra/acabado/AcabadoFibraModule'
+import EnsayoFibraModule from '@/components/fibra/ensayo/EnsayoFibraModule'
 import ReparacionFibraModule from '@/components/fibra/reparacion/ReparacionFibraModule'
 import EmpaqueFibraModule from '@/components/fibra/empaque/EmpaqueFibraModule'
 import DigitadoFibraModule from '@/components/fibra/digitado/DigitadoFibraModule'
@@ -26,16 +24,15 @@ interface PermisosModulos {
     cedi?: boolean;
     pulido?: boolean;
     acabado?: boolean;
+    ensayo?: boolean;
     empaque?: boolean;
     pintura?: boolean;
     vaciado?: boolean;
-    desmolde?: boolean;
     digitado?: boolean;
     prensado?: boolean;
     dashboard?: boolean;
     parametros?: boolean;
     reparacion?: boolean;
-    contramoldes?: boolean;
     administracion?: boolean;
     [key: string]: boolean | undefined;
 }
@@ -88,11 +85,16 @@ export default function FibraPage() {
         // Definir el módulo activo inicial basado en permisos (modulos o fibra)
         const modulos = combinedUser.permisos?.modulos;
         const fibraPerms = (combinedUser.permisos as any)?.fibra;
-        const checkPerm = (m: string) => modulos?.[m] === true || fibraPerms?.[m] === true;
+        const checkPerm = (m: string) => {
+            if (m === 'ensayo') {
+                return modulos?.ensayo === true || fibraPerms?.ensayo === true || modulos?.acabado === true || fibraPerms?.acabado === true
+            }
+            return modulos?.[m] === true || fibraPerms?.[m] === true
+        }
 
         if (modulos || fibraPerms) {
             if (!checkPerm('pintura')) {
-                const priorityModules = ['pintura', 'contramoldes', 'vaciado', 'desmolde', 'pulido', 'acabado', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
+                const priorityModules = ['pintura', 'vaciado', 'pulido', 'ensayo', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
                 const firstAllowed = priorityModules.find(m => checkPerm(m));
                 if (firstAllowed) {
                     setActiveModule(firstAllowed);
@@ -134,7 +136,12 @@ export default function FibraPage() {
     if (!user) return null
 
     const hasPermission = (moduleName: string) => {
-        return user.permisos?.modulos?.[moduleName] === true || (user.permisos as any)?.fibra?.[moduleName] === true;
+        const fibra = (user.permisos as any)?.fibra
+        const modulos = user.permisos?.modulos
+        if (moduleName === 'ensayo') {
+            return modulos?.ensayo === true || fibra?.ensayo === true || modulos?.acabado === true || fibra?.acabado === true
+        }
+        return modulos?.[moduleName] === true || fibra?.[moduleName] === true
     }
 
     return (
@@ -201,22 +208,6 @@ export default function FibraPage() {
                             </button>
                         )}
 
-                        {hasPermission('contramoldes') && (
-                            <button
-                                onClick={() => setActiveModule('contramoldes')}
-                                title={sidebarOpen ? undefined : 'Contramoldes'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'contramoldes'
-                                    ? 'bg-[#254153] text-white'
-                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                                </svg>
-                                <span>Contramoldes</span>
-                            </button>
-                        )}
-
                         {hasPermission('vaciado') && (
                             <button
                                 onClick={() => setActiveModule('vaciado')}
@@ -230,22 +221,6 @@ export default function FibraPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                 </svg>
                                 <span>Vaciado</span>
-                            </button>
-                        )}
-
-                        {hasPermission('desmolde') && (
-                            <button
-                                onClick={() => setActiveModule('desmolde')}
-                                title={sidebarOpen ? undefined : 'Desmolde'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'desmolde'
-                                    ? 'bg-[#254153] text-white'
-                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span>Desmolde</span>
                             </button>
                         )}
 
@@ -265,19 +240,19 @@ export default function FibraPage() {
                             </button>
                         )}
 
-                        {hasPermission('acabado') && (
+                        {hasPermission('ensayo') && (
                             <button
-                                onClick={() => setActiveModule('acabado')}
-                                title={sidebarOpen ? undefined : 'Acabado'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'acabado'
+                                onClick={() => setActiveModule('ensayo')}
+                                title={sidebarOpen ? undefined : 'Ensayo'}
+                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'ensayo'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                                 </svg>
-                                <span>Acabado</span>
+                                <span>Ensayo</span>
                             </button>
                         )}
 
@@ -300,7 +275,7 @@ export default function FibraPage() {
                         {hasPermission('empaque') && (
                             <button
                                 onClick={() => setActiveModule('empaque')}
-                                title={sidebarOpen ? undefined : 'Empaque'}
+                                title={sidebarOpen ? undefined : 'Guacales'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'empaque'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -309,7 +284,7 @@ export default function FibraPage() {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                 </svg>
-                                <span>Empaque</span>
+                                <span>Guacales</span>
                             </button>
                         )}
 
@@ -434,18 +409,14 @@ export default function FibraPage() {
                             <BuscadorOrdenesFibraModule />
                         ) : activeModule === 'mapa' ? (
                             <MapaProcesosFibraModule />
-                        ) :activeModule === 'pintura' && hasPermission('pintura') ? (
+                        ) : activeModule === 'pintura' && hasPermission('pintura') ? (
                             <PinturaFibraModule userEmail={user?.email || ''} />
-                        ) : activeModule === 'contramoldes' && hasPermission('contramoldes') ? (
-                            <ContramoldeFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'vaciado' && hasPermission('vaciado') ? (
                             <VaciadoFibraModule userEmail={user?.email || ''} />
-                        ) : activeModule === 'desmolde' && hasPermission('desmolde') ? (
-                            <DesmoldeFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'pulido' && hasPermission('pulido') ? (
                             <PulidoFibraModule userEmail={user?.email || ''} />
-                        ) : activeModule === 'acabado' && hasPermission('acabado') ? (
-                            <AcabadoFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'ensayo' && hasPermission('ensayo') ? (
+                            <EnsayoFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'reparacion' && hasPermission('reparacion') ? (
                             <ReparacionFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'empaque' && hasPermission('empaque') ? (

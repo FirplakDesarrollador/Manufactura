@@ -321,7 +321,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     <StatCard label="Pintura Hoy" value={stats.pintura} color="bg-orange-50 text-orange-600" />
                     <StatCard label="Desgelcada" value={stats.desgelcada} color="bg-yellow-50 text-yellow-600" />
                     <StatCard label="Vaciado Hoy" value={stats.vaciado} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard label="Acabado Hoy" value={stats.acabado} color="bg-purple-50 text-purple-600" />
+                    <StatCard label="Ensayo Hoy" value={stats.acabado} color="bg-purple-50 text-purple-600" />
                     <StatCard label="Saldo" value={stats.saldo} color="bg-rose-50 text-rose-600" />
                     <StatCard label="Digitado" value={stats.digitado} color="bg-slate-50 text-slate-600" />
                     <StatCard label="Transito" value={stats.transito} color="bg-amber-50 text-amber-600" />
@@ -643,6 +643,8 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             <option value="Desgelcada">Desgelcada</option>
                                             <option value="Vaciado">Vaciado</option>
                                             <option value="Pulido">Pulido</option>
+                                            <option value="Ensayo">Ensayo</option>
+                                            <option value="Guacales">Guacales</option>
                                             <option value="Acabado">Acabado</option>
                                             <option value="Empaque">Empaque</option>
                                             <option value="Digitado">Digitado</option>
@@ -780,11 +782,10 @@ const TRACE_STAGES: Array<{
 }> = [
     { label: 'Pintura', dateKey: 'pintura_fecha', userKey: 'pintura_user_name' },
     { label: 'Vaciado', dateKey: 'vaciado_fecha', userKey: 'vaciado_user_name' },
-    { label: 'Contramolde', dateKey: 'contramolde_fecha', userKey: 'contramolde_user_name' },
     { label: 'Pulido', dateKey: 'pulido_fecha', userKey: 'pulido_user_name' },
-    { label: 'Acabado', dateKey: 'acabado_fecha', userKey: 'acabado_user_name' },
+    { label: 'Ensayo', dateKey: 'acabado_fecha', userKey: 'acabado_user_name' },
     { label: 'Reparacion', dateKey: 'reparacion_fecha', userKey: 'reparacion_user_name' },
-    { label: 'Empaque', dateKey: 'empaque_fecha', userKey: 'empaque_user_name' },
+    { label: 'Guacales', dateKey: 'empaque_fecha', userKey: 'empaque_user_name' },
     { label: 'Digitado', dateKey: 'digitado_fecha', userKey: 'digitado_user_name' },
     { label: 'Transito', dateKey: 'transito_fecha', userKey: 'transito_user_name' },
     { label: 'Cedi', dateKey: 'cedi_fecha', userKey: 'cedi_user_name' },

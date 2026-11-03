@@ -181,7 +181,7 @@ export async function getMetricasDiaActual(): Promise<MetricasDia | null> {
     const pToday = todayR.filter(r => isTodayStr(r.pintura_fecha))
     const vToday = todayR.filter(r => isTodayStr(r.vaciado_fecha))
     const cToday = todayR.filter(r => isTodayStr(r.cedi_fecha) && r.estado === 'Cedi')
-    const aToday = pToday.filter(r => ['Pulido', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || ''))
+    const aToday = pToday.filter(r => ['Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque', 'Digitado', 'Transito', 'Cedi'].includes(r.estado || ''))
 
     // Helper for breakdowns
     const sumBy = (arr: any[], key: string, val: string) => arr.filter(r => r[key] === val).length

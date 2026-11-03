@@ -20,7 +20,7 @@ interface Usuario {
 
 const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     hdt: ['acceso_general', 'crear', 'editar', 'estadisticas'],
-    fibra: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
+    fibra: ['cedi', 'pulido', 'ensayo', 'empaque', 'pintura', 'vaciado', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'administracion'],
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
     calidad: ['ms', 'editar', 'eliminar', 'configurar_defectos', 'saldos_y_destrucciones'],
@@ -70,7 +70,8 @@ const SUBMODULO_LABELS: Record<string, string> = {
     contingencias: 'Contingencias',
     asistencia: 'Asistencia',
     configurar_defectos: 'Configurar Defectos',
-    saldos_y_destrucciones: 'Saldos y Destrucciones'
+    saldos_y_destrucciones: 'Saldos y Destrucciones',
+    ensayo: 'Ensayo'
 };
 
 export default function UsuariosConfiguracionPage() {
