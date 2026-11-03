@@ -11,10 +11,10 @@ import { Search, Eraser, RefreshCw, ChevronsUpDown, FileText, Clipboard, Users, 
 // Buscador de órdenes FV (solo consulta): en qué proceso están las piezas de cada orden,
 // su historial por pieza y el detalle de la orden en SAP.
 
-type Etapa = { key: keyof OrdenFabricacion | 'programado'; label: string }
+export type Etapa = { key: keyof OrdenFabricacion | 'programado'; label: string }
 
 // Orden del flujo de la planta; Saldo y Destrucción van al final
-const ETAPAS: Etapa[] = [
+export const ETAPAS: Etapa[] = [
     { key: 'programado', label: 'Programado' },
     { key: 'pintura', label: 'Pintura' },
     { key: 'desgelcada', label: 'Desgelcada' },
@@ -35,7 +35,7 @@ const ETAPAS: Etapa[] = [
 type EstadoOrden = 'Sin iniciar' | 'En proceso' | 'Entregada'
 
 // Mismo cálculo de la tarjeta de Administración (OrdenCard): programado = cantidad − piezas en etapas
-function piezasPorEtapa(o: OrdenFabricacion) {
+export function piezasPorEtapa(o: OrdenFabricacion) {
     const v = (n?: number) => Math.max(0, n || 0)
     const cantidad = Math.max(0, o.cantidad || o.cantidad_programada || 0)
     const sumEtapas = v(o.pintura) + v(o.pulido) + v(o.reparacion) + v(o.saldo) + v(o.empaque) + v(o.transito) +
