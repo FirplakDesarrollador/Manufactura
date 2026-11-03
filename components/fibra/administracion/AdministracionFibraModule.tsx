@@ -440,6 +440,14 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                             filteredOrdenes.map((item) => (
                                 <div key={item.id} className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
                                 <div className="flex gap-3 items-stretch">
+                                    <div className="flex-1 min-w-0">
+                                        <OrdenCard
+                                            orden={item}
+                                            isActive={false}
+                                            onClick={() => setEditModal({ type: 'of', item })}
+                                            moldes={allMoldes}
+                                        />
+                                    </div>
                                     <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center">
                                         <button
                                             onClick={() => toggleOrden(item.id)}
@@ -469,14 +477,6 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                         >
                                             <Trash2 size={18} />
                                         </button>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <OrdenCard
-                                            orden={item}
-                                            isActive={false}
-                                            onClick={() => setEditModal({ type: 'of', item })}
-                                            moldes={allMoldes}
-                                        />
                                     </div>
                                 </div>
                                 {expandedOrdenes.has(item.id) && (
