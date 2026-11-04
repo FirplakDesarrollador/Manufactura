@@ -11,6 +11,7 @@ import Header from '@/components/opt-sistemica/Header';
 import Combobox from '@/components/ficha-rcc/Combobox';
 import { PLANTAS_LIST, ORIGENES_LIST } from '@/lib/ficha-rcc/constants';
 import { isAuthorized } from '@/lib/ficha-rcc/auth';
+import { fetchDefectosPlanta } from '@/lib/ficha-rcc/defectos';
 import SubHeader from '@/components/ficha-rcc/SubHeader';
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import { RESPONSABLES_LIST } from '@/lib/ficha-rcc/constants';
@@ -45,20 +46,10 @@ export default function CrearFichaPage() {
 
   const fetchDefectos = async () => {
     try {
-      const { data, error } = await supabase
-        .from('cat_defectos')
-        .select('nombre_defecto')
-        .eq('planta', planta)
-        .order('posicion', { ascending: true });
-      
-      if (error) throw error;
-      
-      if (data) {
-        const nombres = data.map(d => d.nombre_defecto);
-        setDefectosCargados(nombres);
-        if (nombres.length > 0) {
-          setProblema(nombres[0]);
-        }
+      const nombres = await fetchDefectosPlanta(planta);
+      setDefectosCargados(nombres);
+      if (nombres.length > 0) {
+        setProblema(nombres[0]);
       }
     } catch (err) {
       console.error('Error cargando defectos:', err);

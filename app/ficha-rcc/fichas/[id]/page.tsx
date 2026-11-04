@@ -10,6 +10,7 @@ import Header from '@/components/opt-sistemica/Header';
 import Combobox from '@/components/ficha-rcc/Combobox';
 import { PLANTAS_LIST, ORIGENES_LIST } from '@/lib/ficha-rcc/constants';
 import { isAuthorized, checkCanEditFicha } from '@/lib/ficha-rcc/auth';
+import { fetchDefectosPlanta } from '@/lib/ficha-rcc/defectos';
 import SubHeader from '@/components/ficha-rcc/SubHeader';
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import { RESPONSABLES_LIST } from '@/lib/ficha-rcc/constants';
@@ -52,13 +53,7 @@ export default function DetalleFichaPage({ params }: { params: Promise<{ id: str
 
   const fetchDefectos = async () => {
     try {
-      const { data, error } = await supabase
-        .from('cat_defectos')
-        .select('nombre_defecto')
-        .eq('planta', planta)
-        .order('posicion', { ascending: true });
-      
-      if (data) setDefectosCargados(data.map(d => d.nombre_defecto));
+      setDefectosCargados(await fetchDefectosPlanta(planta));
     } catch (err) {
       console.error('Error cargando catálogo:', err);
     }
@@ -465,7 +460,8 @@ export default function DetalleFichaPage({ params }: { params: Promise<{ id: str
           <div style={{ marginBottom: '24px' }}>
              <Combobox 
                 label="Problema (Defecto detectado)"
-                options={defectosCargados}
+                // Fichas antiguas pueden tener un defecto que ya no está en el catálogo: se conserva
+                options={problema && !defectosCargados.includes(problema) ? [problema, ...defectosCargados] : defectosCargados}
                 value={problema}
                 onChange={setProblema}
                 placeholder={defectosCargados.length === 0 ? "Cargando defectos..." : "Seleccionar defecto..."}
