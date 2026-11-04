@@ -18,12 +18,17 @@ export async function getRegistrosParaEnsayo(): Promise<RegistroTrazabilidad[]> 
 }
 
 export async function registrarEnsayo(registrer: string, usuarioEmail: string) {
+    return registrarEnsayoConDestino(registrer, usuarioEmail, 'Guacales')
+}
+
+// Resultado del ensayo: pasa a Guacales, o se manda a Reparación o Destrucción (la fecha y el usuario quedan en acabado_*)
+export async function registrarEnsayoConDestino(registrer: string, usuarioEmail: string, destino: 'Guacales' | 'Reparacion' | 'Destruccion') {
     const userId = await requireUserId(usuarioEmail)
 
     const { data, error } = await supabase
         .from('trazabilidad_fv')
         .update({
-            estado: 'Guacales',
+            estado: destino,
             acabado_fecha: new Date().toISOString(),
             acabado_user_id: userId
         })

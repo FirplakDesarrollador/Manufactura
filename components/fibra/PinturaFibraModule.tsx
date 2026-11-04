@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/fibra'
+import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoyMetricas } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
 import MoldSelector from '../pintura/MoldSelector'
 import { Search, X, History, ClipboardList } from 'lucide-react'
@@ -43,7 +43,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         try {
             const [ordenesData, trazaData, moldesData] = await Promise.all([
                 getOrdenesFabricacion(),
-                getRegistrosTrazabilidadHoy(), // Usar hoy para métricas rápidas
+                getRegistrosTrazabilidadHoyMetricas(), // Usar hoy para métricas rápidas
                 getAllMoldes()
             ])
             setOrdenes(ordenesData)
@@ -271,7 +271,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
     }
 
     return (
-        <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
+        <div className="min-h-full md:h-full flex flex-col bg-slate-50/30 md:overflow-hidden">
             <EncabezadoFibra
                 metrics={metrics}
                 searchText={searchText}
@@ -285,7 +285,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 md:overflow-y-auto p-2 sm:p-4">
                 {view === 'history' ? (
                     <HistorySection />
                 ) : (
@@ -300,7 +300,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                             <div className="text-center py-8 text-gray-500">No se encontraron órdenes</div>
                         ) : (
                             filteredOrdenes.map((orden) => (
-                                <OrdenCard
+                                <OrdenCard planta="fv"
                                     key={orden.id}
                                     orden={orden}
                                     isActive={selectedOrden?.id === orden.id}
@@ -314,15 +314,14 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             </div>
 
             {/* Bottom Action Bar */}
-            <div className="bg-gray-50 px-4 py-2 border-t border-gray-200">
+            <div className="sticky bottom-0 z-10 md:static bg-gray-50 px-2 sm:px-4 py-2 border-t border-gray-200">
                 <div className="flex flex-col lg:flex-row gap-2 items-stretch lg:items-end w-full">
                     <div className="flex flex-col sm:flex-row gap-2 flex-1">
                         {/* Line Selector Removed for Fibra */}
 
                         {/* Mold Selector with Search */}
                         <div className="w-full sm:w-1/2">
-                            <label className="md:hidden text-xs font-bold text-cyan-600 uppercase mb-1">Molde</label>
-                            <div className="relative">
+                                                        <div className="relative">
                                 <div 
                                     onClick={() => !!selectedOrden && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
                                     className={`w-full h-9 px-3 text-sm bg-white text-gray-900 font-semibold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all

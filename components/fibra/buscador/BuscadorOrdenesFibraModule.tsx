@@ -2,11 +2,13 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { OrdenFabricacion } from '@/types/pintura'
-import { parseDBDate } from '@/lib/utils/date'
+import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
+import { getRegistrosTrazabilidadHoyMetricas, getAllMoldes } from '@/lib/supabase/queries/fibra'
+import OrdenCard from '@/components/pintura/OrdenCard'
+import EncabezadoFibra, { useMetricasFibra } from '../EncabezadoFibra'
 import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
-import { Search, Eraser, RefreshCw, ChevronsUpDown, FileText, Clipboard, Users, AlertTriangle } from 'lucide-react'
+import { RefreshCw, ChevronsUpDown, FileText, AlertTriangle } from 'lucide-react'
 
 // Buscador de órdenes FV (solo consulta): en qué proceso están las piezas de cada orden,
 // su historial por pieza y el detalle de la orden en SAP.
@@ -52,13 +54,14 @@ const COLOR_ESTADO: Record<EstadoOrden, string> = {
     'Entregada': 'bg-emerald-50 text-emerald-800 border-emerald-300'
 }
 
-const fecha = (d?: string | null) => d ? parseDBDate(d).toLocaleDateString('es-ES') : '—'
-
 export default function BuscadorOrdenesFibraModule() {
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
+    const [trazabilidad, setTrazabilidad] = useState<RegistroTrazabilidad[]>([])
+    const [moldes, setMoldes] = useState<Molde[]>([])
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [busqueda, setBusqueda] = useState('')
+    const [fechaFiltro, setFechaFiltro] = useState('')
     const [etapaFiltro, setEtapaFiltro] = useState<string>('')
     const [estadoFiltro, setEstadoFiltro] = useState<EstadoOrden | ''>('')
     const [abiertas, setAbiertas] = useState<Set<number>>(new Set())
@@ -68,23 +71,24 @@ export default function BuscadorOrdenesFibraModule() {
     const cargar = async () => {
         setCargando(true)
         setError(null)
-        const { data, error } = await supabase.from('ordenes_fabricacion_fv').select('*').order('fecha_entrega_estimada', { ascending: true })
+        const [{ data, error }, trazaHoy, moldesData] = await Promise.all([
+            supabase.from('ordenes_fabricacion_fv').select('*').order('fecha_entrega_estimada', { ascending: true }),
+            getRegistrosTrazabilidadHoyMetricas(),
+            getAllMoldes()
+        ])
         if (error) setError(`No se pudieron cargar las órdenes: ${error.message}`)
         else setOrdenes(data || [])
+        setTrazabilidad(trazaHoy)
+        setMoldes(moldesData)
         setCargando(false)
     }
 
     useEffect(() => { cargar() }, [])
-    useEffect(() => { setLimite(50) }, [busqueda, etapaFiltro, estadoFiltro])
+    useEffect(() => { setLimite(50) }, [busqueda, fechaFiltro, etapaFiltro, estadoFiltro])
 
-    const conEtapas = useMemo(() => ordenes.map(o => ({ o, ...piezasPorEtapa(o) })), [ordenes])
-
-    const porBusqueda = useMemo(() => {
-        const q = busqueda.trim().toLowerCase()
-        if (!q) return conEtapas
-        return conEtapas.filter(({ o }) => [o.orden_fabricacion, o.pedido, (o as any).numero_pedido, o.producto_descripcion, o.producto_sku, o.molde_descripcion, o.molde_sku, o.cliente]
-            .some(v => String(v ?? '').toLowerCase().includes(q)))
-    }, [conEtapas, busqueda])
+    // Búsqueda y fecha: el mismo filtro base del encabezado común de piso FV
+    const { baseFilteredOrdenes, metrics } = useMetricasFibra(ordenes, trazabilidad, busqueda, fechaFiltro)
+    const porBusqueda = useMemo(() => baseFilteredOrdenes.map(o => ({ o, ...piezasPorEtapa(o) })), [baseFilteredOrdenes])
 
     // Totales por proceso según la búsqueda y el estado (sin el filtro de proceso, para poder cambiarlo)
     const totales = useMemo(() => {
@@ -114,58 +118,45 @@ export default function BuscadorOrdenesFibraModule() {
         return n
     })
 
-    const hayFiltros = busqueda || etapaFiltro || estadoFiltro
-
     return (
-        <div className="h-full flex flex-col bg-[#F6F3EE]/40 overflow-hidden">
-            {/* Barra de búsqueda y estados */}
-            <div className="bg-white border-b border-[#e2ded5] px-4 py-3 space-y-3">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 text-[#324354] mr-2">
-                        <Search className="w-5 h-5" />
-                        <h2 className="text-base sm:text-lg font-black">Buscador de órdenes FV</h2>
-                    </div>
-                    <div className="relative flex-1 min-w-[240px]">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <input
-                            type="text"
-                            autoFocus
-                            placeholder="OF, pedido, SKU, producto, molde o cliente"
-                            value={busqueda}
-                            onChange={e => setBusqueda(e.target.value)}
-                            className="w-full h-9 pl-9 pr-3 bg-[#F6F3EE] border border-[#e2ded5] rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-[#324354]/30"
-                        />
-                    </div>
-                    <div className="flex items-center gap-1">
+        <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
+            <EncabezadoFibra
+                metrics={metrics}
+                searchText={busqueda}
+                onSearchChange={setBusqueda}
+                selectedDate={fechaFiltro}
+                onDateChange={setFechaFiltro}
+                onClear={() => { setBusqueda(''); setFechaFiltro(''); setEtapaFiltro(''); setEstadoFiltro('') }}
+                loading={cargando}
+                placeholder="OF, pedido, SKU, producto, molde o cliente"
+                extra={
+                    <div className="flex items-center gap-1.5">
                         {(Object.keys(conteoEstados) as EstadoOrden[]).map(e => (
                             <button key={e} onClick={() => setEstadoFiltro(estadoFiltro === e ? '' : e)}
-                                className={`h-9 px-3 rounded-lg border text-xs font-bold whitespace-nowrap ${estadoFiltro === e ? 'bg-[#324354] text-white border-[#324354]' : COLOR_ESTADO[e]}`}>
+                                className={`h-8 px-2.5 rounded-lg border text-[11px] font-bold whitespace-nowrap ${estadoFiltro === e ? 'bg-[#324354] text-white border-[#324354]' : COLOR_ESTADO[e]}`}>
                                 {e} <span className="font-black">{conteoEstados[e]}</span>
                             </button>
                         ))}
+                        <button onClick={cargar} disabled={cargando}
+                            className="h-8 w-8 flex items-center justify-center bg-[#324354] text-white rounded-lg hover:bg-[#254153] disabled:opacity-50" title="Actualizar órdenes">
+                            <RefreshCw size={15} className={cargando ? 'animate-spin' : ''} />
+                        </button>
                     </div>
-                    <button onClick={() => { setBusqueda(''); setEtapaFiltro(''); setEstadoFiltro('') }} disabled={!hayFiltros}
-                        className="h-9 w-9 flex items-center justify-center bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-40" title="Limpiar filtros">
-                        <Eraser size={16} />
-                    </button>
-                    <button onClick={cargar} disabled={cargando}
-                        className="h-9 w-9 flex items-center justify-center bg-[#324354] text-white rounded-lg hover:bg-[#254153] disabled:opacity-50" title="Actualizar órdenes">
-                        <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} />
-                    </button>
-                </div>
+                }
+            />
 
-                {/* Piezas por proceso: clic para ver solo las órdenes con piezas en ese proceso */}
-                <div className="max-w-7xl mx-auto flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+            {/* Filtrar por proceso: clic para ver solo las órdenes con piezas en ese proceso */}
+            <div className="px-4 py-1.5 bg-white border-b border-slate-200 flex items-center gap-2">
+                <span className="text-[10px] font-black text-cyan-600 uppercase shrink-0">Filtrar por proceso</span>
+                <div className="flex gap-1 overflow-x-auto no-scrollbar">
                     {ETAPAS.map(e => {
                         const t = totales[e.key]
                         const activa = etapaFiltro === e.key
                         return (
                             <button key={e.key} onClick={() => setEtapaFiltro(activa ? '' : e.key)}
                                 title={`${t.piezas} pieza(s) en ${e.label} · ${t.ordenes} orden(es)`}
-                                className={`shrink-0 min-w-[78px] px-2 py-1 rounded-lg border text-center transition-colors ${activa ? 'bg-[#324354] border-[#324354] text-white' : t.piezas > 0 ? 'bg-white border-[#e2ded5] text-[#324354] hover:bg-slate-50' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
-                                <div className="text-[9px] font-black uppercase leading-tight">{e.label}</div>
-                                <div className="text-sm font-black leading-tight">{t.piezas}</div>
-                                <div className={`text-[9px] leading-tight ${activa ? 'text-white/70' : 'text-slate-400'}`}>{t.ordenes} OF</div>
+                                className={`shrink-0 h-7 px-2 rounded-lg border text-[10px] font-bold whitespace-nowrap transition-colors ${activa ? 'bg-[#324354] border-[#324354] text-white' : t.piezas > 0 ? 'bg-white border-slate-200 text-[#324354] hover:bg-slate-50' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                {e.label} <span className="font-black">{t.ordenes}</span>
                             </button>
                         )
                     })}
@@ -174,18 +165,18 @@ export default function BuscadorOrdenesFibraModule() {
 
             {/* Lista de órdenes */}
             <div className="flex-1 overflow-auto p-4">
-                <div className="max-w-7xl mx-auto space-y-2">
-                    <div className="flex items-center gap-2 text-xs">
-                        <span className="px-3 py-1 bg-[#324354] text-white rounded-full font-black">{filtradas.length} orden(es)</span>
-                        {etapaFiltro && <span className="text-slate-500 font-semibold">con piezas en <b>{ETAPAS.find(e => e.key === etapaFiltro)?.label}</b></span>}
+                <div className="space-y-2">
+                    <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
+                        Ordenes encontradas: {filtradas.length}
+                        {etapaFiltro && <span className="text-slate-500 normal-case font-semibold"> · con piezas en <b>{ETAPAS.find(e => e.key === etapaFiltro)?.label}</b></span>}
                     </div>
 
                     {error ? (
                         <div className="p-4 bg-red-50 border border-red-400 text-red-800 rounded-xl font-bold text-sm flex items-center gap-2"><AlertTriangle size={18} /> {error}</div>
                     ) : cargando ? (
-                        <div className="p-16 text-center text-slate-400 font-bold italic bg-white rounded-2xl border border-[#e2ded5]">Cargando órdenes...</div>
+                        <div className="text-center py-8 text-gray-500">Cargando órdenes...</div>
                     ) : filtradas.length === 0 ? (
-                        <div className="p-16 text-center text-slate-400 font-bold italic bg-white rounded-2xl border border-[#e2ded5]">No se encontraron órdenes</div>
+                        <div className="text-center py-8 text-gray-500">No se encontraron órdenes</div>
                     ) : (
                         <>
                             {filtradas.slice(0, limite).map(({ o, cantidad, piezas, estado, excedida }) => {
@@ -194,58 +185,36 @@ export default function BuscadorOrdenesFibraModule() {
                                 return (
                                     <div key={o.id} className="space-y-2">
                                         <div className="flex gap-3 items-stretch">
-                                        <div className={`flex-1 min-w-0 bg-white rounded-xl border shadow-sm p-3 flex flex-col lg:flex-row gap-3 ${excedida ? 'border-red-400' : 'border-[#e2ded5]'}`}>
-                                            {/* Datos de la orden */}
-                                            <div className="lg:w-[30%] min-w-0 lg:pr-3 lg:border-r border-[#e2ded5]">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <Clipboard size={14} className="text-[#324354]" />
-                                                    <span className="text-sm font-black text-[#324354]">OF {o.orden_fabricacion}</span>
+                                            {/* Misma tarjeta de orden de los demás módulos + franja con el estado y el avance a CEDI */}
+                                            <div className={`flex-1 min-w-0 bg-white border-2 rounded-lg ${excedida ? 'border-red-400' : 'border-gray-300'}`}>
+                                                <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none [&>button]:cursor-default [&>button:hover]:bg-white">
+                                                    <OrdenCard planta="fv" conDetalle={false} orden={o} isActive={false} onClick={() => { }} moldes={moldes} />
+                                                </div>
+                                                <div className="rounded-b-md border-t-2 border-gray-200 bg-slate-50 px-3 py-1.5 flex flex-wrap items-center gap-3">
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${COLOR_ESTADO[estado]}`}>{estado}</span>
+                                                    <div className="flex-1 min-w-[160px] flex items-center gap-2">
+                                                        <div className="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden" title={`${piezas.cedi} de ${cantidad} en CEDI`}>
+                                                            <div className="h-full bg-[#59a96a]" style={{ width: `${avance}%` }} />
+                                                        </div>
+                                                        <span className="text-[10px] font-black text-[#324354] shrink-0">{avance}% en CEDI</span>
+                                                    </div>
                                                     {excedida && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-600 text-white">Piezas en etapas &gt; cantidad</span>}
                                                 </div>
-                                                <div className="text-[11px] font-bold text-slate-800 mt-1 leading-snug break-words">{o.producto_descripcion || o.molde_descripcion || o.producto_sku || 'Sin descripción'}</div>
-                                                <div className="text-[10px] text-slate-500 mt-0.5 truncate">SKU: {o.producto_sku || o.molde_sku || '—'} · Pedido: {o.pedido || (o as any).numero_pedido || '—'}</div>
-                                                <div className="text-[10px] text-slate-500 mt-0.5">Ideal producción: <b>{fecha(o.fecha_ideal_produccion)}</b> · Entrega: <b>{fecha(o.fecha_entrega_estimada)}</b></div>
-                                                <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1 truncate"><Users size={11} /> {o.cliente || (o as any).cliente_nombre || 'Cliente no registrado'}</div>
                                             </div>
 
-                                            {/* Procesos */}
-                                            <div className="flex-1 min-w-0 flex flex-col gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black uppercase text-slate-500 shrink-0">Cantidad {cantidad}</span>
-                                                    <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden" title={`${piezas.cedi} de ${cantidad} en CEDI`}>
-                                                        <div className="h-full bg-[#59a96a]" style={{ width: `${avance}%` }} />
-                                                    </div>
-                                                    <span className="text-[10px] font-black text-[#324354] shrink-0">{avance}% en CEDI</span>
-                                                </div>
-                                                <div className="grid grid-cols-5 sm:grid-cols-8 xl:grid-cols-[repeat(15,minmax(0,1fr))] gap-1">
-                                                    {ETAPAS.map(e => {
-                                                        const n = piezas[e.key]
-                                                        return (
-                                                            <div key={e.key} title={`${e.label}: ${n}`}
-                                                                className={`rounded-md border px-0.5 py-1 text-center ${n > 0 ? (e.key === etapaFiltro ? 'bg-amber-100 border-amber-400 text-amber-900' : 'bg-[#324354] border-[#324354] text-white') : 'bg-white border-slate-200 text-slate-300'}`}>
-                                                                <div className="text-[8px] font-black uppercase leading-tight truncate">{e.label}</div>
-                                                                <div className="text-sm font-black leading-tight">{n}</div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
+                                            {/* Acciones: mismos botones y posición que Administración */}
+                                            <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center shrink-0">
+                                                <button onClick={() => alternar(o.id)}
+                                                    className={`p-2 rounded-lg transition-colors ${abierta ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'}`}
+                                                    title={abierta ? 'Ocultar procesos por pieza' : 'Ver procesos por pieza'}>
+                                                    <ChevronsUpDown size={18} />
+                                                </button>
+                                                <button onClick={() => setDetalleOf(o.orden_fabricacion)}
+                                                    className="p-2 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50"
+                                                    title="Detalle de la orden en SAP (lista de materiales, comentarios)">
+                                                    <FileText size={18} />
+                                                </button>
                                             </div>
-                                        </div>
-
-                                        {/* Acciones: mismos botones y posición que Administración */}
-                                        <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center shrink-0">
-                                            <button onClick={() => alternar(o.id)}
-                                                className={`p-2 rounded-lg transition-colors ${abierta ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'}`}
-                                                title={abierta ? 'Ocultar procesos por pieza' : 'Ver procesos por pieza'}>
-                                                <ChevronsUpDown size={18} />
-                                            </button>
-                                            <button onClick={() => setDetalleOf(o.orden_fabricacion)}
-                                                className="p-2 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50"
-                                                title="Detalle de la orden en SAP (lista de materiales, comentarios)">
-                                                <FileText size={18} />
-                                            </button>
-                                        </div>
                                         </div>
                                         {abierta && <OrderProcessesPanel orden={o} registros={[]} />}
                                     </div>

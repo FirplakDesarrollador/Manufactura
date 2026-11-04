@@ -51,6 +51,9 @@ export function useMetricasFibra(ordenes: OrdenFabricacion[], trazabilidad: Regi
             return pDate === today
         })
 
+        const pulidoToday = trazabilidad.filter(t => (t.pulido_fecha || '').split('T')[0] === today)
+        const huacalesToday = trazabilidad.filter(t => (t.empaque_fecha || '').split('T')[0] === today)
+
         const acabadoToday = trazabilidad.filter(t => {
             const aDate = (t.acabado_fecha || '').split('T')[0]
             return aDate === today
@@ -71,6 +74,8 @@ export function useMetricasFibra(ordenes: OrdenFabricacion[], trazabilidad: Regi
             pintura: pinturaToday.length,
             desgelcada: 0,
             vaciado: vaciadoToday.length,
+            pulido: pulidoToday.length,
+            huacales: huacalesToday.length,
             acabado: acabadoToday.length,
             saldo: baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.saldo || 0), 0),
             digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
@@ -103,15 +108,16 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
     return (
         <>
             {/* Summary Cards */}
-            <div className="px-4 py-2 bg-white border-b border-slate-200">
+            <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200">
                 <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
                     <StatCard label="Cantidad" value={metrics.cantidad} color="bg-blue-50 text-blue-600" />
                     <StatCard label="Programado" value={metrics.programado} color="bg-indigo-50 text-indigo-600" />
-                    <StatCard label="Pintura Hoy" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
+                    <StatCard label="Pintura" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
                     <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-yellow-50 text-yellow-600" />
-                    <StatCard label="Vaciado Hoy" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard label="Ensayo Hoy" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
-                    <StatCard label="Saldo" value={metrics.saldo} color="bg-rose-50 text-rose-600" />
+                    <StatCard label="Vaciado" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
+                    <StatCard label="Pulido" value={metrics.pulido} color="bg-cyan-50 text-cyan-600" />
+                    <StatCard label="Ensayo" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
+                    <StatCard label="Huacales" value={metrics.huacales} color="bg-lime-50 text-lime-700" />
                     <StatCard label="Digitado" value={metrics.digitado} color="bg-slate-50 text-slate-600" />
                     <StatCard label="Transito" value={metrics.transito} color="bg-amber-50 text-amber-600" />
                     <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-green-50 text-green-600" />
@@ -120,9 +126,9 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
             </div>
 
             {/* Controls */}
-            <div className="px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-3">
-                    <div className="flex-1 min-w-[300px]">
+            <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-2 sm:gap-3">
+                    <div className="basis-full md:basis-0 flex-1 min-w-0 md:min-w-[300px]">
                         <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Búsqueda Global</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
@@ -136,7 +142,7 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
                         </div>
                     </div>
 
-                    <div className="w-48">
+                    <div className="w-40 sm:w-48">
                         <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Filtrar Fecha</label>
                         <div className="relative">
                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
@@ -178,7 +184,7 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
 
 function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
     return (
-        <div className={`flex-1 min-w-[76px] px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
+        <div className={`flex-1 min-w-[64px] sm:min-w-[76px] px-1 sm:px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
             <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
             <span className="text-sm font-black tracking-tight">{value}</span>
         </div>
