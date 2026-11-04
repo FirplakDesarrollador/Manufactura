@@ -25,6 +25,7 @@ export interface ConteoDefecto { nombre: string; cantidad: number }
 export interface DatosAutoMs {
     pintura: { total: number; l1: number; l2: number; l3: number };
     colores: number;
+    desgelcadas: number;               // piezas pintadas ese día que quedaron en estado Desgelcada
     coloresDetalle: ConteoDefecto[];
     vaciado: { total: number; pequenas: number; medianas: number; grandes: number };
     calidad: number | null;            // % IFI del día (mismo cálculo de Calidad MS)
@@ -69,11 +70,9 @@ export const manualVacio = (): ManualMs => ({
     reparacion: '', desgelcadas: '', mesones: '', mesaTrabajo: '', barras: '', linea: '', lineaBuffer: '', pulido: '', automantenimiento: ''
 });
 
-export const MOTIVOS_AUSENTISMO = ['Incapacitado', 'Cita médica', 'Se dirige a la EPS', 'Permiso', 'Calamidad doméstica', 'Vacaciones', 'Licencia', 'No se presentó'];
-export const CAUSAS_PARO_MS = [
-    'Alistamiento', 'Alimentación', 'Lavado de máquina Ultracaster', 'Lavado de máquina', 'Alto ausentismo', 'Avería en multicolor cabina L1',
-    'Avería en extractor de cabina L2', 'Bajo ritmo en vaciado', 'Piezas con no calidad', 'Falta de moldes', 'Falta de material', 'Reunión', 'Capacitación'
-];
+export const MOTIVOS_AUSENTISMO = ['Incapacitado', 'Cita médica', 'Se dirige a la EPS', 'Permiso', 'Calamidad doméstica', 'Vacaciones', 'Licencia', 'No se presentó', 'No se ha reportado - no responde'];
+// Los 5 paros que más se repiten en MS (histórico de paros por familia / modo de pérdida)
+export const CAUSAS_PARO_MS = ['Alistamiento', 'Alimentación', 'Lavado de máquina Ultracaster', 'Ausentismo de personas', 'Piezas con no calidad'];
 
 export interface InformeMsGuardado {
     id: number;
@@ -113,10 +112,10 @@ async function filasDelDia<T>(client: SupabaseClient, columnaFecha: string, colu
 }
 
 export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): Promise<DatosAutoMs> {
-    type FilaPintura = { pintura_linea: string | null; producto_color: string | null };
+    type FilaPintura = { pintura_linea: string | null; producto_color: string | null; estado: string | null };
     type FilaVaciado = { producto_tamano: string | null };
     const [pintadas, vaciadas] = await Promise.all([
-        filasDelDia<FilaPintura>(client, 'pintura_fecha', 'id, pintura_linea, producto_color', fecha),
+        filasDelDia<FilaPintura>(client, 'pintura_fecha', 'id, pintura_linea, producto_color, estado', fecha),
         filasDelDia<FilaVaciado>(client, 'vaciado_fecha', 'id, producto_tamano', fecha)
     ]);
 
@@ -136,6 +135,8 @@ export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): 
             l3: contar(pintadas, r => r.pintura_linea === 'Linea 3')
         },
         colores: coloresDetalle.reduce((a, c) => a + c.cantidad, 0),
+        // Control de Piso no guarda la fecha del desgelcado (Vaciado solo cambia el estado): se cuenta por el día de pintura
+        desgelcadas: contar(pintadas, r => r.estado === 'Desgelcada'),
         coloresDetalle,
         vaciado: {
             total: vaciadas.length,
@@ -214,7 +215,7 @@ export function construirTextoMs(fecha: string, m: ManualMs, a: DatosAutoMs | nu
     l.push(`*Vaciado: ${deProgramado(a?.vaciado.total ?? null, prog)}`);
     l.push(`*Pequeñas: ${a?.vaciado.pequenas ?? '-'}`, `*Medianas: ${a?.vaciado.medianas ?? '-'}`, `*Grandes: ${a?.vaciado.grandes ?? '-'}`, '');
 
-    l.push(`*Piezas ruteadas CNC: ${valor(m.cnc)}`, `*Piezas vaciadas ADM: ${valor(m.adm)}`, `*Piezas vaciadas Ultracaster: ${valor(m.ultracaster)}`, '');
+    l.push(`*Piezas ruteadas CNC: ${valor(m.cnc)}`, `*Piezas vaciadas ADM: ${valor(m.adm)}`, `*Piezas vaciadas Ultracaster: ${m.ultracaster.trim() === '' && a ? miles(a.vaciado.total) : valor(m.ultracaster)}`, '');
 
     l.push(`*Acabado: ${deProgramado(num(m.acabado), prog)}`);
     l.push(`*Calidad: ${a?.calidad == null ? '-' : `${Math.round(a.calidad)}%`}`);
@@ -234,10 +235,77 @@ export function construirTextoMs(fecha: string, m: ManualMs, a: DatosAutoMs | nu
     l.push('');
 
     l.push('*OTROS:');
-    l.push(`*Piezas de reparación: ${valor(m.reparacion)}`, `*Piezas desgelcadas: ${valor(m.desgelcadas)}`, `*Mesones: ${valor(m.mesones)}`,
+    l.push(`*Piezas de reparación: ${valor(m.reparacion)}`, `*Piezas desgelcadas: ${m.desgelcadas.trim() === '' && a ? miles(a.desgelcadas ?? 0) : valor(m.desgelcadas)}`, `*Mesones: ${valor(m.mesones)}`,
         `*Mesa de trabajo: ${valor(m.mesaTrabajo)}`, `*Barras: ${valor(m.barras)}`, '');
     l.push(`*Línea: ${valor(m.linea)}`, `*Línea buffer: ${valor(m.lineaBuffer)}`, `*Pulido: ${valor(m.pulido)}`, '');
     l.push(`*Auto mantenimiento: ${num(m.automantenimiento) == null ? '-' : `${miles(num(m.automantenimiento)!)} %`}`);
+
+    return l.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Texto para el Excel "Nivel de productividad" (hojas BD_MS y BD_PAROS): se pega en Claude para Excel,
+// por eso usa los nombres exactos de las columnas y va separado por tabulaciones
+// ---------------------------------------------------------------------------
+
+export function construirTextoExcelMs(fecha: string, m: ManualMs, a: DatosAutoMs | null): string {
+    const [y, mes, d] = fecha.split('-').map(Number);
+    const dia = `${mes}/${d}/${y}`; // mismo formato de la columna Dia / FECHA del Excel
+    const n = (s: string) => (num(s) == null ? '' : String(num(s)));
+    const ultracaster = m.ultracaster.trim() === '' && a ? String(a.vaciado.total) : n(m.ultracaster);
+    const desgelcadas = m.desgelcadas.trim() === '' && a ? String(a.desgelcadas ?? 0) : n(m.desgelcadas);
+    const aus = m.ausentismos.filter(x => x.nombre.trim());
+    const limpio = (s: string) => s.replace(/[\t\n]+/g, ' ').trim().toUpperCase();
+
+    const bdMs: [string, string][] = [
+        ['Dia', dia],
+        ['PLANTA', 'MS'],
+        ['OBJ PIEZAS', n(m.programado)],
+        ['AUSENTISMO_GENERAL', String(aus.length)],
+        ['Real Pintura Linea 1', a ? String(a.pintura.l1) : ''],
+        ['Real Pintura Linea 2', a ? String(a.pintura.l2) : ''],
+        ['Real Pintura Linea 3', a ? String(a.pintura.l3) : ''],
+        ['Real Vaciado', a ? String(a.vaciado.total) : ''],
+        ['ADM', n(m.adm)],
+        ['CNC Pulido', n(m.cnc)],
+        ['Real Acabado', n(m.acabado)],
+        ['CALIDAD', a?.calidad == null ? '' : `${Math.round(a.calidad)}%`],
+        ['Kg entregados al CEDI', n(m.kilos)],
+        ['Mesones', n(m.mesones)]
+    ];
+
+    const paros = [
+        ...conCausa(m.parosPintura).map(p => ({ proceso: 'PINTURA', p, tipo: 'REAL' })),
+        ...conCausa(m.parosVaciado).map(p => ({ proceso: 'VACIADO', p, tipo: 'REAL' })),
+        ...conCausa(m.reflejados).map(p => ({ proceso: '', p, tipo: 'REFLEJADO' }))
+    ];
+
+    const l: string[] = [];
+    l.push(`Llena el informe MS del ${dia} en el Excel "Nivel de productividad" (hojas BD_MS y BD_PAROS) con los datos de abajo, siguiendo cómo se han llenado los días anteriores:`);
+    l.push(
+        '1. BD_MS: agrega una fila nueva para el día. Las columnas en gris son fórmulas: no escribas valores en ellas, cópiales la fórmula de la fila anterior.',
+        '2. La mano de obra teórica (MO_TEORICA_MS_T1, T2, T3 y total) y las demás columnas de personas son las mismas durante toda la semana: tómalas de la fila anterior si es la misma semana. Si cambió la semana, pregúntame antes de llenarlas.',
+        '3. TOTAL_PERSONAS y PRESENTISMO se calculan con el ausentismo del día, igual que en las filas anteriores.',
+        '4. Horarios, tiempo de alimentación y demás columnas que no vienen en los datos: usa los mismos valores de la fila anterior.',
+        '5. BD_PAROS: una fila por cada paro, con FAMILIA, MODO PERDIDA, EQUIPO, AREA RESPONSABLE y RESPONSABLE2 según cómo se han clasificado paros parecidos en el histórico. Antes de escribir, muéstrame una tabla con la clasificación sugerida de cada paro para revisarla.',
+        '6. No modifiques filas de otros días.', ''
+    );
+    l.push('DATOS PARA BD_MS:');
+    l.push(bdMs.map(c => c[0]).join('\t'), bdMs.map(c => c[1]).join('\t'), '');
+    l.push('DATOS PARA BD_PAROS (falta clasificar FAMILIA, MODO PERDIDA, EQUIPO, AREA RESPONSABLE y RESPONSABLE2):');
+    l.push(['FECHA', 'PLANTA', 'PROCESO', 'DESCRIPCIÓN', 'TIEMPO TOTAL (MIN)', 'TIPO DE PARO'].join('\t'));
+    paros.forEach(({ proceso, p, tipo }) => l.push([dia, 'MS', proceso, limpio(p.causa), n(p.minutos), tipo].join('\t')));
+    if (!paros.length) l.push('(sin paros)');
+    l.push('');
+    l.push('DATOS DE REFERENCIA (no tienen columna en BD_MS):');
+    l.push(`Piezas vaciadas Ultracaster\t${ultracaster}`, `Colores\t${a ? a.colores : ''}`, `Piezas revisadas en inspección\t${a ? a.revisadas : ''}`);
+    l.push(`Ausentismos\t${aus.map(x => `${x.nombre.trim()}${x.motivo.trim() ? ` (${x.motivo.trim().toLowerCase()})` : ''}`).join('; ')}`);
+    l.push(`Piezas de reparación\t${n(m.reparacion)}`, `Piezas desgelcadas\t${desgelcadas}`, `Mesa de trabajo\t${n(m.mesaTrabajo)}`, `Barras\t${n(m.barras)}`);
+    l.push(`Línea\t${n(m.linea)}`, `Línea buffer\t${n(m.lineaBuffer)}`, `Pulido\t${n(m.pulido)}`, `Auto mantenimiento\t${num(m.automantenimiento) == null ? '' : `${num(m.automantenimiento)}%`}`);
+    if (a) l.push(`RRC\t${a.rrc.map(r => `${r.nombre}: ${r.cantidad}`).join('; ')}`);
+
+    // El mismo informe que antes llegaba por WhatsApp, como respaldo para Claude
+    l.push('', 'INFORME DEL SUPERVISOR (formato WhatsApp):', construirTextoMs(fecha, m, a));
 
     return l.join('\n');
 }
