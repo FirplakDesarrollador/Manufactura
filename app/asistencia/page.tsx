@@ -35,11 +35,11 @@ const APP_SUMMARIES = [
       { name: "Indicadores Calidad", desc: "Módulo de estadísticas de rendimiento y defectos promedio de calidad." },
       { name: "Calidad MS", desc: "Registro específico de inspección para piezas de Mármol Sintético." },
       { name: "Ficha RRC (Respuesta Rápida Calidad)", desc: "Tarjeta de control y corrección ante incidentes graves de calidad o materia prima." },
-      { name: "Criterios de Calidad", desc: "Catálogo visual de defectos admisibles y no admisibles por producto." },
+      { name: "Criterios de Aceptación y Rechazo", desc: "Catálogo visual de defectos admisibles y no admisibles por planta." },
       { name: "Plan de Vigilancia", desc: "Pautas de chequeo sistemático del proceso en puntos críticos de control." },
       { name: "QRQC", desc: "Flujo de Respuesta Rápida de Control de Calidad ante quejas o fallas graves." }
     ],
-    tips: ["Registra siempre la causa raíz del defecto en la Ficha RRC.", "Revisa los Criterios de Calidad visuales si tienes dudas sobre la gravedad de un defecto."]
+    tips: ["Registra siempre la causa raíz del defecto en la Ficha RRC.", "Revisa los Criterios de Aceptación y Rechazo si tienes dudas sobre la gravedad de un defecto."]
   },
   {
     id: "sistema-produccion",
@@ -123,7 +123,7 @@ const KNOWLEDGE_BASE: Record<string, string> = {
   
   "control de piso": "El módulo de **Control de Piso** permite registrar la producción diaria de piezas procesadas. \n\nCuenta con **3 submódulos**:\n* **Control de Piso Mármol:** Registro de vaciado, pulido y empaque de mármol sintético.\n* **Control de Piso Muebles:** Reporte de corte, enchape e inspección de madera.\n* **Control de Piso Fibra:** Registro de vaciado y acabado de bañeras.\n\n*Tip:* Asegúrate de verificar tu línea y operario antes de reportar la producción diaria.",
   
-  calidad: "El módulo de **Calidad** se utiliza para asegurar que todos los productos cumplan los estándares exigidos antes del despacho al CEDI.\n\nCuenta con **6 submódulos**:\n1. **Indicadores Calidad:** Gráficas de rendimiento y defectos promedio.\n2. **Calidad MS:** Registro de inspección de piezas de mármol.\n3. **Ficha RRC:** Reporte de Respuesta Rápida de Calidad ante anomalías.\n4. **Criterios de Calidad:** Catálogo de fallas permitidas y no permitidas.\n5. **Plan de Vigilancia:** Chequeo en puntos críticos del proceso.\n6. **QRQC:** Flujo de análisis rápido de fallas graves.\n\n*Tip:* Usa la Ficha RRC de inmediato ante incidentes graves de calidad.",
+  calidad: "El módulo de **Calidad** se utiliza para asegurar que todos los productos cumplan los estándares exigidos antes del despacho al CEDI.\n\nCuenta con **6 submódulos**:\n1. **Indicadores Calidad:** Gráficas de rendimiento y defectos promedio.\n2. **Calidad MS:** Registro de inspección de piezas de mármol.\n3. **Ficha RRC:** Reporte de Respuesta Rápida de Calidad ante anomalías.\n4. **Criterios de Aceptación y Rechazo:** Catálogo de fallas permitidas y no permitidas por planta.\n5. **Plan de Vigilancia:** Chequeo en puntos críticos del proceso.\n6. **QRQC:** Flujo de análisis rápido de fallas graves.\n\n*Tip:* Usa la Ficha RRC de inmediato ante incidentes graves de calidad.",
   
   "sistema de produccion": "El **Sistema de Producción** gestiona la eficiencia y estandarización del proceso productivo.\n\nCuenta con **8 submódulos**:\n1. **Estadísticas del Sistema:** Historial de KPIs e indicadores.\n2. **Bitácora de Turno:** Registro de novedades y actividades programadas.\n3. **HDT Hoja División de Trabajo:** Estandarización de operaciones.\n4. **Hora a Hora:** Comparación en tiempo real de producción contra meta.\n5. **OPT Operativa:** Auditoría de seguridad y 5S a operarios.\n6. **OPT Sistémica:** Programación semanal y calendario de auditorías.\n7. **5'S:** Estándares de clasificación, orden y limpieza.\n8. **Tarjetas Excelencia:** Propuestas de mejora del personal.\n\n*Tip:* Registra el Hora a Hora al final de cada hora laboral.",
   
@@ -283,11 +283,11 @@ export default function AsistenciaPage() {
       `}} />
 
       {/* Subheader Toggler (Pills layout matching Hora a Hora) */}
-      <div className="w-full bg-white border-b border-[#e2ded5] relative z-10 py-3 shadow-[0_2px_10px_rgba(50,67,84,0.02)]">
-        <div className="max-w-4xl mx-auto px-6 flex justify-center gap-4">
+      <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-10 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center">
+        <div className="max-w-4xl w-full mx-auto px-3 flex justify-center gap-2 sm:gap-3">
           <button
             onClick={() => setActiveTab('assistant')}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold tracking-wide transition-all cursor-pointer border ${
+            className={`inline-flex items-center gap-2 h-7 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer border ${
               activeTab === 'assistant'
                 ? 'bg-[#324354] text-white border-[#324354] shadow-sm'
                 : 'bg-white text-slate-600 border-[#e2ded5] hover:bg-slate-50'
@@ -298,7 +298,7 @@ export default function AsistenciaPage() {
           </button>
           <button
             onClick={() => setActiveTab('glossary')}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold tracking-wide transition-all cursor-pointer border ${
+            className={`inline-flex items-center gap-2 h-7 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer border ${
               activeTab === 'glossary'
                 ? 'bg-[#324354] text-white border-[#324354] shadow-sm'
                 : 'bg-white text-slate-600 border-[#e2ded5] hover:bg-slate-50'

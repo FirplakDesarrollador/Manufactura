@@ -6,7 +6,7 @@ export async function getRegistrosParaEmpaque(): Promise<RegistroTrazabilidad[]>
     const { data, error } = await supabase
         .from('query_trazabilidad_fv')
         .select('*')
-        .eq('estado', 'Acabado')
+        .in('estado', ['Guacales', 'Acabado'])
         .order('acabado_fecha', { ascending: false })
 
     if (error) {

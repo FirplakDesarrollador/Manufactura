@@ -19,13 +19,16 @@ interface DefectsSettingsModalProps {
     onClose: () => void
     defects: DefectoMS[]
     onSave: (updatedDefects: DefectoMS[]) => Promise<void>
+    // Permiso "Ver" de Configuración: se consulta sin poder modificar
+    soloLectura?: boolean
 }
 
 export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
     isOpen,
     onClose,
     defects,
-    onSave
+    onSave,
+    soloLectura = false
 }) => {
     const [localDefects, setLocalDefects] = useState<DefectoMS[]>([])
     const [isSaving, setIsSaving] = useState(false)
@@ -67,7 +70,7 @@ export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
             <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-[#254153] text-white rounded-t-lg">
-                    <h2 className="text-lg font-black uppercase tracking-wider">Configuración de Defectos</h2>
+                    <h2 className="text-lg font-black uppercase tracking-wider">Configuración de Defectos{soloLectura && <span className="ml-2 text-xs font-bold normal-case tracking-normal text-white/70">(solo consulta)</span>}</h2>
                     <button onClick={onClose} className="p-1 hover:bg-white/10 rounded transition-colors">
                         <X className="w-5 h-5" />
                     </button>
@@ -82,6 +85,7 @@ export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="border border-gray-300 rounded px-3 py-1.5 text-sm w-64 focus:outline-none focus:border-[#254153]"
                     />
+                    {!soloLectura && (
                     <button
                         onClick={handleSaveClick}
                         disabled={isSaving}
@@ -96,11 +100,13 @@ export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
                         )}
                         <span>{isSaving ? 'Guardando...' : 'Guardar Cambios'}</span>
                     </button>
+                    )}
                 </div>
 
                 {/* Table */}
                 <div className="flex-1 overflow-auto bg-gray-100 p-6">
                     <div className="bg-white border border-gray-200 rounded shadow-sm">
+                        <fieldset disabled={soloLectura} className={soloLectura ? "opacity-80" : ""}>
                         <table className="w-full text-left border-collapse text-sm">
                             <thead>
                                 <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px] tracking-wider">
@@ -174,6 +180,7 @@ export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
                                 })}
                             </tbody>
                         </table>
+                        </fieldset>
                         {filteredDefects.length === 0 && (
                             <div className="p-8 text-center text-gray-500">
                                 No se encontraron defectos con esa búsqueda.

@@ -2,20 +2,20 @@
 
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Header from '@/components/opt-sistemica/Header'
 import { useEffect, useState, useCallback } from 'react'
 import PinturaFibraModule from '@/components/fibra/PinturaFibraModule'
 import DashboardFibraModule from '@/components/fibra/dashboard/DashboardFibraModule'
-import ContramoldeFibraModule from '@/components/fibra/contramoldes/ContramoldeFibraModule'
 import VaciadoFibraModule from '@/components/fibra/vaciado/VaciadoFibraModule'
-import DesmoldeFibraModule from '@/components/fibra/desmolde/DesmoldeFibraModule'
 import PulidoFibraModule from '@/components/fibra/pulido/PulidoFibraModule'
-import AcabadoFibraModule from '@/components/fibra/acabado/AcabadoFibraModule'
+import EnsayoFibraModule from '@/components/fibra/ensayo/EnsayoFibraModule'
 import ReparacionFibraModule from '@/components/fibra/reparacion/ReparacionFibraModule'
 import EmpaqueFibraModule from '@/components/fibra/empaque/EmpaqueFibraModule'
 import DigitadoFibraModule from '@/components/fibra/digitado/DigitadoFibraModule'
 import CediFibraModule from '@/components/fibra/cedi/CediFibraModule'
 import ParametrosFibraModule from '@/components/fibra/parametros/ParametrosFibraModule'
 import AdministracionFibraModule from '@/components/fibra/administracion/AdministracionFibraModule'
+import MapaProcesosFibraModule from '@/components/fibra/mapa/MapaProcesosFibraModule'
 
 
 
@@ -23,16 +23,15 @@ interface PermisosModulos {
     cedi?: boolean;
     pulido?: boolean;
     acabado?: boolean;
+    ensayo?: boolean;
     empaque?: boolean;
     pintura?: boolean;
     vaciado?: boolean;
-    desmolde?: boolean;
     digitado?: boolean;
     prensado?: boolean;
     dashboard?: boolean;
     parametros?: boolean;
     reparacion?: boolean;
-    contramoldes?: boolean;
     administracion?: boolean;
     [key: string]: boolean | undefined;
 }
@@ -85,16 +84,24 @@ export default function FibraPage() {
         // Definir el módulo activo inicial basado en permisos (modulos o fibra)
         const modulos = combinedUser.permisos?.modulos;
         const fibraPerms = (combinedUser.permisos as any)?.fibra;
-        const checkPerm = (m: string) => modulos?.[m] === true || fibraPerms?.[m] === true;
+        const checkPerm = (m: string) => {
+            if (m === 'ensayo') {
+                return modulos?.ensayo === true || fibraPerms?.ensayo === true || modulos?.acabado === true || fibraPerms?.acabado === true
+            }
+            return modulos?.[m] === true || fibraPerms?.[m] === true
+        }
 
         if (modulos || fibraPerms) {
             if (!checkPerm('pintura')) {
-                const priorityModules = ['pintura', 'contramoldes', 'vaciado', 'desmolde', 'pulido', 'acabado', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
+                const priorityModules = ['pintura', 'vaciado', 'pulido', 'ensayo', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
                 const firstAllowed = priorityModules.find(m => checkPerm(m));
                 if (firstAllowed) {
                     setActiveModule(firstAllowed);
                 } else if (checkPerm('dashboard')) {
                     setActiveModule('dashboard');
+                } else {
+                    // El mapa de procesos es solo consulta: lo ve cualquier usuario de la planta
+                    setActiveModule('mapa');
                 }
             } else {
                 setActiveModule('pintura');
@@ -107,6 +114,10 @@ export default function FibraPage() {
     useEffect(() => {
         getUserData()
     }, [getUserData])
+
+    useEffect(() => {
+        if (window.innerWidth < 768) setSidebarOpen(false)
+    }, [])
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
@@ -124,174 +135,122 @@ export default function FibraPage() {
     if (!user) return null
 
     const hasPermission = (moduleName: string) => {
-        return user.permisos?.modulos?.[moduleName] === true || (user.permisos as any)?.fibra?.[moduleName] === true;
+        const fibra = (user.permisos as any)?.fibra
+        const modulos = user.permisos?.modulos
+        if (moduleName === 'ensayo') {
+            return modulos?.ensayo === true || fibra?.ensayo === true || modulos?.acabado === true || fibra?.acabado === true
+        }
+        return modulos?.[moduleName] === true || fibra?.[moduleName] === true
     }
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <header className="bg-[#254153] border-b border-[#1a2e3b] sticky top-0 z-50 shadow-md">
-                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-12">
-                        <div className="flex items-center space-x-3">
-                            <button
-                                onClick={() => router.push('/home/selection')}
-                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
-                                title="Volver a Selección"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                </svg>
-                            </button>
-                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                                <svg className="w-5 h-5 text-[#254153]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </div>
-                            <h1 className="text-lg font-bold text-white">Manufactura - Fibra</h1>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-[10px] text-gray-200">Bienvenido</p>
-                                <p className="text-white font-semibold text-xs">{user?.email || 'Usuario'}</p>
-                            </div>
-                            <button
-                                onClick={handleSignOut}
-                                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 px-3 rounded-lg transition text-[10px]"
-                            >
-                                Cerrar Sesión
-                            </button>
-                            <button
-                                onClick={() => setSidebarOpen(!sidebarOpen)}
-                                className="text-white hover:bg-[#1a2e3b] p-2 rounded-lg transition-colors border border-white/20"
-                                title="Toggle Sidebar"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <Header title="Control de Piso Fibra (FV)" subtitle="" compact={true} userEmail={user?.email} showLogout={true} onLogout={handleSignOut} />
 
             <div className="flex min-h-[calc(100vh-3rem)] relative">
                 {/* Sidebar Backdrop (Mobile only) */}
                 {sidebarOpen && (
                     <div
-                        className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300"
+                        className="fixed inset-0 top-12 bg-black/50 z-40 md:hidden transition-opacity duration-300"
                         onClick={() => setSidebarOpen(false)}
                     />
                 )}
 
                 {/* Sidebar */}
+                {/* Espacio que ocupa la barra de íconos en celular (el menú abierto flota encima) */}
+                <div className="w-12 shrink-0 md:hidden" />
                 <aside
-                    className={`fixed md:relative inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out bg-white border-r border-gray-200 shadow-lg
-                        ${sidebarOpen ? 'translate-x-0 w-52' : '-translate-x-full md:translate-x-0 md:w-0'}
-                        overflow-hidden`}
+                    className={`fixed md:sticky top-12 bottom-0 md:h-[calc(100vh-3rem)] left-0 z-50 md:z-30 shrink-0 transition-all duration-300 ease-in-out bg-white border-r border-[#e2ded5] shadow-sm overflow-hidden
+                        ${sidebarOpen ? 'w-52' : 'w-12'}`}
                 >
-                    <nav className="p-2 space-y-1 overflow-y-auto h-[calc(100vh-3rem)]">
+                    <nav onClick={e => { if (window.innerWidth < 768 && (e.target as HTMLElement).closest('button') && !(e.target as HTMLElement).closest('[title$="menú de módulos"]')) setSidebarOpen(false) }} className={`p-2 space-y-1 overflow-y-auto h-full ${sidebarOpen ? '' : '[&_button>span]:hidden [&_button]:justify-center [&_button]:px-0'}`}>
+                        {/* Abrir / recoger el menú de módulos (antes era el botón ≡ del encabezado propio de Fibra) */}
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            className="flex items-center space-x-2 px-3 h-8 mb-1 rounded-lg w-full text-[10px] font-black uppercase tracking-wider text-[#324354] bg-[#F6F3EE] hover:bg-[#e2ded5] transition-colors"
+                            title={sidebarOpen ? 'Recoger menú de módulos' : 'Abrir menú de módulos'}
+                        >
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? 'M11 19l-7-7 7-7m8 14l-7-7 7-7' : 'M13 5l7 7-7 7M5 5l7 7-7 7'} />
+                            </svg>
+                            <span className="flex-1 text-left">Módulos FV</span>
+                        </button>
 
                         {hasPermission('pintura') && (
                             <button
                                 onClick={() => setActiveModule('pintura')}
+                                title={sidebarOpen ? undefined : 'Pintura'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'pintura'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h10a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H3zM15 8.5h2M7 7V4h4v3M6 12l-1.5 8h3.5L9.5 12M10.5 12.5c1 .3 1.5 1 1.5 2M19.5 5.5h.01M21.5 8.5h.01M19.5 11.5h.01M21.5 3h.01M21.5 14h.01" />
                                 </svg>
                                 <span>Pintura</span>
-                            </button>
-                        )}
-
-                        {hasPermission('contramoldes') && (
-                            <button
-                                onClick={() => setActiveModule('contramoldes')}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'contramoldes'
-                                    ? 'bg-[#254153] text-white'
-                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                                </svg>
-                                <span>Contramoldes</span>
                             </button>
                         )}
 
                         {hasPermission('vaciado') && (
                             <button
                                 onClick={() => setActiveModule('vaciado')}
+                                title={sidebarOpen ? undefined : 'Vaciado'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'vaciado'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11ZM5 2l5 5M2 13h15M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z" />
                                 </svg>
                                 <span>Vaciado</span>
-                            </button>
-                        )}
-
-                        {hasPermission('desmolde') && (
-                            <button
-                                onClick={() => setActiveModule('desmolde')}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'desmolde'
-                                    ? 'bg-[#254153] text-white'
-                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span>Desmolde</span>
                             </button>
                         )}
 
                         {hasPermission('pulido') && (
                             <button
                                 onClick={() => setActiveModule('pulido')}
+                                title={sidebarOpen ? undefined : 'Pulido'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'pulido'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3v3.5M21 12h-3.5M12 21v-3.5M3 12h3.5M18.4 5.6l-2.5 2.5M18.4 18.4l-2.5-2.5M5.6 18.4l2.5-2.5M5.6 5.6l2.5 2.5" />
                                 </svg>
                                 <span>Pulido</span>
                             </button>
                         )}
 
-                        {hasPermission('acabado') && (
+                        {hasPermission('ensayo') && (
                             <button
-                                onClick={() => setActiveModule('acabado')}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'acabado'
+                                onClick={() => setActiveModule('ensayo')}
+                                title={sidebarOpen ? undefined : 'Ensayo'}
+                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'ensayo'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                                 </svg>
-                                <span>Acabado</span>
+                                <span>Ensayo</span>
                             </button>
                         )}
 
                         {hasPermission('reparacion') && (
                             <button
                                 onClick={() => setActiveModule('reparacion')}
+                                title={sidebarOpen ? undefined : 'Reparación'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'reparacion'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                                 </svg>
                                 <span>Reparación</span>
                             </button>
@@ -300,28 +259,30 @@ export default function FibraPage() {
                         {hasPermission('empaque') && (
                             <button
                                 onClick={() => setActiveModule('empaque')}
+                                title={sidebarOpen ? undefined : 'Guacales'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'empaque'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18v14H3zM3 9.5h18M3 14.5h18M7 5v14M17 5v14" />
                                 </svg>
-                                <span>Empaque</span>
+                                <span>Guacales</span>
                             </button>
                         )}
 
                         {hasPermission('digitado') && (
                             <button
                                 onClick={() => setActiveModule('digitado')}
+                                title={sidebarOpen ? undefined : 'Digitado'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'digitado'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM6 9h.01M10 9h.01M14 9h.01M18 9h.01M8 12.5h.01M12 12.5h.01M16 12.5h.01M7 16h10" />
                                 </svg>
                                 <span>Digitado</span>
                             </button>
@@ -330,13 +291,14 @@ export default function FibraPage() {
                         {hasPermission('cedi') && (
                             <button
                                 onClick={() => setActiveModule('cedi')}
+                                title={sidebarOpen ? undefined : 'CEDI'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'cedi'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35ZM6 22V12h12v10M6 15h12M6 18.5h12" />
                                 </svg>
                                 <span>CEDI</span>
                             </button>
@@ -345,6 +307,7 @@ export default function FibraPage() {
                         {hasPermission('dashboard') && (
                             <button
                                 onClick={() => setActiveModule('dashboard')}
+                                title={sidebarOpen ? undefined : 'Dashboard'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'dashboard'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -360,6 +323,7 @@ export default function FibraPage() {
                         {hasPermission('parametros') && (
                             <button
                                 onClick={() => setActiveModule('parametros')}
+                                title={sidebarOpen ? undefined : 'Parámetros'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'parametros'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
@@ -375,63 +339,50 @@ export default function FibraPage() {
                         {hasPermission('administracion') && (
                             <button
                                 onClick={() => setActiveModule('administracion')}
+                                title={sidebarOpen ? undefined : 'Administración'}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'administracion'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    {/* Escudo con visto bueno: control y supervisión */}
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4" />
                                 </svg>
                                 <span>Administración</span>
                             </button>
                         )}
 
-                        {hasPermission('prensado') && (
-                            <button
-                                onClick={() => setActiveModule('tvprensado')}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'tvprensado'
-                                    ? 'bg-[#254153] text-white'
-                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                                <span>TV Prensado</span>
-                            </button>
-                        )}
-
-                        <div className="pt-4 border-t border-gray-200 mt-4">
-                            <button
-                                onClick={() => router.push('/home/selection')}
-                                className="flex items-center space-x-2 px-3 py-1.5 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors w-full font-medium text-xs"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                </svg>
-                                <span>Volver al Inicio</span>
-                            </button>
-                        </div>
+                        {/* Mapa de procesos: solo consulta, sin permiso propio */}
+                        <button
+                            onClick={() => setActiveModule('mapa')}
+                            title={sidebarOpen ? undefined : 'Mapa de procesos'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'mapa'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                            </svg>
+                            <span>Mapa de procesos</span>
+                        </button>
                     </nav>
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 h-[calc(100vh-4rem)] bg-white overflow-hidden relative">
+                <main className="flex-1 min-w-0 h-[calc(100vh-3rem)] bg-white overflow-hidden relative">
                     <div className="h-full overflow-y-auto">
-                        {activeModule === 'pintura' && hasPermission('pintura') ? (
+                        {activeModule === 'mapa' ? (
+                            <MapaProcesosFibraModule />
+                        ) : activeModule === 'pintura' && hasPermission('pintura') ? (
                             <PinturaFibraModule userEmail={user?.email || ''} />
-                        ) : activeModule === 'contramoldes' && hasPermission('contramoldes') ? (
-                            <ContramoldeFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'vaciado' && hasPermission('vaciado') ? (
                             <VaciadoFibraModule userEmail={user?.email || ''} />
-                        ) : activeModule === 'desmolde' && hasPermission('desmolde') ? (
-                            <DesmoldeFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'pulido' && hasPermission('pulido') ? (
                             <PulidoFibraModule userEmail={user?.email || ''} />
-                        ) : activeModule === 'acabado' && hasPermission('acabado') ? (
-                            <AcabadoFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'ensayo' && hasPermission('ensayo') ? (
+                            <EnsayoFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'reparacion' && hasPermission('reparacion') ? (
                             <ReparacionFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'empaque' && hasPermission('empaque') ? (

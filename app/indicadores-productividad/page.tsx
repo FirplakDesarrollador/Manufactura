@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, Edit3, Users, RefreshCw, CheckCircle2, Clock } from "lucide-react";
+import { LayoutGrid, SlidersHorizontal, BarChart3, TrendingUp, ShieldCheck, UserX, Search, Filter, Calendar, Share2, Download, Maximize2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Edit3, Wrench, Building2, Activity, Users, RefreshCw, CheckCircle2, Clock, Hammer } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList } from "recharts";
 import Header from "@/components/opt-sistemica/Header";
+import CarruselPestanas from "@/components/ui/CarruselPestanas";
 import { supabase } from "@/lib/supabase";
-import IndicadoresCalidadView from "@/components/calidad/IndicadoresCalidadView";
+import IndicadoresCalidadView, { MAIN_SUBHEADER_TABS, type MainTabKey } from "@/components/calidad/IndicadoresCalidadView";
 import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView";
+import RmoldDashboard from "@/components/indicadores/RmoldDashboard";
 
 // Plant keys supported
 type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
@@ -159,9 +161,55 @@ const POWERBI_URLS = {
     ausentismo: process.env.NEXT_PUBLIC_POWERBI_AUSENTISMO ?? "",
 };
 
+// Pestañas del Tablero de Control (segundo nivel), en este orden
+type VistaTablero = "hora-a-hora" | "tablero" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "mantenimiento" | "sistema-produccion" | "rmold" | "variacion" | "ausentismo";
+const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode }[] = [
+    { id: "hora-a-hora", label: "Tiempo Real", icon: <Clock size={14} /> },
+    { id: "tablero", label: "Tablero de Control", icon: <SlidersHorizontal size={14} /> },
+    { id: "bi", label: "Control de Piso", icon: <LayoutGrid size={14} /> },
+    { id: "nivel-servicio", label: "Nivel de Servicio", icon: <BarChart3 size={14} /> },
+    { id: "productividad", label: "Productividad", icon: <TrendingUp size={14} /> },
+    { id: "calidad", label: "Calidad", icon: <ShieldCheck size={14} /> },
+    { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={14} /> },
+    { id: "sistema-produccion", label: "Sistema de Producción", icon: <Building2 size={14} /> },
+    { id: "rmold", label: "RMOLD", icon: <Hammer size={14} /> },
+    { id: "variacion", label: "Variación", icon: <Activity size={14} /> },
+    { id: "ausentismo", label: "Ausentismo", icon: <UserX size={14} /> }
+];
+
+// Pestañas nuevas que aún no tienen tablero
+const VISTAS_EN_CONSTRUCCION: Partial<Record<VistaTablero, string>> = {
+    mantenimiento: "Indicadores de mantenimiento (preventivo, correctivo, TPM y disponibilidad de máquinas).",
+    "sistema-produccion": "Indicadores del Sistema de Producción (5S, auditorías y bitácora).",
+    variacion: "Variación de los indicadores frente a la meta y al periodo anterior."
+};
+
 export default function IndicadoresProductividadPage() {
     // View mode state (Default: "tablero")
-    const [viewMode, setViewMode] = useState<"tablero" | "hora-a-hora" | "bi" | "nivel-servicio" | "productividad" | "calidad" | "ausentismo">("tablero");
+    const [viewMode, setViewMode] = useState<VistaTablero>("tablero");
+    // Tercer nivel (pestañas de Calidad): se despliega u oculta con la flecha del botón Calidad
+    const [calidadMenuAbierto, setCalidadMenuAbierto] = useState(true);
+    const [calidadTab, setCalidadTab] = useState<MainTabKey>("CALIDAD_IFI");
+
+    // La pestaña queda en la dirección (?vista=calidad&sub=CALIDAD_IFI) para que al refrescar o compartir
+    // el enlace se abra la misma vista
+    const [urlLeida, setUrlLeida] = useState(false);
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const vista = params.get("vista");
+        const sub = params.get("sub");
+        if (vista && PESTANAS_TABLERO.some(p => p.id === vista)) setViewMode(vista as VistaTablero);
+        if (sub && MAIN_SUBHEADER_TABS.some(t => t.id === sub)) setCalidadTab(sub as MainTabKey);
+        setUrlLeida(true);
+    }, []);
+    useEffect(() => {
+        if (!urlLeida) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set("vista", viewMode);
+        if (viewMode === "calidad") url.searchParams.set("sub", calidadTab);
+        else url.searchParams.delete("sub");
+        window.history.replaceState(null, "", url.toString());
+    }, [urlLeida, viewMode, calidadTab]);
 
     // Plant selector state
     const [selectedPlant, setSelectedPlant] = useState<PlantKey>("MS");
@@ -314,109 +362,67 @@ export default function IndicadoresProductividadPage() {
             {/* Header */}
             <Header
                 title="Tablero de Control"
-                subtitle="Indicadores de Productividad"
+                subtitle=""
+                compact={true}
                 backUrl="/home"
                 showLogout={false}
             />
 
-            {/* Sub-Header Actions */}
-            <div className="w-full bg-white border-b border-[#e2ded5] py-1.5 px-4 shadow-2xs">
-                <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-2 sm:gap-3">
-                    {/* 0. Hora a Hora */}
-                    <button
-                        onClick={() => setViewMode("hora-a-hora")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "hora-a-hora"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <Clock size={15} />
-                        <span>Hora a Hora</span>
-                    </button>
-
-                    {/* 1. Tablero de Control (Unificado) */}
-                    <button
-                        onClick={() => setViewMode("tablero")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "tablero"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <SlidersHorizontal size={15} />
-                        <span>Tablero de Control</span>
-                    </button>
-
-                    {/* 3. Control de Piso MS */}
-                    <button
-                        onClick={() => setViewMode("bi")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "bi"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <LayoutGrid size={15} />
-                        <span>Control de Piso MS</span>
-                    </button>
-
-                    {/* 4. Nivel de Servicio */}
-                    <button
-                        onClick={() => setViewMode("nivel-servicio")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "nivel-servicio"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <BarChart3 size={15} />
-                        <span>Nivel de Servicio</span>
-                    </button>
-
-                    {/* 5. Productividad */}
-                    <button
-                        onClick={() => setViewMode("productividad")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "productividad"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <TrendingUp size={15} />
-                        <span>Productividad</span>
-                    </button>
-
-                    {/* 6. Calidad */}
-                    <button
-                        onClick={() => setViewMode("calidad")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "calidad"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <ShieldCheck size={15} />
-                        <span>Calidad</span>
-                    </button>
-
-                    {/* 7. Ausentismo */}
-                    <button
-                        onClick={() => setViewMode("ausentismo")}
-                        className={`flex items-center gap-2 px-4 py-1.5 font-bold text-xs sm:text-sm rounded-xl transition duration-200 cursor-pointer ${
-                            viewMode === "ausentismo"
-                                ? "bg-[#324354] text-white shadow-md"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        }`}
-                    >
-                        <UserX size={15} />
-                        <span>Ausentismo</span>
-                    </button>
-                </div>
+            {/* Sub-Header Actions (segundo nivel): pegado debajo del banner (h-12) */}
+            <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-12 z-40">
+                <CarruselPestanas className="max-w-[1800px] mx-auto">
+                    {PESTANAS_TABLERO.map(p => {
+                        const activa = viewMode === p.id;
+                        const esCalidad = p.id === "calidad";
+                        return (
+                            <button
+                                key={p.id}
+                                onClick={() => {
+                                    // Calidad: su flecha despliega u oculta el tercer nivel (pestañas de Calidad)
+                                    if (esCalidad && activa) setCalidadMenuAbierto(v => !v);
+                                    else {
+                                        setViewMode(p.id);
+                                        if (esCalidad) setCalidadMenuAbierto(true);
+                                    }
+                                }}
+                                title={esCalidad && activa ? (calidadMenuAbierto ? "Ocultar pestañas de Calidad" : "Mostrar pestañas de Calidad") : p.label}
+                                className={`flex items-center gap-1.5 h-7 px-3 font-bold text-[11px] sm:text-xs rounded-lg transition duration-200 cursor-pointer whitespace-nowrap shrink-0 ${
+                                    activa ? "bg-[#324354] text-white shadow-md" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                }`}
+                            >
+                                {p.icon}
+                                <span>{p.label}</span>
+                                {esCalidad && (activa && calidadMenuAbierto ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                            </button>
+                        );
+                    })}
+                </CarruselPestanas>
             </div>
 
+            {/* Tercer nivel: pestañas de Calidad, pegado al segundo y con su misma altura */}
+            {viewMode === "calidad" && calidadMenuAbierto && (
+                <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-[88px] z-30">
+                    <CarruselPestanas className="max-w-[1800px] mx-auto">
+                        {MAIN_SUBHEADER_TABS.map(t => (
+                            <button
+                                key={t.id}
+                                onClick={() => setCalidadTab(t.id)}
+                                className={`flex items-center gap-1.5 h-7 px-3 font-bold text-[11px] sm:text-xs rounded-lg transition duration-200 cursor-pointer whitespace-nowrap shrink-0 ${
+                                    calidadTab === t.id
+                                        ? "bg-[#324354] text-white shadow-md"
+                                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                }`}
+                            >
+                                {t.icon}
+                                <span>{t.label}</span>
+                            </button>
+                        ))}
+                    </CarruselPestanas>
+                </div>
+            )}
+
             {/* Main Area */}
-            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" ? "max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
+            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" || viewMode === "rmold" ? "max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
                 {viewMode === "hora-a-hora" ? (
                     <div className="w-full animate-in fade-in duration-300">
                         <HoraAHoraPlantasView fecha={fechaISO} />
@@ -469,9 +475,19 @@ export default function IndicadoresProductividadPage() {
                             className="w-full h-full border-none"
                         ></iframe>
                     </div>
+                ) : VISTAS_EN_CONSTRUCCION[viewMode] ? (
+                    <div className="w-full bg-white rounded-3xl shadow-sm border border-[#e2ded5] p-10 flex flex-col items-center justify-center text-center gap-2 min-h-[320px] animate-in fade-in duration-300">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">En construcción</span>
+                        <h2 className="text-lg font-black text-[#324354]">{PESTANAS_TABLERO.find(p => p.id === viewMode)?.label}</h2>
+                        <p className="text-sm text-slate-500 max-w-md">{VISTAS_EN_CONSTRUCCION[viewMode]}</p>
+                    </div>
+                ) : viewMode === "rmold" ? (
+                    <div className="w-full animate-in fade-in duration-300">
+                        <RmoldDashboard />
+                    </div>
                 ) : viewMode === "calidad" ? (
                     <div className="w-full animate-in fade-in duration-300">
-                        <IndicadoresCalidadView showMainHeader={false} />
+                        <IndicadoresCalidadView showMainHeader={false} tab={calidadTab} onTabChange={setCalidadTab} ocultarPestanas />
                     </div>
                 ) : (
                     <div className="space-y-5 animate-in fade-in duration-300">

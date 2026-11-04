@@ -35,25 +35,12 @@ import {
     Clock,
     Activity
 } from 'lucide-react';
-import {
-    MS_FECHA_INICIO_BI,
-    MsPiezaNormalizada,
-    calcularIfiPorDia,
-    calcularIfiPorMes,
-    calcularPareto,
-    calcularReferencias,
-    calcularResumen,
-    fetchCatalogoDefectosMs,
-    fetchMsReportes,
-    fetchProductosMs,
-    normalizarPiezas
-} from '@/lib/calidad/msCalidad';
 import CalidadFVDashboard from '@/components/calidad/CalidadFVDashboard';
 import CalidadGeneralIFI from '@/components/calidad/CalidadGeneralIFI';
+import CalidadMsDashboard from '@/components/calidad/CalidadMsDashboard';
+import CalidadSaldosDashboard from '@/components/calidad/CalidadSaldosDashboard';
 import {
     ResponsiveContainer,
-    LineChart,
-    Line,
     BarChart,
     Bar,
     XAxis,
@@ -61,17 +48,11 @@ import {
     Tooltip,
     CartesianGrid,
     Cell,
-    ReferenceLine,
     PieChart,
-    Pie,
-    Legend
+    Pie
 } from 'recharts';
 
 // URLs de Power BI
-const POWERBI_URL_GENERAL =
-    process.env.NEXT_PUBLIC_POWERBI_CALIDAD_GENERAL ||
-    'https://app.powerbi.com/view?r=eyJrIjoiN2MxNmUwZTUtYTY0MC00MmFjLWI2ZjctMDYzNDJlODU4MTk0IiwidCI6ImZhMWRlMDRmLTQ3ODAtNGQ4My1hOTQyLTkzYzdhZThkZWU5ZCIsImMiOjR9';
-
 const POWERBI_URL_MS =
     process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MS ||
     'https://app.powerbi.com/view?r=eyJrIjoiN2ZkMjI1YjAtYmMyYi00ZDQxLWJjZDktZWVkZmFiMGU0NTgzIiwidCI6ImZhMWRlMDRmLTQ3ODAtNGQ4My1hOTQyLTkzYzdhZThkZWU5ZCIsImMiOjR9';
@@ -84,32 +65,8 @@ const POWERBI_URL_MBL = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MBL || '';
 const POWERBI_URL_CEFI = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_CEFI || '';
 const POWERBI_URL_MOLDES = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MOLDES || '';
 
-// Catálogo y colores de Pareto
-const PARETO_COLORS = [
-    '#008080', '#e06634', '#0284c7', '#10b981', '#8b5cf6',
-    '#f59e0b', '#ec4899', '#6366f1', '#ef4444', '#14b8a6',
-    '#84cc16', '#a855f7', '#06b6d4', '#f97316', '#3b82f6',
-    '#e11d48', '#d97706', '#475569', '#64748b', '#94a3b8'
-];
-
-// Meses del año
-const MESES = [
-    { num: '01', nombre: 'enero' },
-    { num: '02', nombre: 'febrero' },
-    { num: '03', nombre: 'marzo' },
-    { num: '04', nombre: 'abril' },
-    { num: '05', nombre: 'mayo' },
-    { num: '06', nombre: 'junio' },
-    { num: '07', nombre: 'julio' },
-    { num: '08', nombre: 'agosto' },
-    { num: '09', nombre: 'septiembre' },
-    { num: '10', nombre: 'octubre' },
-    { num: '11', nombre: 'noviembre' },
-    { num: '12', nombre: 'diciembre' }
-];
-
 // Pestañas Principales Solicitadas en el SubHeader
-type MainTabKey = 'CALIDAD_IFI' | 'SALDOS' | 'PLAN_VIGILANCIA' | 'RRC' | 'QRQC';
+export type MainTabKey = 'CALIDAD_IFI' | 'SALDOS' | 'PLAN_VIGILANCIA' | 'RRC' | 'QRQC';
 
 interface SubHeaderTab {
     id: MainTabKey;
@@ -117,7 +74,7 @@ interface SubHeaderTab {
     icon: React.ReactNode;
 }
 
-const MAIN_SUBHEADER_TABS: SubHeaderTab[] = [
+export const MAIN_SUBHEADER_TABS: SubHeaderTab[] = [
     { id: 'CALIDAD_IFI', label: 'Calidad IFI', icon: <TrendingUp size={15} /> },
     { id: 'SALDOS', label: 'Saldos y Destrucciones', icon: <Trash2 size={15} /> },
     { id: 'PLAN_VIGILANCIA', label: 'Plan de Vigilancia', icon: <ShieldCheck size={15} /> },
@@ -271,14 +228,22 @@ const UnderConstructionCard = ({
 
 interface IndicadoresCalidadViewProps {
     showMainHeader?: boolean;
+    // Solo la sección de Mármol Sintético (pestaña Indicadores de Calidad MS); misma vista del tablero de control
+    soloMs?: boolean;
+    // Pestañas controladas desde la página (el Tablero de Control las muestra como su tercer nivel)
+    tab?: MainTabKey;
+    onTabChange?: (tab: MainTabKey) => void;
+    ocultarPestanas?: boolean;
 }
 
-export default function IndicadoresCalidadView({ showMainHeader = false }: IndicadoresCalidadViewProps) {
+export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false, tab, onTabChange, ocultarPestanas = false }: IndicadoresCalidadViewProps) {
     const router = useRouter();
     const [userEmail, setUserEmail] = useState<string>('');
     
     // Pestaña activa principal
-    const [activeTab, setActiveTab] = useState<MainTabKey>('CALIDAD_IFI');
+    const [tabInterno, setTabInterno] = useState<MainTabKey>('CALIDAD_IFI');
+    const activeTab = tab ?? tabInterno;
+    const setActiveTab = (t: MainTabKey) => (onTabChange ? onTabChange(t) : setTabInterno(t));
     const [isLoading, setIsLoading] = useState(false);
 
     // Vistas individuales por planta (HTML nativo vs Power BI)
@@ -295,23 +260,6 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         setPlantViews(prev => ({ ...prev, [plantKey]: view }));
     };
 
-    // Filtros de fecha MS
-    const [selectedYear, setSelectedYear] = useState<string>(() => String(new Date().getFullYear()));
-    const [selectedMonth, setSelectedMonth] = useState<string>(() => MESES[new Date().getMonth()].nombre);
-    const [selectedDay, setSelectedDay] = useState<string>('All');
-
-    // Filtros de defectos MS
-    const [filterTotalPiezas, setFilterTotalPiezas] = useState<boolean>(true);
-    const [filterSoloReparacion, setFilterSoloReparacion] = useState<boolean>(false);
-
-    // Búsqueda en tabla de referencias MS
-    const [refSearch, setRefSearch] = useState<string>('');
-    const [expandedRefs, setExpandedRefs] = useState<Record<string, boolean>>({});
-
-    // Piezas MS del año seleccionado (Supabase, misma lógica del Power BI "BI Calidad MS")
-    const [msPiezasAnio, setMsPiezasAnio] = useState<MsPiezaNormalizada[]>([]);
-    const [hasLiveSupabaseData, setHasLiveSupabaseData] = useState<boolean>(false);
-    const [msLoadError, setMsLoadError] = useState<string | null>(null);
 
     // --- ESTADOS PARA LA PESTAÑA SALDOS Y DESTRUCCIONES ---
     const [saldosReports, setSaldosReports] = useState<SaldoEvento[]>(SALDOS_REAL_DATA);
@@ -330,35 +278,6 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         void checkAuth();
     }, []);
 
-    // Consultar en Supabase todas las piezas MS del año seleccionado.
-    // Mes y día se filtran en memoria para que el cambio de filtro sea inmediato.
-    const fetchSupabaseData = useCallback(async () => {
-        setIsLoading(true);
-        setMsLoadError(null);
-        try {
-            const desde = selectedYear === 'All' ? `${MS_FECHA_INICIO_BI}T00:00:00Z` : `${selectedYear}-01-01T00:00:00Z`;
-            const hasta = selectedYear === 'All'
-                ? `${new Date().getUTCFullYear() + 1}-01-01T00:00:00Z`
-                : `${Number(selectedYear) + 1}-01-01T00:00:00Z`;
-
-            const [rows, catalogo, productos] = await Promise.all([
-                fetchMsReportes(supabase, desde, hasta, 'id, created_at, producto_id, defecto, Reparacion'),
-                fetchCatalogoDefectosMs(supabase),
-                fetchProductosMs(supabase)
-            ]);
-
-            const piezas = normalizarPiezas(rows, catalogo, productos);
-            setMsPiezasAnio(piezas);
-            setHasLiveSupabaseData(piezas.length > 0);
-        } catch (err: any) {
-            console.warn('Error consultando Supabase para calidad:', err);
-            setMsPiezasAnio([]);
-            setHasLiveSupabaseData(false);
-            setMsLoadError(err?.message || 'Error consultando Supabase');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [selectedYear]);
 
     // Consultar registros reales de Saldos y Destrucciones desde Supabase
     const fetchSaldosSupabase = useCallback(async () => {
@@ -443,78 +362,10 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
     }, []);
 
     useEffect(() => {
-        if (activeTab === 'CALIDAD_IFI') {
-            void fetchSupabaseData();
-        } else if (activeTab === 'SALDOS') {
+        if (activeTab === 'SALDOS') {
             void fetchSaldosSupabase();
         }
-    }, [fetchSupabaseData, fetchSaldosSupabase, activeTab]);
-
-    // Piezas MS del periodo seleccionado (mes / día dentro del año cargado)
-    const msMesNum = MESES.find(m => m.nombre === selectedMonth)?.num;
-    const msPiezasMes = useMemo(() => {
-        if (selectedMonth === 'All' || !msMesNum) return msPiezasAnio;
-        return msPiezasAnio.filter(p => p.fecha.slice(5, 7) === msMesNum);
-    }, [msPiezasAnio, selectedMonth, msMesNum]);
-
-    const msPiezasPeriodo = useMemo(() => {
-        if (selectedDay === 'All') return msPiezasMes;
-        const dd = selectedDay.padStart(2, '0');
-        return msPiezasMes.filter(p => p.fecha.slice(8, 10) === dd);
-    }, [msPiezasMes, selectedDay]);
-
-    // KPIs, Pareto y referencias MS (medidas del Power BI "BI Calidad MS")
-    const metrics = useMemo(() => {
-        const r = calcularResumen(msPiezasPeriodo);
-        const pareto = calcularPareto(msPiezasPeriodo);
-        return {
-            pctOpaco: r.pctOpaco.toFixed(1),
-            piezasBuenas: r.piezasBuenas,
-            piezasDefectuosas: r.piezasDefectuosas,
-            piezasRevisadas: r.piezasRevisadas,
-            cantidadDefectos: r.cantidadDefectos,
-            pctMoldes: r.pctMoldes.toFixed(1),
-            dpu: r.dpu.toFixed(1),
-            calidad: r.calidad.toFixed(1),
-            paretoCausas: pareto,
-            totalCausas: pareto.length,
-            referencias: calcularReferencias(msPiezasPeriodo)
-        };
-    }, [msPiezasPeriodo]);
-
-    // Tendencias IFI: por día del mes seleccionado y por mes del año seleccionado
-    const ifiPorDia = useMemo(() => calcularIfiPorDia(msPiezasMes), [msPiezasMes]);
-    const ifiAnio = selectedYear === 'All' ? String(new Date().getUTCFullYear()) : selectedYear;
-    const ifiPorMes = useMemo(
-        () => calcularIfiPorMes(msPiezasAnio, ifiAnio, MESES.map(m => m.nombre)),
-        [msPiezasAnio, ifiAnio]
-    );
-
-    // Filtrar lista de referencias por búsqueda
-    const filteredReferencias = useMemo(() => {
-        if (!refSearch.trim()) return metrics.referencias;
-        const q = refSearch.toLowerCase();
-        return metrics.referencias.filter(
-            r => r.referencia.toLowerCase().includes(q) ||
-                r.subdefectos.some(s => s.name.toLowerCase().includes(q))
-        );
-    }, [metrics.referencias, refSearch]);
-
-    const toggleRefExpanded = (refName: string) => {
-        setExpandedRefs(prev => ({
-            ...prev,
-            [refName]: !prev[refName]
-        }));
-    };
-
-    const resetFilters = () => {
-        setSelectedYear(String(new Date().getFullYear()));
-        setSelectedMonth(MESES[new Date().getMonth()].nombre);
-        setSelectedDay('All');
-        setFilterTotalPiezas(true);
-        setFilterSoloReparacion(false);
-        setRefSearch('');
-    };
+    }, [fetchSaldosSupabase, activeTab]);
 
     // --- CÁLCULOS ESTADÍSTICOS DE SALDOS Y DESTRUCCIONES ---
     const saldosMetrics = useMemo(() => {
@@ -622,12 +473,6 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         };
     }, [saldosReports, saldosFilterTipo, saldosSelectedDate, saldosSearchTerm]);
 
-    // Función auxiliar para color de semáforo FIRPLAK
-    const getSemaforoColor = (val: number) => {
-        if (val > 90) return 'text-[#59a96a] bg-emerald-50 border-emerald-200';
-        if (val >= 85) return 'text-[#deb841] bg-amber-50 border-amber-200';
-        return 'text-[#d14747] bg-rose-50 border-rose-200';
-    };
 
     return (
         <div className={`flex flex-col font-sans text-[#000000] w-full ${showMainHeader ? 'min-h-screen bg-[#F6F3EE]' : ''}`}>
@@ -640,16 +485,17 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                 />
             )}
 
-            {/* 2. SubHeader Oficial con Pestañas Agrupadas */}
-            <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-2xs relative z-30 w-full font-sans">
-                <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
+            {/* 2. SubHeader Oficial con Pestañas Agrupadas (no aplica en la vista solo MS) */}
+            {!soloMs && !ocultarPestanas && (
+            <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center">
+                <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {MAIN_SUBHEADER_TABS.map(tab => {
                         const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                                className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
                                     isActive
                                         ? 'bg-[#324354] text-white shadow-sm'
                                         : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -662,6 +508,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                     })}
                 </div>
             </div>
+            )}
 
             {/* 3. Contenido Principal */}
             <div className="flex-1 w-full pb-10">
@@ -675,432 +522,23 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 1: CALIDAD GENERAL PLANTAS - IFI */}
                         {/* ------------------------------------------------------------- */}
+                        {!soloMs && (<>
                         <section id="general-plantas" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Calidad General Plantas - IFI
-                                        </h2>
-                                        <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-blue-200">
-                                            Consolidado Corporativo
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Cumplimiento ponderado de calidad de las 5 plantas de producción (MS, MBL, CEFI, FV, RTM), cada una con su meta y su peso
-                                    </p>
-                                </div>
-
-                                {/* Botón de alternancia HTML vs Power BI */}
-                                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                    <button
-                                        onClick={() => togglePlantView('general', 'html')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.general === 'html'
-                                                ? 'bg-[#324354] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <BarChart3 className="w-3.5 h-3.5" />
-                                        <span>Tablero Dinámico</span>
-                                    </button>
-                                    <button
-                                        onClick={() => togglePlantView('general', 'powerbi')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.general === 'powerbi'
-                                                ? 'bg-[#0084d1] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                        <span>Power BI</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {plantViews.general === 'powerbi' ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad General"
-                                        src={POWERBI_URL_GENERAL}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <CalidadGeneralIFI />
-                            )}
+                            <CalidadGeneralIFI />
                         </section>
 
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Mármol Sintético" plantKey="MS" />
+                        </>)}
 
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 2: MÁRMOL SINTÉTICO (MS) */}
                         {/* ------------------------------------------------------------- */}
                         <section id="marmol-sintetico" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Mármol Sintético (MS)
-                                        </h2>
-                                        <span className={`px-2.5 py-0.5 font-extrabold rounded-full text-[10px] uppercase tracking-wider border ${
-                                            msLoadError
-                                                ? 'bg-rose-100 text-rose-800 border-rose-300'
-                                                : hasLiveSupabaseData
-                                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                                    : 'bg-slate-100 text-slate-600 border-slate-300'
-                                        }`}>
-                                            {isLoading ? 'Cargando…' : msLoadError ? 'Error de conexión' : hasLiveSupabaseData ? 'Supabase En Vivo' : 'Sin registros'}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Informe detallado de calidad MS, Pareto de causas, referencias y tendencias de IFI
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    {/* Botón de alternancia HTML vs Power BI */}
-                                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                        <button
-                                            onClick={() => togglePlantView('ms', 'html')}
-                                            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                                plantViews.ms === 'html'
-                                                    ? 'bg-[#324354] text-white shadow-xs'
-                                                    : 'text-slate-600 hover:text-black'
-                                            }`}
-                                        >
-                                            <BarChart3 className="w-3.5 h-3.5" />
-                                            <span>Tablero Dinámico</span>
-                                        </button>
-                                        <button
-                                            onClick={() => togglePlantView('ms', 'powerbi')}
-                                            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                                plantViews.ms === 'powerbi'
-                                                    ? 'bg-[#0084d1] text-white shadow-xs'
-                                                    : 'text-slate-600 hover:text-black'
-                                            }`}
-                                        >
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                            <span>Power BI</span>
-                                        </button>
-                                    </div>
-
-                                    <button
-                                        onClick={fetchSupabaseData}
-                                        disabled={isLoading}
-                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                                        title="Recargar datos MS"
-                                    >
-                                        <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {plantViews.ms === 'powerbi' ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad MS"
-                                        src={POWERBI_URL_MS}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {/* Barra de Filtros MS */}
-                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-50 p-2 sm:p-2.5 rounded-xl border border-slate-200">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            {/* Selector Año */}
-                                            <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-2xs text-xs">
-                                                <span className="text-slate-400 font-bold">Año</span>
-                                                <select
-                                                    value={selectedYear}
-                                                    onChange={e => setSelectedYear(e.target.value)}
-                                                    className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
-                                                >
-                                                    <option value="All">Todos</option>
-                                                    <option value="2026">2026</option>
-                                                    <option value="2025">2025</option>
-                                                </select>
-                                            </div>
-
-                                            {/* Selector Mes */}
-                                            <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-2xs text-xs">
-                                                <span className="text-slate-400 font-bold">Mes</span>
-                                                <select
-                                                    value={selectedMonth}
-                                                    onChange={e => setSelectedMonth(e.target.value)}
-                                                    className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer capitalize"
-                                                >
-                                                    <option value="All">Todos</option>
-                                                    {MESES.map(m => (
-                                                        <option key={m.num} value={m.nombre} className="capitalize">
-                                                            {m.nombre}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            {/* Selector Día */}
-                                            <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-2xs text-xs">
-                                                <span className="text-slate-400 font-bold">Día</span>
-                                                <select
-                                                    value={selectedDay}
-                                                    onChange={e => setSelectedDay(e.target.value)}
-                                                    className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
-                                                >
-                                                    <option value="All">Todos</option>
-                                                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                                                        <option key={d} value={d.toString()}>
-                                                            {d}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-3">
-                                            {/* Checkbox Total Piezas */}
-                                            <label className="flex items-center gap-1 font-bold text-slate-700 cursor-pointer text-xs">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filterTotalPiezas}
-                                                    onChange={e => setFilterTotalPiezas(e.target.checked)}
-                                                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-0 cursor-pointer"
-                                                />
-                                                <span>Total Piezas</span>
-                                            </label>
-
-                                            {/* Checkbox Solo Reparación */}
-                                            <label className="flex items-center gap-1 font-bold text-slate-700 cursor-pointer text-xs">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filterSoloReparacion}
-                                                    onChange={e => setFilterSoloReparacion(e.target.checked)}
-                                                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-0 cursor-pointer"
-                                                />
-                                                <span>Reparación</span>
-                                            </label>
-
-                                            <button
-                                                onClick={resetFilters}
-                                                className="text-[11px] text-blue-600 hover:text-blue-800 font-bold hover:underline"
-                                            >
-                                                Limpiar
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* 8 Tarjetas KPI Oficiales de MS */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">% Opaco</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.pctOpaco} %</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Buenas</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.piezasBuenas.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Defectuosas</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.piezasDefectuosas.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Revisadas</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.piezasRevisadas.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Defectos</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.cantidadDefectos.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-rose-50/70 rounded-xl border border-rose-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-rose-800 uppercase truncate">% Moldes</span>
-                                            <span className="text-base sm:text-lg font-black text-rose-900 mt-0.5">{metrics.pctMoldes} %</span>
-                                        </div>
-                                        <div className="p-2 bg-sky-600 text-white rounded-xl shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100 truncate">DPU</span>
-                                            <span className="text-base sm:text-lg font-black mt-0.5">{metrics.dpu}</span>
-                                        </div>
-                                        <div className="p-2 bg-[#0084d1] text-white rounded-xl shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100 truncate">Calidad</span>
-                                            <span className="text-base sm:text-lg font-black mt-0.5">{metrics.calidad} %</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Gráficos MS: Pareto Donut y Detalle por Referencia */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-                                        {/* Pareto de Causas */}
-                                        <div className="lg:col-span-7 bg-white rounded-xl p-3 shadow-xs border border-slate-200 flex flex-col justify-between">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-800">Pareto de causas</h3>
-                                                <span className="text-[10px] text-slate-400 font-bold">{metrics.totalCausas} causas</span>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
-                                                <div className="md:col-span-6 space-y-1 max-h-[195px] overflow-y-auto pr-1 scrollbar-thin">
-                                                    {metrics.paretoCausas.slice(0, 10).map((d, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between text-[11px] py-0.5 border-b border-slate-100 hover:bg-slate-50 px-1 rounded">
-                                                            <div className="flex items-center gap-1.5 truncate mr-1.5">
-                                                                <span
-                                                                    className="w-2 h-2 rounded-full flex-shrink-0"
-                                                                    style={{ backgroundColor: PARETO_COLORS[idx % PARETO_COLORS.length] }}
-                                                                />
-                                                                <span className="truncate text-slate-700 font-medium">{d.name}</span>
-                                                            </div>
-                                                            <div className="text-right flex-shrink-0 font-mono text-[10px]">
-                                                                <span className="font-bold text-slate-900">{d.cantidad}</span>
-                                                                <span className="text-slate-400 ml-0.5">({d.pct}%)</span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                <div className="md:col-span-6 h-[195px] flex items-center justify-center relative">
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <PieChart>
-                                                            <Pie
-                                                                data={metrics.paretoCausas.slice(0, 15)}
-                                                                dataKey="cantidad"
-                                                                nameKey="name"
-                                                                cx="50%"
-                                                                cy="50%"
-                                                                innerRadius={38}
-                                                                outerRadius={68}
-                                                                paddingAngle={2}
-                                                            >
-                                                                {metrics.paretoCausas.slice(0, 15).map((entry, index) => (
-                                                                    <Cell key={`cell-${index}`} fill={PARETO_COLORS[index % PARETO_COLORS.length]} />
-                                                                ))}
-                                                            </Pie>
-                                                            <Tooltip formatter={(value: any, name: any) => [`${value} piezas`, name]} />
-                                                        </PieChart>
-                                                    </ResponsiveContainer>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Detalle por Referencia con Acordeón */}
-                                        <div className="lg:col-span-5 bg-white rounded-xl p-3 shadow-xs border border-slate-200 flex flex-col">
-                                            <div className="flex items-center justify-between gap-2 mb-2">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-800">Detalle por Referencia</h3>
-                                                <div className="relative w-36">
-                                                    <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Buscar..."
-                                                        value={refSearch}
-                                                        onChange={e => setRefSearch(e.target.value)}
-                                                        className="w-full pl-6 pr-2 py-0.5 text-xs bg-slate-50 border border-slate-300 rounded-md outline-none focus:border-[#324354]"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="overflow-y-auto max-h-[195px] scrollbar-thin text-xs">
-                                                <table className="w-full text-left">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 text-[10px] border-b border-slate-200">
-                                                        <tr>
-                                                            <th className="py-1 px-1.5">Referencia</th>
-                                                            <th className="py-1 px-1.5 text-right">Piezas Def.</th>
-                                                            {filterTotalPiezas && <th className="py-1 px-1.5 text-right">Total Piezas</th>}
-                                                            {filterSoloReparacion && <th className="py-1 px-1.5 text-right">Reparación</th>}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {filteredReferencias.map(ref => {
-                                                            const isExpanded = !!expandedRefs[ref.referencia];
-                                                            return (
-                                                                <React.Fragment key={ref.referencia}>
-                                                                    <tr
-                                                                        onClick={() => toggleRefExpanded(ref.referencia)}
-                                                                        className="hover:bg-slate-50 cursor-pointer font-bold text-slate-800 transition-colors"
-                                                                    >
-                                                                        <td className="py-1 px-1.5 flex items-center gap-1">
-                                                                            {isExpanded ? (
-                                                                                <ChevronDown className="w-3 h-3 text-blue-600 flex-shrink-0" />
-                                                                            ) : (
-                                                                                <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                                                                            )}
-                                                                            <span className="truncate">{ref.referencia}</span>
-                                                                        </td>
-                                                                        <td className="py-1 px-1.5 text-right font-black text-slate-900">{ref.piezasDefectuosas}</td>
-                                                                        {filterTotalPiezas && <td className="py-1 px-1.5 text-right text-slate-600">{ref.totalPiezas}</td>}
-                                                                        {filterSoloReparacion && <td className="py-1 px-1.5 text-right text-slate-600">{ref.reparacion}</td>}
-                                                                    </tr>
-                                                                    {isExpanded && ref.subdefectos.map((s, sIdx) => (
-                                                                        <tr key={sIdx} className="bg-slate-50/80 text-[10px] text-slate-600">
-                                                                            <td className="py-0.5 pl-6 pr-1.5 border-l-2 border-blue-400 truncate">• {s.name}</td>
-                                                                            <td className="py-0.5 px-1.5 text-right font-bold text-slate-800">{s.piezasDefectuosas}</td>
-                                                                            {filterTotalPiezas && <td className="py-0.5 px-1.5 text-right">{s.totalPiezas}</td>}
-                                                                            {filterSoloReparacion && <td className="py-0.5 px-1.5 text-right">{s.reparacion}</td>}
-                                                                        </tr>
-                                                                    ))}
-                                                                </React.Fragment>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Gráficos de Tendencia: IFI por Día y por Mes */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-                                        <div className="lg:col-span-8 bg-white rounded-xl p-3 shadow-xs border border-slate-200">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-800 capitalize">
-                                                    IFI por Día ({selectedMonth === 'All' ? 'todos los meses' : selectedMonth} {selectedYear === 'All' ? '' : selectedYear})
-                                                </h3>
-                                                <div className="flex items-center gap-2 text-[10px]">
-                                                    <span className="flex items-center gap-1 font-bold text-slate-600">
-                                                        <span className="w-2.5 h-0.5 bg-[#0284c7]" /> Calidad Real
-                                                    </span>
-                                                    <span className="flex items-center gap-1 font-bold text-slate-600">
-                                                        <span className="w-2.5 h-0.5 bg-[#dc2626] border-dashed" /> Meta 90%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="h-[175px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={ifiPorDia} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis dataKey={selectedMonth === 'All' ? 'fecha' : 'dia'} tick={{ fontSize: 10 }} />
-                                                        <YAxis domain={[(min: number) => Math.max(0, Math.min(60, Math.floor(min / 10) * 10)), 100]} tick={{ fontSize: 10 }} />
-                                                        <Tooltip formatter={(val: any) => [`${val} %`, 'Calidad IFI']} />
-                                                        <ReferenceLine y={90} stroke="#dc2626" strokeDasharray="4 4" strokeWidth={1.5} />
-                                                        <Line type="monotone" dataKey="calidad" stroke="#0284c7" strokeWidth={2} dot={{ r: 2.5, fill: '#0284c7' }} />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-
-                                        <div className="lg:col-span-4 bg-white rounded-xl p-3 shadow-xs border border-slate-200">
-                                            <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5">IFI por Mes ({ifiAnio})</h3>
-                                            <div className="h-[175px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={ifiPorMes} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis dataKey="mes" tickFormatter={val => val.substring(0, 3)} tick={{ fontSize: 10 }} />
-                                                        <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                                                        <Tooltip formatter={(val: any) => [`${val} %`, 'Calidad']} />
-                                                        <ReferenceLine y={90} stroke="#dc2626" strokeDasharray="4 4" strokeWidth={1.5} />
-                                                        <Bar dataKey="calidad" radius={[4, 4, 0, 0]}>
-                                                            {ifiPorMes.map((entry, index) => {
-                                                                const isSelected = entry.mes === selectedMonth;
-                                                                const fillColor = isSelected ? '#9a3412' : '#d8b4a6';
-                                                                return <Cell key={`bar-${index}`} fill={fillColor} />;
-                                                            })}
-                                                        </Bar>
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            <CalidadMsDashboard powerBiUrl={POWERBI_URL_MS} />
                         </section>
 
+                        {!soloMs && (<>
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Fibra de Vidrio" plantKey="FV" />
 
@@ -1108,59 +546,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                         {/* PLANTA 3: FIBRA DE VIDRIO (FV) */}
                         {/* ------------------------------------------------------------- */}
                         <section id="fibra-vidrio" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Fibra de Vidrio (FV)
-                                        </h2>
-                                        <span className="px-2.5 py-0.5 bg-sky-100 text-sky-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-sky-300">
-                                            Laminación y Acabado
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Control de calidad en laminación, gelcoat, refuerzo estructural y acabado de bañeras y tinas
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                    <button
-                                        onClick={() => togglePlantView('fv', 'html')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.fv === 'html'
-                                                ? 'bg-[#324354] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <BarChart3 className="w-3.5 h-3.5" />
-                                        <span>Tablero Dinámico</span>
-                                    </button>
-                                    <button
-                                        onClick={() => togglePlantView('fv', 'powerbi')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.fv === 'powerbi'
-                                                ? 'bg-[#0084d1] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                        <span>Power BI</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {plantViews.fv === 'powerbi' ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad FV"
-                                        src={POWERBI_URL_FV}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <CalidadFVDashboard />
-                            )}
+                            <CalidadFVDashboard powerBiUrl={POWERBI_URL_FV} />
                         </section>
 
                         {/* LINEA DIVISORIA */}
@@ -1488,6 +874,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                 </div>
                             )}
                         </section>
+                        </>)}
                     </div>
                 )}
 
@@ -1496,6 +883,11 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                 {/* ========================================================================= */}
                 {activeTab === 'SALDOS' && (
                     <div className="p-3 md:p-6 max-w-[1900px] w-full mx-auto space-y-5 animate-in fade-in duration-300">
+                        {/* Tablero de saldos y destrucciones (estilo Mármol Sintético) */}
+                        <section id="saldos-destrucciones" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
+                            <CalidadSaldosDashboard />
+                        </section>
+
                         {/* Header con Acción Rápida */}
                         <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#e2ded5] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div>

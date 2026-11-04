@@ -58,8 +58,10 @@ export async function POST(req: Request) {
             comps = mueble.componentes;
           }
           comps.forEach((comp: any) => {
-            const isCantoOrTablero = comp.componente.toUpperCase().startsWith("CANTO") || comp.componente.toUpperCase().startsWith("TABLERO");
-            if (isCantoOrTablero) {
+            const compName = String(comp.componente || '').trim().toUpperCase();
+            const isExcluded = compName.includes("KIT") || compName.includes("INSTRUCTIV") || compName.includes("INSTRUCC");
+            const isTarget = compName.includes("CANTO") || compName.includes("TABLERO") || compName.includes("FONDO");
+            if (isTarget && !isExcluded) {
               skuMap.set(comp.sku, comp.componente);
             }
           });
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
 
     const skusToFetch = Array.from(skuMap.keys());
     if (skusToFetch.length === 0) {
-      return NextResponse.json({ message: 'No Cantos or Tableros found to sync' });
+      return NextResponse.json({ message: 'No Cantos, Tableros or Fondos found to sync' });
     }
 
     // 3. SAP Login

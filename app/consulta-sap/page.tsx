@@ -7,7 +7,7 @@ import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer, Calendar } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer, Calendar, AlertTriangle, Camera } from 'lucide-react'
 import LiberacionMueblesView from '@/components/liberacion-muebles/LiberacionMueblesView'
 
 interface ComponentItem {
@@ -403,6 +403,46 @@ const generateMockOrder = (no: string): OrderData => {
     };
 };
 
+// Aviso en rojo con los datos que SAP no entregó o no se reconocen (evita falsos positivos)
+const AvisoFaltantesSap = ({ faltantes }: { faltantes: string[] }) => faltantes.length ? (
+    <div className="mx-2 mt-1 px-2.5 py-1.5 bg-red-50 border border-red-400 text-red-800 text-[11px] font-semibold flex items-start gap-1.5 select-text" role="alert">
+        <span className="shrink-0 w-4 h-4 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">!</span>
+        <span>SAP no entregó o no se reconoce: {faltantes.join(' · ')}. Verifique en SAP antes de usar estos datos.</span>
+    </div>
+) : null;
+
+// Estado de la última consulta a SAP (el distintivo verde solo aparece si la consulta respondió)
+const EstadoConsultaSap = ({ estado }: { estado: 'sin-consulta' | 'ok' | 'error' }) => estado === 'sin-consulta' ? null : (
+    <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${estado === 'ok' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-red-100 text-red-800 border-red-300'}`}>
+        {estado === 'ok' ? 'SAP respondió' : 'Error al consultar SAP'}
+    </span>
+);
+
+// Aviso rojo del Semáforo: información crítica, se pide enviar captura al Director de Manufactura
+const AvisoErrorSemaforo = ({ titulo, lineas, detalle, hora }: { titulo: string; lineas: string[]; detalle?: string; hora: string }) => (
+    <div role="alert" className="w-full max-w-3xl bg-red-50 border-2 border-red-500 rounded-2xl p-4 sm:p-5 text-left space-y-3 select-text shadow-sm">
+        <div className="flex items-start gap-3">
+            <AlertTriangle size={26} className="text-red-600 shrink-0 mt-0.5" />
+            <div className="min-w-0 space-y-1">
+                <h3 className="text-sm sm:text-base font-black text-red-800">{titulo}</h3>
+                {lineas.length === 1 ? (
+                    <p className="text-sm font-semibold text-red-800">{lineas[0]}</p>
+                ) : (
+                    <ul className="list-disc pl-5 text-xs sm:text-sm font-semibold text-red-800 space-y-0.5">
+                        {lineas.map((l, i) => <li key={i}>{l}</li>)}
+                    </ul>
+                )}
+                {detalle && <p className="text-[11px] font-mono text-red-700/80 break-all">Detalle técnico: {detalle}</p>}
+                <p className="text-[11px] text-red-700">Fecha y hora: {hora}</p>
+            </div>
+        </div>
+        <div className="bg-red-600 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-bold flex items-center gap-2">
+            <Camera size={18} className="shrink-0" />
+            <span>Toma una captura de pantalla de este mensaje y envíalo al Director de Manufactura para corregirlo.</span>
+        </div>
+    </div>
+);
+
 const SapLinkArrow = () => (
     <span title="Navegar en SAP" className="inline-flex items-center">
         <svg
@@ -430,6 +470,8 @@ export default function ConsultaSAPPage() {
     const [itemLoading, setItemLoading] = useState(false)
     const [itemInnerTab, setItemInnerTab] = useState<'inventario' | 'lista-materiales'>('inventario')
     const [itemMatches, setItemMatches] = useState<Array<{ itemCode: string; itemName: string }>>([])
+    const [itemFaltantes, setItemFaltantes] = useState<string[]>([])
+    const [itemEstadoSap, setItemEstadoSap] = useState<'sin-consulta' | 'ok' | 'error'>('sin-consulta')
 
     const handleItemSearch = async (byField: 'code' | 'name', searchTermOverride?: string) => {
         const val = searchTermOverride || (byField === 'code' ? itemCodeInput.trim() : itemNameInput.trim());
@@ -444,16 +486,27 @@ export default function ConsultaSAPPage() {
             const res = await fetch(`/api/sap/items?${param}`);
             const data = await res.json();
             if (res.ok && data.item) {
+                const faltantes: string[] = data.faltantes || [];
                 setActiveItem(data.item);
                 setItemCodeInput(data.item.itemCode);
                 setItemNameInput(data.item.itemName);
                 setItemMatches(data.matches || []);
-                toast.success(`Artículo ${data.item.itemCode} cargado desde SAP B1`);
+                setItemFaltantes(faltantes);
+                setItemEstadoSap('ok');
+                if (faltantes.length) toast.error(`Artículo ${data.item.itemCode}: SAP no entregó ${faltantes.length} dato(s). Revise el aviso en rojo.`);
+                else toast.success(`Artículo ${data.item.itemCode} cargado desde SAP B1`);
             } else {
+                // No se deja en pantalla el artículo anterior: parecería el consultado
+                setActiveItem(EMPTY_ITEM);
+                setItemFaltantes([]);
+                setItemEstadoSap('error');
                 toast.error(data.error || "No se encontró el artículo en SAP B1");
             }
         } catch (err: any) {
             console.error("Error al consultar artículo SAP:", err);
+            setActiveItem(EMPTY_ITEM);
+            setItemFaltantes([]);
+            setItemEstadoSap('error');
             toast.error("Error al conectar con SAP B1");
         } finally {
             setItemLoading(false);
@@ -463,6 +516,8 @@ export default function ConsultaSAPPage() {
     // Estados de búsqueda e interfaz SAP (Consulta Ordenes) - Inicialmente Vacíos
     const [searchQuery, setSearchQuery] = useState("")
     const [activeOrder, setActiveOrder] = useState<OrderData>(EMPTY_ORDER)
+    const [orderFaltantes, setOrderFaltantes] = useState<string[]>([])
+    const [orderEstadoSap, setOrderEstadoSap] = useState<'sin-consulta' | 'ok' | 'error'>('sin-consulta')
     const [tabActive, setTabActive] = useState<'componentes' | 'resumen' | 'anexos'>('componentes')
     const [currentTime, setCurrentTime] = useState("")
 
@@ -513,6 +568,11 @@ export default function ConsultaSAPPage() {
     const [semaforoDataList, setSemaforoDataList] = useState<SemaforoItem[]>([])
     const [semaforoHasLoaded, setSemaforoHasLoaded] = useState<boolean>(false)
     const [semaforoDataSource, setSemaforoDataSource] = useState<string>('')
+    // Error de la última consulta (se muestra en rojo; nunca se dejan en pantalla datos de una consulta anterior)
+    const [semaforoError, setSemaforoError] = useState<{ mensaje: string; detalle?: string; hora: string } | null>(null)
+    // Datos faltantes o no reconocidos que informa /api/sap/semaforo aunque la consulta haya respondido
+    const [semaforoAdvertencias, setSemaforoAdvertencias] = useState<string[]>([])
+    const [semaforoConsultaHora, setSemaforoConsultaHora] = useState<string>("") // hora fija de la consulta (no un reloj)
 
     // Estados para pestaña Query - Órdenes Liberadas (FPK - Ordenes de fabricación liberadas)
     const [releasedOrdersList, setReleasedOrdersList] = useState<ReleasedOrderItem[]>([])
@@ -581,15 +641,26 @@ export default function ConsultaSAPPage() {
             const res = await fetch(`/api/sap/production-orders/${orderNum}`);
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
+                // No se deja en pantalla la orden anterior: parecería la consultada
+                setActiveOrder(EMPTY_ORDER);
+                setOrderFaltantes([]);
+                setOrderEstadoSap('error');
                 toast.error(errData.error || "Orden no encontrada en SAP", { id: loadingId });
                 return;
             }
             const data = await res.json();
+            const faltantes: string[] = data.faltantes || [];
             setActiveOrder(data);
+            setOrderFaltantes(faltantes);
+            setOrderEstadoSap('ok');
             setCompSortCol(null);
-            toast.success(`Orden ${orderNum} cargada correctamente`, { id: loadingId });
+            if (faltantes.length) toast.error(`Orden ${orderNum}: SAP no entregó ${faltantes.length} dato(s). Revise el aviso en rojo.`, { id: loadingId });
+            else toast.success(`Orden ${orderNum} cargada correctamente`, { id: loadingId });
         } catch (error) {
             console.error(error);
+            setActiveOrder(EMPTY_ORDER);
+            setOrderFaltantes([]);
+            setOrderEstadoSap('error');
             toast.error("Error de conexión con SAP", { id: loadingId });
         }
     }
@@ -728,42 +799,62 @@ export default function ConsultaSAPPage() {
         if (!res.ok || !contentType.includes('application/json')) {
             const text = await res.text();
             let errorMsg = `Error HTTP ${res.status}`;
+            let detalle: string | undefined;
             try {
                 const json = JSON.parse(text);
-                errorMsg = json.details || json.error || errorMsg;
+                errorMsg = json.error || json.details || errorMsg;
+                detalle = json.details && json.details !== errorMsg ? json.details : undefined;
             } catch {
                 if (text.startsWith('<')) {
-                    errorMsg = `El servidor respondió con HTML (${res.status}). Verifique la conexión a Cloudflare.`;
+                    errorMsg = `El servidor de la app respondió con una página HTML (HTTP ${res.status}) en lugar de datos. Puede que la consulta haya tardado demasiado o que el servidor haya fallado.`;
                 } else if (text) {
                     errorMsg = text.slice(0, 150);
                 }
             }
-            throw new Error(errorMsg);
+            throw Object.assign(new Error(errorMsg), { detalle });
         }
         return await res.json();
     };
 
+    // Consulta el Semáforo y deja en pantalla el resultado real: si falla, se borran los datos
+    // anteriores y se muestra el error en rojo (con instrucción de enviar captura al Director de Manufactura)
+    const consultarSemaforo = async (): Promise<SemaforoItem[] | null> => {
+        const hora = new Date().toLocaleString('es-CO');
+        try {
+            const result = await fetchSemaforoApi();
+            if (!result.success || !Array.isArray(result.data) || result.data.length === 0) {
+                throw Object.assign(new Error(result.error || 'La consulta del Semáforo respondió sin registros.'), { detalle: result.details });
+            }
+            setSemaforoDataList(result.data);
+            setSemaforoDataSource(result.source || 'Fuente no informada');
+            setSemaforoHasLoaded(true);
+            setSemaforoAdvertencias(Array.isArray(result.advertencias) ? result.advertencias : []);
+            setSemaforoConsultaHora(hora);
+            setSemaforoError(null);
+            return result.data;
+        } catch (err: any) {
+            setSemaforoDataList([]);
+            setSemaforoHasLoaded(false);
+            setSemaforoAdvertencias([]);
+            setSemaforoError({ mensaje: err?.message || 'Error de red al consultar el Semáforo.', detalle: err?.detalle, hora });
+            return null;
+        }
+    };
+
     // Exportar Query FPK - Semaforo - DJP a Excel con TODAS las 39 columnas
     const handleExportExcel = async () => {
+        setSemaforoError(null);
         try {
             let dataToExport = semaforoDataList;
             if (dataToExport.length === 0) {
                 const toastId = toast.loading("Consultando datos del Semáforo para generar Excel...");
-                try {
-                    const result = await fetchSemaforoApi();
-                    if (result.success && result.data) {
-                        dataToExport = result.data;
-                        setSemaforoDataList(result.data);
-                        setSemaforoHasLoaded(true);
-                        toast.dismiss(toastId);
-                    } else {
-                        toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-                        return;
-                    }
-                } catch (err: any) {
-                    toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+                const datos = await consultarSemaforo();
+                if (!datos) {
+                    toast.error("No se pudo consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
                     return;
                 }
+                dataToExport = datos;
+                toast.dismiss(toastId);
             }
 
             const exportRows = dataToExport.map(item => ({
@@ -817,30 +908,24 @@ export default function ConsultaSAPPage() {
         } catch (err) {
             console.error(err);
             toast.error("Error al generar el archivo Excel");
+            setSemaforoError({ mensaje: 'Error al generar el archivo Excel del Semáforo.', detalle: (err as any)?.message, hora: new Date().toLocaleString('es-CO') });
         }
     };
 
     // Exportar "Prioridades Diarias Plantas" con todas las 10 pestañas procesadas
     const handleDownloadPrioridades = async () => {
+        setSemaforoError(null);
         try {
             let dataToExport = semaforoDataList;
             if (dataToExport.length === 0) {
                 const toastId = toast.loading("Consultando datos del Semáforo para generar Prioridades...");
-                try {
-                    const result = await fetchSemaforoApi();
-                    if (result.success && result.data) {
-                        dataToExport = result.data;
-                        setSemaforoDataList(result.data);
-                        setSemaforoHasLoaded(true);
-                        toast.dismiss(toastId);
-                    } else {
-                        toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-                        return;
-                    }
-                } catch (err: any) {
-                    toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+                const datos = await consultarSemaforo();
+                if (!datos) {
+                    toast.error("No se pudo consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
                     return;
                 }
+                dataToExport = datos;
+                toast.dismiss(toastId);
             }
 
             const toastId = toast.loading("Generando archivo 'Prioridades Diarias de Plantas'...");
@@ -850,6 +935,7 @@ export default function ConsultaSAPPage() {
         } catch (err: any) {
             console.error("Error al generar Prioridades Diarias:", err);
             toast.error(`Error al generar el archivo: ${err.message || 'error desconocido'}`);
+            setSemaforoError({ mensaje: "Error al generar el archivo 'Prioridades diarias de Plantas'.", detalle: err?.message, hora: new Date().toLocaleString('es-CO') });
         }
     };
 
@@ -858,17 +944,9 @@ export default function ConsultaSAPPage() {
         setIsExecuting(true);
         const toastId = toast.loading("Consultando query 'FPK - Semaforo - DJP'...");
         try {
-            const result = await fetchSemaforoApi();
-            if (result.success && result.data) {
-                setSemaforoDataList(result.data);
-                setSemaforoDataSource(result.source || 'Desconocido');
-                setSemaforoHasLoaded(true);
-                toast.success(`Semáforo actualizado correctamente (${result.total.toLocaleString('es-CO')} registros cargados)`, { id: toastId });
-            } else {
-                toast.error(`Error al actualizar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-            }
-        } catch (err: any) {
-            toast.error(`Error al actualizar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+            const datos = await consultarSemaforo();
+            if (!datos) toast.error("Error al consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
+            else toast.success(`Semáforo actualizado (${datos.length.toLocaleString('es-CO')} registros)`, { id: toastId });
         } finally {
             setIsExecuting(false);
         }
@@ -881,32 +959,31 @@ export default function ConsultaSAPPage() {
 
     // Copiar tabla completa al portapapeles
     const handleCopyData = async () => {
+        setSemaforoError(null);
         let dataToCopy = semaforoDataList;
         if (dataToCopy.length === 0) {
             const toastId = toast.loading("Consultando datos del Semáforo para copiar...");
-            try {
-                const result = await fetchSemaforoApi();
-                if (result.success && result.data) {
-                    dataToCopy = result.data;
-                    setSemaforoDataList(dataToCopy);
-                    setSemaforoHasLoaded(true);
-                    toast.dismiss(toastId);
-                } else {
-                    toast.error(`Error al consultar Semáforo: ${result.error || result.details || 'respuesta inválida'}`, { id: toastId });
-                    return;
-                }
-            } catch (err: any) {
-                toast.error(`Error al consultar Semáforo: ${err.message || 'error de red'}`, { id: toastId });
+            const datos = await consultarSemaforo();
+            if (!datos) {
+                toast.error("No se pudo consultar el Semáforo. Revise el aviso en rojo.", { id: toastId });
                 return;
             }
+            dataToCopy = datos;
+            toast.dismiss(toastId);
         }
 
         const headerText = "Originnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\tDisponible PT01\tFecha Creación OP\tEstado\tFecha Recomendada Liberación\tFecha Real Liberación\tConsumo Para Liberar\tColor Liberación Txt\tColor Liberación\tCumplimiento Liberación\tFecha Entrega Lote\tFecha Recomendada de Entrega\tFecha Cierre OP\tFecha Ideal Entrega Producción\tConsumo Amortiguador Planta\tColor Producción Txt\tColor Producción\tCumplimiento Planta\tDias Retrazo Firplak\tColor Firplak Txt\tColor Firplak\tCumplimiento Firplak\tFecha Prometida Entrega Item\tDestino\tNumLote\tMolde\tCapacidad Molde\tFecha Carga Molde\tAmortiguador\tCliente\n";
-        const rowsText = dataToCopy.map(item => 
-            `${item.originnum}\t${item.nroOp}\t${item.sku}\t${item.descripcion}\t${item.planta}\t${item.familia}\t${item.tipoOrden}\t${item.cantPendiente}\t${item.cantPendItem}\t${item.cantTotal}\t${item.disponiblePt01}\t${item.fechaCreacionOp}\t${item.estado}\t${item.fechaRecomendadaLiberacion}\t${item.fechaRealLiberacion}\t${item.consumoParaLiberar}\t${item.colorLiberacionTxt}\t${item.colorLiberacion}\t${item.cumplimientoLiberacion}\t${item.fechaEntregaLote}\t${item.fechaRecomendadaEntrega}\t${item.fechaCierreOp}\t${item.fechaIdealEntregaProduccion}\t${item.consumoAmortiguadorPlanta}\t${item.colorProduccionTxt}\t${item.colorProduccion}\t${item.cumplimientoPlanta}\t${item.diasRetrazoFirplak}\t${item.colorFirplakTxt}\t${item.colorFirplak}\t${item.cumplimientoFirplak}\t${item.fechaPrometidaEntregaItem}\t${item.destino}\t${item.numLote}\t${item.molde}\t${item.capacidadMolde}\t${item.fechaCargaMolde}\t${item.amortiguador}\t${item.cliente}`
-        ).join('\n');
-        
-        navigator.clipboard.writeText(headerText + rowsText);
+        // Celdas sin dato se copian vacías (antes salía el texto "null")
+        const columnas: Array<keyof SemaforoItem> = ['originnum', 'nroOp', 'sku', 'descripcion', 'planta', 'familia', 'tipoOrden', 'cantPendiente', 'cantPendItem', 'cantTotal', 'disponiblePt01', 'fechaCreacionOp', 'estado', 'fechaRecomendadaLiberacion', 'fechaRealLiberacion', 'consumoParaLiberar', 'colorLiberacionTxt', 'colorLiberacion', 'cumplimientoLiberacion', 'fechaEntregaLote', 'fechaRecomendadaEntrega', 'fechaCierreOp', 'fechaIdealEntregaProduccion', 'consumoAmortiguadorPlanta', 'colorProduccionTxt', 'colorProduccion', 'cumplimientoPlanta', 'diasRetrazoFirplak', 'colorFirplakTxt', 'colorFirplak', 'cumplimientoFirplak', 'fechaPrometidaEntregaItem', 'destino', 'numLote', 'molde', 'capacidadMolde', 'fechaCargaMolde', 'amortiguador', 'cliente'];
+        const rowsText = dataToCopy.map(item => columnas.map(c => item[c] ?? '').join('\t')).join('\n');
+
+        try {
+            await navigator.clipboard.writeText(headerText + rowsText);
+        } catch (err: any) {
+            toast.error("No se pudieron copiar los datos al portapapeles");
+            setSemaforoError({ mensaje: 'No se pudieron copiar los datos del Semáforo al portapapeles.', detalle: err?.message, hora: new Date().toLocaleString('es-CO') });
+            return;
+        }
         setCopiedData(true);
         toast.success(`Datos de la consulta SAP (${dataToCopy.length.toLocaleString('es-CO')} registros) copiados al portapapeles`);
         setTimeout(() => setCopiedData(false), 2000);
@@ -1107,12 +1184,12 @@ export default function ConsultaSAPPage() {
             />
 
             {/* SUBHEADER BAR FIXED WITH TABS */}
-            <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-sm relative z-30 w-full font-sans sticky top-0">
-                <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-2 justify-center overflow-x-auto scrollbar-hide py-0.5">
+            <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center sticky top-0">
+                <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-2 justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {/* 1. Consulta Ordenes */}
                     <button
                         onClick={() => setSubHeaderTab('consulta-ordenes')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'consulta-ordenes'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1125,7 +1202,7 @@ export default function ConsultaSAPPage() {
                     {/* 2. Consulta por Producto */}
                     <button
                         onClick={() => setSubHeaderTab('consulta-producto')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'consulta-producto'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1138,7 +1215,7 @@ export default function ConsultaSAPPage() {
                     {/* 3. Query - Semáforo */}
                     <button
                         onClick={() => setSubHeaderTab('query-semaforo')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'query-semaforo'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1151,7 +1228,7 @@ export default function ConsultaSAPPage() {
                     {/* 4. Query - Ordenes Liberadas (Nuevo) */}
                     <button
                         onClick={() => setSubHeaderTab('query-ordenes-liberadas')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'query-ordenes-liberadas'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1164,7 +1241,7 @@ export default function ConsultaSAPPage() {
                     {/* 5. Query - Entregas Producción (Nuevo) */}
                     <button
                         onClick={() => setSubHeaderTab('query-entregas-produccion')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'query-entregas-produccion'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1177,7 +1254,7 @@ export default function ConsultaSAPPage() {
                     {/* 6. Liberación Muebles */}
                     <button
                         onClick={() => setSubHeaderTab('liberacion-muebles')}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap ${
                             subHeaderTab === 'liberacion-muebles'
                                 ? 'bg-[#324354] text-white shadow-md'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -1207,6 +1284,7 @@ export default function ConsultaSAPPage() {
                                 <span className="font-semibold text-gray-800 text-[11px] tracking-wide">
                                     Orden de fabricación{activeOrder.noOrden ? ` - ${activeOrder.noOrden}` : ''}
                                 </span>
+                                <EstadoConsultaSap estado={orderEstadoSap} />
                             </div>
                             
                             {/* Search container con botón Buscar estilizado */}
@@ -1241,6 +1319,7 @@ export default function ConsultaSAPPage() {
 
                         {/* SAP GOLD SHARP ACCENT BORDER */}
                         <div className="h-[3px] bg-[#f4b000] w-full"></div>
+                        <AvisoFaltantesSap faltantes={orderFaltantes} />
 
                         {/* SAP WINDOW BODY */}
                         <div className="py-0.5 px-2 bg-[#f3f0ea] flex flex-col gap-0.5">
@@ -1270,11 +1349,10 @@ export default function ConsultaSAPPage() {
                                         <select 
                                             value={activeOrder.estado} 
                                             disabled 
-                                            className="bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd] font-semibold text-emerald-800"
+                                            className={`bg-[#fcfdfd] border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] w-[140px] rounded-none focus:outline-none disabled:bg-[#fcfdfd] font-semibold ${activeOrder.estado === 'Cancelado' ? 'text-red-700' : 'text-emerald-800'}`}
                                         >
-                                            <option>Liberado</option>
-                                            <option>Planificado</option>
-                                            <option>Cerrado</option>
+                                            {/* Si SAP trae un estado que no está en la lista se muestra tal cual (antes caía en "Liberado") */}
+                                            {[...new Set(['Liberado', 'Planificado', 'Cerrado', 'Cancelado', activeOrder.estado].filter(Boolean))].map(e => <option key={e}>{e}</option>)}
                                         </select>
                                     </div>
 
@@ -2131,9 +2209,35 @@ export default function ConsultaSAPPage() {
                                 </div>
                             )}
 
+                            {/* ERROR DE CONSULTA: siempre visible y en rojo */}
+                            {semaforoError && (
+                                <AvisoErrorSemaforo
+                                    titulo={semaforoHasLoaded ? 'Error al generar el archivo' : 'Error en la consulta del Semáforo: no hay datos válidos para usar'}
+                                    lineas={[semaforoError.mensaje]}
+                                    detalle={semaforoError.detalle}
+                                    hora={semaforoError.hora}
+                                />
+                            )}
+                            {/* La consulta respondió, pero con datos faltantes o no reconocidos */}
+                            {semaforoHasLoaded && semaforoAdvertencias.length > 0 && (
+                                <AvisoErrorSemaforo
+                                    titulo={`La consulta respondió, pero con ${semaforoAdvertencias.length} problema(s) en los datos. Úselos con precaución.`}
+                                    lineas={semaforoAdvertencias}
+                                    hora={semaforoConsultaHora}
+                                />
+                            )}
+
                             {/* MENSAJE CENTRAL CON REGISTROS ENCONTRADOS / ESTADO */}
                             <div className="w-full max-w-lg bg-white border border-[#a3a3a3] rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-3">
-                                {!semaforoHasLoaded ? (
+                                {semaforoError && !semaforoHasLoaded ? (
+                                    <div className="space-y-2">
+                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-red-100 text-red-700 rounded-full mb-1">
+                                            <AlertTriangle size={28} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-red-700">Consulta fallida: 0 registros válidos</h3>
+                                        <p className="text-xs text-slate-500">Intente de nuevo con <strong>"Actualizar Semáforo"</strong>. Si el error continúa, envíe la captura del aviso en rojo.</p>
+                                    </div>
+                                ) : !semaforoHasLoaded ? (
                                     <div className="space-y-2">
                                         <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 text-amber-800 rounded-full mb-1">
                                             <FileSpreadsheet size={28} />
@@ -2145,15 +2249,21 @@ export default function ConsultaSAPPage() {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full mb-1">
-                                            <Check size={28} />
+                                        <div className={`inline-flex items-center justify-center w-14 h-14 rounded-full mb-1 ${semaforoAdvertencias.length ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                                            {semaforoAdvertencias.length ? <AlertTriangle size={28} /> : <Check size={28} />}
                                         </div>
                                         <h3 className="text-2xl font-extrabold text-[#324354]">
                                             {semaforoDataList.length.toLocaleString('es-CO')} Registros Encontrados
                                         </h3>
-                                        <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
-                                            ✓ Consulta completada exitosamente desde: <strong>{semaforoDataSource}</strong>
-                                        </div>
+                                        {semaforoAdvertencias.length ? (
+                                            <div className="inline-block text-xs text-red-800 font-semibold bg-red-50 py-1.5 px-4 rounded-xl border border-red-300">
+                                                ⚠ Consulta con {semaforoAdvertencias.length} problema(s) en los datos ({semaforoDataSource}). Revise el aviso en rojo.
+                                            </div>
+                                        ) : (
+                                            <div className="inline-block text-xs text-emerald-800 font-semibold bg-emerald-50 py-1.5 px-4 rounded-xl border border-emerald-200">
+                                                ✓ Consulta completada y validada desde: <strong>{semaforoDataSource}</strong>
+                                            </div>
+                                        )}
                                         <p className="text-xs text-slate-500 pt-1">
                                             Los datos están listos para ser descargados directamente en Excel o copiados al portapapeles.
                                         </p>
@@ -2172,11 +2282,13 @@ export default function ConsultaSAPPage() {
                                     }
                                 </span>
                                 <span className="text-gray-400">|</span>
-                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                    <span className={`w-2 h-2 rounded-full inline-block ${semaforoHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                                    {semaforoHasLoaded 
-                                        ? "Consulta ejecutada con éxito [200 OK]"
-                                        : "Estado: Listo para actualización u orden de descarga"
+                                <span className={`font-semibold flex items-center gap-1 ${semaforoError || semaforoAdvertencias.length ? 'text-red-700' : 'text-emerald-700'}`}>
+                                    <span className={`w-2 h-2 rounded-full inline-block ${semaforoError || semaforoAdvertencias.length ? 'bg-red-600' : semaforoHasLoaded ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                    {semaforoError
+                                        ? "Error (ver aviso en rojo)"
+                                        : semaforoHasLoaded
+                                            ? semaforoAdvertencias.length ? `Consulta con ${semaforoAdvertencias.length} problema(s) en los datos` : "Consulta ejecutada y validada"
+                                            : "Estado: Listo para actualización u orden de descarga"
                                     }
                                 </span>
                             </div>
@@ -2211,14 +2323,13 @@ export default function ConsultaSAPPage() {
                                         Consultando SAP B1...
                                     </span>
                                 )}
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold border border-emerald-300">
-                                    SAP Conectado Live
-                                </span>
+                                <EstadoConsultaSap estado={itemEstadoSap} />
                             </div>
                         </div>
 
                         {/* SAP GOLD SHARP ACCENT BORDER */}
                         <div className="h-[3px] bg-[#f4b000] w-full"></div>
+                        <AvisoFaltantesSap faltantes={itemFaltantes} />
 
                         {/* SAP WINDOW BODY */}
                         <div className="py-2 px-3 bg-[#f3f0ea] flex flex-col gap-2">
@@ -2378,7 +2489,7 @@ export default function ConsultaSAPPage() {
                                                         {activeItem.warehouses && activeItem.warehouses.length > 0 ? (
                                                             activeItem.warehouses.map((wh, idx) => {
                                                                 const disp = wh.available !== undefined ? wh.available : (wh.inStock - wh.committed + wh.ordered);
-                                                                const dispReal = wh.dispReal !== undefined ? wh.dispReal : disp;
+                                                                const dispReal = wh.dispReal;
                                                                 const isHighlight = wh.warehouseCode === 'PT-02';
                                                                 return (
                                                                     <tr 
@@ -2407,7 +2518,7 @@ export default function ConsultaSAPPage() {
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center"></td>
-                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black font-semibold">{dispReal.toFixed(2)}</td>
+                                                                        <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-black font-semibold">{dispReal != null ? dispReal.toFixed(2) : ''}</td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono">{wh.amortiguadorToc || ''}</td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono">{wh.minOrderQty && wh.minOrderQty > 0 ? wh.minOrderQty : ''}</td>
                                                                         <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-right font-mono">{wh.leadTime && wh.leadTime > 0 ? wh.leadTime : ''}</td>
@@ -2512,7 +2623,7 @@ export default function ConsultaSAPPage() {
                                                                     <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-500 select-text">{row.costoEstTotal}</td>
                                                                     <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-semibold select-text">{row.precioUnitario}</td>
                                                                     <td className="px-2.5 py-0.5 border-r border-[#e0ddd5] text-right font-mono text-gray-900 font-bold select-text">{row.total}</td>
-                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] select-text"></td>
+                                                                    <td className="px-2 py-0.5 border-r border-[#e0ddd5] select-text">{row.comentarios}</td>
                                                                     <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-center font-mono text-gray-600 select-text">{row.ctaWip}</td>
                                                                     <td className="px-2 py-0.5 text-center select-text"></td>
                                                                 </tr>
@@ -2544,10 +2655,10 @@ export default function ConsultaSAPPage() {
                                                     <tfoot className="sticky bottom-0 bg-[#eceae6] border-t-2 border-[#a3a3a3] font-bold font-mono text-[11px] z-10 text-black">
                                                         <tr>
                                                             <td colSpan={10} className="px-2 py-1 border-r border-[#c2c0bb] text-right text-gray-600 font-sans">Totales:</td>
-                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono">{activeItem.itemCode ? '$ 0.00' : ''}</td>
+                                                            <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono"></td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right"></td>
                                                             <td className="px-2.5 py-1 border-r border-[#c2c0bb] text-right font-mono text-emerald-800">
-                                                                {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? '$ 10,723.40' : (activeItem.itemCode ? '$ 0.00' : '')}
+                                                                {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? `$ ${activeItem.bomComponents.reduce((a: number, r: any) => a + (Number(r.totalNum) || 0), 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                                                             </td>
                                                             <td colSpan={3} className="px-2 py-1"></td>
                                                         </tr>

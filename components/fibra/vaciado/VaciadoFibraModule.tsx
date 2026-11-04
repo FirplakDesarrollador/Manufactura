@@ -1,193 +1,126 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { RegistroTrazabilidad } from '@/types/pintura'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { getRegistrosParaVaciado } from '@/lib/supabase/queries/fibra_vaciado'
+import { getOrdenesFabricacion, getAllMoldes, getRegistrosTrazabilidadHoyMetricas } from '@/lib/supabase/queries/fibra'
+import EncabezadoFibra, { useMetricasFibra } from '../EncabezadoFibra'
 import RegistroVaciadoCard from './RegistroVaciadoCard'
 import KilosTable from './KilosTable'
-import { Search, Eraser, Info, Database, ClipboardList, TableProperties } from 'lucide-react'
+import { ClipboardList, TableProperties } from 'lucide-react'
 
 export default function VaciadoFibraModule({ userEmail }: { userEmail: string }) {
     const [activeTab, setActiveTab] = useState<'reportar' | 'kilos'>('reportar')
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
+    const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
+    const [trazabilidad, setTrazabilidad] = useState<RegistroTrazabilidad[]>([])
+    const [moldes, setMoldes] = useState<Molde[]>([])
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
-    const [selectedMaquina, setSelectedMaquina] = useState<string>(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('vaciado_maquina') || ''
-        }
-        return ''
-    })
+    const [selectedDate, setSelectedDate] = useState('')
 
-    useEffect(() => {
-        if (selectedMaquina) {
-            localStorage.setItem('vaciado_maquina', selectedMaquina)
-        }
-    }, [selectedMaquina])
-
-    const loadRegistros = async () => {
+    // Piezas pendientes de vaciado + órdenes, moldes y registros de hoy (tarjeta e indicadores iguales a Pintura)
+    const loadRegistros = useCallback(async () => {
         setLoading(true)
-        const data = await getRegistrosParaVaciado()
+        const [data, ordenesData, moldesData, trazaHoy] = await Promise.all([
+            getRegistrosParaVaciado(), getOrdenesFabricacion(), getAllMoldes(), getRegistrosTrazabilidadHoyMetricas()
+        ])
         setRegistros(data)
+        setOrdenes(ordenesData)
+        setMoldes(moldesData)
+        setTrazabilidad(trazaHoy)
         setLoading(false)
-    }
+    }, [])
 
     useEffect(() => {
         if (activeTab === 'reportar') {
             loadRegistros()
         }
-    }, [activeTab])
+    }, [activeTab, loadRegistros])
 
-    const filteredRegistros = registros.filter(r => {
-        if (!searchText) return true
+    const { baseFilteredOrdenes, metrics } = useMetricasFibra(ordenes, trazabilidad, searchText, selectedDate)
+
+    const ordenPorOf = useMemo(() => {
+        const m = new Map<string, OrdenFabricacion>()
+        for (const o of ordenes) m.set(String(o.orden_fabricacion), o)
+        return m
+    }, [ordenes])
+
+    // Una pieza se muestra si su orden pasa la búsqueda y la fecha, o (sin fecha) si la búsqueda coincide con la pieza (p. ej. el serial)
+    const filteredRegistros = useMemo(() => {
+        if (!searchText && !selectedDate) return registros
+        const ofsFiltradas = new Set(baseFilteredOrdenes.map(o => String(o.orden_fabricacion)))
         const search = searchText.toLowerCase()
-        return (
-            r.molde_serial?.toLowerCase().includes(search) ||
-            r.molde_descripcion?.toLowerCase().includes(search) ||
-            r.orden_fabricacion?.toLowerCase().includes(search) ||
-            r.producto_descripcion?.toLowerCase().includes(search) ||
-            r.pedido?.toLowerCase().includes(search) ||
-            r.numero_pedido?.toLowerCase().includes(search)
-        )
-    })
+        return registros.filter(r => {
+            if (ofsFiltradas.has(String(r.orden_fabricacion))) return true
+            if (selectedDate || !search) return false
+            return [r.molde_serial, r.molde_descripcion, r.orden_fabricacion, r.producto_descripcion, r.pedido, r.numero_pedido]
+                .some(v => (v || '').toLowerCase().includes(search))
+        })
+    }, [registros, baseFilteredOrdenes, searchText, selectedDate])
 
     return (
-        <div className="h-full flex flex-col bg-gray-50/50">
-            {/* Main Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
-                <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h2 className="text-base font-extrabold text-[#254153] flex items-center gap-2 uppercase tracking-tight">
-                            <Database size={20} className="text-amber-600" />
-                            Módulo de Vaciado
-                        </h2>
-                        <p className="text-xs text-gray-500 font-bold mt-0.5 uppercase tracking-widest opacity-80">
-                            Registro de piezas y consulta de pesos estándar.
-                        </p>
-                    </div>
-
-                    {/* Tab Navigation */}
-                    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner">
+        <div className="min-h-full md:h-full flex flex-col bg-slate-50/30 md:overflow-hidden">
+            <EncabezadoFibra
+                metrics={metrics}
+                searchText={searchText}
+                onSearchChange={setSearchText}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                onClear={() => { setSearchText(''); setSelectedDate('') }}
+                loading={loading}
+                placeholder="OF / Producto / Pedido / Molde..."
+                extra={
+                    <div className="flex h-8 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                         <button
                             onClick={() => setActiveTab('reportar')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'reportar'
-                                ? 'bg-[#254153] text-white shadow-lg scale-105'
-                                : 'text-gray-500 hover:text-[#254153] hover:bg-white/50'
-                                }`}
+                            className={`flex items-center gap-1.5 px-3 rounded-md text-[11px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'reportar' ? 'bg-[#254153] text-white' : 'text-slate-500 hover:text-[#254153]'}`}
                         >
-                            <ClipboardList size={16} />
+                            <ClipboardList size={14} />
                             Reportar
                         </button>
                         <button
                             onClick={() => setActiveTab('kilos')}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'kilos'
-                                ? 'bg-[#254153] text-white shadow-lg scale-105'
-                                : 'text-gray-500 hover:text-[#254153] hover:bg-white/50'
-                                }`}
+                            className={`flex items-center gap-1.5 px-3 rounded-md text-[11px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'kilos' ? 'bg-[#254153] text-white' : 'text-slate-500 hover:text-[#254153]'}`}
                         >
-                            <TableProperties size={16} />
+                            <TableProperties size={14} />
                             Tabla Kilos
                         </button>
                     </div>
-                </div>
-            </div>
+                }
+            />
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-4">
-                <div className="max-w-6xl mx-auto h-full">
-                    {activeTab === 'reportar' ? (
-                        <div className="space-y-4">
-                            {/* Search and Stats bar for Reporting */}
-                            <div className="bg-white p-3 rounded-xl border-2 border-gray-100 shadow-sm flex flex-col md:flex-row gap-3">
-                                <div className="relative flex-1 group">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-amber-500 transition-colors">
-                                        <Search size={18} />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar por OF, Producto, Pedido o Molde..."
-                                        value={searchText}
-                                        onChange={(e) => setSearchText(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-2 border-transparent rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all shadow-sm font-bold text-sm"
-                                    />
-                                </div>
-                                <div className="flex flex-col sm:flex-row gap-2">
-                                    <div className="flex flex-col min-w-[200px]">
-                                        <select
-                                            value={selectedMaquina}
-                                            onChange={(e) => setSelectedMaquina(e.target.value)}
-                                            className={`h-full px-3 py-2.5 rounded-xl border-2 font-black uppercase tracking-widest text-xs transition-all outline-none ${!selectedMaquina
-                                                ? 'border-red-300 bg-red-50 text-red-500 animate-pulse'
-                                                : 'border-amber-200 bg-amber-50 text-amber-700'
-                                                }`}
-                                        >
-                                            <option value="" disabled>-- SELECCIONAR MÁQUINA --</option>
-                                            <option value="ADM">ADM</option>
-                                            <option value="Ultracaster">ULTRACASTER</option>
-                                        </select>
-                                        {!selectedMaquina && (
-                                            <span className="text-[10px] font-black text-red-500 mt-1 ml-1 uppercase animate-bounce">
-                                                * Máquina obligatoria
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    <button
-                                        onClick={() => setSearchText('')}
-                                        className="bg-orange-500 hover:bg-orange-600 text-white px-6 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
-                                    >
-                                        <Eraser size={18} />
-                                        <span className="text-sm font-black uppercase tracking-widest">Limpiar</span>
-                                    </button>
-                                    <div className="bg-[#254153] text-white px-5 flex items-center border border-[#254153] rounded-xl shadow-lg">
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-tighter leading-none">Pendientes</p>
-                                            <p className="text-xl font-black leading-none mt-0.5">{registros.length}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Pieces List */}
-                            {loading ? (
-                                <div className="flex flex-col items-center justify-center py-32 space-y-4">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-100 border-t-amber-600" />
-                                    <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Cargando piezas...</span>
-                                </div>
-                            ) : filteredRegistros.length === 0 ? (
-                                <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 py-32 flex flex-col items-center justify-center text-center px-6">
-                                    <div className="bg-gray-50 p-8 rounded-full mb-6">
-                                        <ClipboardList size={64} className="text-gray-200" />
-                                    </div>
-                                    <h3 className="text-xl font-extrabold text-[#254153]">No hay piezas encontradas</h3>
-                                    <p className="text-sm text-gray-500 max-w-xs mt-2 font-medium">
-                                        {searchText
-                                            ? "Intenta con otros criterios de búsqueda."
-                                            : "No existen piezas en estado 'Pintura' actualmente."}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 gap-4">
-                                    <div className="text-xs font-black text-[#254153]/40 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
-                                        <div className="h-1 w-10 bg-amber-200 rounded-full" />
-                                        Piezas para Vaciado: {filteredRegistros.length}
-                                    </div>
-                                    {filteredRegistros.map((registro, index) => (
-                                        <RegistroVaciadoCard
-                                            key={registro.registrer || index}
-                                            registro={registro}
-                                            usuarioEmail={userEmail}
-                                            onRefresh={loadRegistros}
-                                            selectedMaquina={selectedMaquina}
-                                        />
-                                    ))}
-                                </div>
-                            )}
+            {/* Contenido */}
+            <div className="flex-1 md:overflow-y-auto p-2 sm:p-4">
+                {activeTab === 'reportar' ? (
+                    <div className="space-y-2">
+                        <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
+                            Piezas pendientes de vaciado: {filteredRegistros.length}
                         </div>
-                    ) : (
+                        {loading ? (
+                            <div className="text-center py-8 text-gray-500">Cargando piezas...</div>
+                        ) : filteredRegistros.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                {searchText || selectedDate ? 'No se encontraron piezas con esos filtros' : "No hay piezas en estado 'Pintura' pendientes de vaciado"}
+                            </div>
+                        ) : (
+                            filteredRegistros.map((registro, index) => (
+                                <RegistroVaciadoCard
+                                    key={registro.registrer || index}
+                                    registro={registro}
+                                    orden={ordenPorOf.get(String(registro.orden_fabricacion))}
+                                    moldes={moldes}
+                                    usuarioEmail={userEmail}
+                                    onRefresh={loadRegistros}
+                                />
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    <div className="max-w-6xl mx-auto">
                         <KilosTable />
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     )

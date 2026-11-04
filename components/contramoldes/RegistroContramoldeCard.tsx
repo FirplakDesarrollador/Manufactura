@@ -1,5 +1,5 @@
 'use client'
-import { parseDBDate } from '@/lib/utils/date';
+import { parseDBDate, parseDBTimestamp } from '@/lib/utils/date';
 
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
@@ -81,7 +81,7 @@ export default function RegistroContramoldeCard({ registro, usuarioEmail, onRefr
                             <div>
                                 <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Fecha Pintura</p>
                                 <p className="text-xs font-bold text-gray-900">
-                                    {parseDBDate(registro.pintura_fecha).toLocaleString()}
+                                    {parseDBTimestamp(registro.pintura_fecha).toLocaleString()}
                                 </p>
                             </div>
                         </div>

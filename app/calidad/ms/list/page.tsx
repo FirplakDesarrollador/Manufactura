@@ -581,77 +581,77 @@ export default function ReportedDefectsListPage() {
                 onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
             />
 
-            {/* Filter Bar - Same height (h-14 / 56px) as main blue header */}
-            <div className="bg-gray-50 border-b border-gray-200 px-3 sm:px-4 py-2 xl:py-0 xl:h-14 sticky top-[56px] z-40 flex items-center shadow-xs">
-                <div className="max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between xl:grid xl:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-4 relative xl:h-full gap-2">
+            {/* Barra de filtros (nivel 2): 40 px, una sola fila desde 1200 px (zoom 100 %) */}
+            <div className="bg-gray-50 border-b border-gray-200 px-3 sm:px-4 py-1.5 min-[1200px]:py-0 min-[1200px]:h-10 sticky top-[48px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto flex flex-wrap items-center justify-between min-[1200px]:grid min-[1200px]:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] min-[1200px]:gap-4 relative min-[1200px]:h-full gap-2">
                     {/* Left: Filters - Ampliado para aprovechar el espacio */}
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min xl:max-w-[640px]">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min min-[1200px]:max-w-[440px] 2xl:max-w-[600px]">
                         {/* Date Picker */}
-                        <div className="w-full sm:w-36 relative shrink-0">
-                            <CalendarIcon className="w-4 h-4 text-[#254153] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <div className="w-full sm:w-[118px] relative shrink-0">
+                            <CalendarIcon className="w-3 h-3 text-[#254153] absolute left-2 top-1/2 -translate-y-1/2" />
                             <input
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => {
                                     setSelectedDate(e.target.value)
                                 }}
-                                className="w-full h-10 bg-white border border-gray-300 rounded px-2 text-xs font-black text-[#254153] focus:border-[#254153] outline-none pl-8"
+                                className="w-full h-7 bg-white border border-gray-300 rounded px-1.5 text-[10px] font-black text-[#254153] focus:border-[#254153] outline-none pl-6"
                             />
                         </div>
 
                         {/* Product Filter with Search */}
-                        <div className="flex-1 min-w-[120px] [contain:inline-size]">
+                        <div className="flex-1 min-w-[100px] [contain:inline-size]">
                             <SearchableSelect
                                 name="productoFilter"
                                 options={productOptions}
                                 placeholder="TODAS LAS REFERENCIAS"
                                 value={selectedProduct}
                                 onValueChange={(val) => setSelectedProduct(val)}
-                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-[10px] outline-none focus:border-[#254153] h-7 uppercase flex items-center"
                             />
                         </div>
 
                         {/* Defect Filter with Search */}
-                        <div className="flex-1 min-w-[120px] [contain:inline-size]">
+                        <div className="flex-1 min-w-[100px] [contain:inline-size]">
                             <SearchableSelect
                                 name="defectoFilter"
                                 options={defectOptions}
                                 placeholder="TODOS LOS DEFECTOS"
                                 value={selectedDefect}
                                 onValueChange={(val) => setSelectedDefect(val)}
-                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-xs outline-none focus:border-[#254153] h-10 uppercase flex items-center"
+                                className="w-full bg-white border border-gray-300 rounded px-2.5 font-black text-[#254153] text-[10px] outline-none focus:border-[#254153] h-7 uppercase flex items-center"
                             />
                         </div>
                     </div>
 
                     {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
-                    <div className="order-3 xl:order-none w-full xl:w-auto flex justify-center z-20">
+                    <div className="order-3 min-[1200px]:order-none w-full min-[1200px]:w-auto flex justify-center z-20">
                         <CalidadMsNavButtons activeTab="list" hasSettingsPermission={true} />
                     </div>
 
                     {/* Right: Piece Stats Summary */}
-                    <div className="order-2 xl:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-3 gap-y-1 w-full sm:w-auto sm:ml-auto xl:ml-0 xl:justify-self-end min-w-0">
-                        <div className="bg-[#254153] text-white px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest border border-black shadow-inner">
+                    <div className="order-2 min-[1200px]:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-2 gap-y-1 w-full sm:w-auto sm:ml-auto min-[1200px]:ml-0 min-[1200px]:justify-self-end min-w-0">
+                        <div className="bg-[#254153] text-white px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border border-black shadow-inner">
                             REG: {filteredReports.length}
                         </div>
                         <div className="flex items-center space-x-1.5">
                             <div className="w-2 h-2 bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase">OK:</span>
-                            <span className="text-base font-black text-green-600">{pieceStats.buenos}</span>
+                            <span className="text-[9px] font-black text-gray-400 uppercase">OK:</span>
+                            <span className="text-sm font-black text-green-600">{pieceStats.buenos}</span>
                         </div>
                         <div className="flex items-center space-x-1.5">
                             <div className="w-2 h-2 bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.5)]" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase">DEF:</span>
-                            <span className="text-base font-black text-red-600">{pieceStats.defectuosos}</span>
+                            <span className="text-[9px] font-black text-gray-400 uppercase">DEF:</span>
+                            <span className="text-sm font-black text-red-600">{pieceStats.defectuosos}</span>
                         </div>
-                        <div className="h-7 w-px bg-gray-300" />
+                        <div className="h-5 w-px bg-gray-300" />
                         <div className="flex flex-col items-center">
-                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">Total</span>
-                            <span className="text-base font-black text-[#254153] leading-none">{pieceStats.total}</span>
+                            <span className="text-[8px] font-black text-gray-400 uppercase leading-none">Total</span>
+                            <span className="text-sm font-black text-[#254153] leading-none">{pieceStats.total}</span>
                         </div>
                         <div className="flex flex-col items-center px-2 border-l border-gray-300">
-                            <span className="text-[9px] font-black text-gray-400 uppercase leading-none">IFI</span>
-                            <span className={`text-base font-black leading-none ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
+                            <span className="text-[8px] font-black text-gray-400 uppercase leading-none">IFI</span>
+                            <span className={`text-sm font-black leading-none ${pieceStats.eficiencia >= 90 ? 'text-green-600' : pieceStats.eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pieceStats.eficiencia.toFixed(1)}%</span>
                         </div>
                     </div>
                 </div>

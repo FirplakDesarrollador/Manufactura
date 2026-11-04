@@ -36,6 +36,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [expandedRegistros, setExpandedRegistros] = useState<Set<string | number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
+    // Orden cuyo detalle de SAP (lista de materiales, comentarios…) está abierto
 
     // Modal State
     const [editModal, setEditModal] = useState<{
@@ -310,14 +311,14 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     return (
         <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
             {/* Summary Cards */}
-            <div className="p-4 bg-white border-b border-slate-200">
-                <div className="flex flex-wrap gap-3 overflow-x-auto pb-2 no-scrollbar">
+            <div className="px-4 py-2 bg-white border-b border-slate-200">
+                <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
                     <StatCard label="Cantidad" value={stats.cantidad} color="bg-blue-50 text-blue-600" />
                     <StatCard label="Programado" value={stats.programado} color="bg-indigo-50 text-indigo-600" />
                     <StatCard label="Pintura Hoy" value={stats.pintura} color="bg-orange-50 text-orange-600" />
                     <StatCard label="Desgelcada" value={stats.desgelcada} color="bg-yellow-50 text-yellow-600" />
                     <StatCard label="Vaciado Hoy" value={stats.vaciado} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard label="Acabado Hoy" value={stats.acabado} color="bg-purple-50 text-purple-600" />
+                    <StatCard label="Ensayo Hoy" value={stats.acabado} color="bg-purple-50 text-purple-600" />
                     <StatCard label="Saldo" value={stats.saldo} color="bg-rose-50 text-rose-600" />
                     <StatCard label="Digitado" value={stats.digitado} color="bg-slate-50 text-slate-600" />
                     <StatCard label="Transito" value={stats.transito} color="bg-amber-50 text-amber-600" />
@@ -435,37 +436,43 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                         ) : (
                             filteredOrdenes.map((item) => (
                                 <div key={item.id} className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
-                                <div className="flex gap-3 items-stretch">
-                                    <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center">
-                                        <button
-                                            onClick={() => toggleOrden(item.id)}
-                                            className={`p-2 rounded-lg transition-colors ${expandedOrdenes.has(item.id) ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'}`}
-                                            title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
-                                        >
-                                            <ChevronsUpDown size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => setEditModal({ type: 'of', item })}
-                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50"
-                                            title="Editar Orden"
-                                        >
-                                            <Edit2 size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete('of', item.id)}
-                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-red-50/50"
-                                            title="Eliminar Orden"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <OrdenCard
+                                {/* Misma tarjeta de los módulos de piso FV (detalle junto a "Moldes") y franja inferior con las acciones */}
+                                <div className="bg-white border-2 border-gray-300 rounded-lg">
+                                    <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none">
+                                        <OrdenCard planta="fv"
                                             orden={item}
                                             isActive={false}
                                             onClick={() => setEditModal({ type: 'of', item })}
                                             moldes={allMoldes}
                                         />
+                                    </div>
+                                    <div className="rounded-b-md border-t-2 border-gray-200 bg-slate-50 px-3 py-1.5 flex flex-wrap items-center gap-2">
+                                        <button
+                                            onClick={() => toggleOrden(item.id)}
+                                            className={`h-8 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors ${expandedOrdenes.has(item.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`}
+                                            title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
+                                        >
+                                            <ChevronsUpDown size={15} />
+                                            {expandedOrdenes.has(item.id) ? 'Ocultar piezas' : 'Ver piezas'}
+                                        </button>
+                                        <div className="ml-auto flex gap-2">
+                                            <button
+                                                onClick={() => setEditModal({ type: 'of', item })}
+                                                className="h-8 px-3 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                title="Editar Orden"
+                                            >
+                                                <Edit2 size={15} />
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete('of', item.id)}
+                                                className="h-8 px-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                title="Eliminar Orden"
+                                            >
+                                                <Trash2 size={15} />
+                                                Eliminar
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 {expandedOrdenes.has(item.id) && (
@@ -632,6 +639,8 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             <option value="Desgelcada">Desgelcada</option>
                                             <option value="Vaciado">Vaciado</option>
                                             <option value="Pulido">Pulido</option>
+                                            <option value="Ensayo">Ensayo</option>
+                                            <option value="Guacales">Guacales</option>
                                             <option value="Acabado">Acabado</option>
                                             <option value="Empaque">Empaque</option>
                                             <option value="Digitado">Digitado</option>
@@ -739,8 +748,8 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
 function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
     return (
-        <div className={`shrink-0 p-3 rounded-xl border border-slate-100 shadow-sm min-w-[100px] flex flex-col items-center justify-center ${color}`}>
-            <span className="text-[9px] font-black uppercase opacity-70 mb-1">{label}</span>
+        <div className={`flex-1 min-w-[76px] px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
+            <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
             <span className="text-sm font-black tracking-tight">{value}</span>
         </div>
     )
@@ -766,11 +775,10 @@ const TRACE_STAGES: Array<{
 }> = [
     { label: 'Pintura', dateKey: 'pintura_fecha', userKey: 'pintura_user_name' },
     { label: 'Vaciado', dateKey: 'vaciado_fecha', userKey: 'vaciado_user_name' },
-    { label: 'Contramolde', dateKey: 'contramolde_fecha', userKey: 'contramolde_user_name' },
     { label: 'Pulido', dateKey: 'pulido_fecha', userKey: 'pulido_user_name' },
-    { label: 'Acabado', dateKey: 'acabado_fecha', userKey: 'acabado_user_name' },
+    { label: 'Ensayo', dateKey: 'acabado_fecha', userKey: 'acabado_user_name' },
     { label: 'Reparacion', dateKey: 'reparacion_fecha', userKey: 'reparacion_user_name' },
-    { label: 'Empaque', dateKey: 'empaque_fecha', userKey: 'empaque_user_name' },
+    { label: 'Guacales', dateKey: 'empaque_fecha', userKey: 'empaque_user_name' },
     { label: 'Digitado', dateKey: 'digitado_fecha', userKey: 'digitado_user_name' },
     { label: 'Transito', dateKey: 'transito_fecha', userKey: 'transito_user_name' },
     { label: 'Cedi', dateKey: 'cedi_fecha', userKey: 'cedi_user_name' },
@@ -778,7 +786,8 @@ const TRACE_STAGES: Array<{
     { label: 'Destruccion', dateKey: 'destruccion_fecha', userKey: 'destruccion_user_name' }
 ]
 
-function OrderProcessesPanel({
+// También lo usa el Buscador de órdenes FV en modo solo consulta (sin onEdit/onDelete/onTransfer)
+export function OrderProcessesPanel({
     orden,
     registros: parentRegistros,
     onEdit,
@@ -787,9 +796,9 @@ function OrderProcessesPanel({
 }: {
     orden: OrdenFabricacion
     registros: RegistroTrazabilidad[]
-    onEdit: (registro: RegistroTrazabilidad) => void
-    onDelete: (registro: RegistroTrazabilidad) => void
-    onTransfer: (registro: RegistroTrazabilidad) => void
+    onEdit?: (registro: RegistroTrazabilidad) => void
+    onDelete?: (registro: RegistroTrazabilidad) => void
+    onTransfer?: (registro: RegistroTrazabilidad) => void
 }) {
     const [fetchedRegistros, setFetchedRegistros] = useState<RegistroTrazabilidad[] | null>(parentRegistros && parentRegistros.length > 0 ? parentRegistros : null)
     const [loadingRecords, setLoadingRecords] = useState(false)
@@ -822,7 +831,7 @@ function OrderProcessesPanel({
     const registros = fetchedRegistros !== null ? fetchedRegistros : parentRegistros
 
     const handleDeleteRecord = (registro: RegistroTrazabilidad) => {
-        onDelete(registro)
+        onDelete?.(registro)
         if (fetchedRegistros) {
             setFetchedRegistros(prev => prev ? prev.filter(r => (r.registrer || r.id) !== (registro.registrer || registro.id)) : null)
         }
@@ -862,17 +871,17 @@ function OrderProcessesPanel({
                                     <InfoPill label="Pedido" value={registro.numero_pedido || registro.pedido || '-'} />
                                     <InfoPill label="Molde" value={registro.molde_serial || '-'} />
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => onEdit(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
+                                {(onEdit || onTransfer || onDelete) && <div className="flex gap-2">
+                                    <button onClick={() => onEdit?.(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
                                         <Edit2 size={16} />
                                     </button>
-                                    <button onClick={() => onTransfer(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
+                                    <button onClick={() => onTransfer?.(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
                                         <ArrowRightLeft size={16} />
                                     </button>
                                     <button onClick={() => handleDeleteRecord(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
                                         <Trash2 size={16} />
                                     </button>
-                                </div>
+                                </div>}
                             </div>
                             <TraceProcessTimeline registro={registro} />
                         </div>

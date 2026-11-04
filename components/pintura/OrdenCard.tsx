@@ -1,24 +1,30 @@
 import { parseDBDate } from '@/lib/utils/date';
-import React from 'react'
+import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
-import { Box, Clipboard, Users, AlertTriangle } from 'lucide-react'
+import { Box, Clipboard, Users, AlertTriangle, FileText } from 'lucide-react'
+import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
 
 interface OrdenCardProps {
     orden: OrdenFabricacion
     isActive: boolean
     onClick: () => void
     moldes: Molde[]
+    planta?: 'fv'   // FV: recuadros en el orden del encabezado de piso FV (Ensayo y Huacales en lugar de Acabado/Empaque/Estantería)
+    conDetalle?: boolean   // FV: botón de detalle SAP junto a "Moldes" (se apaga donde la pantalla ya tiene su propio botón)
 }
 
 // Helper to render a small metric box within the card
 const MiniMetric = ({ label, value, color }: { label: string, value: number, color?: string }) => (
-    <div className={`flex flex-col items-center justify-center p-1 border rounded ${color || 'border-gray-200'}`}>
-        <span className="text-[10px] font-bold text-gray-900 uppercase text-center leading-tight">{label}</span>
+    <div className={`flex flex-col items-center justify-center p-1 border rounded min-w-0 ${color || 'border-gray-200'}`}>
+        {/* Nombres largos (Programado, Destrucción, Reparación…) un punto más pequeños para que quepan en el recuadro */}
+        <span className={`font-bold text-gray-900 uppercase text-center leading-tight max-w-full ${label.length > 9 ? 'text-[9px] tracking-tighter' : 'text-[10px]'}`}>{label}</span>
         <span className="text-sm font-bold text-gray-900">{value}</span>
     </div>
 )
 
-export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCardProps) {
+export default function OrdenCard({ orden, isActive, onClick, moldes, planta, conDetalle = true }: OrdenCardProps) {
+    const [verDetalle, setVerDetalle] = useState(false)
     const sku = (orden.molde_sku || orden.producto_sku || orden.sku || '').trim().toLowerCase()
     const codeMatch = sku.match(/PMOL\d*-(\d+)/i) || (orden.molde_sku ? orden.molde_sku.match(/PMOL\d*-(\d+)/i) : null)
     const targetCode = codeMatch ? codeMatch[1].replace(/^0+/, '') : ''
@@ -32,8 +38,8 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
         if (sku && (mSku === sku || mSerial === sku)) return true
         if (targetCode && mSerial.split('-')[0].replace(/^0+/, '') === targetCode) return true
         if (targetDesc && mDesc) {
-            const mKeywords = mDesc.replace(/molde|nuevo/gi, '').split(/\s+/).filter(w => w.length > 2)
-            if (mKeywords.length > 0 && mKeywords.every(kw => targetDesc.includes(kw))) return true
+            const mKeywords = mDesc.replace(/molde|nuevo/gi, '').split(/\s+/).filter((w: string) => w.length > 2)
+            if (mKeywords.length > 0 && mKeywords.every((kw: string) => targetDesc.includes(kw))) return true
         }
         return false
     })
@@ -63,7 +69,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
     return (
         <button
             onClick={onClick}
-            className={`w-full text-left p-3 rounded-lg border-2 transition-all flex flex-col md:flex-row gap-3 md:gap-0 relative ${isExcedido
+            className={`w-full text-left p-3 rounded-lg border-2 transition-all grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-2 lg:flex lg:flex-row lg:gap-0 relative ${isExcedido
                 ? 'bg-red-50/30 border-red-500 ring-4 ring-red-500/20 shadow-md'
                 : isActive
                 ? 'bg-cyan-100 border-cyan-500 ring-4 ring-cyan-500/20 shadow-md'
@@ -77,14 +83,14 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                 </div>
             )}
             {/* Left Section: Basic Info */}
-            <div className="w-full md:w-1/4 md:pr-2 md:border-r border-gray-300 flex flex-col justify-between overflow-hidden">
-                <div className="overflow-hidden">
+            <div className="w-full lg:w-[28%] lg:pr-2 lg:border-r border-gray-300 flex flex-col justify-between min-w-0">
+                <div className="min-w-0">
                     <div className="flex items-center gap-1 text-cyan-600 mb-1">
                         <Clipboard size={14} className="shrink-0" />
                         <span className="text-xs font-bold text-gray-900 truncate">OF: {orden.orden_fabricacion}</span>
 
                     </div>
-                    <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || orden.numero_pedido || 'Sin pedido'}</div>
+                    <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || (orden as any).numero_pedido || 'Sin pedido'}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
                         {orden.fecha_ideal_produccion ? (
                             <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
@@ -102,24 +108,39 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                         )}
                     </div>
                     {(() => {
-                        const rawDesc = orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'
-                        const cleanDesc = rawDesc.replace(/\s*\(\s*CAJA[^\)]*\)/gi, '').trim()
+                        const fullDesc = orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'
                         return (
-                            <div className="text-[11px] font-bold text-gray-800 mt-1 line-clamp-2 leading-tight" title={cleanDesc}>
-                                {cleanDesc}
+                            <div className="text-[11px] font-bold text-gray-800 mt-1 leading-snug break-words" title={fullDesc}>
+                                {fullDesc}
                             </div>
                         )
                     })()}
                     <div className="text-[9px] text-gray-400 italic mt-0.5 truncate">SKU: {sku || 'No definido'}</div>
                 </div>
-                <div className="flex items-center gap-1 text-cyan-500 mt-2 md:mt-auto">
+                <div className="flex items-center gap-1 text-cyan-500 mt-2 lg:mt-auto">
                     <Users size={12} className="shrink-0" />
                     <span className="text-[11px] font-bold truncate">Cliente: {orden.cliente || orden.cliente_nombre || 'No registrado'}</span>
                 </div>
             </div>
 
             {/* Middle Section: Mold Status */}
-            <div className="w-full md:w-1/5 md:px-3 md:border-r border-gray-300 flex flex-col justify-center bg-gray-50 md:bg-transparent p-2 md:p-0 rounded">
+            <div className="w-full sm:w-auto sm:min-w-[180px] lg:min-w-0 lg:w-[17%] lg:px-3 lg:border-r border-gray-300 flex flex-col justify-center bg-gray-50 lg:bg-transparent p-2 lg:p-0 rounded">
+                <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">Moldes</span>
+                    {planta === 'fv' && conDetalle && (
+                        // La tarjeta ya es un botón: el detalle va como span con rol de botón para no anidar botones
+                        <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={e => { e.stopPropagation(); setVerDetalle(true) }}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setVerDetalle(true) } }}
+                            className="p-1.5 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50 cursor-pointer"
+                            title="Detalle de la orden en SAP (lista de materiales, comentarios)"
+                        >
+                            <FileText size={16} />
+                        </span>
+                    )}
+                </div>
                 <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-bold">
                     <div className="text-cyan-600">Totales: <span className="text-gray-900">{orden.moldes_totales || relevantMoldes.length}</span></div>
                     <div className="text-red-500">Reparación: <span className="text-gray-900">{orden.moldes_en_reparacion || enReparacion}</span></div>
@@ -130,7 +151,28 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
             </div>
 
             {/* Right Section: Process Grid */}
-            <div className="flex-1 md:pl-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1">
+            {planta === 'fv' ? (
+                // FV: mismo orden del encabezado. En la base, las piezas en Ensayo cuentan en `acabado` y las de
+                // Guacales (por poner o ya en huacal) en `empaque`; la reparación larga suma en Reparación
+                <div className="sm:col-span-2 flex-1 lg:pl-3 grid grid-cols-4 sm:grid-cols-7 gap-1">
+                    <MiniMetric label="Cantidad" value={cantidadTotal} color={isExcedido ? "bg-red-100 border-red-400 text-red-700" : "bg-cyan-50 border-cyan-200"} />
+                    <MiniMetric label="Programado" value={programadoCalculado} color="bg-orange-50 border-orange-200" />
+                    <MiniMetric label="Pintura" value={Math.max(0, orden.pintura || 0)} />
+                    <MiniMetric label="Desgelcada" value={Math.max(0, orden.desgelcada || 0)} />
+                    <MiniMetric label="Vaciado" value={Math.max(0, orden.vaciado || 0)} />
+                    <MiniMetric label="Pulido" value={Math.max(0, orden.pulido || 0)} />
+                    <MiniMetric label="Ensayo" value={Math.max(0, orden.acabado || 0)} />
+
+                    <MiniMetric label="Reparación" value={Math.max(0, orden.reparacion || 0) + Math.max(0, orden.reparacion_larga || 0)} />
+                    <MiniMetric label="Huacales" value={Math.max(0, orden.empaque || 0)} />
+                    <MiniMetric label="Saldo" value={Math.max(0, orden.saldo || 0)} />
+                    <MiniMetric label="Destrucción" value={Math.max(0, orden.destruccion || 0)} />
+                    <MiniMetric label="Digitado" value={Math.max(0, orden.digitado || 0)} />
+                    <MiniMetric label="Tránsito" value={Math.max(0, orden.transito || 0)} />
+                    <MiniMetric label="CEDI" value={Math.max(0, orden.cedi || 0)} color="bg-cyan-50 border-cyan-200" />
+                </div>
+            ) : (
+            <div className="sm:col-span-2 flex-1 lg:pl-3 grid grid-cols-4 sm:grid-cols-8 gap-1">
                 <MiniMetric label="Cantidad" value={cantidadTotal} color={isExcedido ? "bg-red-100 border-red-400 text-red-700" : "bg-cyan-50 border-cyan-200"} />
                 <MiniMetric label="Pintura" value={Math.max(0, orden.pintura || 0)} />
                 <MiniMetric label="Desgelcada" value={Math.max(0, orden.desgelcada || 0)} />
@@ -149,6 +191,14 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
                 <MiniMetric label="Digitado" value={Math.max(0, orden.digitado || 0)} />
                 <MiniMetric label="CEDI" value={Math.max(0, orden.cedi || 0)} color="bg-cyan-50 border-cyan-200" />
             </div>
+            )}
+            {/* El modal va fuera de la tarjeta (portal) y no propaga clics a ella */}
+            {verDetalle && typeof document !== 'undefined' && createPortal(
+                <div onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                    <DetalleOrdenSapModal ordenFabricacion={orden.orden_fabricacion} onClose={() => setVerDetalle(false)} />
+                </div>,
+                document.body
+            )}
         </button>
     )
 }

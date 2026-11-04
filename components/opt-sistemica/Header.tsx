@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { URL_CALIDAD_FV_POWERAPPS } from '@/lib/calidad/enlaces';
 
 interface HeaderProps {
   title: string;
@@ -28,6 +29,9 @@ export default function Header({
   compact = false
 }: HeaderProps) {
   const router = useRouter();
+  // Estándar FIRPLAK: todas las pantallas usan el estilo compacto (banner de 48 px, logo h-9, sin subtítulo).
+  // "compact" solo define la posición: pegajoso (true) o fijo con espaciador (false).
+  const estilo = true;
   const [isOpen, setIsOpen] = useState(false);
   const [internalEmail, setInternalEmail] = useState<string | undefined>(undefined);
   const [showUnderConstructionModal, setShowUnderConstructionModal] = useState(false);
@@ -89,36 +93,36 @@ export default function Header({
   return (
     <>
       <header className={`z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full ${compact ? 'sticky top-0' : 'fixed top-0 left-0 right-0'}`}>
-      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${compact ? 'h-14' : 'h-20'}`}>
+      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${estilo ? 'h-12' : 'h-20'}`}>
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
-        <div className={`flex items-center ${compact ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
+        <div className={`flex items-center ${estilo ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
           {onBack && (
             <button
               onClick={onBack}
-              className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${compact ? 'w-8 h-8' : 'w-10 h-10'}`}
+              className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${estilo ? 'w-8 h-8' : 'w-10 h-10'}`}
               title="Volver"
             >
-              <svg className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} group-hover:-translate-x-0.5 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`${estilo ? 'w-5 h-5' : 'w-6 h-6'} group-hover:-translate-x-0.5 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
           )}
           <button
             onClick={() => setIsOpen(true)}
-            className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${compact ? 'w-8 h-8' : 'w-10 h-10'}`}
+            className={`group flex items-center justify-center text-white hover:text-slate-300 transition-colors cursor-pointer ${estilo ? 'w-8 h-8' : 'w-10 h-10'}`}
             title="Menú de Navegación"
           >
-            <svg className={`${compact ? 'w-6 h-6' : 'w-8 h-8'} group-hover:scale-110 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`${estilo ? 'w-6 h-6' : 'w-8 h-8'} group-hover:scale-110 transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           <div>
-            <h1 className={`${compact ? 'text-lg sm:text-xl font-light text-white tracking-widest uppercase leading-none' : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
+            <h1 className={`${estilo ? `text-base sm:text-lg font-light text-white tracking-widest uppercase leading-none` : 'text-xl sm:text-2xl font-display font-light text-white tracking-widest uppercase leading-none mb-1'}`}>
               {title}
             </h1>
-            {subtitle ? (
-              <p className={`${compact ? 'text-[11px] sm:text-xs text-[#F6F3EE]/70 font-medium tracking-wide leading-none mt-0.5' : 'text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none'}`}>
+            {!estilo && subtitle ? (
+              <p className={`${estilo ? 'text-[11px] sm:text-xs text-[#F6F3EE]/70 font-medium tracking-wide leading-none mt-0.5' : 'text-xs sm:text-sm text-[#F6F3EE]/70 font-medium tracking-wide leading-none'}`}>
                 {subtitle}
               </p>
             ) : null}
@@ -130,7 +134,7 @@ export default function Header({
           <img 
             src="/logo-firplak-clean.png" 
             alt="Firplak" 
-            className={`${compact ? 'h-8' : 'h-13'} w-auto object-contain`} 
+            className={`${estilo ? 'h-9' : 'h-16'} w-auto object-contain`}
           />
         </div>
 
@@ -145,24 +149,11 @@ export default function Header({
           {(internalEmail || userEmail) && (
             <div className="flex items-center gap-2">
               <div className="text-right max-w-[200px] lg:max-w-[300px] min-w-0">
-                <p className={`${compact ? 'text-base sm:text-lg font-semibold text-white truncate tracking-wide leading-none mb-0.5' : 'text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none mb-1'}`} title={internalEmail || userEmail}>
+                <p className={`${estilo ? `text-sm sm:text-base font-semibold text-white truncate tracking-wide leading-none` : 'text-xl sm:text-2xl font-semibold text-white truncate tracking-wide leading-none'}`} title={internalEmail || userEmail}>
                   {getFirstName(internalEmail || userEmail || '')}
                 </p>
-                <p className={`${compact ? 'text-[11px]' : 'text-xs sm:text-sm'} italic text-[#7B8E90] tracking-wider leading-none`}>
-                  Usuario
-                </p>
               </div>
-              {showLogout && (
-                <button
-                  onClick={handleSignOut}
-                  className="p-1.5 hover:bg-white/10 rounded transition-colors text-white/60 hover:text-white"
-                  title="Cerrar sesión"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </button>
-              )}
+              {/* Sin botón de cerrar sesión en el banner: se cierra desde el menú lateral */}
             </div>
           )}
         </div>
@@ -225,9 +216,8 @@ export default function Header({
               ]
             },
             { 
-              label: 'Informe de Turno', 
-              path: '#',
-              isUnderConstruction: true,
+              label: 'Informe de Turno',
+              path: '/informe-turno',
               icon: (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -254,8 +244,9 @@ export default function Header({
               subItems: [
                 { label: 'Indicadores Calidad', path: '/calidad' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
+                { label: 'Calidad FV (Atajo)', path: URL_CALIDAD_FV_POWERAPPS },
                 { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
-                { label: 'Criterios de Calidad', path: '/calidad/criterios' },
+                { label: 'Criterios de Aceptación y Rechazo', path: '/calidad/criterios' },
                 { label: 'Plan de Vigilancia', path: '/calidad/vigilancia' },
                 { label: 'QRQC Quick Response Quality Control', path: '/calidad/qrqc' }
               ]
@@ -315,9 +306,20 @@ export default function Header({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
               </svg>
             )},
-            { label: 'Talento Humano', path: 'https://talentohumano.vercel.app', icon: (
+            { label: 'Talento Humano (Atajo)', path: 'https://talentohumano.vercel.app', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H17m10 0v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            )},
+            { label: 'Moldes (Atajo)', path: 'https://app-moldes-theta.vercel.app/login', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+            )},
+            // Página pública de Firplak (catálogo de productos)
+            { label: 'Firplak.com (Atajo)', path: 'https://www.firplak.com', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
               </svg>
             )},
             { label: 'Cultura', path: '/cultura', icon: (
@@ -351,14 +353,15 @@ export default function Header({
                   {/* Zona Izquierda: Clic para Navegar al Módulo */}
                   <button
                     onClick={() => {
-                      if (item.isUnderConstruction) {
+                      if ('isUnderConstruction' in item && item.isUnderConstruction) {
                         setConstructionModuleName(item.label);
                         setShowUnderConstructionModal(true);
                         setIsOpen(false);
                       } else {
                         setIsOpen(false);
                         if (item.path.startsWith('http')) {
-                          window.open(`${item.path}?email=${encodeURIComponent(userEmail || '')}`, '_blank');
+                          // Solo Talento Humano recibe el correo; Moldes es otra app con su propio ingreso
+                          window.open(item.path.includes('talentohumano') ? `${item.path}?email=${encodeURIComponent(userEmail || '')}` : item.path, '_blank');
                         } else {
                           router.push(item.path);
                         }
@@ -402,7 +405,9 @@ export default function Header({
                         key={sIdx}
                         onClick={() => {
                           setIsOpen(false);
-                          router.push(sub.path);
+                          // Atajos a aplicaciones externas (Power Apps) se abren en otra pestaña
+                          if (sub.path.startsWith('http')) window.open(sub.path, '_blank', 'noopener,noreferrer');
+                          else router.push(sub.path);
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-all duration-300 text-slate-300 hover:text-white font-medium text-xs text-left cursor-pointer"
                       >
@@ -484,7 +489,7 @@ export default function Header({
         </div>
       )}
     </header>
-    {!compact && <div className="h-20 w-full shrink-0"></div>}
+    {!compact && <div className={`h-12 w-full shrink-0`}></div>}
    </>
   );
 }

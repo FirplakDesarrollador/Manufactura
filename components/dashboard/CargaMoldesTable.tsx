@@ -471,7 +471,7 @@ export default function CargaMoldesTable() {
 
                                             {/* Descripción */}
                                             <td 
-                                                className="px-4 py-2.5 text-gray-700 max-w-[280px] truncate" 
+                                                className="px-4 py-2.5 text-gray-700 min-w-[220px] whitespace-normal break-words" 
                                                 title={row.moldeDescripcion}
                                             >
                                                 {row.moldeDescripcion || '-'}

@@ -41,7 +41,7 @@ export function MetricCards({ data, loading }: MetricCardsProps) {
         { title: "Desgelcadas", value: data?.desgelcada || 0, bg: "bg-white", text: "text-[#254153]" },
 
         // Row 5
-        { title: "Acabado", value: data?.acabado || 0, bg: "bg-[#208b7e]", text: "text-white" },
+        { title: "Ensayo", value: data?.acabado || 0, bg: "bg-[#208b7e]", text: "text-white" },
         { title: "Digitado", value: data?.digitado || 0, bg: "bg-white", text: "text-[#254153]" },
         { title: "En Transito", value: data?.transito || 0, bg: "bg-white", text: "text-[#254153]" },
     ]
