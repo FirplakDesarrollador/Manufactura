@@ -89,7 +89,7 @@ export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, o
                         </button>
                         
                         <div className="pointer-events-none opacity-90 scale-[0.98] origin-left">
-                            <OrdenCard
+                            <OrdenCard planta="fv"
                                 orden={order}
                                 isActive={true}
                                 onClick={() => {}}

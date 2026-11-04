@@ -51,6 +51,27 @@ export async function getRegistrosTrazabilidadHoy(): Promise<RegistroTrazabilida
     return data || []
 }
 
+// Indicadores del encabezado de piso FV: lo de getRegistrosTrazabilidadHoy más lo pulido y lo puesto en guacal hoy
+// (consulta aparte para no cambiar el historial de Pintura, que lista lo que devuelve getRegistrosTrazabilidadHoy)
+export async function getRegistrosTrazabilidadHoyMetricas(): Promise<RegistroTrazabilidad[]> {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStr = today.toISOString()
+
+    const { data, error } = await supabase
+        .from('query_trazabilidad_fv')
+        .select('*')
+        .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},pulido_fecha.gte.${todayStr},acabado_fecha.gte.${todayStr},empaque_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},transito_fecha.gte.${todayStr},estado.eq.Digitado,estado.eq.Transito`)
+        .limit(10000)
+
+    if (error) {
+        console.error('Error fetching registros trazabilidad hoy (métricas):', error)
+        return []
+    }
+
+    return data || []
+}
+
 export async function getRegistrosTrazabilidadActivos(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
         .from('query_trazabilidad_fv')

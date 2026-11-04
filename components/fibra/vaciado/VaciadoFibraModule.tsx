@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { getRegistrosParaVaciado } from '@/lib/supabase/queries/fibra_vaciado'
-import { getOrdenesFabricacion, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/fibra'
+import { getOrdenesFabricacion, getAllMoldes, getRegistrosTrazabilidadHoyMetricas } from '@/lib/supabase/queries/fibra'
 import EncabezadoFibra, { useMetricasFibra } from '../EncabezadoFibra'
 import RegistroVaciadoCard from './RegistroVaciadoCard'
 import KilosTable from './KilosTable'
@@ -23,7 +23,7 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
     const loadRegistros = useCallback(async () => {
         setLoading(true)
         const [data, ordenesData, moldesData, trazaHoy] = await Promise.all([
-            getRegistrosParaVaciado(), getOrdenesFabricacion(), getAllMoldes(), getRegistrosTrazabilidadHoy()
+            getRegistrosParaVaciado(), getOrdenesFabricacion(), getAllMoldes(), getRegistrosTrazabilidadHoyMetricas()
         ])
         setRegistros(data)
         setOrdenes(ordenesData)
@@ -60,7 +60,7 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
     }, [registros, baseFilteredOrdenes, searchText, selectedDate])
 
     return (
-        <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
+        <div className="min-h-full md:h-full flex flex-col bg-slate-50/30 md:overflow-hidden">
             <EncabezadoFibra
                 metrics={metrics}
                 searchText={searchText}
@@ -91,7 +91,7 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
             />
 
             {/* Contenido */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 md:overflow-y-auto p-2 sm:p-4">
                 {activeTab === 'reportar' ? (
                     <div className="space-y-2">
                         <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">

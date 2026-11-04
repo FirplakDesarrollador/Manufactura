@@ -20,11 +20,9 @@ import {
     Trash2,
     X,
     ChevronsUpDown,
-    ArrowRightLeft,
-    FileText
+    ArrowRightLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
-import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
 
 export default function AdministracionFibraModule({ userEmail }: { userEmail?: string }) {
     // userEmail available for future use
@@ -39,7 +37,6 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     const [expandedRegistros, setExpandedRegistros] = useState<Set<string | number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
     // Orden cuyo detalle de SAP (lista de materiales, comentarios…) está abierto
-    const [detalleOf, setDetalleOf] = useState<string | number | null>(null)
 
     // Modal State
     const [editModal, setEditModal] = useState<{
@@ -439,44 +436,43 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                         ) : (
                             filteredOrdenes.map((item) => (
                                 <div key={item.id} className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
-                                <div className="flex gap-3 items-stretch">
-                                    <div className="flex-1 min-w-0">
-                                        <OrdenCard
+                                {/* Misma tarjeta de los módulos de piso FV (detalle junto a "Moldes") y franja inferior con las acciones */}
+                                <div className="bg-white border-2 border-gray-300 rounded-lg">
+                                    <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none">
+                                        <OrdenCard planta="fv"
                                             orden={item}
                                             isActive={false}
                                             onClick={() => setEditModal({ type: 'of', item })}
                                             moldes={allMoldes}
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center">
+                                    <div className="rounded-b-md border-t-2 border-gray-200 bg-slate-50 px-3 py-1.5 flex flex-wrap items-center gap-2">
                                         <button
                                             onClick={() => toggleOrden(item.id)}
-                                            className={`p-2 rounded-lg transition-colors ${expandedOrdenes.has(item.id) ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'}`}
+                                            className={`h-8 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors ${expandedOrdenes.has(item.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`}
                                             title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
                                         >
-                                            <ChevronsUpDown size={18} />
+                                            <ChevronsUpDown size={15} />
+                                            {expandedOrdenes.has(item.id) ? 'Ocultar piezas' : 'Ver piezas'}
                                         </button>
-                                        <button
-                                            onClick={() => setDetalleOf(item.orden_fabricacion)}
-                                            className="p-2 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50"
-                                            title="Detalle de la orden en SAP (lista de materiales, comentarios)"
-                                        >
-                                            <FileText size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => setEditModal({ type: 'of', item })}
-                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50"
-                                            title="Editar Orden"
-                                        >
-                                            <Edit2 size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete('of', item.id)}
-                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-red-50/50"
-                                            title="Eliminar Orden"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
+                                        <div className="ml-auto flex gap-2">
+                                            <button
+                                                onClick={() => setEditModal({ type: 'of', item })}
+                                                className="h-8 px-3 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                title="Editar Orden"
+                                            >
+                                                <Edit2 size={15} />
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete('of', item.id)}
+                                                className="h-8 px-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                title="Eliminar Orden"
+                                            >
+                                                <Trash2 size={15} />
+                                                Eliminar
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 {expandedOrdenes.has(item.id) && (
@@ -745,9 +741,6 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                         </div>
                     </div>
                 </div>
-            )}
-            {detalleOf != null && (
-                <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)} />
             )}
         </div>
     )
