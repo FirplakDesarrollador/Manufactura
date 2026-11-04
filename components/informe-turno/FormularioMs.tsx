@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Copy, Info, Loader2, Plus, RefreshCw, Send, Trash2, Zap } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Copy, FileSpreadsheet, Info, Loader2, Plus, RefreshCw, Send, Trash2, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
     CAUSAS_PARO_MS, DatosAutoMs, FilaAusentismo, FilaParo, InformeMsGuardado, ManualMs, MOTIVOS_AUSENTISMO,
-    cargarDatosAutoMs, cargarInformesMs, construirTextoMs, guardarInformeMs, manualVacio
+    cargarDatosAutoMs, cargarInformesMs, construirTextoExcelMs, construirTextoMs, guardarInformeMs, manualVacio
 } from '@/lib/informe-turno/ms';
 
 const hoyBogota = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
@@ -22,6 +22,38 @@ function Auto({ fuente }: { fuente: string }) {
         <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase text-sky-800 bg-sky-50 border border-sky-200 rounded px-1.5 py-px" title={`Se toma automáticamente de ${fuente}`}>
             <Zap className="w-2.5 h-2.5" /> {fuente}
         </span>
+    );
+}
+
+// Texto libre con sugerencias en una lista compacta (la del datalist del navegador es muy espaciada y no se puede ajustar)
+function ConSugerencias({ value, onChange, opciones, placeholder }: { value: string; onChange: (v: string) => void; opciones: string[]; placeholder: string }) {
+    const [abierto, setAbierto] = useState(false);
+    const filtro = value.trim().toLowerCase();
+    const visibles = opciones.filter(o => !filtro || o.toLowerCase().includes(filtro));
+    return (
+        <div className="relative">
+            <input
+                value={value}
+                onChange={e => { onChange(e.target.value); setAbierto(true); }}
+                onFocus={() => setAbierto(true)}
+                onBlur={() => setTimeout(() => setAbierto(false), 120)}
+                onKeyDown={e => { if (e.key === 'Escape') setAbierto(false); }}
+                placeholder={placeholder}
+                className={`${campo} font-medium pr-7`}
+            />
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {abierto && visibles.length > 0 && !(visibles.length === 1 && visibles[0] === value) && (
+                <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-56 overflow-y-auto">
+                    {visibles.map(o => (
+                        <li key={o}>
+                            <button type="button" onMouseDown={e => { e.preventDefault(); onChange(o); setAbierto(false); }} className="w-full text-left px-2.5 py-1 text-[13px] font-medium text-slate-700 hover:bg-slate-100 leading-tight">
+                                {o}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
     );
 }
 
@@ -48,7 +80,7 @@ export default function FormularioMs() {
     const [m, setM] = useState<ManualMs>(manualVacio());
     const [guardando, setGuardando] = useState(false);
     const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
-    const [copiado, setCopiado] = useState(false);
+    const [copiado, setCopiado] = useState<'whatsapp' | 'excel' | null>(null);
 
     useEffect(() => {
         let vivo = true;
@@ -88,7 +120,14 @@ export default function FormularioMs() {
     const setAus = (i: number, k: keyof FilaAusentismo, v: string) => setM(p => ({ ...p, ausentismos: p.ausentismos.map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
     const setParo = (lista: ListaParos, i: number, k: keyof FilaParo, v: string) => setM(p => ({ ...p, [lista]: p[lista].map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
     const quitarParo = (lista: ListaParos, i: number) => setM(p => ({ ...p, [lista]: p[lista].filter((_, j) => j !== i) }));
-    const agregarParo = (lista: ListaParos) => setM(p => ({ ...p, [lista]: [...p[lista], { minutos: '', causa: '' }] }));
+    const agregarParo = (lista: ListaParos, causa = '') => {
+        setM(p => ({ ...p, [lista]: [...p[lista], { minutos: '', causa }] }));
+        // Con la causa ya puesta solo falta escribir los minutos
+        setTimeout(() => {
+            const filas = document.querySelectorAll<HTMLInputElement>(`[data-paros="${lista}"] input[type="number"]`);
+            filas[filas.length - 1]?.focus();
+        }, 0);
+    };
 
     const numero = (k: CampoNumero, label: string, ayuda?: string, sufijo?: string) => (
         <div>
@@ -97,19 +136,42 @@ export default function FormularioMs() {
         </div>
     );
 
+    // Campo que por defecto muestra el dato de Control de Piso; si se escribe otro valor, manda el escrito
+    const conDefecto = (k: CampoNumero, label: string, auto: number | undefined, origen: string) => (
+        <div>
+            <label className={etiqueta}>{label}</label>
+            <input type="number" inputMode="decimal" min={0} step="any" value={m[k].trim() !== '' ? m[k] : auto != null ? String(auto) : ''} onChange={e => set(k, e.target.value)} placeholder="0" className={campo} />
+            {m[k].trim() === '' ? (
+                <span className="text-[10px] font-bold text-sky-700 mt-0.5 inline-block">= {origen}</span>
+            ) : auto != null && Number(m[k]) !== auto && (
+                <button type="button" onClick={() => set(k, '')} className="text-[10px] font-bold text-sky-700 hover:underline mt-0.5">
+                    Volver a {origen}: {auto}
+                </button>
+            )}
+        </div>
+    );
+
     const listaParos = (lista: ListaParos, titulo: string, minutosOpcional = false) => (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5" data-paros={lista}>
             <span className="text-[11px] font-black uppercase text-slate-600">{titulo}</span>
             {m[lista].map((p, i) => (
                 <div key={i} className="grid grid-cols-[80px_1fr_auto] gap-2">
                     <input type="number" inputMode="decimal" min={0} step="any" value={p.minutos} onChange={e => setParo(lista, i, 'minutos', e.target.value)} placeholder={minutosOpcional ? 'min' : '0'} className={campo} title="Minutos" />
-                    <input list="causas-paro-ms" value={p.causa} onChange={e => setParo(lista, i, 'causa', e.target.value)} placeholder="Causa (ej. avería en extractor de cabina #2, se apagaba)" className={`${campo} font-medium`} />
+                    <ConSugerencias value={p.causa} onChange={v => setParo(lista, i, 'causa', v)} opciones={CAUSAS_PARO_MS} placeholder="Causa (ej. avería en extractor de cabina #2, se apagaba)" />
                     <button type="button" onClick={() => quitarParo(lista, i)} className="w-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg" title="Quitar"><Trash2 className="w-4 h-4" /></button>
                 </div>
             ))}
-            <button type="button" onClick={() => agregarParo(lista)} className="w-full py-1.5 rounded-lg border-2 border-dashed border-slate-300 text-xs font-bold text-slate-500 hover:border-[#324354] hover:text-[#324354] flex items-center justify-center gap-1">
-                <Plus className="w-3.5 h-3.5" /> Agregar paro
-            </button>
+            {/* Paros más comunes: un clic agrega la fila con la causa puesta y el cursor en los minutos */}
+            <div className="flex flex-wrap gap-1">
+                {CAUSAS_PARO_MS.map(c => (
+                    <button key={c} type="button" onClick={() => agregarParo(lista, c)} className="px-2 py-0.5 rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-600 hover:border-[#324354] hover:text-[#324354] flex items-center gap-0.5">
+                        <Plus className="w-3 h-3" /> {c}
+                    </button>
+                ))}
+                <button type="button" onClick={() => agregarParo(lista)} className="px-2 py-0.5 rounded-full border-2 border-dashed border-slate-300 text-[11px] font-bold text-slate-500 hover:border-[#324354] hover:text-[#324354] flex items-center gap-0.5">
+                    <Plus className="w-3 h-3" /> Otro paro
+                </button>
+            </div>
         </div>
     );
 
@@ -127,19 +189,20 @@ export default function FormularioMs() {
         }
     };
 
-    const copiar = async () => {
+    const copiar = async (cual: 'whatsapp' | 'excel') => {
+        const contenido = cual === 'excel' ? construirTextoExcelMs(fecha, m, auto) : texto;
         try {
-            await navigator.clipboard.writeText(texto);
+            await navigator.clipboard.writeText(contenido);
         } catch {
             const ta = document.createElement('textarea');
-            ta.value = texto;
+            ta.value = contenido;
             document.body.appendChild(ta);
             ta.select();
             document.execCommand('copy');
             ta.remove();
         }
-        setCopiado(true);
-        setTimeout(() => setCopiado(false), 2000);
+        setCopiado(cual);
+        setTimeout(() => setCopiado(null), 2500);
     };
 
     // Guarda y abre WhatsApp con el informe listo para elegir el grupo
@@ -156,8 +219,6 @@ export default function FormularioMs() {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-            <datalist id="causas-paro-ms">{CAUSAS_PARO_MS.map(x => <option key={x} value={x} />)}</datalist>
-            <datalist id="motivos-ausentismo-ms">{MOTIVOS_AUSENTISMO.map(x => <option key={x} value={x} />)}</datalist>
 
             {/* Formulario */}
             <section className={`lg:col-span-7 bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border ${existente ? 'border-amber-400 ring-4 ring-amber-100' : 'border-[#e2ded5]'} space-y-5`}>
@@ -199,7 +260,7 @@ export default function FormularioMs() {
                         {m.ausentismos.map((x, i) => (
                             <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2">
                                 <input value={x.nombre} onChange={e => setAus(i, 'nombre', e.target.value)} placeholder="Nombre" className={`${campo} font-medium`} />
-                                <input list="motivos-ausentismo-ms" value={x.motivo} onChange={e => setAus(i, 'motivo', e.target.value)} placeholder="Motivo" className={`${campo} font-medium`} />
+                                <ConSugerencias value={x.motivo} onChange={v => setAus(i, 'motivo', v)} opciones={MOTIVOS_AUSENTISMO} placeholder="Motivo" />
                                 <button type="button" onClick={() => setM(p => ({ ...p, ausentismos: p.ausentismos.filter((_, j) => j !== i) }))} className="w-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg" title="Quitar"><Trash2 className="w-4 h-4" /></button>
                             </div>
                         ))}
@@ -238,14 +299,7 @@ export default function FormularioMs() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-2.5">
                         {numero('cnc', 'Piezas ruteadas CNC')}
                         {numero('adm', 'Piezas vaciadas ADM')}
-                        <div>
-                            {numero('ultracaster', 'Piezas vaciadas Ultracaster')}
-                            {a && m.ultracaster.trim() === '' && a.vaciado.total > 0 && (
-                                <button type="button" onClick={() => set('ultracaster', String(Math.max(0, a.vaciado.total - (Number(m.adm) || 0))))} className="text-[10px] font-bold text-sky-700 hover:underline mt-0.5">
-                                    Usar vaciado − ADM: {Math.max(0, a.vaciado.total - (Number(m.adm) || 0))}
-                                </button>
-                            )}
-                        </div>
+                        {conDefecto('ultracaster', 'Piezas vaciadas Ultracaster', a?.vaciado.total, 'total de vaciado')}
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                         {numero('acabado', 'Acabado', 'Piezas de acabado del turno (varía respecto a Control de Piso)')}
@@ -302,7 +356,7 @@ export default function FormularioMs() {
                     <h3 className="text-sm font-black text-[#324354] mb-2">6. Otros</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-2.5">
                         {numero('reparacion', 'Piezas de reparación')}
-                        {numero('desgelcadas', 'Piezas desgelcadas')}
+                        {conDefecto('desgelcadas', 'Piezas desgelcadas', a?.desgelcadas, 'Control de Piso')}
                         {numero('mesones', 'Mesones')}
                         {numero('mesaTrabajo', 'Mesa de trabajo')}
                         {numero('barras', 'Barras')}
@@ -333,8 +387,11 @@ export default function FormularioMs() {
                     <div className="flex items-center justify-between gap-2">
                         <h3 className="text-[10px] font-black uppercase tracking-wider text-white/70">Mensaje para WhatsApp</h3>
                         <div className="flex gap-1.5">
-                            <button onClick={copiar} className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold flex items-center gap-1">
-                                {copiado ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copiado ? 'Copiado' : 'Copiar'}
+                            <button onClick={() => copiar('excel')} className="px-2.5 py-1.5 rounded-lg bg-white text-[#324354] hover:bg-slate-100 text-xs font-black flex items-center gap-1" title="Copia los datos con los nombres de columna de BD_MS y BD_PAROS para pegarlos en Claude para Excel">
+                                {copiado === 'excel' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <FileSpreadsheet className="w-3.5 h-3.5" />} {copiado === 'excel' ? 'Copiado' : 'Pasar a Excel'}
+                            </button>
+                            <button onClick={() => copiar('whatsapp')} className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold flex items-center gap-1">
+                                {copiado === 'whatsapp' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copiado === 'whatsapp' ? 'Copiado' : 'Copiar'}
                             </button>
                             <button onClick={enviarWhatsapp} disabled={guardando} className="px-2.5 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#1fb757] text-[#0b3d1f] text-xs font-black flex items-center gap-1 disabled:opacity-50" title="Guarda el informe y abre WhatsApp para elegir el grupo">
                                 <Send className="w-3.5 h-3.5" /> Guardar y enviar
