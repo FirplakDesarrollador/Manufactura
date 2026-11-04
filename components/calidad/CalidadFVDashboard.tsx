@@ -37,8 +37,6 @@ const PARETO_COLORS = [
     '#84cc16', '#a855f7', '#06b6d4', '#f97316', '#3b82f6',
     '#e11d48', '#d97706', '#475569', '#64748b', '#94a3b8'
 ];
-const COLOR_OTROS = '#cbd5e1';
-const CAUSAS_EN_ANILLO = 12;
 
 // Semáforo del IFI FV (meta 35%): verde ≥ meta, amarillo hasta 10 pts debajo, rojo más abajo
 const META_FV = FV_META_IFI;
@@ -106,9 +104,9 @@ function useClicUnico() {
     };
 }
 
-// Etiqueta con el % de cada porción del anillo (solo porciones con espacio suficiente)
+// Etiqueta con el % de cada porción del anillo: las participaciones pequeñas van sin número (no caben)
 const etiquetaPorcion = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
-    if (!percent || percent < 0.025) return null;
+    if (!percent || percent < 0.05) return null;
     const rad = Math.PI / 180;
     const r = outerRadius + 10;
     const x = cx + r * Math.cos(-midAngle * rad);
@@ -223,21 +221,12 @@ export default function CalidadFVDashboard({ powerBiUrl }: { powerBiUrl?: string
         [piezas, selPeriodo, selRef]);
     const colorCausa = useMemo(() => {
         const m = new Map<string, string>();
-        pareto.forEach((c, i) => m.set(c.name, i < CAUSAS_EN_ANILLO ? PARETO_COLORS[i % PARETO_COLORS.length] : COLOR_OTROS));
+        pareto.forEach((c, i) => m.set(c.name, PARETO_COLORS[i % PARETO_COLORS.length]));
         return m;
     }, [pareto]);
-    const anillo = useMemo(() => {
-        const top = pareto.slice(0, CAUSAS_EN_ANILLO).map(c => ({ ...c, color: colorCausa.get(c.name)! }));
-        const resto = pareto.slice(CAUSAS_EN_ANILLO);
-        if (resto.length) {
-            const cantidad = resto.reduce((a, c) => a + c.cantidad, 0);
-            const pct = Math.round(resto.reduce((a, c) => a + c.pct, 0) * 10) / 10;
-            top.push({ name: `Otras (${resto.length})`, cantidad, pct, esMolde: false, color: COLOR_OTROS });
-        }
-        return top;
-    }, [pareto, colorCausa]);
-    // Si la causa elegida queda en "Otras", se resalta esa porción
-    const causaEnAnillo = selCausa && anillo.some(a => a.name === selCausa) ? selCausa : selCausa ? anillo[anillo.length - 1]?.name : null;
+    // Todas las causas en el anillo (sin agrupar en "Otras"): cada porción se puede elegir y filtra el tablero
+    const anillo = useMemo(() => pareto.map(c => ({ ...c, color: colorCausa.get(c.name)! })), [pareto, colorCausa]);
+    const causaEnAnillo = selCausa;
 
     // Productos: filtrados por periodo y causa; las revisadas no dependen de la causa
     const referencias = useMemo(() => {
@@ -527,14 +516,15 @@ export default function CalidadFVDashboard({ powerBiUrl }: { powerBiUrl?: string
                                                 cy="50%"
                                                 innerRadius="55%"
                                                 outerRadius="100%"
-                                                paddingAngle={1.5}
+                                                paddingAngle={anillo.length > 15 ? 0.5 : 1.5}
+                                                minAngle={1.5}
                                                 label={etiquetaPorcion}
                                                 labelLine={false}
                                                 isAnimationActive={false}
                                                 cursor="pointer"
                                                 onClick={(d: any) => {
                                                     const nombre = d?.payload?.name ?? d?.name;
-                                                    if (!clicAnillo.tomar() || !nombre || String(nombre).startsWith('Otras (')) return;
+                                                    if (!clicAnillo.tomar() || !nombre) return;
                                                     alternarCausa(nombre);
                                                 }}
                                             >

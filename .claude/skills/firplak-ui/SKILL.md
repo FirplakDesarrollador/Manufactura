@@ -26,7 +26,7 @@ Este skill concentra las reglas visuales de la aplicación. Complementa:
 | Semáforo amarillo | `#deb841` | Alerta |
 | Semáforo rojo | `#d14747` | No cumple |
 
-- **Tipografía:** Montserrat en toda la interfaz. Títulos de banner en mayúsculas, `font-light`, `tracking-widest`.
+- **Tipografía:** Montserrat en toda la interfaz (aplicada en `html, body` en `app/globals.css`; si una pantalla se ve en Times/serif, revisar que no se haya perdido esa regla). Títulos de banner en mayúsculas, `font-light`, `tracking-widest`.
 - **Pantalla de referencia:** laptops Dell a 150% → **1280 × ~680 px** útiles (breakpoint `xl`). Todo diseño debe verse completo en ese tamaño sin superposiciones; probar también 360 px (celular), 768 px (tablet vertical), 1024 px y 1536 px o más.
 - **Tablets de planta:** Galaxy Tab A9+ en horizontal ≈ **1280 px** de ancho (mismo breakpoint `xl`).
 
@@ -263,7 +263,7 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - **Clic en un mes o un año** de cualquier gráfica de tiempo **cambia los filtros de arriba** (Año/Mes) y todo el tablero pasa a ese periodo; otro clic en el mismo quita ese filtro (mes → año completo; año → todos). Clic en un día solo lo resalta y filtra las demás gráficas. Los periodos fuera de los filtros quedan tenues.
 - Cada gráfica no se filtra a sí misma. Gráficas de tiempo: si el periodo elegido está en la otra (día ↔ mes ↔ año), se resaltan los periodos que lo contienen.
 - Dos gráficas de tendencia: la principal sigue la granularidad automática; la secundaria tiene botones **"Por mes" / "Promedio por año"** (por mes: todos los meses de los años elegidos, los meses fuera del filtro tenues; por año: todos los años, valor = promedio de sus meses). Arranca automática (principal por día → por mes; por mes → por año) y vuelve a automática al cambiar filtros.
-- **Todas las gráficas muestran sus valores**: columnas y líneas con `LabelList position="top"` (1 decimal); puntos de línea con el color del semáforo. Anillo/torta: % en cada porción con espacio (≥ 2,5 %), las causas más allá de 12 se agrupan en "Otras (n)".
+- **Todas las gráficas muestran sus valores**: columnas y líneas con `LabelList position="top"` (1 decimal); puntos de línea con el color del semáforo. Anillo/torta: **todas las causas con su color, sin agrupar en "Otras"** (cada porción se puede tocar y filtra el tablero); el % solo en porciones ≥ 5 % (las pequeñas van sin número porque no se leen) y `minAngle` para que no desaparezcan.
 - Al elegir una causa, las tendencias cambian a "% piezas con <causa>" (sin meta) con el color de la causa.
 
 **Datos y configuración**

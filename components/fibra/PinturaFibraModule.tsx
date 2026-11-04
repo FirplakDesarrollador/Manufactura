@@ -5,7 +5,8 @@ import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
 import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
 import MoldSelector from '../pintura/MoldSelector'
-import { Search, X, Calendar, History, ClipboardList, RefreshCw } from 'lucide-react'
+import { Search, X, History, ClipboardList } from 'lucide-react'
+import EncabezadoFibra, { useMetricasFibra } from './EncabezadoFibra'
 import HistorySection from './HistorySection'
 import ModalBuscarMolde from '../pintura/ModalBuscarMolde'
 
@@ -147,29 +148,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         }
     }, [selectedOrden, allMoldes])
 
-    // Base filter for metrics (matches Administration)
-    const baseFilteredOrdenes = useMemo(() => {
-        const search = (searchText || '').toLowerCase()
-        return ordenes.filter((orden) => {
-            const matchesSearch = !search ||
-                (orden.producto_descripcion || '').toLowerCase().includes(search) ||
-                (orden.orden_fabricacion || '').toLowerCase().includes(search) ||
-                (orden.pedido || (orden as any).numero_pedido || '').toLowerCase().includes(search) ||
-                (orden.molde_descripcion || '').toLowerCase().includes(search) ||
-                (orden.producto_sku || '').toLowerCase().includes(search) ||
-                (orden.molde_sku || '').toLowerCase().includes(search) ||
-                (orden.cliente || orden.cliente_nombre || '').toLowerCase().includes(search)
-
-            const matchesDate = !selectedDate ||
-                (orden.fecha_ideal_produccion &&
-                    orden.fecha_ideal_produccion.includes(selectedDate)) ||
-                (!orden.fecha_ideal_produccion &&
-                    orden.fecha_entrega_estimada &&
-                    orden.fecha_entrega_estimada.includes(selectedDate))
-
-            return matchesSearch && matchesDate
-        })
-    }, [ordenes, searchText, selectedDate])
+    // Filtro base y métricas compartidos con los demás módulos de piso FV
+    const { baseFilteredOrdenes, metrics } = useMetricasFibra(ordenes, trazabilidad, searchText, selectedDate)
 
     // Filter and sort ordenes based on search and date (Safe from null/undefined)
     const filteredOrdenes = useMemo(() => {
@@ -189,64 +169,6 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             return valA - valB
         })
     }, [baseFilteredOrdenes])
-
-    // Calculate metrics to match reference app (FlutterFlow)
-    const metrics = useMemo(() => {
-        const today = new Date().toISOString().split('T')[0]
-
-        // 1. Quantity & Programmed (Totals for all filtered orders)
-        const totalCantidad = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.cantidad_programada || o.cantidad || 0), 0)
-        const totalProgramado = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.programado || 0), 0)
-
-        // 2. Daily Production (From traceability)
-        // We look for everything processed today in any stage
-        const recordsToday = trazabilidad.filter(t => {
-            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
-            const pDate = (t.pintura_fecha || '').split('T')[0]
-            const aDate = (t.acabado_fecha || '').split('T')[0]
-            const dDate = (t.digitado_fecha || '').split('T')[0]
-            
-            return vDate === today || pDate === today || aDate === today || dDate === today
-        })
-
-        const vaciadoToday = trazabilidad.filter(t => {
-            const vDate = (t.vaciado_fecha || t.fecha_vaciado || '').split('T')[0]
-            return vDate === today
-        })
-
-        const pinturaToday = trazabilidad.filter(t => {
-            const pDate = (t.pintura_fecha || '').split('T')[0]
-            return pDate === today
-        })
-
-        const acabadoToday = trazabilidad.filter(t => {
-            const aDate = (t.acabado_fecha || '').split('T')[0]
-            return aDate === today
-        })
-        // Kilograms: Current Transito + Cedi Today (Matches FF logic for 3407.8kg)
-        const transitoTotal = trazabilidad.filter(t => t.estado === 'Transito')
-        const cediToday = trazabilidad.filter(t => (t.cedi_fecha || '').split('T')[0] === today)
-        
-        const totalKilos = [...transitoTotal, ...cediToday]
-            .reduce((acc, t) => acc + (Number(t.kilos_vaciados) || 0), 0)
-
-        // Derive transito from filtered orders so it respects the search filter exactly
-        const transitoFiltered = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.transito || 0), 0)
-
-        return {
-            cantidad: totalCantidad,
-            programado: totalProgramado,
-            pintura: pinturaToday.length,
-            desgelcada: 0,
-            vaciado: vaciadoToday.length,
-            acabado: acabadoToday.length,
-            saldo: baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.saldo || 0), 0),
-            digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
-            transito: transitoFiltered,
-            cedi: cediToday.length,
-            kilogramos: parseFloat(totalKilos.toFixed(1))
-        }
-    }, [baseFilteredOrdenes, trazabilidad])
 
     const [syncing, setSyncing] = useState(false)
 
@@ -350,72 +272,17 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
-            {/* Summary Cards */}
-            <div className="px-4 py-2 bg-white border-b border-slate-200">
-                <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
-                    <StatCard label="Cantidad" value={metrics.cantidad} color="bg-blue-50 text-blue-600" />
-                    <StatCard label="Programado" value={metrics.programado} color="bg-indigo-50 text-indigo-600" />
-                    <StatCard label="Pintura Hoy" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
-                    <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-yellow-50 text-yellow-600" />
-                    <StatCard label="Vaciado Hoy" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard label="Ensayo Hoy" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
-                    <StatCard label="Saldo" value={metrics.saldo} color="bg-rose-50 text-rose-600" />
-                    <StatCard label="Digitado" value={metrics.digitado} color="bg-slate-50 text-slate-600" />
-                    <StatCard label="Transito" value={metrics.transito} color="bg-amber-50 text-amber-600" />
-                    <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-green-50 text-green-600" />
-                    <StatCard label="Kg Hoy" value={metrics.kilogramos.toFixed(1)} color="bg-blue-600 text-white" />
-                </div>
-            </div>
-
-            {/* Controls */}
-            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-4">
-                    <div className="flex-1 min-w-[300px]">
-                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Búsqueda Global</label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Producto / OF / Pedido / ..."
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="w-48">
-                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Filtrar Fecha</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="date"
-                                value={selectedDate || ''}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-cyan-500"
-                            />
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={handleClearFilters}
-                        className="p-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
-                        title="Limpiar filtros"
-                    >
-                        <X size={20} />
-                    </button>
-
-                    <button
-                        onClick={handleSyncSap}
-                        disabled={syncing || loading}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors shadow-sm disabled:opacity-50 text-xs font-bold uppercase tracking-wider h-[38px] self-end mb-[1px]"
-                        title="Sincronizar y recargar órdenes desde SAP"
-                    >
-                        <RefreshCw size={15} className={syncing || loading ? 'animate-spin' : ''} />
-                        <span className="hidden sm:inline">Actualizar SAP</span>
-                    </button>
-                </div>
-            </div>
+            <EncabezadoFibra
+                metrics={metrics}
+                searchText={searchText}
+                onSearchChange={setSearchText}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                onClear={handleClearFilters}
+                onSyncSap={handleSyncSap}
+                syncing={syncing}
+                loading={loading}
+            />
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto p-4">
@@ -447,9 +314,9 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             </div>
 
             {/* Bottom Action Bar */}
-            <div className="bg-gray-50 p-4 border-t border-gray-200">
-                <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-end w-full">
-                    <div className="flex flex-col sm:flex-row gap-4 flex-1">
+            <div className="bg-gray-50 px-4 py-2 border-t border-gray-200">
+                <div className="flex flex-col lg:flex-row gap-2 items-stretch lg:items-end w-full">
+                    <div className="flex flex-col sm:flex-row gap-2 flex-1">
                         {/* Line Selector Removed for Fibra */}
 
                         {/* Mold Selector with Search */}
@@ -458,7 +325,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                             <div className="relative">
                                 <div 
                                     onClick={() => !!selectedOrden && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
-                                    className={`w-full px-4 py-3 bg-white text-gray-900 font-bold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
+                                    className={`w-full h-9 px-3 text-sm bg-white text-gray-900 font-semibold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
                                         ${!selectedOrden ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
                                     `}
                                 >
@@ -467,7 +334,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                                             ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
                                             : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
                                     </span>
-                                    <Search size={18} className="text-gray-400" />
+                                    <Search size={15} className="text-gray-400" />
                                 </div>
 
                                 {isMoldDropdownOpen && (
@@ -523,10 +390,10 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                         <button
                             onClick={handleSubmit}
                             disabled={!selectedOrden || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
-                            className="flex-1 lg:min-w-[150px] py-3 bg-cyan-600 text-white rounded-lg font-bold text-lg hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
+                            className="flex-1 lg:min-w-[130px] h-9 bg-cyan-600 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             {submitting ? 'Reg...' : 'Pintar'}
                         </button>
@@ -535,28 +402,28 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                             {/* Moldes Info Button */}
                             <button
                                 onClick={() => setIsMoldModalOpen(true)}
-                                className="flex-1 lg:flex-none bg-white text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors whitespace-nowrap"
+                                className="flex-1 lg:flex-none h-9 text-sm bg-white text-gray-900 font-bold px-4 rounded-lg flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors whitespace-nowrap"
                             >
-                                <Search size={20} className="text-cyan-500" />
+                                <Search size={16} className="text-cyan-500" />
                                 Moldes
                             </button>
 
                             {/* Registros / Volver Button */}
                             <button
                                 onClick={() => setView(view === 'report' ? 'history' : 'report')}
-                                className={`flex-1 lg:flex-none font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 border shadow-sm transition-colors whitespace-nowrap ${view === 'history'
+                                className={`flex-1 lg:flex-none h-9 text-sm font-bold px-4 rounded-lg flex items-center justify-center gap-2 border shadow-sm transition-colors whitespace-nowrap ${view === 'history'
                                     ? 'bg-cyan-600 text-white border-cyan-700 hover:bg-cyan-700'
                                     : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
                                     }`}
                             >
                                 {view === 'history' ? (
                                     <>
-                                        <ClipboardList size={20} />
+                                        <ClipboardList size={16} />
                                         Reportar
                                     </>
                                 ) : (
                                     <>
-                                        <History size={20} className="text-cyan-500" />
+                                        <History size={16} className="text-cyan-500" />
                                         Registros
                                     </>
                                 )}
@@ -589,11 +456,3 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
     )
 }
 
-function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
-    return (
-        <div className={`flex-1 min-w-[76px] px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
-            <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
-            <span className="text-sm font-black tracking-tight">{value}</span>
-        </div>
-    )
-}

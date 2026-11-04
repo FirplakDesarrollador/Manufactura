@@ -2,17 +2,21 @@
 import { parseDBTimestamp } from '@/lib/utils/date';
 
 import React, { useState } from 'react'
-import { RegistroTrazabilidad } from '@/types/pintura'
+import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarVaciado, registrarDesgelcado } from '@/lib/supabase/queries/fibra_vaciado'
-import { Hash, Layers, Info, CheckCircle, Clock, AlertTriangle, X, Package, Scale } from 'lucide-react'
+import OrdenCard from '@/components/pintura/OrdenCard'
+import { Layers, CheckCircle, Clock, AlertTriangle, X, Scale } from 'lucide-react'
 
 interface RegistroVaciadoCardProps {
     registro: RegistroTrazabilidad
+    orden?: OrdenFabricacion
+    moldes: Molde[]
     usuarioEmail: string
     onRefresh: () => void
 }
 
-export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh }: RegistroVaciadoCardProps) {
+// Misma tarjeta de orden que Pintura (OrdenCard) + franja de la pieza: serial, fecha de pintura, masa teórica y acciones
+export default function RegistroVaciadoCard({ registro, orden, moldes, usuarioEmail, onRefresh }: RegistroVaciadoCardProps) {
     const [loading, setLoading] = useState(false)
     const [confirmingDesgelcar, setConfirmingDesgelcar] = useState(false)
 
@@ -44,126 +48,95 @@ export default function RegistroVaciadoCard({ registro, usuarioEmail, onRefresh 
     }
 
     return (
-        <div className="bg-white border-2 border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                    {/* Secondary Info Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-amber-600">
-                                <Hash size={22} />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-400 uppercase font-black tracking-widest leading-none">OF:</p>
-                                <p className="text-lg font-black text-gray-900 mt-0.5">{registro.orden_fabricacion}</p>
-                            </div>
+        <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+            {orden ? (
+                // La tarjeta de la orden solo informa: sin borde propio ni selección
+                <div className="[&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none [&>button]:cursor-default [&>button:hover]:bg-white">
+                    <OrdenCard orden={orden} isActive={false} onClick={() => { }} moldes={moldes} />
+                </div>
+            ) : (
+                <div className="p-3 text-xs">
+                    <div className="font-bold text-gray-900">OF: {registro.orden_fabricacion}</div>
+                    <div className="text-[11px] font-bold text-gray-800 mt-1">{registro.producto_descripcion || registro.producto_sku}</div>
+                    <div className="mt-1 text-[10px] font-bold text-red-600 flex items-center gap-1">
+                        <AlertTriangle size={12} /> La OF no está en las órdenes de fabricación FV cargadas
+                    </div>
+                </div>
+            )}
+
+            {/* Pieza a vaciar */}
+            <div className="border-t-2 border-gray-200 bg-amber-50/40 px-3 py-2 flex flex-col lg:flex-row lg:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <Layers size={18} className="text-amber-600 shrink-0" />
+                        <div>
+                            <p className="text-[10px] text-gray-500 uppercase font-black leading-none">Serial</p>
+                            <p className="text-lg font-black text-amber-700 leading-tight">{registro.molde_serial}</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-amber-600">
-                                <Layers size={22} />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-400 uppercase font-black tracking-widest leading-none mb-0.5">Serial:</p>
-                                <p className="text-2xl font-black text-amber-700 tracking-tight leading-none">{registro.molde_serial}</p>
-                            </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Clock size={16} className="text-amber-600 shrink-0" />
+                        <div>
+                            <p className="text-[10px] text-gray-500 uppercase font-black leading-none">Fecha pintura</p>
+                            <p className="text-xs font-bold text-gray-900 leading-tight mt-0.5">
+                                {registro.pintura_fecha ? parseDBTimestamp(registro.pintura_fecha).toLocaleString('es-CO') : '—'}
+                            </p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-amber-600">
-                                <Info size={18} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Línea</p>
-                                <p className="text-base font-bold text-gray-900">{registro.linea}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-amber-600">
-                                <Package size={18} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Referencia</p>
-                                <p className="text-sm font-bold text-gray-900 leading-tight line-clamp-2" title={registro.producto_descripcion}>{registro.producto_descripcion || registro.producto_sku}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-50 p-2 rounded-lg text-amber-600">
-                                <Clock size={18} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Fecha Pintura</p>
-                                <p className="text-base font-bold text-gray-900">
-                                    {parseDBTimestamp(registro.pintura_fecha).toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-emerald-50 p-2 rounded-lg text-emerald-600">
-                                <Scale size={18} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-400 uppercase font-black tracking-tighter">Masa Teórica</p>
-                                <p className="text-base font-bold text-gray-900">
-                                    {registro.molde_masa_teorica ? `${Number(registro.molde_masa_teorica).toFixed(2)} Kg` : 'N/A'}
-                                </p>
-                            </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Scale size={16} className="text-emerald-600 shrink-0" />
+                        <div>
+                            <p className="text-[10px] text-gray-500 uppercase font-black leading-none">Masa teórica</p>
+                            <p className="text-xs font-bold text-gray-900 leading-tight mt-0.5">
+                                {registro.molde_masa_teorica ? `${Number(registro.molde_masa_teorica).toFixed(2)} Kg` : 'N/A'}
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="pt-2 xl:pt-0 shrink-0 flex flex-col gap-2 min-w-[280px]">
-                    <button
-                        onClick={handleRegister}
-                        disabled={loading || confirmingDesgelcar}
-                        className={`w-full text-white px-8 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all uppercase tracking-widest ${confirmingDesgelcar
-                            ? 'bg-gray-300 cursor-not-allowed grayscale'
-                            : 'bg-[#254153] hover:bg-[#1a2e3b] active:scale-95 shadow-amber-900/10'
-                            } disabled:opacity-50`}
-                    >
-                        {loading && !confirmingDesgelcar ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white" />
-                        ) : (
-                            <CheckCircle size={20} />
-                        )}
-                        REGISTRAR VACIADO
-                    </button>
-
+                {/* Acciones */}
+                <div className="flex gap-2 shrink-0">
                     {!confirmingDesgelcar ? (
-                        <button
-                            onClick={() => setConfirmingDesgelcar(true)}
-                            disabled={loading}
-                            className="w-full bg-white border-2 border-red-100 text-red-500 hover:bg-red-50 px-8 py-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all uppercase tracking-widest active:scale-95"
-                        >
-                            <AlertTriangle size={16} />
-                            Desgelcar Pieza
-                        </button>
+                        <>
+                            <button
+                                onClick={handleRegister}
+                                disabled={loading}
+                                className="h-9 px-4 bg-[#254153] hover:bg-[#1a2e3b] text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                            >
+                                {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" /> : <CheckCircle size={16} />}
+                                Registrar vaciado
+                            </button>
+                            <button
+                                onClick={() => setConfirmingDesgelcar(true)}
+                                disabled={loading}
+                                className="h-9 px-4 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                            >
+                                <AlertTriangle size={16} />
+                                Desgelcar pieza
+                            </button>
+                        </>
                     ) : (
-                        <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <>
                             <button
                                 onClick={handleDesgelcar}
                                 disabled={loading}
-                                className="w-full bg-red-600 text-white hover:bg-red-700 px-8 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all uppercase tracking-widest shadow-lg shadow-red-200 active:scale-95"
+                                className="h-9 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors"
                             >
-                                {loading ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />
-                                ) : (
-                                    <AlertTriangle size={16} />
-                                )}
-                                ¿ESTÁ SEGURO DE DESGELCAR?
+                                {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" /> : <AlertTriangle size={16} />}
+                                ¿Está seguro de desgelcar?
                             </button>
                             <button
                                 onClick={() => setConfirmingDesgelcar(false)}
                                 disabled={loading}
-                                className="w-full bg-gray-100 text-gray-500 hover:bg-gray-200 px-8 py-1.5 rounded-lg font-bold text-[10px] flex items-center justify-center gap-2 transition-all uppercase tracking-widest"
+                                className="h-9 px-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg font-bold text-sm flex items-center justify-center gap-1.5 transition-colors"
                             >
-                                <X size={12} />
+                                <X size={14} />
                                 Cancelar
                             </button>
-                        </div>
+                        </>
                     )}
                 </div>
             </div>
         </div>
     )
 }
-
