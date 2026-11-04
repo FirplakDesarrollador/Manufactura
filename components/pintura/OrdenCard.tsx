@@ -119,6 +119,7 @@ export default function OrdenCard({ orden, isActive, onClick, moldes }: OrdenCar
 
             {/* Middle Section: Mold Status */}
             <div className="w-full md:w-[17%] md:px-3 md:border-r border-gray-300 flex flex-col justify-center bg-gray-50 md:bg-transparent p-2 md:p-0 rounded">
+                <div className="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1">Moldes</div>
                 <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-bold">
                     <div className="text-cyan-600">Totales: <span className="text-gray-900">{orden.moldes_totales || relevantMoldes.length}</span></div>
                     <div className="text-red-500">Reparación: <span className="text-gray-900">{orden.moldes_en_reparacion || enReparacion}</span></div>

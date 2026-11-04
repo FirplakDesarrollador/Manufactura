@@ -164,7 +164,7 @@ export default function SelectionPage() {
                             >
                                 <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
                                     <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9V5.5a2 2 0 0 1 4 0M3 9h18a1 1 0 0 1 0 2H3a1 1 0 0 1 0-2zM4 11v2.5A5.5 5.5 0 0 0 9.5 19h5a5.5 5.5 0 0 0 5.5-5.5V11M7 19l-.5 2h11l-.5-2M14 11v3.5h3V11M13 2.5c-.6.8.6 1.5 0 2.5M15.5 2c-.6.8.6 1.5 0 2.5M18 2.5c-.6.8.6 1.5 0 2.5" />
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">

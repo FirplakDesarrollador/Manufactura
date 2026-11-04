@@ -16,6 +16,11 @@ type Proceso = {
     id: string
     label: string
     sub?: string
+    // Procesos unificados en un solo rectángulo: cada nombre conserva su espacio (en columnas o en filas)
+    nombres?: string[]
+    enColumnas?: boolean
+    aislado?: boolean  // proceso que aún no está en el flujo
+    sinContador?: boolean  // solo se dibuja el proceso, sin contador de OF ni mensajes
     tipo: TipoProceso
     etapas: string[]   // campos de ordenes_fabricacion_fv que suman en este proceso ([] = sin registro en la app)
     caja: Caja         // posición en el plano del layout (px de la imagen de referencia)
@@ -36,23 +41,21 @@ const punto = (x: number, y: number): React.CSSProperties => ({
 
 const PROCESOS: Proceso[] = [
     { id: 'vaciado', label: 'Vaciado', tipo: 'notificacion', etapas: ['vaciado'], caja: [693, 81, 885, 244] },
-    { id: 'curado', label: 'Zona Curado', tipo: 'espera', etapas: ['estanteria'], caja: [898, 81, 1160, 318] },
+    { id: 'curado', label: 'Zona Curado', sinContador: true, tipo: 'espera', etapas: [], caja: [898, 81, 1160, 318] },
     { id: 'pintura', label: 'Pintura', tipo: 'notificacion', etapas: ['pintura'], caja: [1173, 83, 1330, 200] },
     { id: 'huacales', label: 'Huacales', tipo: 'notificacion', etapas: ['empaque'], caja: [218, 450, 328, 641] },
     { id: 'acabado2', label: 'Acabado 2', tipo: 'sin-notificacion', etapas: [], caja: [336, 450, 435, 641] },
     { id: 'ensayo', label: 'Ensayo', tipo: 'notificacion', etapas: [], caja: [439, 450, 548, 641] },
-    { id: 'ensamble2', label: 'Ensamble 2', tipo: 'sin-notificacion', etapas: [], caja: [556, 450, 666, 641] },
-    { id: 'ensamble1', label: 'Ensamble 1', tipo: 'sin-notificacion', etapas: [], caja: [670, 450, 779, 641] },
-    { id: 'acabado1', label: 'Acabado 1', tipo: 'sin-notificacion', etapas: ['acabado'], caja: [782, 450, 885, 641] },
+    { id: 'ensamble', label: 'Ensamble 2 · Ensamble 1 · Acabado', nombres: ['Ensamble 2', 'Ensamble 1', 'Acabado'], enColumnas: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [556, 450, 885, 641] },
     { id: 'pulido', label: 'Pulido', tipo: 'notificacion', etapas: ['pulido'], caja: [911, 450, 1059, 641] },
-    { id: 'nivelacion', label: 'Nivelación', tipo: 'sin-notificacion', etapas: [], caja: [1067, 450, 1173, 641] },
+    { id: 'nivelacion', label: 'Desmolde · Herrajes · Nivelación', nombres: ['Desmolde', 'Herrajes', 'Nivelación'], tipo: 'sin-notificacion', etapas: [], caja: [1067, 450, 1173, 641] },
     { id: 'reparacion', label: 'Reparación', tipo: 'sin-notificacion', etapas: ['reparacion', 'reparacion_larga'], caja: [336, 650, 435, 747] },
-    { id: 'soldadura', label: 'Soldadura', tipo: 'sin-notificacion', etapas: [], caja: [1067, 660, 1173, 752] },
+    { id: 'soldadura', label: 'Soldadura', aislado: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [1067, 660, 1173, 752] },
     // Pasos virtuales (no son procesos físicos): Programado → Pintura … Huacales → Digitado → Tránsito → CEDI
     { id: 'programado', label: 'Programado', sub: 'Pendiente por pintar', tipo: 'virtual', etapas: ['programado'], caja: [1183, 236, 1338, 641] },
-    { id: 'digitado', label: 'Digitado', tipo: 'virtual', etapas: ['digitado'], caja: [100, 545, 200, 605] },
-    { id: 'transito', label: 'Tránsito', tipo: 'virtual', etapas: ['transito'], caja: [100, 405, 200, 465] },
-    { id: 'cedi', label: 'CEDI', tipo: 'virtual', etapas: ['cedi'], caja: [100, 265, 200, 325] }
+    { id: 'digitado', label: 'Digitado', tipo: 'virtual', etapas: ['digitado'], caja: [70, 495, 208, 641] },
+    { id: 'transito', label: 'Tránsito', tipo: 'virtual', etapas: ['transito'], caja: [70, 315, 208, 455] },
+    { id: 'cedi', label: 'CEDI', tipo: 'virtual', etapas: ['cedi'], caja: [70, 135, 208, 275] }
 ]
 
 // Flechas de flujo (centro en px del plano)
@@ -60,11 +63,10 @@ const FLECHAS: { x: number; y: number; dir: 'izq' | 'der' | 'arriba' | 'abajo' }
     { x: 891, y: 140, dir: 'izq' }, { x: 891, y: 196, dir: 'der' },        // Zona Curado ⇄ Vaciado
     { x: 1166, y: 196, dir: 'izq' },                                       // Pintura → Zona Curado
     { x: 1255, y: 220, dir: 'arriba' },                                    // Programado → Pintura
-    { x: 1134, y: 438, dir: 'abajo' },                                     // Zona Curado → Nivelación
-    ...[1063, 898, 780, 668, 552, 437, 332].map(x => ({ x, y: 620, dir: 'izq' as const })),
-    { x: 209, y: 575, dir: 'izq' },                                        // Huacales → Digitado
-    { x: 150, y: 485, dir: 'arriba' }, { x: 150, y: 345, dir: 'arriba' },  // Digitado → Tránsito → CEDI
-    { x: 1120, y: 651, dir: 'arriba' },                                    // Soldadura → Nivelación
+    { x: 1134, y: 438, dir: 'abajo' },                                     // Zona Curado → Desmolde · Herrajes · Nivelación
+    ...[1063, 898, 552, 437, 332].map(x => ({ x, y: 620, dir: 'izq' as const })),
+    { x: 213, y: 568, dir: 'izq' },                                        // Huacales → Digitado
+    { x: 139, y: 475, dir: 'arriba' }, { x: 139, y: 295, dir: 'arriba' },  // Digitado → Tránsito → CEDI
     { x: 375, y: 646, dir: 'arriba' }, { x: 396, y: 646, dir: 'abajo' }    // Acabado 2 ⇄ Reparación
 ]
 const ICONO_FLECHA = { izq: ArrowLeft, der: ArrowRight, arriba: ArrowUp, abajo: ArrowDown }
@@ -126,17 +128,27 @@ export default function MapaProcesosFibraModule() {
         const piezas = lista.reduce((s, x) => s + x.piezas, 0)
         return (
             <div key={p.id} style={pos(p.caja)}
-                className={`absolute rounded border-2 px-1.5 py-1 flex flex-col overflow-hidden ${estilo.caja}`}>
-                <div className="flex items-start justify-between gap-1">
-                    <span className="text-[11px] font-black leading-tight">{p.label}{p.sub && <span className="block text-[9px] font-semibold italic opacity-80">{p.sub}</span>}</span>
-                    {!sinCampo && (
-                        <span className={`shrink-0 text-[9px] font-black px-1 rounded leading-4 ${estilo.badge}`}
+                title={p.aislado ? `${p.label}: fuera del flujo, no afecta a ningún proceso` : undefined}
+                className={`absolute rounded border-2 px-1.5 py-1 flex flex-col overflow-hidden ${estilo.caja} ${p.aislado ? 'opacity-60 border-dashed' : ''}`}>
+                {p.nombres && (
+                    // Procesos unificados: cada nombre en su propio espacio, separados por líneas
+                    <div className={p.enColumnas ? 'grid divide-x divide-white/40' : 'flex flex-col divide-y divide-white/40'}
+                        style={p.enColumnas ? { gridTemplateColumns: `repeat(${p.nombres.length}, minmax(0, 1fr))` } : undefined}>
+                        {p.nombres.map(n => (
+                            <span key={n} className={`text-[11px] font-black leading-tight ${p.enColumnas ? 'px-1.5 first:pl-0' : 'py-1 first:pt-0'}`}>{n}</span>
+                        ))}
+                    </div>
+                )}
+                <div className={`flex items-start justify-between gap-1 ${p.nombres ? 'mt-1' : ''}`}>
+                    {!p.nombres && <span className="text-[11px] font-black leading-tight">{p.label}{p.sub && <span className="block text-[9px] font-semibold italic opacity-80">{p.sub}</span>}</span>}
+                    {!sinCampo && !p.sinContador && (
+                        <span className={`ml-auto shrink-0 text-[9px] font-black px-1 rounded leading-4 ${estilo.badge}`}
                             title={`${lista.length} orden(es) · ${piezas} pieza(s)`}>
                             {lista.length} OF
                         </span>
                     )}
                 </div>
-                {sinCampo ? (
+                {p.sinContador ? null : sinCampo ? (
                     <div className="mt-auto text-[9px] italic opacity-80 leading-tight">Sin registro en la app</div>
                 ) : (
                     <>
@@ -196,9 +208,8 @@ export default function MapaProcesosFibraModule() {
                         <div className="relative w-full" style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}>
                             {PROCESOS.map(caja)}
 
-                            {/* Zona Curado → Nivelación: desmolde e instalación de herraje */}
+                            {/* Zona Curado → Desmolde · Herrajes · Nivelación */}
                             <div className="absolute w-[3px] bg-[#00b050] -translate-x-1/2" style={{ ...punto(1134, 318), height: `${((432 - 318) / ALTO) * 100}%` }} />
-                            <div className="absolute -translate-x-full text-right text-[10px] font-bold text-slate-600 leading-tight" style={punto(1126, 360)}>Desmolde<br />Instalación herraje</div>
 
                             {FLECHAS.map((f, i) => {
                                 const Icono = ICONO_FLECHA[f.dir]
@@ -207,7 +218,7 @@ export default function MapaProcesosFibraModule() {
                         </div>
                         <p className="mt-1 text-[9px] text-slate-400 italic">
                             Cada número es una OF (últimos 4 dígitos; ×N = piezas de esa OF en el proceso). Clic para ver el detalle SAP.
-                            Zona Curado = Estantería; Huacales = Empaque; Reparación incluye reparación larga. Digitado, Tránsito y CEDI son pasos virtuales.
+                            Huacales = Empaque; Reparación incluye reparación larga. Digitado, Tránsito y CEDI son pasos virtuales.
                         </p>
                     </div>
                 )}
