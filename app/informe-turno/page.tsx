@@ -6,13 +6,14 @@ import { Hammer, Factory } from 'lucide-react';
 import Header from '@/components/opt-sistemica/Header';
 import CarruselPestanas from '@/components/ui/CarruselPestanas';
 import FormularioRmold from '@/components/informe-turno/FormularioRmold';
+import FormularioMs from '@/components/informe-turno/FormularioMs';
 import { supabase } from '@/lib/supabase';
 
-// Plantas del Informe de Turno. Reparación de Moldes es la primera; las de producción vendrán después.
+// Plantas del Informe de Turno: Reparación de Moldes y Mármol Sintético activas; las demás vendrán después.
 type PlantaInforme = 'RMOLD' | 'MS' | 'FV' | 'MBL' | 'CEFI' | 'QZ';
 const PLANTAS: { id: PlantaInforme; label: string; nombre: string; activa: boolean }[] = [
     { id: 'RMOLD', label: 'RMOLD', nombre: 'Reparación de Moldes', activa: true },
-    { id: 'MS', label: 'MS', nombre: 'Mármol Sintético', activa: false },
+    { id: 'MS', label: 'MS', nombre: 'Mármol Sintético', activa: true },
     { id: 'FV', label: 'FV', nombre: 'Fibra de Vidrio', activa: false },
     { id: 'MBL', label: 'MBL', nombre: 'Muebles', activa: false },
     { id: 'CEFI', label: 'CEFI', nombre: 'CEFI', activa: false },
@@ -72,6 +73,7 @@ export default function InformeTurnoPage() {
 
             <main className="flex-1 w-full max-w-[1500px] mx-auto p-2 sm:p-4 pb-8 animate-in fade-in duration-300">
                 {actual.id === 'RMOLD' && <FormularioRmold />}
+                {actual.id === 'MS' && <FormularioMs />}
             </main>
         </div>
     );

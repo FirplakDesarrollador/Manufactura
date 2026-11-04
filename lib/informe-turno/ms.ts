@@ -1,0 +1,286 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { calcularResumen, fetchCatalogoDefectosMs, fetchMsReportes, normalizarPiezas } from '@/lib/calidad/msCalidad';
+
+// Informe final de turno MS (Mármol Sintético): reemplaza el mensaje de cierre que los supervisores enviaban por WhatsApp.
+// Lo que ya existe en Control de Piso y en Calidad MS se jala solo; el supervisor diligencia el resto.
+
+// Colores "normales" del día: lo demás (granitos, negro, grises…) se cuenta como Colores en el informe
+const COLORES_BASE = ['BLANCO', 'NATURAL', 'MARFIL'];
+
+// Defectos que se reportan en el bloque RRC, en el orden del informe. Se buscan en ms_defectos por palabras clave
+// (sin número, tildes ni mayúsculas) para no depender del texto exacto del catálogo.
+export const RRC_MS: { nombre: string; claves: string[] }[] = [
+    { nombre: 'Masa en gelcoat', claves: ['masa en gel'] },
+    { nombre: 'Gelcoat desmoldado', claves: ['gelcoat desmoldado', 'gel desmoldado'] },
+    { nombre: 'Despique por mala manipulación', claves: ['despique', 'despicad'] },
+    { nombre: 'Pintura chorreada', claves: ['chorread'] },
+    { nombre: 'Rajado al desmoldar', claves: ['rajad'] },
+    { nombre: 'Pieza dañada al perforar', claves: ['perfor'] },
+    { nombre: 'Pintura sin catalizador', claves: ['catalizador'] },
+    { nombre: 'Burbuja de aire en el acabado', claves: ['burbuja'] }
+];
+
+export interface ConteoDefecto { nombre: string; cantidad: number }
+
+export interface DatosAutoMs {
+    pintura: { total: number; l1: number; l2: number; l3: number };
+    colores: number;
+    coloresDetalle: ConteoDefecto[];
+    vaciado: { total: number; pequenas: number; medianas: number; grandes: number };
+    calidad: number | null;            // % IFI del día (mismo cálculo de Calidad MS)
+    revisadas: number;                 // piezas revisadas en inspección
+    rrc: ConteoDefecto[];              // los 8 defectos del informe
+    otrosDefectos: ConteoDefecto[];    // defectos del día que no están en el bloque RRC (solo informativo)
+    errorCalidad?: string;
+}
+
+export interface FilaAusentismo { nombre: string; motivo: string }
+export interface FilaParo { minutos: string; causa: string }
+
+export interface ManualMs {
+    ausentismos: FilaAusentismo[];
+    programado: string;
+    cnc: string;
+    adm: string;
+    ultracaster: string;
+    acabado: string;
+    kilos: string;
+    parosPintura: FilaParo[];
+    parosVaciado: FilaParo[];
+    reflejados: FilaParo[];
+    reparacion: string;
+    desgelcadas: string;
+    mesones: string;
+    mesaTrabajo: string;
+    barras: string;
+    linea: string;
+    lineaBuffer: string;
+    pulido: string;
+    automantenimiento: string;
+}
+
+// Alistamiento y alimentación se reportan todos los días: vienen puestos y el supervisor solo ajusta los minutos
+const parosBase = (): FilaParo[] => [{ minutos: '10', causa: 'Alistamiento' }, { minutos: '48', causa: 'Alimentación' }];
+
+export const manualVacio = (): ManualMs => ({
+    ausentismos: [],
+    programado: '', cnc: '', adm: '', ultracaster: '', acabado: '', kilos: '',
+    parosPintura: parosBase(), parosVaciado: parosBase(), reflejados: [],
+    reparacion: '', desgelcadas: '', mesones: '', mesaTrabajo: '', barras: '', linea: '', lineaBuffer: '', pulido: '', automantenimiento: ''
+});
+
+export const MOTIVOS_AUSENTISMO = ['Incapacitado', 'Cita médica', 'Se dirige a la EPS', 'Permiso', 'Calamidad doméstica', 'Vacaciones', 'Licencia', 'No se presentó'];
+export const CAUSAS_PARO_MS = [
+    'Alistamiento', 'Alimentación', 'Lavado de máquina Ultracaster', 'Lavado de máquina', 'Alto ausentismo', 'Avería en multicolor cabina L1',
+    'Avería en extractor de cabina L2', 'Bajo ritmo en vaciado', 'Piezas con no calidad', 'Falta de moldes', 'Falta de material', 'Reunión', 'Capacitación'
+];
+
+export interface InformeMsGuardado {
+    id: number;
+    fecha: string;
+    usuario_email: string | null;
+    datos: { manual?: Partial<ManualMs>; auto?: DatosAutoMs } | null;
+    texto: string | null;
+    updated_at: string;
+}
+
+const normalizar = (s: string) =>
+    s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^\s*\d+\s*[.)-]\s*/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+const diaSiguiente = (fecha: string) => {
+    const d = new Date(`${fecha}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+};
+
+// Control de Piso guarda las fechas en hora local de Colombia sin zona: el día va de 00:00 a 00:00
+async function filasDelDia<T>(client: SupabaseClient, columnaFecha: string, columnas: string, fecha: string): Promise<T[]> {
+    const filas: T[] = [];
+    const PAGINA = 1000;
+    for (let desde = 0; ; desde += PAGINA) {
+        const { data, error } = await client
+            .from('query_trazabilidad_ms')
+            .select(columnas)
+            .gte(columnaFecha, fecha)
+            .lt(columnaFecha, diaSiguiente(fecha))
+            .order('id', { ascending: true })
+            .range(desde, desde + PAGINA - 1);
+        if (error) throw error;
+        filas.push(...((data as unknown as T[]) || []));
+        if (!data || data.length < PAGINA) break;
+    }
+    return filas;
+}
+
+export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): Promise<DatosAutoMs> {
+    type FilaPintura = { pintura_linea: string | null; producto_color: string | null };
+    type FilaVaciado = { producto_tamano: string | null };
+    const [pintadas, vaciadas] = await Promise.all([
+        filasDelDia<FilaPintura>(client, 'pintura_fecha', 'id, pintura_linea, producto_color', fecha),
+        filasDelDia<FilaVaciado>(client, 'vaciado_fecha', 'id, producto_tamano', fecha)
+    ]);
+
+    const coloresMap = new Map<string, number>();
+    pintadas.forEach(r => {
+        const color = String(r.producto_color || '').trim().toUpperCase();
+        if (color && !COLORES_BASE.includes(color)) coloresMap.set(color, (coloresMap.get(color) || 0) + 1);
+    });
+    const coloresDetalle = [...coloresMap.entries()].map(([nombre, cantidad]) => ({ nombre, cantidad })).sort((a, b) => b.cantidad - a.cantidad);
+    const contar = <F,>(arr: F[], f: (r: F) => boolean) => arr.filter(f).length;
+
+    const datos: DatosAutoMs = {
+        pintura: {
+            total: pintadas.length,
+            l1: contar(pintadas, r => r.pintura_linea === 'Linea 1'),
+            l2: contar(pintadas, r => r.pintura_linea === 'Linea 2'),
+            l3: contar(pintadas, r => r.pintura_linea === 'Linea 3')
+        },
+        colores: coloresDetalle.reduce((a, c) => a + c.cantidad, 0),
+        coloresDetalle,
+        vaciado: {
+            total: vaciadas.length,
+            pequenas: contar(vaciadas, r => r.producto_tamano === 'Pequena'),
+            medianas: contar(vaciadas, r => r.producto_tamano === 'Mediana'),
+            grandes: contar(vaciadas, r => r.producto_tamano === 'Grande')
+        },
+        calidad: null,
+        revisadas: 0,
+        rrc: RRC_MS.map(d => ({ nombre: d.nombre, cantidad: 0 })),
+        otrosDefectos: []
+    };
+
+    // Calidad MS: mismo cálculo de la app de Calidad (pieza buena = sin defectos o solo opaco), en el día de Colombia
+    try {
+        const desde = new Date(`${fecha}T00:00:00-05:00`).toISOString();
+        const hasta = new Date(`${diaSiguiente(fecha)}T00:00:00-05:00`).toISOString();
+        const [reportes, catalogo] = await Promise.all([
+            fetchMsReportes(client, desde, hasta, 'id, created_at, producto_id, defecto, Reparacion'),
+            fetchCatalogoDefectosMs(client)
+        ]);
+        const piezas = normalizarPiezas(reportes, catalogo);
+        const resumen = calcularResumen(piezas);
+        datos.revisadas = resumen.piezasRevisadas;
+        datos.calidad = resumen.piezasRevisadas > 0 ? resumen.calidad : null;
+
+        // Piezas por defecto (una pieza cuenta una vez por defecto)
+        const porDefecto = new Map<string, number>();
+        piezas.forEach(p => new Set(p.defectos.map(d => d.nombre)).forEach(n => porDefecto.set(n, (porDefecto.get(n) || 0) + 1)));
+        const usados = new Set<string>();
+        datos.rrc = RRC_MS.map(d => {
+            let cantidad = 0;
+            porDefecto.forEach((n, nombre) => {
+                const limpio = normalizar(nombre);
+                if (d.claves.some(k => limpio.includes(k))) { cantidad += n; usados.add(nombre); }
+            });
+            return { nombre: d.nombre, cantidad };
+        });
+        datos.otrosDefectos = [...porDefecto.entries()]
+            .filter(([nombre]) => !usados.has(nombre) && normalizar(nombre) !== 'opaco')
+            .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+            .sort((a, b) => b.cantidad - a.cantidad);
+    } catch (e: unknown) {
+        datos.errorCalidad = (e as { message?: string })?.message || 'No se pudo leer Calidad MS';
+    }
+
+    return datos;
+}
+
+// ---------------------------------------------------------------------------
+// Texto del informe (mismo formato que se enviaba por WhatsApp)
+// ---------------------------------------------------------------------------
+
+const num = (s: string) => (s.trim() === '' || Number.isNaN(Number(s.replace(',', '.'))) ? null : Number(s.replace(',', '.')));
+const miles = (n: number) => n.toLocaleString('es-CO', { maximumFractionDigits: 1 });
+const deProgramado = (v: number | null, programado: number | null) => `${v == null ? '-' : miles(v)}${programado ? ` de ${miles(programado)}` : ''}`;
+const paro = (p: FilaParo) => `-${p.minutos.trim() ? `${p.minutos.trim()} min ` : ''}${p.causa.trim()}`;
+const conCausa = (arr: FilaParo[]) => arr.filter(p => p.causa.trim());
+
+export function construirTextoMs(fecha: string, m: ManualMs, a: DatosAutoMs | null): string {
+    const prog = num(m.programado);
+    const valor = (s: string) => (num(s) == null ? '-' : miles(num(s)!));
+    const aus = m.ausentismos.filter(x => x.nombre.trim());
+    const fechaTxt = new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const l: string[] = [];
+
+    l.push('*INFORME FINAL MS*', `_${fechaTxt}_`, '');
+    l.push(`.AUSENTISMOS: ${String(aus.length).padStart(2, '0')}`);
+    aus.forEach(x => l.push(`-${x.nombre.trim()}${x.motivo.trim() ? ` ${x.motivo.trim().toLowerCase()}` : ''}`));
+    l.push('');
+
+    l.push(`*PINTURA: ${deProgramado(a?.pintura.total ?? null, prog)}`);
+    l.push(`*Línea 1: ${a?.pintura.l1 ?? '-'}`, `*Línea 2: ${a?.pintura.l2 ?? '-'}`, `*Línea 3: ${a?.pintura.l3 ?? '-'}`, '');
+    l.push(`*Colores: ${a?.colores ?? '-'}`, '');
+
+    l.push(`*Vaciado: ${deProgramado(a?.vaciado.total ?? null, prog)}`);
+    l.push(`*Pequeñas: ${a?.vaciado.pequenas ?? '-'}`, `*Medianas: ${a?.vaciado.medianas ?? '-'}`, `*Grandes: ${a?.vaciado.grandes ?? '-'}`, '');
+
+    l.push(`*Piezas ruteadas CNC: ${valor(m.cnc)}`, `*Piezas vaciadas ADM: ${valor(m.adm)}`, `*Piezas vaciadas Ultracaster: ${valor(m.ultracaster)}`, '');
+
+    l.push(`*Acabado: ${deProgramado(num(m.acabado), prog)}`);
+    l.push(`*Calidad: ${a?.calidad == null ? '-' : `${Math.round(a.calidad)}%`}`);
+    l.push(`*Kilos vaciados: ${num(m.kilos) == null ? '-' : `${miles(num(m.kilos)!)} kg`}`, '');
+    l.push(`*Piezas revisadas en inspección: ${a ? a.revisadas : '-'}`, '');
+
+    l.push('*PAROS REALES:');
+    l.push('-Pintura', ...conCausa(m.parosPintura).map(paro), '');
+    l.push('-Vaciado', ...conCausa(m.parosVaciado).map(paro), '');
+
+    l.push('*REFLEJADOS:');
+    const refl = conCausa(m.reflejados);
+    l.push(...(refl.length ? refl.map(paro) : ['-Sin paros reflejados']), '');
+
+    l.push('*RRC');
+    (a?.rrc || RRC_MS.map(d => ({ nombre: d.nombre, cantidad: 0 }))).forEach(d => l.push(`*${d.nombre}: ${a ? d.cantidad : '-'}`));
+    l.push('');
+
+    l.push('*OTROS:');
+    l.push(`*Piezas de reparación: ${valor(m.reparacion)}`, `*Piezas desgelcadas: ${valor(m.desgelcadas)}`, `*Mesones: ${valor(m.mesones)}`,
+        `*Mesa de trabajo: ${valor(m.mesaTrabajo)}`, `*Barras: ${valor(m.barras)}`, '');
+    l.push(`*Línea: ${valor(m.linea)}`, `*Línea buffer: ${valor(m.lineaBuffer)}`, `*Pulido: ${valor(m.pulido)}`, '');
+    l.push(`*Auto mantenimiento: ${num(m.automantenimiento) == null ? '-' : `${miles(num(m.automantenimiento)!)} %`}`);
+
+    return l.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Guardado (tabla informe_turno_ms, ver informe_turno_ms.sql). Nunca se borra: un informe por día que se actualiza.
+// ---------------------------------------------------------------------------
+
+const mensajeTabla = (e: { message?: string; code?: string }) =>
+    /informe_turno_ms/.test(e?.message || '') && /(does not exist|schema cache|not find)/i.test(e?.message || '')
+        ? 'Falta ejecutar informe_turno_ms.sql en Supabase para poder guardar.'
+        : e?.message || 'No se pudo guardar el informe';
+
+export async function cargarInformesMs(client: SupabaseClient): Promise<InformeMsGuardado[]> {
+    const { data, error } = await client
+        .from('informe_turno_ms')
+        .select('id, fecha, usuario_email, datos, texto, updated_at')
+        .eq('activo', true)
+        .order('fecha', { ascending: false })
+        .limit(60);
+    if (error) throw new Error(mensajeTabla(error));
+    return (data as InformeMsGuardado[]) || [];
+}
+
+export async function guardarInformeMs(
+    client: SupabaseClient,
+    info: { id?: number; fecha: string; manual: ManualMs; auto: DatosAutoMs | null; texto: string }
+): Promise<number> {
+    const { data: u } = await client.auth.getUser();
+    const fila = {
+        fecha: info.fecha,
+        usuario_uuid: u?.user?.id ?? null,
+        usuario_email: u?.user?.email ?? null,
+        datos: { manual: info.manual, auto: info.auto },
+        texto: info.texto,
+        updated_at: new Date().toISOString()
+    };
+    if (info.id) {
+        const { error } = await client.from('informe_turno_ms').update(fila).eq('id', info.id);
+        if (error) throw new Error(mensajeTabla(error));
+        return info.id;
+    }
+    const { data, error } = await client.from('informe_turno_ms').insert(fila).select('id').single();
+    if (error) throw new Error(mensajeTabla(error));
+    return (data as { id: number }).id;
+}
