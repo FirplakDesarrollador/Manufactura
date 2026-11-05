@@ -1,37 +1,43 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calcularResumen, fetchCatalogoDefectosMs, fetchMsReportes, normalizarPiezas } from '@/lib/calidad/msCalidad';
+import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
 
 // Informe final de turno MS (Mármol Sintético): reemplaza el mensaje de cierre que los supervisores enviaban por WhatsApp.
 // Lo que ya existe en Control de Piso y en Calidad MS se jala solo; el supervisor diligencia el resto.
 
 // Colores "normales" del día: lo demás (granitos, negro, grises…) se cuenta como Colores en el informe
 const COLORES_BASE = ['BLANCO', 'NATURAL', 'MARFIL'];
+const TAMANOS = ['Pequena', 'Mediana', 'Grande'];
 
 // Defectos que se reportan en el bloque RRC, en el orden del informe. Se buscan en ms_defectos por palabras clave
 // (sin número, tildes ni mayúsculas) para no depender del texto exacto del catálogo.
+// Las claves se prueban en orden (de la más específica a la más general) y se usa la primera que encuentre algo:
+// así "despique" no suma los otros despiques (ruteadora, flauta, línea…) ni "perfor" la "Despicada en perforación".
+// El catálogo tiene errores de digitación (ej. "manipualción"), por eso se busca por fragmentos y no por el nombre exacto.
 export const RRC_MS: { nombre: string; claves: string[] }[] = [
-    { nombre: 'Masa en gelcoat', claves: ['masa en gel'] },
+    { nombre: 'Masa en gelcoat', claves: ['masa en gelcoat', 'masa en gel'] },
     { nombre: 'Gelcoat desmoldado', claves: ['gelcoat desmoldado', 'gel desmoldado'] },
-    { nombre: 'Despique por mala manipulación', claves: ['despique', 'despicad'] },
-    { nombre: 'Pintura chorreada', claves: ['chorread'] },
-    { nombre: 'Rajado al desmoldar', claves: ['rajad'] },
-    { nombre: 'Pieza dañada al perforar', claves: ['perfor'] },
-    { nombre: 'Pintura sin catalizador', claves: ['catalizador'] },
-    { nombre: 'Burbuja de aire en el acabado', claves: ['burbuja'] }
+    { nombre: 'Despique por mala manipulación', claves: ['mala manip'] },
+    { nombre: 'Pintura chorreada', claves: ['pintura chorread', 'chorread'] },
+    { nombre: 'Rajado al desmoldar', claves: ['rajado al desmold', 'rajad'] },
+    { nombre: 'Pieza dañada al perforar', claves: ['danada al perfor', 'pieza danada'] },
+    { nombre: 'Pintura sin catalizador', claves: ['sin catalizador', 'catalizador'] },
+    { nombre: 'Burbuja de aire en el acabado', claves: ['burbuja de aire en el acabado', 'burbuja de aire', 'burbuja'] }
 ];
 
-export interface ConteoDefecto { nombre: string; cantidad: number }
+export interface ConteoDefecto { nombre: string; cantidad: number; fuentes?: string[] } // fuentes: defectos de ms_defectos contados
 
 export interface DatosAutoMs {
     pintura: { total: number; l1: number; l2: number; l3: number };
     colores: number;
     desgelcadas: number;               // piezas pintadas ese día que quedaron en estado Desgelcada
     coloresDetalle: ConteoDefecto[];
-    vaciado: { total: number; pequenas: number; medianas: number; grandes: number };
+    vaciado: { total: number; pequenas: number; medianas: number; grandes: number; sinTamano?: ConteoDefecto[] }; // sinTamano: productos sin tamaño (ej. "No aplica")
     calidad: number | null;            // % IFI del día (mismo cálculo de Calidad MS)
     revisadas: number;                 // piezas revisadas en inspección
     rrc: ConteoDefecto[];              // los 8 defectos del informe
     otrosDefectos: ConteoDefecto[];    // defectos del día que no están en el bloque RRC (solo informativo)
+    topDefectos?: ConteoDefecto[];     // los 3 defectos con más piezas del día (sugerencia de paro por no calidad)
     errorCalidad?: string;
 }
 
@@ -46,6 +52,7 @@ export interface ManualMs {
     ultracaster: string;
     acabado: string;
     kilos: string;
+    metaKilos: string;
     parosPintura: FilaParo[];
     parosVaciado: FilaParo[];
     reflejados: FilaParo[];
@@ -65,14 +72,76 @@ const parosBase = (): FilaParo[] => [{ minutos: '10', causa: 'Alistamiento' }, {
 
 export const manualVacio = (): ManualMs => ({
     ausentismos: [],
-    programado: '', cnc: '', adm: '', ultracaster: '', acabado: '', kilos: '',
+    programado: '', cnc: '', adm: '', ultracaster: '', acabado: '', kilos: '', metaKilos: '',
     parosPintura: parosBase(), parosVaciado: parosBase(), reflejados: [],
     reparacion: '', desgelcadas: '', mesones: '', mesaTrabajo: '', barras: '', linea: '', lineaBuffer: '', pulido: '', automantenimiento: ''
 });
 
+// Paro reflejado por kilos: (meta de kilos de la semana - kilos entregados al CEDI) / kilos por minuto
+export const KG_POR_MINUTO_MS = 9.09;
+export const META_KILOS_MS_INICIAL = 5376;
+// Los paros reflejados reparten ese tiempo: se permite pasarse hasta 5 min
+export const TOLERANCIA_REFLEJADOS_MIN = 5;
+
+const aNumero = (s: string | undefined) => {
+    const v = Number((s ?? '').trim().replace(',', '.'));
+    return (s ?? '').trim() === '' || Number.isNaN(v) ? null : v;
+};
+
+export function minutosParoKilos(meta: number | null, kilos: number | null): number | null {
+    if (meta == null || kilos == null) return null;
+    return Math.max(0, Math.round((meta - kilos) / KG_POR_MINUTO_MS));
+}
+
+// Lunes de la semana de la fecha (YYYY-MM-DD), para saber si dos informes son de la misma semana
+const lunesDe = (f: string) => {
+    const d = new Date(`${f}T12:00:00`);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+};
+
+// La meta cambia cada semana: por defecto se toma la del último informe guardado antes de la fecha
+export function metaKilosPorDefecto(informes: InformeMsGuardado[], fecha: string): { valor: number; mismaSemana: boolean } {
+    const previo = informes
+        .filter(i => i.fecha < fecha && aNumero(i.datos?.manual?.metaKilos) != null)
+        .sort((x, y) => (x.fecha < y.fecha ? 1 : -1))[0];
+    if (!previo) return { valor: META_KILOS_MS_INICIAL, mismaSemana: true };
+    return { valor: aNumero(previo.datos?.manual?.metaKilos)!, mismaSemana: lunesDe(previo.fecha) === lunesDe(fecha) };
+}
+
 export const MOTIVOS_AUSENTISMO = ['Incapacitado', 'Cita médica', 'Se dirige a la EPS', 'Permiso', 'Calamidad doméstica', 'Vacaciones', 'Licencia', 'No se presentó', 'No se ha reportado - no responde'];
 // Los 5 paros que más se repiten en MS (histórico de paros por familia / modo de pérdida)
-export const CAUSAS_PARO_MS = ['Alistamiento', 'Alimentación', 'Lavado de máquina Ultracaster', 'Ausentismo de personas', 'Piezas con no calidad'];
+// Personal activo de Mármol Sintético (base de Talento Humano), para la lista de ausentismos
+export async function cargarPersonasMs(): Promise<string[]> {
+    const { data, error } = await supabaseTH
+        .from('empleados')
+        .select('nombreCompleto')
+        .eq('activo', true)
+        .eq('planta', 'Marmol sintetico')
+        .order('nombreCompleto', { ascending: true });
+    if (error) throw error;
+    return [...new Set((data || []).map(e => (e.nombreCompleto || '').trim()).filter(Boolean))];
+}
+
+// Paro reflejado por ausentismo: 10,06 min por persona ausente, máximo 60 min
+export const MIN_PARO_POR_AUSENTE = 10.06;
+export const MAX_PARO_AUSENTISMO_MIN = 60;
+export const personasAusentes = (m: ManualMs) => m.ausentismos.filter(x => x.nombre.trim()).length;
+export const minutosParoAusentismo = (personas: number) => Math.min(MAX_PARO_AUSENTISMO_MIN, Math.round(personas * MIN_PARO_POR_AUSENTE));
+
+// Sugerencias de paros reflejados: avería, lavado de Ultracaster, ausentismo con las personas reportadas y no calidad con el top 3 de defectos
+export function causasReflejadoMs(m: ManualMs, a: DatosAutoMs | null): string[] {
+    const ausentes = personasAusentes(m);
+    const top = (a?.topDefectos || []).filter(d => d.cantidad > 0);
+    return [
+        'Avería',
+        'Lavado de máquina Ultracaster',
+        ausentes ? `Ausentismo de ${ausentes} ${ausentes === 1 ? 'persona' : 'personas'}` : 'Ausentismo de personas',
+        top.length ? `No calidad por ${top.map(d => `${d.nombre.toLowerCase()} (${d.cantidad})`).join(', ')}` : 'No calidad por'
+    ];
+}
+
+export const CAUSAS_PARO_MS =['Alistamiento', 'Alimentación', 'Lavado de máquina Ultracaster', 'Ausentismo de personas', 'Piezas con no calidad'];
 
 export interface InformeMsGuardado {
     id: number;
@@ -113,10 +182,10 @@ async function filasDelDia<T>(client: SupabaseClient, columnaFecha: string, colu
 
 export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): Promise<DatosAutoMs> {
     type FilaPintura = { pintura_linea: string | null; producto_color: string | null; estado: string | null };
-    type FilaVaciado = { producto_tamano: string | null };
+    type FilaVaciado = { producto_tamano: string | null; producto_descripcion: string | null };
     const [pintadas, vaciadas] = await Promise.all([
         filasDelDia<FilaPintura>(client, 'pintura_fecha', 'id, pintura_linea, producto_color, estado', fecha),
-        filasDelDia<FilaVaciado>(client, 'vaciado_fecha', 'id, producto_tamano', fecha)
+        filasDelDia<FilaVaciado>(client, 'vaciado_fecha', 'id, producto_tamano, producto_descripcion', fecha)
     ]);
 
     const coloresMap = new Map<string, number>();
@@ -126,6 +195,11 @@ export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): 
     });
     const coloresDetalle = [...coloresMap.entries()].map(([nombre, cantidad]) => ({ nombre, cantidad })).sort((a, b) => b.cantidad - a.cantidad);
     const contar = <F,>(arr: F[], f: (r: F) => boolean) => arr.filter(f).length;
+    const agrupar = (nombres: string[]): ConteoDefecto[] => {
+        const m = new Map<string, number>();
+        nombres.forEach(n => m.set(n, (m.get(n) || 0) + 1));
+        return [...m.entries()].map(([nombre, cantidad]) => ({ nombre, cantidad }));
+    };
 
     const datos: DatosAutoMs = {
         pintura: {
@@ -142,7 +216,9 @@ export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): 
             total: vaciadas.length,
             pequenas: contar(vaciadas, r => r.producto_tamano === 'Pequena'),
             medianas: contar(vaciadas, r => r.producto_tamano === 'Mediana'),
-            grandes: contar(vaciadas, r => r.producto_tamano === 'Grande')
+            grandes: contar(vaciadas, r => r.producto_tamano === 'Grande'),
+            // Piezas cuyo producto no tiene tamaño Pequeña/Mediana/Grande: se muestran para que la suma cuadre con el total
+            sinTamano: agrupar(vaciadas.filter(r => !TAMANOS.includes(r.producto_tamano || '')).map(r => `${r.producto_descripcion || 'Producto sin nombre'} (${r.producto_tamano || 'sin tamaño'})`))
         },
         calidad: null,
         revisadas: 0,
@@ -166,19 +242,29 @@ export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): 
         // Piezas por defecto (una pieza cuenta una vez por defecto)
         const porDefecto = new Map<string, number>();
         piezas.forEach(p => new Set(p.defectos.map(d => d.nombre)).forEach(n => porDefecto.set(n, (porDefecto.get(n) || 0) + 1)));
+
+        // Defecto(s) del catálogo que corresponden a cada línea RRC: la primera clave (en orden) que encuentre algo
+        const nombresCatalogo = [...new Set([...catalogo.values(), ...porDefecto.keys()])].filter(Boolean);
         const usados = new Set<string>();
         datos.rrc = RRC_MS.map(d => {
-            let cantidad = 0;
-            porDefecto.forEach((n, nombre) => {
-                const limpio = normalizar(nombre);
-                if (d.claves.some(k => limpio.includes(k))) { cantidad += n; usados.add(nombre); }
-            });
-            return { nombre: d.nombre, cantidad };
+            let fuentes: string[] = [];
+            for (const k of d.claves) {
+                fuentes = nombresCatalogo.filter(n => normalizar(n).includes(k));
+                if (fuentes.length) break;
+            }
+            fuentes.forEach(f => usados.add(f));
+            const cantidad = piezas.filter(p => p.defectos.some(x => fuentes.includes(x.nombre))).length;
+            return { nombre: d.nombre, cantidad, fuentes };
         });
         datos.otrosDefectos = [...porDefecto.entries()]
             .filter(([nombre]) => !usados.has(nombre) && normalizar(nombre) !== 'opaco')
             .map(([nombre, cantidad]) => ({ nombre, cantidad }))
             .sort((a, b) => b.cantidad - a.cantidad);
+        datos.topDefectos = [...porDefecto.entries()]
+            .filter(([nombre]) => normalizar(nombre) !== 'opaco')
+            .map(([nombre, cantidad]) => ({ nombre: nombre.replace(/^\s*\d+\s*[.)-]\s*/, '').trim(), cantidad }))
+            .sort((a, b) => b.cantidad - a.cantidad)
+            .slice(0, 3);
     } catch (e: unknown) {
         datos.errorCalidad = (e as { message?: string })?.message || 'No se pudo leer Calidad MS';
     }
@@ -213,7 +299,10 @@ export function construirTextoMs(fecha: string, m: ManualMs, a: DatosAutoMs | nu
     l.push(`*Colores: ${a?.colores ?? '-'}`, '');
 
     l.push(`*Vaciado: ${deProgramado(a?.vaciado.total ?? null, prog)}`);
-    l.push(`*Pequeñas: ${a?.vaciado.pequenas ?? '-'}`, `*Medianas: ${a?.vaciado.medianas ?? '-'}`, `*Grandes: ${a?.vaciado.grandes ?? '-'}`, '');
+    l.push(`*Pequeñas: ${a?.vaciado.pequenas ?? '-'}`, `*Medianas: ${a?.vaciado.medianas ?? '-'}`, `*Grandes: ${a?.vaciado.grandes ?? '-'}`);
+    const sinTamano = (a?.vaciado.sinTamano || []).reduce((s, x) => s + x.cantidad, 0);
+    if (sinTamano) l.push(`*Sin tamaño: ${sinTamano}`);
+    l.push('');
 
     l.push(`*Piezas ruteadas CNC: ${valor(m.cnc)}`, `*Piezas vaciadas ADM: ${valor(m.adm)}`, `*Piezas vaciadas Ultracaster: ${m.ultracaster.trim() === '' && a ? miles(a.vaciado.total) : valor(m.ultracaster)}`, '');
 
@@ -298,6 +387,7 @@ export function construirTextoExcelMs(fecha: string, m: ManualMs, a: DatosAutoMs
     if (!paros.length) l.push('(sin paros)');
     l.push('');
     l.push('DATOS DE REFERENCIA (no tienen columna en BD_MS):');
+    l.push(`Meta de kilos de la semana\t${n(m.metaKilos)}`);
     l.push(`Piezas vaciadas Ultracaster\t${ultracaster}`, `Colores\t${a ? a.colores : ''}`, `Piezas revisadas en inspección\t${a ? a.revisadas : ''}`);
     l.push(`Ausentismos\t${aus.map(x => `${x.nombre.trim()}${x.motivo.trim() ? ` (${x.motivo.trim().toLowerCase()})` : ''}`).join('; ')}`);
     l.push(`Piezas de reparación\t${n(m.reparacion)}`, `Piezas desgelcadas\t${desgelcadas}`, `Mesa de trabajo\t${n(m.mesaTrabajo)}`, `Barras\t${n(m.barras)}`);

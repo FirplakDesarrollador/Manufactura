@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, Copy, FileSpreadsheet, Info, Loader2, Plus, RefreshCw, Send, Trash2, Zap } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Copy, ExternalLink, FileSpreadsheet, Info, Loader2, Plus, RefreshCw, Send, Trash2, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
     CAUSAS_PARO_MS, DatosAutoMs, FilaAusentismo, FilaParo, InformeMsGuardado, ManualMs, MOTIVOS_AUSENTISMO,
-    cargarDatosAutoMs, cargarInformesMs, construirTextoExcelMs, construirTextoMs, guardarInformeMs, manualVacio
+    KG_POR_MINUTO_MS, TOLERANCIA_REFLEJADOS_MIN, causasReflejadoMs, cargarPersonasMs, minutosParoAusentismo, personasAusentes, cargarDatosAutoMs, cargarInformesMs, construirTextoExcelMs, construirTextoMs, guardarInformeMs,
+    manualVacio, metaKilosPorDefecto, minutosParoKilos
 } from '@/lib/informe-turno/ms';
 
 const hoyBogota = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
@@ -26,7 +27,7 @@ function Auto({ fuente }: { fuente: string }) {
 }
 
 // Texto libre con sugerencias en una lista compacta (la del datalist del navegador es muy espaciada y no se puede ajustar)
-function ConSugerencias({ value, onChange, opciones, placeholder }: { value: string; onChange: (v: string) => void; opciones: string[]; placeholder: string }) {
+function ConSugerencias({ value, onChange, opciones, placeholder, invalido = false }: { value: string; onChange: (v: string) => void; opciones: string[]; placeholder: string; invalido?: boolean }) {
     const [abierto, setAbierto] = useState(false);
     const filtro = value.trim().toLowerCase();
     const visibles = opciones.filter(o => !filtro || o.toLowerCase().includes(filtro));
@@ -39,7 +40,7 @@ function ConSugerencias({ value, onChange, opciones, placeholder }: { value: str
                 onBlur={() => setTimeout(() => setAbierto(false), 120)}
                 onKeyDown={e => { if (e.key === 'Escape') setAbierto(false); }}
                 placeholder={placeholder}
-                className={`${campo} font-medium pr-7`}
+                className={`${campo} font-medium pr-7 ${invalido ? 'border-rose-500 bg-rose-50' : ''}`}
             />
             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
             {abierto && visibles.length > 0 && !(visibles.length === 1 && visibles[0] === value) && (
@@ -71,6 +72,23 @@ export default function FormularioMs() {
     const [fecha, setFecha] = useState(hoyBogota());
     const [informes, setInformes] = useState<InformeMsGuardado[]>([]);
     const [errorInformes, setErrorInformes] = useState<string | null>(null);
+    const [personas, setPersonas] = useState<string[]>([]);
+
+    // Mismo atajo del Home: la app de Talento Humano recibe el correo del usuario
+    const abrirTalentoHumano = async () => {
+        const ventana = window.open('', '_blank');
+        const { data } = await supabase.auth.getUser();
+        const url = `https://talentohumano.vercel.app?email=${encodeURIComponent(data.user?.email || '')}`;
+        if (ventana) ventana.location.href = url;
+        else window.location.href = url;
+    };
+
+    // Personal activo de la planta para elegir los ausentes
+    useEffect(() => {
+        let vivo = true;
+        cargarPersonasMs().then(d => { if (vivo) setPersonas(d); }).catch(() => { /* si falla, el nombre se escribe a mano */ });
+        return () => { vivo = false; };
+    }, []);
     const [recarga, setRecarga] = useState(0);
 
     const [auto, setAuto] = useState<DatosAutoMs | null>(null);
@@ -111,22 +129,59 @@ export default function FormularioMs() {
     useEffect(() => {
         setM(existente?.datos?.manual ? { ...manualVacio(), ...existente.datos.manual } : manualVacio());
         setMensaje(null);
+        setCalculado(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fecha, existente?.id]);
 
-    const texto = useMemo(() => construirTextoMs(fecha, m, auto), [fecha, m, auto]);
+    // Meta de kilos de la semana: si no se escribe, se usa la del último informe guardado
+    const metaDefecto = useMemo(() => metaKilosPorDefecto(informes, fecha), [informes, fecha]);
+    const mFinal = useMemo<ManualMs>(() => ({ ...m, metaKilos: m.metaKilos.trim() !== '' ? m.metaKilos : String(metaDefecto.valor) }), [m, metaDefecto]);
+    const aNum = (s: string) => (s.trim() === '' || Number.isNaN(Number(s.replace(',', '.'))) ? null : Number(s.replace(',', '.')));
+    const metaKilos = aNum(mFinal.metaKilos);
+    const kilosReales = aNum(m.kilos);
+    const minutosKilos = minutosParoKilos(metaKilos, kilosReales);
+    // Al calcular, los minutos por kilos son el tiempo que hay que repartir en los paros reflejados (con 5 min de tolerancia)
+    const [calculado, setCalculado] = useState(false);
+    const tiempoReflejar = calculado ? minutosKilos : null;
+    const sumaReflejados = m.reflejados.reduce((s, p) => s + (aNum(p.minutos) ?? 0), 0);
+    const limiteReflejados = tiempoReflejar == null ? null : tiempoReflejar + TOLERANCIA_REFLEJADOS_MIN;
+    const excedido = limiteReflejados != null && sumaReflejados > limiteReflejados;
+    const sinTiempo = tiempoReflejar != null && sumaReflejados >= tiempoReflejar;
+
+    const texto = useMemo(() => construirTextoMs(fecha, mFinal, auto), [fecha, mFinal, auto]);
 
     const set = (k: CampoNumero, v: string) => setM(p => ({ ...p, [k]: v }));
     const setAus = (i: number, k: keyof FilaAusentismo, v: string) => setM(p => ({ ...p, ausentismos: p.ausentismos.map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
     const setParo = (lista: ListaParos, i: number, k: keyof FilaParo, v: string) => setM(p => ({ ...p, [lista]: p[lista].map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
     const quitarParo = (lista: ListaParos, i: number) => setM(p => ({ ...p, [lista]: p[lista].filter((_, j) => j !== i) }));
     const agregarParo = (lista: ListaParos, causa = '') => {
-        setM(p => ({ ...p, [lista]: [...p[lista], { minutos: '', causa }] }));
+        // Ausentismo en reflejados: los minutos se calculan con las personas ausentes (se pueden editar después)
+        const ausentes = personasAusentes(m);
+        const minutos = lista === 'reflejados' && causa.startsWith('Ausentismo de') && ausentes > 0 ? String(minutosParoAusentismo(ausentes)) : '';
+        setM(p => ({ ...p, [lista]: [...p[lista], { minutos, causa }] }));
         // Con la causa ya puesta solo falta escribir los minutos
         setTimeout(() => {
             const filas = document.querySelectorAll<HTMLInputElement>(`[data-paros="${lista}"] input[type="number"]`);
             filas[filas.length - 1]?.focus();
         }, 0);
+    };
+
+    // Un mismo paro no se puede repetir en la lista (ausentismo y no calidad cuentan como uno aunque cambie el detalle)
+    const claveParo = (c: string) => {
+        const t = c.trim().toLowerCase().replace(/\s+/g, ' ');
+        if (t.startsWith('ausentismo de')) return 'ausentismo de';
+        if (t.startsWith('no calidad por')) return 'no calidad por';
+        return t;
+    };
+    const usadas = (lista: ListaParos, excepto = -1) => new Set(m[lista].filter((p, j) => j !== excepto && p.causa.trim()).map(p => claveParo(p.causa)));
+    const hayRepetidos = (['parosPintura', 'parosVaciado', 'reflejados'] as ListaParos[])
+        .some(l => m[l].some((p, i) => p.causa.trim() !== '' && usadas(l, i).has(claveParo(p.causa))));
+    const avisoRepetidos = () => {
+        setMensaje({ ok: false, texto: 'Hay paros repetidos con la misma descripción. Sume los minutos en una sola fila y quite la repetida.' });
+    };
+
+    const avisoExcedido = () => {
+        setMensaje({ ok: false, texto: `Los paros reflejados suman ${sumaReflejados} min y el tiempo a reflejar es ${tiempoReflejar} min (máximo ${limiteReflejados} min). Ajuste los minutos.` });
     };
 
     const numero = (k: CampoNumero, label: string, ayuda?: string, sufijo?: string) => (
@@ -151,24 +206,33 @@ export default function FormularioMs() {
         </div>
     );
 
-    const listaParos = (lista: ListaParos, titulo: string, minutosOpcional = false) => (
+    const listaParos = (lista: ListaParos, titulo: string, minutosOpcional = false, opciones: string[] = CAUSAS_PARO_MS, bloqueado = false) => (
         <div className="space-y-1.5" data-paros={lista}>
             <span className="text-[11px] font-black uppercase text-slate-600">{titulo}</span>
             {m[lista].map((p, i) => (
-                <div key={i} className="grid grid-cols-[80px_1fr_auto] gap-2">
+                <div key={i} className="grid grid-cols-[80px_1fr_auto] gap-2 items-start">
                     <input type="number" inputMode="decimal" min={0} step="any" value={p.minutos} onChange={e => setParo(lista, i, 'minutos', e.target.value)} placeholder={minutosOpcional ? 'min' : '0'} className={campo} title="Minutos" />
-                    <ConSugerencias value={p.causa} onChange={v => setParo(lista, i, 'causa', v)} opciones={CAUSAS_PARO_MS} placeholder="Causa (ej. avería en extractor de cabina #2, se apagaba)" />
+                    <div>
+                        <ConSugerencias value={p.causa} onChange={v => setParo(lista, i, 'causa', v)} placeholder="Causa (ej. avería en extractor de cabina #2, se apagaba)"
+                            opciones={opciones.filter(c => !usadas(lista, i).has(claveParo(c)))} invalido={p.causa.trim() !== '' && usadas(lista, i).has(claveParo(p.causa))} />
+                        {p.causa.trim() !== '' && usadas(lista, i).has(claveParo(p.causa)) && (
+                            <span className="text-[10px] font-bold text-rose-700">Paro repetido: sume los minutos en una sola fila.</span>
+                        )}
+                    </div>
                     <button type="button" onClick={() => quitarParo(lista, i)} className="w-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg" title="Quitar"><Trash2 className="w-4 h-4" /></button>
                 </div>
             ))}
-            {/* Paros más comunes: un clic agrega la fila con la causa puesta y el cursor en los minutos */}
-            <div className="flex flex-wrap gap-1">
-                {CAUSAS_PARO_MS.map(c => (
-                    <button key={c} type="button" onClick={() => agregarParo(lista, c)} className="px-2 py-0.5 rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-600 hover:border-[#324354] hover:text-[#324354] flex items-center gap-0.5">
-                        <Plus className="w-3 h-3" /> {c}
-                    </button>
-                ))}
-                <button type="button" onClick={() => agregarParo(lista)} className="px-2 py-0.5 rounded-full border-2 border-dashed border-slate-300 text-[11px] font-bold text-slate-500 hover:border-[#324354] hover:text-[#324354] flex items-center gap-0.5">
+            {/* Paros más comunes: al elegir uno se agrega la fila con la causa puesta y el cursor en los minutos */}
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[220px] max-w-md">
+                    <select value="" disabled={bloqueado} onChange={e => { if (e.target.value) agregarParo(lista, e.target.value); }}
+                        className={`${campo} font-medium text-slate-600 appearance-none pr-7 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}>
+                        <option value="">{bloqueado ? 'Ya se reflejó todo el tiempo' : 'Agregar paro…'}</option>
+                        {opciones.filter(c => !usadas(lista).has(claveParo(c))).map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <button type="button" disabled={bloqueado} onClick={() => agregarParo(lista)} className="px-2 py-0.5 rounded-full border-2 border-dashed border-slate-300 text-[11px] font-bold text-slate-500 hover:border-[#324354] hover:text-[#324354] flex items-center gap-0.5 disabled:opacity-40 disabled:cursor-not-allowed">
                     <Plus className="w-3 h-3" /> Otro paro
                 </button>
             </div>
@@ -176,10 +240,12 @@ export default function FormularioMs() {
     );
 
     const guardar = async () => {
+        if (hayRepetidos) return avisoRepetidos();
+        if (excedido) return avisoExcedido();
         setGuardando(true);
         setMensaje(null);
         try {
-            await guardarInformeMs(supabase, { id: existente?.id, fecha, manual: m, auto, texto });
+            await guardarInformeMs(supabase, { id: existente?.id, fecha, manual: mFinal, auto, texto });
             setMensaje({ ok: true, texto: `Informe del ${fechaLarga(fecha)} guardado.` });
             setRecarga(n => n + 1);
         } catch (e: any) {
@@ -190,7 +256,9 @@ export default function FormularioMs() {
     };
 
     const copiar = async (cual: 'whatsapp' | 'excel') => {
-        const contenido = cual === 'excel' ? construirTextoExcelMs(fecha, m, auto) : texto;
+        if (hayRepetidos) return avisoRepetidos();
+        if (excedido) return avisoExcedido();
+        const contenido = cual === 'excel' ? construirTextoExcelMs(fecha, mFinal, auto) : texto;
         try {
             await navigator.clipboard.writeText(contenido);
         } catch {
@@ -207,6 +275,8 @@ export default function FormularioMs() {
 
     // Guarda y abre WhatsApp con el informe listo para elegir el grupo
     const enviarWhatsapp = async () => {
+        if (hayRepetidos) return avisoRepetidos();
+        if (excedido) return avisoExcedido();
         const ventana = window.open('', '_blank');
         await guardar();
         const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
@@ -255,11 +325,19 @@ export default function FormularioMs() {
 
                 {/* 1. Ausentismos */}
                 <div>
-                    <h3 className="text-sm font-black text-[#324354] mb-2">1. Ausentismos <span className="text-xs font-bold text-slate-400">({m.ausentismos.filter(x => x.nombre.trim()).length})</span></h3>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <h3 className="text-sm font-black text-[#324354]">1. Ausentismos <span className="text-xs font-bold text-slate-400">({m.ausentismos.filter(x => x.nombre.trim()).length})</span></h3>
+                        {/* Atajo a la app de Talento Humano, donde queda registrado el ausentismo */}
+                        <button type="button" onClick={abrirTalentoHumano}
+                            className="px-2.5 py-1 rounded-lg border border-[#324354] text-[#324354] text-[11px] font-black hover:bg-[#324354] hover:text-white flex items-center gap-1">
+                            <ExternalLink className="w-3.5 h-3.5" /> Registrar en Talento Humano
+                        </button>
+                    </div>
                     <div className="space-y-1.5">
                         {m.ausentismos.map((x, i) => (
                             <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                                <input value={x.nombre} onChange={e => setAus(i, 'nombre', e.target.value)} placeholder="Nombre" className={`${campo} font-medium`} />
+                                <ConSugerencias value={x.nombre} onChange={v => setAus(i, 'nombre', v)}
+                                    opciones={personas.filter(n => n === x.nombre || !m.ausentismos.some(o => o.nombre === n))} placeholder="Nombre" />
                                 <ConSugerencias value={x.motivo} onChange={v => setAus(i, 'motivo', v)} opciones={MOTIVOS_AUSENTISMO} placeholder="Motivo" />
                                 <button type="button" onClick={() => setM(p => ({ ...p, ausentismos: p.ausentismos.filter((_, j) => j !== i) }))} className="w-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg" title="Quitar"><Trash2 className="w-4 h-4" /></button>
                             </div>
@@ -295,6 +373,15 @@ export default function FormularioMs() {
                         <Dato t="Medianas" v={a ? a.vaciado.medianas : cargandoTxt} />
                         <Dato t="Grandes" v={a ? a.vaciado.grandes : cargandoTxt} />
                     </div>
+                    {!!a?.vaciado.sinTamano?.length && (
+                        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 -mt-1.5 mb-3 flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>
+                                {a.vaciado.sinTamano.reduce((s, x) => s + x.cantidad, 0)} pieza(s) vaciada(s) sin tamaño en el maestro de productos, por eso Pequeñas + Medianas + Grandes no da el total:{' '}
+                                {a.vaciado.sinTamano.map(x => `${x.nombre} × ${x.cantidad}`).join('; ')}. Corrija el tamaño del producto en Control de Piso.
+                            </span>
+                        </p>
+                    )}
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-2.5">
                         {numero('cnc', 'Piezas ruteadas CNC')}
@@ -320,8 +407,14 @@ export default function FormularioMs() {
                     <span className="text-[11px] font-black uppercase text-slate-600">RRC</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 mt-1">
                         {(a?.rrc || []).map(d => (
-                            <div key={d.nombre} className="flex justify-between text-xs py-1 border-b border-slate-100">
-                                <span className="text-slate-600">{d.nombre}</span>
+                            <div key={d.nombre} className="flex justify-between items-start gap-2 text-xs py-1 border-b border-slate-100">
+                                <span className="text-slate-600 min-w-0">
+                                    {d.nombre}
+                                    {/* Defecto(s) del catálogo de Calidad MS que se contaron en esta línea */}
+                                    <span className={`block text-[10px] truncate ${d.fuentes?.length ? 'text-slate-400' : 'text-amber-700 font-bold'}`} title={d.fuentes?.join('\n')}>
+                                        {d.fuentes?.length ? `Cuenta: ${d.fuentes.join(' + ')}` : 'No se encontró en el catálogo de defectos'}
+                                    </span>
+                                </span>
                                 <span className={`font-black ${d.cantidad > 0 ? 'text-[#d14747]' : 'text-slate-400'}`}>{d.cantidad}</span>
                             </div>
                         ))}
@@ -348,7 +441,44 @@ export default function FormularioMs() {
                 </div>
                 <div>
                     <h3 className="text-sm font-black text-[#324354] mb-2">5. Paros reflejados</h3>
-                    {listaParos('reflejados', 'Reflejados', true)}
+                    {/* Paro reflejado por kilos: (meta de la semana - kilos entregados al CEDI) / kg por minuto */}
+                    <div className="rounded-xl border border-slate-200 bg-[#F6F3EE] p-3 mb-3">
+                        <div className="grid grid-cols-[minmax(0,160px)_1fr] gap-3 items-end">
+                            <div>
+                                <label className={etiqueta}>Meta kilos semana (kg)</label>
+                                <input type="number" inputMode="decimal" min={0} step="any" value={mFinal.metaKilos}
+                                    onChange={e => setM(p => ({ ...p, metaKilos: e.target.value }))} className={campo} />
+                            </div>
+                            <button type="button" onClick={() => setCalculado(true)} disabled={minutosKilos == null}
+                                className="h-[34px] px-3 rounded-lg bg-[#324354] text-white text-xs font-black uppercase tracking-wider hover:bg-[#26333f] disabled:opacity-40 disabled:cursor-not-allowed">
+                                Calcular paro por kilos
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-1.5">
+                            {kilosReales == null
+                                ? 'Escriba los kilos vaciados (sección 2) para calcular.'
+                                : `(${metaKilos ?? '-'} − ${kilosReales} kg) ÷ ${String(KG_POR_MINUTO_MS).replace('.', ',')} kg/min = ${minutosKilos ?? '-'} min`}
+                        </p>
+                        {m.metaKilos.trim() === '' && !metaDefecto.mismaSemana && (
+                            <p className="text-[11px] font-bold text-amber-800 mt-1 flex items-center gap-1">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Es la meta de la semana pasada: actualícela si cambió.
+                            </p>
+                        )}
+                        {tiempoReflejar != null && (
+                            tiempoReflejar === 0 ? (
+                                <p className="text-[11px] font-bold text-emerald-700 mt-1">Se cumplió la meta de kilos: no hay tiempo para reflejar.</p>
+                            ) : (
+                                <p className={`text-[11px] font-bold mt-1 flex items-center gap-1 ${excedido ? 'text-rose-700' : sumaReflejados >= tiempoReflejar ? 'text-emerald-700' : 'text-[#324354]'}`}>
+                                    {excedido && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                                    Tiempo a reflejar: {tiempoReflejar} min · Reflejado: {sumaReflejados} min ·{' '}
+                                    {excedido
+                                        ? `Se pasa por ${sumaReflejados - tiempoReflejar} min (máximo ${TOLERANCIA_REFLEJADOS_MIN} min). Ajuste los minutos para poder guardar.`
+                                        : sumaReflejados >= tiempoReflejar ? 'Completo' : `Faltan ${tiempoReflejar - sumaReflejados} min`}
+                                </p>
+                            )
+                        )}
+                    </div>
+                    {listaParos('reflejados', 'Reflejados', true, causasReflejadoMs(m, a), sinTiempo)}
                 </div>
 
                 {/* 6. Otros */}
