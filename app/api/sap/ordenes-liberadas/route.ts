@@ -1,6 +1,27 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+async function fetchSapQueryPages(baseUrl: string, sessionId: string, queryName: string): Promise<any[]> {
+    const headers = {
+        Cookie: `B1SESSION=${sessionId}`,
+        Prefer: 'odata.maxpagesize=1000'
+    }
+    let url: string | null = `${baseUrl}/SQLQueries('${queryName}')/List`
+    const rows: any[] = []
+
+    for (let page = 0; page < 15 && url; page++) {
+        const res = await fetch(url, { headers, signal: AbortSignal.timeout(20000) })
+        if (!res.ok) break
+        const data = await res.json()
+        if (Array.isArray(data.value)) rows.push(...data.value)
+        const next = data['@odata.nextLink'] as string | undefined
+        if (!next) break
+        url = next.startsWith('http') ? next : `${baseUrl}/${String(next).replace(/^\//, '')}`
+    }
+
+    return rows
+}
+
 export async function GET() {
     try {
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -59,32 +80,22 @@ export async function GET() {
                 const sessionId = loginData.SessionId;
                 if (sessionId) {
                     const baseUrl = loginUrl.replace('/Login', '');
-                    const [genRes, marmolRes] = await Promise.allSettled([
-                        fetch(`${baseUrl}/SQLQueries('ordenes_pendientes_clean')/List`, {
-                            headers: { 'Cookie': `B1SESSION=${sessionId}`, 'Prefer': 'odata.maxpagesize=1000' },
-                            signal: AbortSignal.timeout(15000)
-                        }),
-                        fetch(`${baseUrl}/SQLQueries('ordenes_marmol_sl136')/List`, {
-                            headers: { 'Cookie': `B1SESSION=${sessionId}`, 'Prefer': 'odata.maxpagesize=1000' },
-                            signal: AbortSignal.timeout(15000)
-                        })
+                    const [genResult, marmolResult] = await Promise.allSettled([
+                        fetchSapQueryPages(baseUrl, sessionId, 'ordenes_pendientes_clean'),
+                        fetchSapQueryPages(baseUrl, sessionId, 'ordenes_marmol_sl136')
                     ]);
+                    const genRows = genResult.status === 'fulfilled' ? genResult.value : [];
+                    const marmolRows = marmolResult.status === 'fulfilled' ? marmolResult.value : [];
 
-                    if (genRes.status === 'fulfilled' && genRes.value.ok) {
-                        const qData = await genRes.value.json();
-                        if (Array.isArray(qData.value) && qData.value.length > 0) {
-                            rawRows = qData.value;
-                            fetchedFromSap = true;
-                            console.log(`SAP Service Layer (general) devolvió ${rawRows.length} órdenes liberadas.`);
-                        }
+                    if (genRows.length > 0) {
+                        rawRows = genRows;
+                        fetchedFromSap = true;
+                        console.log(`SAP Service Layer (general) devolvió ${rawRows.length} órdenes liberadas.`);
                     }
 
-                    if (marmolRes.status === 'fulfilled' && marmolRes.value.ok) {
-                        const mData = await marmolRes.value.json();
-                        if (Array.isArray(mData.value) && mData.value.length > 0) {
-                            marmolRawRows = mData.value;
-                            console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
-                        }
+                    if (marmolRows.length > 0) {
+                        marmolRawRows = marmolRows;
+                        console.log(`SAP Service Layer (Mármol Sintético) devolvió ${marmolRawRows.length} órdenes.`);
                     }
                 }
             }
@@ -424,6 +435,50 @@ export async function GET() {
             console.log(`Upserted ${cleanFibraBatch.length} Fibra orders to ordenes_fabricacion_fibra.`);
         }
 
+        let totalFibraCerradas = 0
+        if (fetchedFromSap && rawRows.length > 0) {
+            const sapAbiertas = new Set(
+                rawRows
+                    .map(item => String(item.DocNum || item.orden_fabricacion || '').trim())
+                    .filter(Boolean)
+            )
+
+            const { data: fibraAbiertas, error: fibraAbiertasErr } = await supabase
+                .from('ordenes_fabricacion_fibra')
+                .select('orden_fabricacion')
+                .eq('pendiente', true)
+
+            if (fibraAbiertasErr) {
+                console.error('Error listando órdenes de fibra abiertas:', fibraAbiertasErr)
+            } else {
+                const porCerrar = (fibraAbiertas || [])
+                    .map(o => String(o.orden_fabricacion))
+                    .filter(of => of && !sapAbiertas.has(of))
+
+                for (let i = 0; i < porCerrar.length; i += 100) {
+                    const lote = porCerrar.slice(i, i + 100)
+                    const { error: closeErr } = await supabase
+                        .from('ordenes_fabricacion_fibra')
+                        .update({
+                            pendiente: false,
+                            fecha_entrega_real: new Date().toISOString(),
+                            modificado_por: 'Sistema SAP (Cierre automático)'
+                        })
+                        .in('orden_fabricacion', lote)
+
+                    if (closeErr) {
+                        console.error('Error cerrando órdenes de fibra ausentes en SAP:', closeErr)
+                    } else {
+                        totalFibraCerradas += lote.length
+                    }
+                }
+
+                if (totalFibraCerradas > 0) {
+                    console.log(`Cierre fibra: ${totalFibraCerradas} órdenes ya cerradas en SAP se ocultaron del control de piso.`)
+                }
+            }
+        }
+
         return NextResponse.json({
             success: true,
             error: false,
@@ -431,6 +486,7 @@ export async function GET() {
             total: mappedRows.length,
             totalMarmol: msUpsertBatch.length,
             totalFibra: totalFibraUpserted,
+            totalFibraCerradas,
             data: mappedRows,
             response: mappedRows
         }, { status: 200 });

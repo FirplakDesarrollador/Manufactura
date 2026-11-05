@@ -79,6 +79,8 @@ import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchA
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
 import * as XLSX from 'xlsx';
+import { descargarHojaDeVidaEquipo } from '@/lib/mantenimiento/hojaDeVidaEquipo';
+import RelacionadosMaquina from '@/components/mantenimiento/RelacionadosMaquina';
 import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
 import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas, computeSemanasFromFrecuencia } from '@/lib/nomenclaturaPlantas';
 
@@ -525,12 +527,14 @@ export default function GestionMantenimientoPage() {
   const [maquinasSearch, setMaquinasSearch] = useState('');
   const [maquinasPlanta, setMaquinasPlanta] = useState('Todas');
   const [maquinasCriticidad, setMaquinasCriticidad] = useState('Todas');
-  const [maquinasEstado, setMaquinasEstado] = useState('Todos');
+  const [maquinasEstado, setMaquinasEstado] = useState('Activos');
   const [maquinasSortColumn, setMaquinasSortColumn] = useState<string>('nombre_equipo');
   const [maquinasSortAsc, setMaquinasSortAsc] = useState<boolean>(true);
   const [maquinasPage, setMaquinasPage] = useState<number>(1);
   const [maquinasPageSize, setMaquinasPageSize] = useState<number>(50);
   const [selectedMachineModal, setSelectedMachineModal] = useState<any | null>(null);
+  const [editandoFicha, setEditandoFicha] = useState(false);
+  useEffect(() => { if (!selectedMachineModal) setEditandoFicha(false); }, [selectedMachineModal]);
   const [machineInterventionSearch, setMachineInterventionSearch] = useState('');
   const [machineInterventionCategory, setMachineInterventionCategory] = useState('Todos');
   const [machineInterventionSortAsc, setMachineInterventionSortAsc] = useState(false);
@@ -599,6 +603,18 @@ export default function GestionMantenimientoPage() {
       default:
         return <span className="text-gray-400 font-bold text-xs">-</span>;
     }
+  };
+
+  // Fecha de referencia del equipo: la de compra y, si no la tiene, la de instalación
+  const fechaEquipo = (m: any): { iso: string; fecha: string; origen: 'Compra' | 'Instalación' } | null => {
+    for (const [campo, origen] of [['fecha_compra', 'Compra'], ['fecha_instalacion', 'Instalación']] as const) {
+      const s = String(m?.[campo] ?? '').trim();
+      if (!s) continue;
+      const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
+      if (isNaN(d.getTime())) continue;
+      return { iso: d.toISOString(), fecha: d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }), origen };
+    }
+    return null;
   };
 
   const renderMachineEstado = (estado?: string | null) => {
@@ -1924,18 +1940,9 @@ export default function GestionMantenimientoPage() {
         }
       }
 
-      try {
-        const cached = localStorage.getItem('firplak_maquinas_catalogo_cache');
-        if (cached) {
-          const list = JSON.parse(cached);
-          if (Array.isArray(list) && list.length > 0) {
-            allMaquinas = allMaquinas.map(m => {
-              const found = list.find((c: any) => String(c.id) === String(m.id) || (c.codigo_equipo && m.codigo_equipo && String(c.codigo_equipo).trim().toUpperCase() === String(m.codigo_equipo).trim().toUpperCase()));
-              return found ? { ...m, ...found } : m;
-            });
-          }
-        }
-      } catch (cErr) {}
+      // La base de datos es la única fuente: la antigua copia local de fichas editadas
+      // tapaba los cambios guardados (p. ej. el estado volvía a ACTIVO), así que se elimina
+      try { localStorage.removeItem('firplak_maquinas_catalogo_cache'); } catch (cErr) {}
 
       // Deduplicar máquinas por ID para evitar registros duplicados en memoria
       const seenMaqIds = new Set<string>();
@@ -2004,6 +2011,16 @@ export default function GestionMantenimientoPage() {
       }
     }
   }, []);
+
+  // La pestaña activa queda en la dirección (?tab=) para que al actualizar la página siga en la misma
+  const tabLeidaDeUrl = useRef(false);
+  useEffect(() => {
+    if (!tabLeidaDeUrl.current) { tabLeidaDeUrl.current = true; return; }
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('tab') === activeTab) return;
+    url.searchParams.set('tab', activeTab);
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, [activeTab]);
 
 
 
@@ -4516,8 +4533,43 @@ export default function GestionMantenimientoPage() {
       proveedor_email: m.proveedor_email || '',
       notas: m.notas || ''
     });
-    setShowMachineFormModal(true);
+    // La edición se hace en la misma ficha (modo edición), no en otra ventana
+    setSelectedMachineModal(m);
+    setEditandoFicha(true);
   };
+
+  // Ficha de la máquina: cada dato se ve como valor y, en modo edición, como campo dentro de la misma caja
+  type CampoFicha = keyof typeof machineFormData;
+  const fichaInputCls = 'w-full mt-0.5 px-2 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-semibold text-[#324354] focus:outline-none focus:ring-2 focus:ring-amber-200';
+  const setCampoFicha = (k: CampoFicha) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setMachineFormData(prev => ({ ...prev, [k]: e.target.value }));
+  const fichaCaja = (label: string, vista: React.ReactNode, edicion: React.ReactNode, fondo = 'bg-[#F6F3EE]', clase = '') => (
+    <div className={`p-3 rounded-xl border min-w-0 ${editandoFicha ? 'bg-amber-50/40 border-amber-200' : `${fondo} border-gray-200`} ${clase}`}>
+      <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">{label}</span>
+      {editandoFicha ? edicion : vista}
+    </div>
+  );
+  const fichaValor = (v: any, vacio = 'Sin registro') => (
+    <strong className="text-[#324354] text-xs sm:text-sm block break-words">{v !== null && v !== undefined && String(v).trim() !== '' ? String(v) : vacio}</strong>
+  );
+  const fichaTexto = (label: string, k: CampoFicha, opts: { tipo?: string; vista?: React.ReactNode; vacio?: string; fondo?: string; clase?: string } = {}) =>
+    fichaCaja(
+      label,
+      opts.vista ?? fichaValor(selectedMachineModal?.[k], opts.vacio),
+      <input
+        type={opts.tipo || 'text'}
+        value={opts.tipo === 'date' ? String(machineFormData[k] || '').slice(0, 10) : String(machineFormData[k] ?? '')}
+        onChange={setCampoFicha(k)}
+        className={fichaInputCls}
+      />,
+      opts.fondo,
+      opts.clase
+    );
+  // Solo las direcciones web se vuelven enlace; hay fichas con "Si" / "No" en estos campos
+  const fichaEnlace = (url?: string | null) =>
+    url && /^https?:\/\//i.test(String(url).trim())
+      ? <a href={String(url).trim()} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-700 hover:underline break-all">{String(url).trim()}</a>
+      : fichaValor(url);
 
   const handleSaveMachineSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4585,80 +4637,30 @@ export default function GestionMantenimientoPage() {
         const targetId = editingMachineId;
         const numId = Number(targetId);
 
-        let { data, error } = await supabase
+        const { data, error } = await supabase
           .from('mantenimiento_maquinas_equipos')
           .update(payload)
           .eq('id', isNaN(numId) ? targetId : numId)
           .select();
 
-        if (error) {
-          const fallback = await supabase
-            .from('maquinas_equipos')
-            .update(payload)
-            .eq('id', isNaN(numId) ? targetId : numId)
-            .select();
-          if (!fallback.error) {
-            data = fallback.data;
-            error = null;
-          }
+        if (error) throw error;
+        // Sin filas devueltas = la base no cambió nada (registro inexistente o sin permiso de edición)
+        if (!data || data.length === 0) {
+          throw new Error(`la base de datos no actualizó la ficha #${targetId}. Verifica que tu usuario tenga permiso para editar máquinas.`);
         }
 
-        // Si no devolvió filas, intentar también por codigo_equipo
-        if ((!data || data.length === 0) && payload.codigo_equipo) {
-          const byCode = await supabase
-            .from('mantenimiento_maquinas_equipos')
-            .update(payload)
-            .eq('codigo_equipo', payload.codigo_equipo)
-            .select();
-          if (byCode.data && byCode.data.length > 0) {
-            data = byCode.data;
-          }
+        // Lo que quedó guardado en la base es lo que se muestra
+        const updatedRecord = data[0];
+        setMaquinasCatalogo(prev => prev.map(m => (String(m.id) === String(targetId) ? { ...m, ...updatedRecord } : m)));
+        if (selectedMachineModal && String(selectedMachineModal.id) === String(targetId)) {
+          setSelectedMachineModal(prev => (prev ? { ...prev, ...updatedRecord } : updatedRecord));
         }
 
-        if (error) {
-          console.warn('Advertencia al sincronizar actualización con Supabase:', error);
-        }
-
-        const updatedRecord = (data && data[0])
-          ? { ...payload, ...data[0] }
-          : { ...payload, id: targetId };
-
-        // Actualizar catálogo local asegurando coincidencia de id (número o texto) o por código
-        setMaquinasCatalogo(prev => prev.map(m => {
-          const isIdMatch = String(m.id) === String(targetId);
-          const isCodeMatch = payload.codigo_equipo && m.codigo_equipo && String(m.codigo_equipo).trim().toUpperCase() === String(payload.codigo_equipo).trim().toUpperCase();
-          if (isIdMatch || isCodeMatch) {
-            return { ...m, ...updatedRecord, estado: payload.estado };
-          }
-          return m;
-        }));
-
-        if (selectedMachineModal) {
-          const isIdMatch = String(selectedMachineModal.id) === String(targetId);
-          const isCodeMatch = payload.codigo_equipo && selectedMachineModal.codigo_equipo && String(selectedMachineModal.codigo_equipo).trim().toUpperCase() === String(payload.codigo_equipo).trim().toUpperCase();
-          if (isIdMatch || isCodeMatch) {
-            setSelectedMachineModal(prev => (prev ? { ...prev, ...updatedRecord, estado: payload.estado } : { ...updatedRecord, estado: payload.estado }));
-          }
-        }
-
-        // Guardar en caché local para persistencia inmediata
-        try {
-          const cached = localStorage.getItem('firplak_maquinas_catalogo_cache');
-          let list = cached ? JSON.parse(cached) : [];
-          if (!Array.isArray(list)) list = [];
-          const idx = list.findIndex((m: any) => String(m.id) === String(targetId) || (payload.codigo_equipo && m.codigo_equipo && String(m.codigo_equipo).trim().toUpperCase() === String(payload.codigo_equipo).trim().toUpperCase()));
-          if (idx >= 0) {
-            list[idx] = { ...list[idx], ...updatedRecord, estado: payload.estado };
-          } else {
-            list.push({ ...updatedRecord, estado: payload.estado });
-          }
-          localStorage.setItem('firplak_maquinas_catalogo_cache', JSON.stringify(list));
-        } catch (lsErr) {}
-
-        alert('¡Ficha técnica de máquina actualizada correctamente en Supabase!');
+        alert(`¡Ficha técnica actualizada correctamente! Estado guardado: ${updatedRecord.estado || '—'}`);
       }
 
       setShowMachineFormModal(false);
+      setEditandoFicha(false);
       resetMachineForm();
     } catch (err: any) {
       console.error('Error guardando máquina en Supabase:', err);
@@ -5335,6 +5337,11 @@ export default function GestionMantenimientoPage() {
           valA = a.criticidad || 'Z';
           valB = b.criticidad || 'Z';
           break;
+        case 'fecha_equipo':
+          // Las máquinas sin fecha quedan al final
+          valA = fechaEquipo(a)?.iso || '9999';
+          valB = fechaEquipo(b)?.iso || '9999';
+          break;
         case 'estado':
           valA = (a.estado || '').toLowerCase();
           valB = (b.estado || '').toLowerCase();
@@ -5355,6 +5362,45 @@ export default function GestionMantenimientoPage() {
     const start = (maquinasPage - 1) * maquinasPageSize;
     return filteredMaquinasList.slice(start, start + maquinasPageSize);
   }, [filteredMaquinasList, maquinasPage, maquinasPageSize]);
+
+  // Excel de máquinas y equipos: las filas filtradas en pantalla con todos los campos de la ficha en columnas
+  const handleDownloadMaquinasExcel = () => {
+    if (filteredMaquinasList.length === 0) {
+      alert('No hay máquinas ni equipos para exportar con los filtros actuales.');
+      return;
+    }
+
+    try {
+      const campos: string[] = [];
+      for (const m of filteredMaquinasList) {
+        for (const k of Object.keys(m)) if (!campos.includes(k)) campos.push(k);
+      }
+      const encabezado = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const valor = (v: any) => (v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : v);
+
+      const dataToExport = filteredMaquinasList.map(m => {
+        const fila: Record<string, any> = {
+          'Código Planta': obtenerCodigoPlanta(m.planta, plantasNomenclatura),
+          'Rutinas PMP': machinePmpCountsMap.get(m.id) || 0
+        };
+        for (const k of campos) fila[encabezado(k)] = valor(m[k]);
+        return fila;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Máquinas y Equipos');
+
+      ws['!cols'] = Object.keys(dataToExport[0]).map(key => ({
+        wch: Math.min(60, Math.max(key.length, ...dataToExport.map(row => String(row[key] ?? '').length)) + 2)
+      }));
+
+      XLSX.writeFile(wb, `Maquinas_Equipos_FIRPLAK_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      console.error('Error exportando máquinas a Excel:', err);
+      alert('Hubo un error al generar el archivo Excel.');
+    }
+  };
 
   // Excel Export for Preventivo
   const handleDownloadPreventivoExcel = () => {
@@ -8712,6 +8758,17 @@ export default function GestionMantenimientoPage() {
                     <option value="Baja">Solo De Baja / Obsoleto</option>
                   </select>
 
+                  {/* Descargar Excel */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadMaquinasExcel}
+                    title="Descargar en Excel las máquinas filtradas con toda la información de su ficha"
+                    className="px-4 py-2.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-600 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Excel</span>
+                  </button>
+
                   {/* Nueva Máquina Button */}
                   <button
                     type="button"
@@ -8786,6 +8843,19 @@ export default function GestionMantenimientoPage() {
                           <ArrowUpDown className="w-3 h-3 text-gray-400" />
                         </div>
                       </th>
+                      <th
+                        onClick={() => {
+                          if (maquinasSortColumn === 'fecha_equipo') setMaquinasSortAsc(!maquinasSortAsc);
+                          else { setMaquinasSortColumn('fecha_equipo'); setMaquinasSortAsc(true); }
+                        }}
+                        className="py-3.5 px-4 cursor-pointer hover:bg-gray-200/60 transition-colors text-center w-32"
+                        title="Fecha de compra; si no tiene, la de instalación"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Fecha Compra</span>
+                          <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                        </div>
+                      </th>
                       <th 
                         onClick={() => {
                           if (maquinasSortColumn === 'criticidad') setMaquinasSortAsc(!maquinasSortAsc);
@@ -8812,9 +8882,6 @@ export default function GestionMantenimientoPage() {
                       </th>
                       <th className="py-3.5 px-4 text-center w-28">
                         <span>Rutinas PMP</span>
-                      </th>
-                      <th className="py-3.5 px-4 text-right w-24">
-                        <span>Ficha</span>
                       </th>
                     </tr>
                   </thead>
@@ -8899,6 +8966,20 @@ export default function GestionMantenimientoPage() {
                               )}
                             </td>
 
+                            {/* Fecha de compra (o de instalación si no tiene compra) */}
+                            <td className="py-3 px-4 text-center">
+                              {(() => {
+                                const f = fechaEquipo(m);
+                                if (!f) return <span className="text-gray-300 font-bold text-xs">-</span>;
+                                return (
+                                  <div className="flex flex-col items-center">
+                                    <span className="font-semibold text-[#324354] whitespace-nowrap">{f.fecha}</span>
+                                    <span className="text-[10px] text-gray-400">{f.origen}</span>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
                             {/* Criticidad */}
                             <td className="py-3 px-4 text-center">
                               {renderMachineCriticidad(m.criticidad)}
@@ -8921,20 +9002,6 @@ export default function GestionMantenimientoPage() {
                               )}
                             </td>
 
-                            {/* Ver Ficha */}
-                            <td className="py-3 px-4 text-right">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedMachineModal(m);
-                                }}
-                                className="px-3 py-1 bg-gray-100 group-hover:bg-[#324354] group-hover:text-white text-gray-700 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Ficha</span>
-                              </button>
-                            </td>
                           </tr>
                         );
                       })
@@ -12164,25 +12231,41 @@ export default function GestionMantenimientoPage() {
         </div>
       )}
 
-      {/* Modal: Ficha Técnica de Máquinas y Equipos */}
+      {/* Modal: Ficha Técnica de Máquinas y Equipos (consulta y edición en la misma ventana) */}
       {selectedMachineModal && (
-        <div 
+        <div
           className="fixed inset-0 z-[9998] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
+            // En modo edición el clic en el fondo no cierra, para no perder cambios
+            if (e.target === e.currentTarget && !editandoFicha) {
               setSelectedMachineModal(null);
             }
           }}
         >
-          <div 
-            className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] shadow-2xl border border-[#e2ded5] flex flex-col overflow-hidden relative animate-in zoom-in-95 duration-200"
+          <div
+            className={`bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] shadow-2xl border flex flex-col overflow-hidden relative animate-in zoom-in-95 duration-200 ${
+              editandoFicha ? 'border-2 border-amber-500 ring-4 ring-amber-100' : 'border-[#e2ded5]'
+            }`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Hidden File Inputs for Machine Photos & Camera (modo edición) */}
+            {editandoFicha && (
+              <>
+                <input type="file" ref={machineFileInputRef} accept="image/*,.pdf,.doc,.docx" multiple onChange={handleMachinePhotoUpload} className="hidden" />
+                <input type="file" ref={machineCameraInputRef} accept="image/*" capture="environment" onChange={handleMachinePhotoUpload} className="hidden" />
+              </>
+            )}
+
             {/* Fixed Header */}
             <div className="px-6 py-4 sm:px-8 sm:py-5 border-b border-[#e2ded5] bg-white shrink-0 flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-1.5 min-w-0 pr-2">
+              <div className="flex flex-col gap-1.5 min-w-0 pr-2 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
+                  {editandoFicha && (
+                    <span className="px-2.5 py-1 text-xs font-black uppercase text-amber-800 bg-amber-100 border border-amber-300 rounded-md">
+                      Modo edición
+                    </span>
+                  )}
                   {selectedMachineModal.codigo_equipo && (
                     <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200">
                       {selectedMachineModal.codigo_equipo}
@@ -12202,28 +12285,57 @@ export default function GestionMantenimientoPage() {
                     </span>
                   )}
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-[#324354] leading-tight truncate">
-                  {selectedMachineModal.nombre_equipo}
-                </h3>
-                {selectedMachineModal.nombre_alterno && (
-                  <p className="text-xs text-gray-500 italic truncate">
-                    Nombre Alterno: {selectedMachineModal.nombre_alterno}
-                  </p>
+                {editandoFicha ? (
+                  <div className="flex flex-col gap-1.5">
+                    <input
+                      type="text"
+                      value={machineFormData.nombre_equipo}
+                      onChange={setCampoFicha('nombre_equipo')}
+                      placeholder="Nombre oficial del equipo / máquina *"
+                      className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-lg sm:text-xl font-black text-[#324354] focus:outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                    <input
+                      type="text"
+                      value={machineFormData.nombre_alterno}
+                      onChange={setCampoFicha('nombre_alterno')}
+                      placeholder="Nombre alterno / alias"
+                      className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs italic text-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="text-xl sm:text-2xl font-black text-[#324354] leading-tight break-words">
+                      {selectedMachineModal.nombre_equipo}
+                    </h3>
+                    {selectedMachineModal.nombre_alterno && (
+                      <p className="text-xs text-gray-500 italic break-words">
+                        Nombre Alterno: {selectedMachineModal.nombre_alterno}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {!editandoFicha && (
+                  <button
+                    type="button"
+                    onClick={() => descargarHojaDeVidaEquipo({
+                      maquina: selectedMachineModal,
+                      codigoPlanta: obtenerCodigoPlanta(selectedMachineModal.planta, plantasNomenclatura),
+                      rutinasPmp: getPmpForMachine(selectedMachineModal),
+                      intervenciones: getInterventionsForMachine(selectedMachineModal)
+                    })}
+                    title="Descargar en PDF la hoja de vida: datos del equipo, rutinas PMP, mantenimiento autónomo, puestas a punto e historial"
+                    className="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-600 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Hoja de vida PDF</span>
+                  </button>
+                )}
                 <button
-                  type="button"
-                  onClick={() => handleOpenEditMachine(selectedMachineModal)}
-                  className="px-3.5 py-2 bg-[#324354] hover:bg-[#324354]/90 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>Editar Ficha</span>
-                </button>
-                <button 
                   onClick={() => setSelectedMachineModal(null)}
                   className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-                  title="Cerrar ventana"
+                  title={editandoFicha ? 'Cerrar sin guardar' : 'Cerrar ventana'}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -12235,8 +12347,58 @@ export default function GestionMantenimientoPage() {
               {/* Photo + General Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Photo Box */}
-                <div className="md:col-span-1 bg-[#F6F3EE] rounded-2xl border border-gray-200 p-3 flex flex-col items-center justify-center min-h-[160px] gap-2">
-                  {(() => {
+                <div className={`md:col-span-1 rounded-2xl border p-3 flex flex-col items-center justify-center min-h-[160px] gap-2 ${editandoFicha ? 'bg-amber-50/40 border-amber-200' : 'bg-[#F6F3EE] border-gray-200'}`}>
+                  {editandoFicha ? (
+                    // Fotos y adjuntos editables: hasta 5, la primera es la principal
+                    <div className="w-full flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">Fotos y adjuntos</span>
+                        <span className="text-[10px] font-bold text-gray-500">{currentMachinePhotos.length}/5</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {currentMachinePhotos.map((photoUrl, idx) => {
+                          const esDoc = /\.(pdf|docx?)($|\?)/i.test(photoUrl);
+                          return (
+                            <div key={idx} className={`relative group h-16 rounded-lg overflow-hidden border-2 bg-white flex items-center justify-center ${idx === 0 ? 'border-[#324354]' : 'border-gray-200'}`}>
+                              {esDoc ? <File className="w-5 h-5 text-[#7B8E90]" /> : <img src={photoUrl} alt={`Adjunto ${idx + 1}`} className="w-full h-full object-cover" />}
+                              {idx === 0 && (
+                                <span className="absolute top-0.5 left-0.5 bg-[#324354] text-white text-[8px] font-black px-1 rounded flex items-center gap-0.5">
+                                  <Star className="w-2 h-2 fill-amber-300 text-amber-300" />
+                                </span>
+                              )}
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                <button type="button" onClick={() => setZoomMachineImage(photoUrl)} className="p-1 bg-white/90 rounded text-gray-800" title="Ver / Ampliar"><Eye className="w-3 h-3" /></button>
+                                {idx > 0 && (
+                                  <button type="button" onClick={() => handleSetPrimaryMachinePhoto(idx)} className="p-1 bg-amber-500 rounded text-slate-950" title="Definir como foto principal"><Star className="w-3 h-3" /></button>
+                                )}
+                                <button type="button" onClick={() => handleRemoveMachinePhoto(idx)} className="p-1 bg-rose-600 rounded text-white" title="Eliminar adjunto"><Trash2 className="w-3 h-3" /></button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => machineFileInputRef.current?.click()}
+                          disabled={uploadingMachinePhoto || currentMachinePhotos.length >= 5}
+                          className="flex-1 px-2 py-1.5 bg-[#324354] hover:bg-[#324354]/90 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {uploadingMachinePhoto ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                          <span>Adjuntar</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowMachineLiveCamera(true)}
+                          disabled={uploadingMachinePhoto || currentMachinePhotos.length >= 5}
+                          className="flex-1 px-2 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Camera className="w-3 h-3" />
+                          <span>Tomar foto</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (() => {
                     const photos = getMachinePhotosList(selectedMachineModal.fotos);
                     if (photos.length === 0) {
                       return (
@@ -12249,8 +12411,8 @@ export default function GestionMantenimientoPage() {
                     return (
                       <div className="w-full flex flex-col items-center gap-2">
                         <div className="relative group cursor-zoom-in w-full flex items-center justify-center">
-                          <img 
-                            src={photos[0]} 
+                          <img
+                            src={photos[0]}
                             alt={selectedMachineModal.nombre_equipo}
                             onClick={() => setZoomMachineImage(photos[0])}
                             className="max-h-48 w-full object-contain rounded-xl shadow-xs group-hover:scale-105 transition-transform"
@@ -12290,89 +12452,137 @@ export default function GestionMantenimientoPage() {
                 </div>
 
                 {/* General Info */}
-                <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 bg-[#F6F3EE] rounded-xl border border-gray-200">
-                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Marca</span>
-                    <strong className="text-[#324354] text-sm block truncate">{selectedMachineModal.marca || 'N/A'}</strong>
-                  </div>
-                  <div className="p-3 bg-[#F6F3EE] rounded-xl border border-gray-200">
-                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Modelo</span>
-                    <strong className="text-[#324354] text-sm block truncate">{selectedMachineModal.modelo || 'N/A'}</strong>
-                  </div>
-                  <div className="p-3 bg-[#F6F3EE] rounded-xl border border-gray-200">
-                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Tipo</span>
-                    <strong className="text-[#324354] text-sm block truncate">{selectedMachineModal.tipo || 'N/A'}</strong>
-                  </div>
-                  <div className="p-3 bg-[#F6F3EE] rounded-xl border border-gray-200">
-                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Criticidad</span>
-                    <div className="mt-0.5">{renderMachineCriticidad(selectedMachineModal.criticidad)}</div>
-                  </div>
-                  <div className="p-3 bg-[#F6F3EE] rounded-xl border border-gray-200">
-                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Estado</span>
-                    <div className="mt-0.5">{renderMachineEstado(selectedMachineModal.estado)}</div>
-                  </div>
-                  <div className="p-3 bg-[#F6F3EE] rounded-xl border border-gray-200">
-                    <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Ubicación / Bodega</span>
-                    <strong className="text-[#324354] text-xs block truncate">{selectedMachineModal.bodega || 'General'}</strong>
-                  </div>
+                <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs content-start">
+                  {editandoFicha && fichaTexto('Código de equipo', 'codigo_equipo')}
+                  {editandoFicha && fichaTexto('Activo fijo (SAP)', 'activo_fijo')}
+                  {editandoFicha && fichaCaja('Planta', null, (
+                    <select value={normalizarPlanta(machineFormData.planta, plantasNomenclatura)} onChange={setCampoFicha('planta')} className={fichaInputCls}>
+                      {plantasNomenclatura.filter(p => p.activo !== false).map(p => (
+                        <option key={p.codigo} value={p.nombre_oficial}>{p.codigo} - {p.nombre_oficial}</option>
+                      ))}
+                    </select>
+                  ))}
+                  {editandoFicha && fichaTexto('Proceso / Sección', 'proceso')}
+                  {fichaTexto('Marca', 'marca', { vacio: 'N/A' })}
+                  {fichaTexto('Modelo', 'modelo', { vacio: 'N/A' })}
+                  {fichaTexto('Tipo', 'tipo', { vacio: 'N/A' })}
+                  {fichaCaja('Criticidad', <div className="mt-0.5">{renderMachineCriticidad(selectedMachineModal.criticidad)}</div>, (
+                    <select value={machineFormData.criticidad} onChange={setCampoFicha('criticidad')} className={fichaInputCls}>
+                      <option value="">Sin clasificar</option>
+                      <option value="A">A · Alta (Crítico)</option>
+                      <option value="B">B · Media (Moderado)</option>
+                      <option value="C">C · Baja (Bajo impacto)</option>
+                    </select>
+                  ))}
+                  {fichaCaja('Estado', <div className="mt-0.5">{renderMachineEstado(selectedMachineModal.estado)}</div>, (
+                    <select value={machineFormData.estado} onChange={setCampoFicha('estado')} className={fichaInputCls}>
+                      <option value="ACTIVO">ACTIVO</option>
+                      <option value="INACTIVO">INACTIVO</option>
+                      <option value="DE BAJA / OBSOLETO">DE BAJA / OBSOLETO</option>
+                    </select>
+                  ))}
+                  {fichaCaja('Clasificación', fichaValor(selectedMachineModal.clasificacion ? `Clase ${selectedMachineModal.clasificacion}` : null, 'Ninguna'), (
+                    <select value={machineFormData.clasificacion} onChange={setCampoFicha('clasificacion')} className={fichaInputCls}>
+                      <option value="">Ninguna</option>
+                      <option value="A">Clase A</option>
+                      <option value="B">Clase B</option>
+                      <option value="C">Clase C</option>
+                    </select>
+                  ))}
+                  {fichaTexto('Ubicación / Bodega', 'bodega', { vacio: 'General', clase: editandoFicha ? '' : 'sm:col-span-2' })}
                 </div>
               </div>
 
               {/* Technical Specifications */}
-              <div className="bg-[#F6F3EE] p-4.5 rounded-2xl border border-gray-200 flex flex-col gap-2">
+              <div className={`p-4.5 rounded-2xl border flex flex-col gap-2 ${editandoFicha ? 'bg-amber-50/40 border-amber-200' : 'bg-[#F6F3EE] border-gray-200'}`}>
                 <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[#7B8E90]" />
                   <span>Especificaciones y Características Técnicas</span>
                 </h4>
-                <div className="text-xs sm:text-sm text-gray-800 bg-white p-4 rounded-xl border border-gray-200 whitespace-pre-wrap leading-relaxed">
-                  {selectedMachineModal.caracteristicas || 'No hay especificaciones técnicas detalladas registradas en el catálogo.'}
-                </div>
+                {editandoFicha ? (
+                  <textarea
+                    value={machineFormData.caracteristicas}
+                    onChange={setCampoFicha('caracteristicas')}
+                    rows={4}
+                    placeholder="Voltaje, amperaje, capacidad, tipo de aceite, dimensiones, tolerancias..."
+                    className="w-full p-3 bg-white border border-amber-300 rounded-xl text-xs sm:text-sm text-[#324354] focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  />
+                ) : (
+                  <div className="text-xs sm:text-sm text-gray-800 bg-white p-4 rounded-xl border border-gray-200 whitespace-pre-wrap leading-relaxed">
+                    {selectedMachineModal.caracteristicas || 'No hay especificaciones técnicas detalladas registradas en el catálogo.'}
+                  </div>
+                )}
               </div>
 
               {/* Financial & Purchase Info */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 bg-white border border-gray-200 rounded-xl">
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Fecha de Compra</span>
-                  <strong className="text-[#324354] text-xs">{selectedMachineModal.fecha_compra || 'Sin fecha'}</strong>
-                </div>
-                <div className="p-3 bg-white border border-gray-200 rounded-xl">
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Fecha Instalación</span>
-                  <strong className="text-[#324354] text-xs">{selectedMachineModal.fecha_instalacion || 'Sin fecha'}</strong>
-                </div>
-                <div className="p-3 bg-white border border-gray-200 rounded-xl">
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Valor de Compra</span>
-                  <strong className="text-[#324354] text-xs">{formatCOP(selectedMachineModal.valor_compra)}</strong>
-                </div>
-                <div className="p-3 bg-white border border-gray-200 rounded-xl">
-                  <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">Factura</span>
-                  <strong className="text-[#324354] text-xs truncate block">{selectedMachineModal.factura || 'Sin registro'}</strong>
-                </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+                {fichaTexto('Fecha de Compra', 'fecha_compra', { tipo: 'date', vacio: 'Sin fecha', fondo: 'bg-white' })}
+                {fichaTexto('Fecha Instalación', 'fecha_instalacion', { tipo: 'date', vacio: 'Sin fecha', fondo: 'bg-white' })}
+                {fichaTexto('Valor de Compra', 'valor_compra', { tipo: 'number', vista: fichaValor(formatCOP(selectedMachineModal.valor_compra)), fondo: 'bg-white' })}
+                {fichaTexto('Valor de Reposición', 'valor_nuevo', { tipo: 'number', vista: fichaValor(selectedMachineModal.valor_nuevo ? formatCOP(selectedMachineModal.valor_nuevo) : null), fondo: 'bg-white' })}
+                {fichaTexto('Factura', 'factura', { fondo: 'bg-white' })}
               </div>
 
               {/* Provider Info */}
-              {(selectedMachineModal.proveedor_nombre || selectedMachineModal.proveedor_contacto || selectedMachineModal.proveedor_telefono) && (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-2">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Información de Proveedor / Servicio Técnico
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-gray-400 block text-[10px]">Proveedor:</span>
-                      <strong className="text-slate-800">{selectedMachineModal.proveedor_nombre || '-'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[10px]">Contacto:</span>
-                      <strong className="text-slate-800">{selectedMachineModal.proveedor_contacto || '-'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[10px]">Teléfono / Email:</span>
-                      <strong className="text-slate-800">
-                        {selectedMachineModal.proveedor_telefono || selectedMachineModal.proveedor_email || '-'}
-                      </strong>
+              <div className="flex flex-col gap-2">
+                <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider">
+                  Proveedor / Servicio Técnico
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  {fichaTexto('Proveedor', 'proveedor_nombre', { fondo: 'bg-slate-50' })}
+                  {fichaTexto('Contacto', 'proveedor_contacto', { fondo: 'bg-slate-50' })}
+                  {fichaTexto('Teléfono / Celular', 'proveedor_telefono', { fondo: 'bg-slate-50' })}
+                  {fichaTexto('Email', 'proveedor_email', { tipo: 'email', fondo: 'bg-slate-50' })}
+                </div>
+              </div>
+
+              {/* Documentación y notas */}
+              <div className="flex flex-col gap-2">
+                <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                  <File className="w-4 h-4 text-[#7B8E90]" />
+                  <span>Documentación y Notas</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  {fichaTexto('Planos técnicos (URL)', 'planos', { vista: fichaEnlace(selectedMachineModal.planos), fondo: 'bg-white' })}
+                  {fichaTexto('Manuales (URL)', 'manuales', { vista: fichaEnlace(selectedMachineModal.manuales), fondo: 'bg-white' })}
+                  {fichaTexto('Estándares (URL)', 'estandares', { vista: fichaEnlace(selectedMachineModal.estandares), fondo: 'bg-white' })}
+                </div>
+                {fichaCaja('Notas y observaciones', (
+                  <p className="text-xs text-[#324354] whitespace-pre-wrap">{selectedMachineModal.notas || 'Sin notas registradas.'}</p>
+                ), (
+                  <textarea value={machineFormData.notas} onChange={setCampoFicha('notas')} rows={3} className={fichaInputCls} />
+                ), 'bg-white')}
+              </div>
+
+              {/* Otros datos de la base que no tienen caja propia (fechas de registro, columnas nuevas…) */}
+              {(() => {
+                const conCaja = new Set(['id', 'fotos', ...Object.keys(machineFormData)]);
+                const otros = Object.entries(selectedMachineModal).filter(([k, v]) => !conCaja.has(k) && v !== null && v !== undefined && String(v).trim() !== '');
+                if (otros.length === 0) return null;
+                const etiqueta = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                const valor = (v: any) => {
+                  if (typeof v === 'object') return JSON.stringify(v);
+                  const s = String(v);
+                  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+                    const d = new Date(s);
+                    if (!isNaN(d.getTime())) return d.toLocaleString('es-CO');
+                  }
+                  return s;
+                };
+                return (
+                  <div className="flex flex-col gap-2">
+                    <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider">Otros datos registrados</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      {otros.map(([k, v]) => (
+                        <div key={k} className="p-3 bg-white rounded-xl border border-gray-200 min-w-0">
+                          <span className="text-gray-400 font-bold block text-[10px] uppercase mb-0.5">{etiqueta(k)}</span>
+                          <strong className="text-[#324354] text-xs block break-words">{valor(v)}</strong>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Linked PMP Preventative Routines */}
               <div className="flex flex-col gap-3">
@@ -12428,6 +12638,25 @@ export default function GestionMantenimientoPage() {
 
               {/* Puestas a Punto (Mtto Autónomo) relacionadas con esta máquina */}
               <PuestasAPuntoMaquina maquina={selectedMachineModal} />
+
+              {/* Rutinas de Mantenimiento Autónomo: aún no se asignan por máquina */}
+              <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
+                    <Wrench className="w-4 h-4 text-[#7B8E90]" />
+                    <span>Mantenimientos Autónomos</span>
+                  </h4>
+                  <span className="px-2.5 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-full text-xs font-bold">
+                    0 Rutina(s)
+                  </span>
+                </div>
+                <div className="p-4 bg-[#F6F3EE] rounded-xl text-center text-xs text-gray-500">
+                  Este equipo no tiene rutinas de mantenimiento autónomo asignadas.
+                </div>
+              </div>
+
+              {/* Tarjetas TPM y auditorías OPT de Mantenimiento Autónomo ligadas a la máquina */}
+              <RelacionadosMaquina maquina={selectedMachineModal} />
 
               {/* Complete Intervention History for this Machine */}
               {selectedMachineModal && (() => {
@@ -12651,34 +12880,61 @@ export default function GestionMantenimientoPage() {
 
             {/* Fixed Footer */}
             <div className="px-6 py-4 sm:px-8 sm:py-4 border-t border-[#e2ded5] bg-[#F6F3EE] shrink-0 flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleRequestDeleteMachine(selectedMachineModal)}
-                  className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Eliminar Máquina</span>
-                </button>
-              </div>
+              {editandoFicha ? (
+                <>
+                  <span className="text-[11px] font-bold text-amber-800">Los cambios se guardan al presionar Guardar.</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setEditandoFicha(false); resetMachineForm(); }}
+                      disabled={savingMachine}
+                      className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-all border border-gray-200 disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveMachineSubmit({ preventDefault: () => {} } as React.FormEvent)}
+                      disabled={savingMachine || uploadingMachinePhoto}
+                      className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {savingMachine ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      <span>{savingMachine ? 'Guardando...' : 'Guardar'}</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRequestDeleteMachine(selectedMachineModal)}
+                      className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar Máquina</span>
+                    </button>
+                  </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedMachineModal(null)}
-                  className="px-5 py-2.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-all border border-gray-200"
-                >
-                  Cerrar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditMachine(selectedMachineModal)}
-                  className="px-5 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>Editar Máquina</span>
-                </button>
-              </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMachineModal(null)}
+                      className="px-5 py-2.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-all border border-gray-200"
+                    >
+                      Cerrar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditMachine(selectedMachineModal)}
+                      className="px-5 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Editar Máquina</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
