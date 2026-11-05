@@ -16,7 +16,7 @@ export function OrderCard({ order }: OrderCardProps) {
         { label: 'PULIDO', value: order.pulido || 0, color: 'text-[#2196f3]' },
         { label: 'REPARACION', value: order.reparacion || 0, color: 'text-[#2196f3]' },
         { label: 'SALDO', value: order.saldo || 0, color: 'text-[#2196f3]' },
-        { label: 'EMPAQUE', value: order.empaque || 0, color: 'text-[#2196f3]' },
+        { label: 'GUACALES', value: order.empaque || 0, color: 'text-[#2196f3]' },
         { label: 'TRANSITO', value: order.transito || 0, color: 'text-[#2196f3]' },
         { label: 'DIGITADO', value: order.digitado || 0, color: 'text-[#2196f3]' },
         { label: 'CEDI', value: order.cedi || 0, color: 'text-[#254153]' },
@@ -25,7 +25,7 @@ export function OrderCard({ order }: OrderCardProps) {
     const secondaryStages = [
         { label: 'VACIADO', value: order.vaciado || 0, color: 'text-[#254153]' },
         { label: 'ESTANTERIA', value: order.estanteria || 0, color: 'text-[#254153]' },
-        { label: 'ACABADO', value: order.acabado || 0, color: 'text-[#254153]' },
+        { label: 'ENSAYO', value: order.acabado || 0, color: 'text-[#254153]' },
         { label: 'REP. LARGA', value: order.reparacion_larga || 0, color: 'text-[#254153]' },
         { label: 'DESTRUCCION', value: order.destruccion || 0, color: 'text-[#254153]' },
     ]

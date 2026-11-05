@@ -3,12 +3,16 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, X, Settings, Archive, Trash2 } from 'lucide-react'
+import { Camera, X, Settings, Archive, Trash2, History, ClipboardList, BarChart2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DefectCard } from '@/components/calidad/DefectCard'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DefectsSettingsModal } from '@/components/calidad/DefectsSettingsModal'
+import { usePermisosCalidadMs } from '@/lib/calidad/usePermisosCalidadMs'
 import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChart'
+import Header from '@/components/opt-sistemica/Header'
+import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
+import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
 
 export default function CalidadMsReportPage() {
     const router = useRouter()
@@ -45,7 +49,8 @@ export default function CalidadMsReportPage() {
         buenos: 0,
         defectuosos: 0,
         total: 0,
-        ifi: 0
+        ifi: 0,
+        saldos: 0
     })
 
     const [selectedProduct, setSelectedProduct] = useState<string>('')
@@ -56,6 +61,10 @@ export default function CalidadMsReportPage() {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [showHourlyChart, setShowHourlyChart] = useState(false)
+    // Permisos por botón: sin "Registro" pero con "Hora a hora" se ve solo la gráfica
+    const { permisos: permisosMs } = usePermisosCalidadMs()
+    const soloHoraAHora = !!permisosMs && !permisosMs.registro
+    const configEditable = permisosMs?.configuracion === 'editar'
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
     const [hasSaldosPermission, setHasSaldosPermission] = useState(false)
     
@@ -121,7 +130,9 @@ export default function CalidadMsReportPage() {
             }).length
             const buenos = total - defectuosos
             const ifi = total > 0 ? (buenos / total) * 100 : 0
-            setStats({ buenos, defectuosos, total, ifi })
+            // Saldos y destrucciones del día (mismo criterio de la pantalla de Saldos)
+            const saldos = reportsRes.data.filter(r => /saldo|destrucci/i.test(String(r.defectos_lista || ''))).length
+            setStats({ buenos, defectuosos, total, ifi, saldos })
         }
 
         setLoading(false)
@@ -130,6 +141,15 @@ export default function CalidadMsReportPage() {
     useEffect(() => {
         const load = async () => {
             await fetchData()
+            if (typeof window !== 'undefined') {
+                const params = new URLSearchParams(window.location.search)
+                if (params.get('chart') === 'true') {
+                    setShowHourlyChart(true)
+                }
+                if (params.get('settings') === 'true') {
+                    setIsSettingsOpen(true)
+                }
+            }
         }
         void load()
     }, [fetchData])
@@ -251,6 +271,7 @@ export default function CalidadMsReportPage() {
     const moldeRefForUpload = useRef<string | undefined>(undefined)
 
     const handleSaveSettings = async (updatedDefects: DefectoMS[]) => {
+        if (!configEditable) return
         try {
             // Update each defect in supabase.
             // Ideally this would be a bulk upsert.
@@ -291,106 +312,64 @@ export default function CalidadMsReportPage() {
 
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans">
-            {/* Professional Header - Full Width */}
-            <header className="bg-[#254153] text-white sticky top-0 z-50 px-4">
-                <div className="mx-auto h-14 flex items-center justify-between">
-                    <div className="flex items-center space-x-6">
-                        <button
-                            onClick={() => router.push('/calidad')}
-                            className="p-1.5 hover:bg-white/10 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                        </button>
-                        <div className="flex items-center space-x-3">
-                            <span className="text-xl font-black tracking-tighter italic">FIRPLAK</span>
-                            <div className="h-4 w-px bg-white/20" />
-                            <span className="text-[10px] uppercase font-bold tracking-[0.3em] opacity-60">MS Quality Control</span>
+            {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
+            <Header
+                title="Calidad MS"
+                subtitle=""
+                compact={true}
+                userEmail={user?.email}
+                showLogout={true}
+                onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            />
+
+            {/* Barra de controles (nivel 2): una sola fila desde 1200 px (pantallas a zoom 100 % ≈ 1266 px) */}
+            {/* En pantallas angostas la barra se divide en filas para no desbordar la página */}
+            <div className="bg-gray-50 border-b border-gray-200 py-1.5 min-[1200px]:py-0 min-[1200px]:h-10 sticky top-[48px] z-40 flex items-center shadow-xs">
+                <div className="max-w-[1800px] w-full mx-auto px-3 sm:px-4 flex flex-wrap items-center justify-between min-[1200px]:grid min-[1200px]:grid-cols-[minmax(min-content,1fr)_auto_minmax(max-content,1fr)] min-[1200px]:gap-4 gap-2 relative min-[1200px]:h-full">
+                    {/* Left: Product Selector & Save button (oculto si el usuario solo ve Hora a hora) */}
+                    {soloHoraAHora ? <div /> : (
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min min-[1200px]:max-w-[520px] 2xl:max-w-[600px]">
+                        <div className="flex-1 min-w-[160px] [contain:inline-size]">
+                            <SearchableSelect
+                                name="producto"
+                                options={products.map((p) => p.Referencia)}
+                                placeholder="SELECCIONAR REFERENCIA DE PRODUCTO"
+                                defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
+                                onValueChange={(val) => {
+                                    const product = products.find(p => p.Referencia === val)
+                                    setSelectedProduct(product ? product.id.toString() : '')
+                                }}
+                                className="w-full h-7 bg-white border border-gray-300 rounded px-2.5 text-[#254153] font-bold text-[11px] focus:border-[#254153] outline-none transition-all flex items-center"
+                            />
                         </div>
-                    </div>
 
-                    <div className="flex items-center space-x-4">
-                        <div className="hidden md:block text-right">
-                            <span className="text-[10px] font-black opacity-40 uppercase tracking-widest block leading-none">Terminal Activa</span>
-                            <span className="text-xs font-bold text-blue-400">{user?.email}</span>
-                        </div>
-                        <button
-                            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-                            className="p-1.5 hover:bg-red-600 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            {/* Control Bar - Full Width */}
-            <div className="bg-gray-50 border-b border-gray-200 sticky top-[56px] z-40">
-                <div className="max-w-full px-4 py-3 flex flex-wrap items-center gap-6">
-                    <div className="flex-1 min-w-[300px]">
-                        <SearchableSelect
-                            name="producto"
-                            options={products.map((p) => p.Referencia)}
-                            placeholder="-- SELECCIONAR REFERENCIA DE PRODUCTO --"
-                            defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
-                            onValueChange={(val) => {
-                                const product = products.find(p => p.Referencia === val)
-                                setSelectedProduct(product ? product.id.toString() : '')
-                            }}
-                            className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-[#254153] font-black text-base focus:border-[#254153] outline-none transition-all"
-                        />
-                    </div>
-
-                    <div className="flex items-center space-x-2">
                         <button
                             onClick={handleSave}
                             disabled={isUploading}
-                            className={`flex items-center space-x-2 px-6 py-2.5 text-white font-black uppercase tracking-widest text-xs transition-all ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
+                            className={`h-7 flex items-center space-x-1.5 px-2.5 text-white font-black uppercase tracking-wider text-[10px] transition-all rounded shadow-sm shrink-0 ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#254153] hover:bg-black'}`}
                         >
                             {isUploading ? (
                                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                             ) : (
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                 </svg>
                             )}
-                            <span>{isUploading ? 'Guardando...' : 'Ejecutar Registro'}</span>
+                            <span>{isUploading ? 'Guardando...' : 'Ejecutar'}</span>
                         </button>
-                        <button
-                            onClick={() => router.push('/calidad/ms/list')}
-                            className="p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50"
-                            title="Ver Reportes del Día"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                        </button>
-                        {hasSettingsPermission && (
-                            <button
-                                onClick={() => setIsSettingsOpen(true)}
-                                className={`p-2.5 bg-white border border-gray-300 text-[#254153] hover:bg-gray-50 border-l-0`}
-                                title="Configurar Defectos"
-                            >
-                                <Settings className="w-5 h-5" />
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setShowHourlyChart(prev => !prev)}
-                            className={`p-2.5 bg-white border border-gray-300 hover:bg-blue-50 border-l-0 transition-colors ${showHourlyChart ? 'text-blue-600' : 'text-gray-400'}`}
-                            title="Indicador Hora a Hora"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        </button>
-                        <button
-                            onClick={() => router.push('/calidad/ms/saldos')}
-                            className="p-2.5 bg-white border border-gray-300 text-red-500 hover:bg-red-50 rounded-r border-l-0"
-                            title="Saldos y Destrucciones"
-                        >
-                            <Trash2 className="w-5 h-5" />
-                        </button>
+                    </div>
+                    )}
+
+                    {/* Center: Nav Buttons - Exactly Centered with Firplak Logo */}
+                    <div className="order-3 min-[1200px]:order-none w-full min-[1200px]:w-auto flex justify-center z-20">
+                        <CalidadMsNavButtons
+                            activeTab="registro"
+                            onOpenSettings={() => setIsSettingsOpen(true)}
+                            onToggleChart={() => !soloHoraAHora && setShowHourlyChart(prev => !prev)}
+                            hasSettingsPermission={hasSettingsPermission}
+                            isChartActive={showHourlyChart || soloHoraAHora}
+                            isSettingsActive={isSettingsOpen}
+                        />
                     </div>
 
                     {/* Hidden Photo Upload Input */}
@@ -411,40 +390,43 @@ export default function CalidadMsReportPage() {
                         }}
                     />
 
-                    <div className="h-10 w-px bg-gray-200 hidden lg:block" />
-
-                    {/* Quick Metrics */}
-                    <div className="flex items-center space-x-8 overflow-x-auto no-scrollbar ml-auto">
-                        <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 rounded-full bg-[#36A284] flex items-center justify-center text-white">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    {/* Right: Quick Metrics */}
+                    <div className="order-2 min-[1200px]:order-none flex flex-wrap items-center justify-center sm:justify-end gap-x-2.5 gap-y-1 2xl:gap-x-4 w-full sm:w-auto sm:ml-auto min-[1200px]:ml-0 min-[1200px]:justify-self-end min-w-0">
+                        <div className="flex items-center space-x-1">
+                            <div className="w-4 h-4 rounded-full bg-[#36A284] flex items-center justify-center text-white">
+                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                             </div>
-                            <span className="text-xl font-bold text-[#36A284]">{stats.buenos}</span>
-                            <span className="text-sm font-medium text-gray-500">Buenos</span>
+                            <span className="text-sm 2xl:text-base font-bold text-[#36A284]">{stats.buenos}</span>
+                            <span className="text-[10px] font-medium text-gray-500">Buenos</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-sm">
+                        <div className="flex items-center space-x-1">
+                            <div className="w-4 h-4 rounded-full bg-[#F24E4E] flex items-center justify-center text-white font-bold text-[10px]">
                                 !
                             </div>
-                            <span className="text-xl font-bold text-[#F24E4E]">{stats.defectuosos}</span>
-                            <span className="text-sm font-medium text-gray-500">Defectuosos</span>
+                            <span className="text-sm 2xl:text-base font-bold text-[#F24E4E]">{stats.defectuosos}</span>
+                            <span className="text-[10px] font-medium text-gray-500">Defectuosos</span>
+                        </div>
+                        <div className="flex items-center space-x-1" title="Saldos y destrucciones del día">
+                            <BrokenSinkIcon className="w-4 h-4" />
+                            <span className="text-sm 2xl:text-base font-bold text-[#254153]">{stats.saldos}</span>
                         </div>
                         <div className="flex items-center">
-                            <span className="text-lg font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
+                            <span className="text-sm 2xl:text-base font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
                         </div>
                         <div className="flex items-center">
-                            <span className="text-lg font-bold text-gray-800">Total: {stats.total}</span>
+                            <span className="text-sm 2xl:text-base font-bold text-gray-800">Total: {stats.total}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Hour-by-Hour Indicator */}
-            {showHourlyChart && (
+            {(showHourlyChart || soloHoraAHora) && (
                 <HourlyInspectionChart reports={todaysReports} />
             )}
 
             {/* Grid */}
+            {!soloHoraAHora && (
             <main className="flex-1 w-full bg-white p-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                     {defects.map((defect, index) => {
@@ -473,6 +455,7 @@ export default function CalidadMsReportPage() {
                     })}
                 </div>
             </main>
+            )}
 
             <footer className="py-4 px-4 bg-[#254153] text-[9px] font-bold text-white/30 uppercase tracking-[0.5em] flex justify-between items-center">
                 <span>© {new Date().getFullYear()} Firplak Engineering</span>
@@ -480,7 +463,8 @@ export default function CalidadMsReportPage() {
             </footer>
 
             <DefectsSettingsModal 
-                isOpen={isSettingsOpen} 
+                isOpen={isSettingsOpen && !!permisosMs?.configuracion}
+                soloLectura={!configEditable}
                 onClose={() => setIsSettingsOpen(false)} 
                 defects={defects}
                 onSave={handleSaveSettings}

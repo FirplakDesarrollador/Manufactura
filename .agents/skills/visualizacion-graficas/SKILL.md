@@ -88,3 +88,16 @@ Utilizar estrictamente los tokens del Manual de Identidad de Firplak:
 | **Muebles (MBL)** | Teal / Esmeralda | `#0d9488` |
 | **CEFI** | Índigo | `#4f46e5` |
 | **Reparación Moldes (RMOLD)** | Rosa / Frambuesa | `#db2777` |
+
+---
+
+## 5. Tablero dinámico estilo Power BI (estándar FIRPLAK)
+
+Referencia: `components/calidad/CalidadGeneralIFI.tsx`. Detalle completo en `.claude/skills/firplak-ui/SKILL.md` §7.1.
+
+- Filtros Año → Mes → Semana → Día de selección múltiple, con borrador encima de cada uno; al abrir, año y mes en curso; sin año marcado = una columna por año.
+- Columnas por día, mes o año según los filtros; valor encima de cada columna (1 decimal); línea de meta punteada azul.
+- Semáforo: verde ≥ meta, amarillo hasta 10 puntos por debajo, rojo.
+- Tarjetas KPI encima: promedio de lo filtrado, mismo semáforo; clic en una tarjeta de componente filtra la gráfica a ese componente.
+- Clic en una columna la resalta (resto al 30 %) y actualiza las tarjetas; otro clic en ella o por fuera la quita.
+- Gráfica principal de 380 px de alto.

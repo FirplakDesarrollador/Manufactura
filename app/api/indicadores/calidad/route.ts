@@ -1,19 +1,31 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import {
+    calcularResumen,
+    fetchCatalogoDefectosMs,
+    fetchMsReportes,
+    normalizarPiezas,
+    rangoDiaUTC
+} from '@/lib/calidad/msCalidad';
+import { calcularResumenFv, normalizarRegistrosFv } from '@/lib/calidad/fvCalidad';
+import { fetchRegistrosFv } from '@/lib/calidad/fvSharepoint';
 
-// Defectos que se excluyen del cálculo de IFI (según estándar de calidad de planta MS)
-const isIgnoredDefect = (defectName: string) => {
-    const cleanName = defectName.replace(/^\s*\d+\.\s*/, '').trim().toLowerCase();
-    return [
-        'saldos/destrucciones',
-        'opaco',
-        'error en pedido referencia',
-        'quebrados logistica'
-    ].includes(cleanName);
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+type CalidadPlanta = { calidad: number; total: number; buenos: number; defectuosos: number };
+
+// Valores de referencia para plantas sin fuente en vivo (MS se calcula desde Supabase)
+const DEFAULT_OTRAS_PLANTAS: Record<string, CalidadPlanta> = {
+    FV: { calidad: 85.0, total: 30, buenos: 25, defectuosos: 5 },
+    QZ: { calidad: 95.0, total: 20, buenos: 19, defectuosos: 1 },
+    MBL: { calidad: 95.0, total: 200, buenos: 190, defectuosos: 10 },
+    CEFI: { calidad: 95.0, total: 180, buenos: 171, defectuosos: 9 },
+    RMOLD: { calidad: 92.0, total: 50, buenos: 46, defectuosos: 4 }
 };
 
 // Histórico diario de Calidad IFI por Planta (sincronizado con Power BI)
-const DAILY_QUALITY_HISTORY: Record<string, Record<string, { calidad: number; total: number; buenos: number; defectuosos: number }>> = {
+const DAILY_QUALITY_HISTORY: Record<string, Record<string, CalidadPlanta>> = {
     // Agosto 2026
     "2026-08-28": {
         MS: { calidad: 78.8, total: 405, buenos: 319, defectuosos: 86 },
@@ -184,74 +196,62 @@ export async function GET(request: Request) {
         }
     }
 
+    // ms_reporte_defectos tiene RLS: se consulta con el token de la sesión del usuario que llama
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.toLowerCase().startsWith('bearer ')) {
+        return NextResponse.json(
+            { success: false, error: 'Se requiere la sesión del usuario (Authorization: Bearer <token>)' },
+            { status: 401 }
+        );
+    }
+
     try {
-        // 1. Intentar consultar registros en tiempo real en Supabase para el día seleccionado
-        const startOfDay = `${fecha}T00:00:00.000Z`;
-        const endOfDay = `${fecha}T23:59:59.999Z`;
+        const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            global: { headers: { Authorization: authHeader } },
+            auth: { persistSession: false, autoRefreshToken: false }
+        });
 
-        const { data: reports, error } = await supabase
-            .from('ms_reporte_defectos')
-            .select('id, created_at, defecto')
-            .gte('created_at', startOfDay)
-            .lte('created_at', endOfDay);
+        // MS: cálculo en vivo con la misma lógica del Power BI "BI Calidad MS"
+        const [desde, hasta] = rangoDiaUTC(fecha);
+        const [rows, catalogo] = await Promise.all([
+            fetchMsReportes(client, desde, hasta, 'id, created_at, producto_id, defecto, Reparacion'),
+            fetchCatalogoDefectosMs(client)
+        ]);
+        const resumen = calcularResumen(normalizarPiezas(rows, catalogo));
 
-        if (!error && reports && reports.length > 0) {
-            const totalMS = reports.length;
-            const defectuososMS = reports.filter(r => {
-                const defs = Array.isArray(r.defecto) ? r.defecto : [];
-                const validDefects = defs.filter(d => {
-                    const name = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '');
-                    if (!name) return false;
-                    return !isIgnoredDefect(name);
-                });
-                return validDefects.length > 0;
-            }).length;
-
-            const buenosMS = totalMS - defectuososMS;
-            const calidadMS = totalMS > 0 ? Math.round(((buenosMS / totalMS) * 100) * 10) / 10 : 85.0;
-
-            const plantCalidad = {
-                MS: { calidad: calidadMS, total: totalMS, buenos: buenosMS, defectuosos: defectuososMS },
-                FV: { calidad: 85.0, total: 30, buenos: 25, defectuosos: 5 },
-                QZ: { calidad: 95.0, total: 20, buenos: 19, defectuosos: 1 },
-                MBL: { calidad: 95.0, total: 200, buenos: 190, defectuosos: 10 },
-                CEFI: { calidad: 95.0, total: 180, buenos: 171, defectuosos: 9 },
-                RMOLD: { calidad: 92.0, total: 50, buenos: 46, defectuosos: 4 }
+        // FV: cálculo en vivo desde la lista SharePoint, misma lógica del Power BI "BI Calidad FV"
+        let fvLive: CalidadPlanta | null = null;
+        try {
+            const r = calcularResumenFv(normalizarRegistrosFv(await fetchRegistrosFv(desde.slice(0, 10), hasta.slice(0, 10))));
+            fvLive = {
+                calidad: Math.round(r.calidad * 10) / 10,
+                total: r.piezasRevisadas,
+                buenos: r.piezasBuenas,
+                defectuosos: r.piezasDefectuosas
             };
-
-            return NextResponse.json({
-                success: true,
-                fecha,
-                fuente: 'supabase_live',
-                plantas: plantCalidad
-            });
+        } catch (fvErr) {
+            console.warn('Aviso calculando calidad FV desde SharePoint:', fvErr);
         }
 
-        // 2. Si no hay registros en Supabase para esa fecha histórica, usar el histórico oficial sincronizado con Power BI
-        if (DAILY_QUALITY_HISTORY[fecha]) {
-            return NextResponse.json({
-                success: true,
-                fecha,
-                fuente: 'powerbi_history',
-                plantas: DAILY_QUALITY_HISTORY[fecha]
-            });
-        }
-
-        // 3. Fallback inteligente por defecto
-        const defaultCalidad = {
-            MS: { calidad: 82.0, total: 400, buenos: 328, defectuosos: 72 },
-            FV: { calidad: 85.0, total: 30, buenos: 25, defectuosos: 5 },
-            QZ: { calidad: 95.0, total: 20, buenos: 19, defectuosos: 1 },
-            MBL: { calidad: 95.0, total: 200, buenos: 190, defectuosos: 10 },
-            CEFI: { calidad: 95.0, total: 180, buenos: 171, defectuosos: 9 },
-            RMOLD: { calidad: 92.0, total: 50, buenos: 46, defectuosos: 4 }
-        };
+        // Las demás plantas aún no tienen fuente en vivo: se mantienen los valores de referencia
+        const otrasPlantas = { ...(DAILY_QUALITY_HISTORY[fecha] || DEFAULT_OTRAS_PLANTAS) };
+        delete otrasPlantas.MS;
+        if (fvLive) otrasPlantas.FV = fvLive;
 
         return NextResponse.json({
             success: true,
             fecha,
-            fuente: 'default_estimate',
-            plantas: defaultCalidad
+            fuente: 'supabase_live',
+            plantas: {
+                ...DEFAULT_OTRAS_PLANTAS,
+                ...otrasPlantas,
+                MS: {
+                    calidad: Math.round(resumen.calidad * 10) / 10,
+                    total: resumen.piezasRevisadas,
+                    buenos: resumen.piezasBuenas,
+                    defectuosos: resumen.piezasDefectuosas
+                }
+            }
         });
 
     } catch (err: any) {

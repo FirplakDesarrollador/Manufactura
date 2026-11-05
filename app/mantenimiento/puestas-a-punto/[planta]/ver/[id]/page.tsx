@@ -3,11 +3,13 @@ import React from 'react';
 import Link from 'next/link';
 import { PrintActions } from '@/components/mtto-autonomo/PrintActions';
 import BackButton from '@/components/mtto-autonomo/BackButton';
+import MaquinaFicha from '@/components/mtto-autonomo/MaquinaFicha';
 
 export const revalidate = 0;
 
 interface TaskItem {
   equipo: string;
+  id_maquina: number | null;
   revisar: string;
   criticidad: string;
   frecuencia: string;
@@ -57,8 +59,9 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
       const key = `${eq}|||${rev}`;
       if (!groupedTasks[key]) {
         groupedTasks[key] = { 
-          equipo: eq, 
-          revisar: rev, 
+          equipo: eq,
+          id_maquina: (row.id_maquina as number | null) ?? null,
+          revisar: rev,
           criticidad: (row.criticidad as string) || 'Media', 
           frecuencia: (row.frecuencia as string) || 'Diaria',
           dias: {} 
@@ -195,7 +198,7 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
                 {items.map((item, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: idx % 2 === 0 ? 'white' : '#F9FBFC' }}>
                     {(rowSpans[idx] ?? 0) > 0 && (
-                      <td rowSpan={rowSpans[idx] ?? 1} style={{ padding: '12px', fontWeight: 700, color: '#1A435B', borderRight: '1px solid #F1F5F9', verticalAlign: 'top' }}>{item.equipo}</td>
+                      <td rowSpan={rowSpans[idx] ?? 1} style={{ padding: '12px', fontWeight: 700, color: '#1A435B', borderRight: '1px solid #F1F5F9', verticalAlign: 'top' }}><MaquinaFicha idMaquina={item.id_maquina} nombre={item.equipo} /></td>
                     )}
                     <td style={{ padding: '12px', color: '#334155', fontSize: '0.9rem' }}>{item.revisar}</td>
                     <td style={{ padding: '12px', textAlign: 'center', fontSize: '0.85rem', color: '#475569' }}>{item.frecuencia}</td>
@@ -266,7 +269,7 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
                 {items.map((item, idx) => (
                   <tr key={idx}>
                     {(rowSpans[idx] ?? 0) > 0 && (
-                      <td rowSpan={rowSpans[idx] ?? 1} className="pt-eq">{item.equipo}</td>
+                      <td rowSpan={rowSpans[idx] ?? 1} className="pt-eq"><MaquinaFicha idMaquina={item.id_maquina} nombre={item.equipo} variant="print" /></td>
                     )}
                     <td className="pt-rev">{item.revisar}</td>
                     <td className="pt-frec">{item.frecuencia ? item.frecuencia.charAt(0) : 'D'}</td>

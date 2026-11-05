@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: any = {
+  // Solo desarrollo: permite abrir `npm run dev` desde tablets/celulares en la red local
+  allowedDevOrigins: ['192.168.1.98'],
   typescript: {
     ignoreBuildErrors: true,
   },

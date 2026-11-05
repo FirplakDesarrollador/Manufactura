@@ -10,7 +10,8 @@ import {
   Circle, 
   Square, 
   ArrowUpRight, 
-  Maximize2 
+  Maximize2,
+  Type 
 } from 'lucide-react';
 
 interface PhotoAnnotationEditorProps {
@@ -19,7 +20,7 @@ interface PhotoAnnotationEditorProps {
   onCancel: () => void;
 }
 
-type ToolType = 'pen' | 'circle' | 'rect' | 'arrow';
+type ToolType = 'pen' | 'circle' | 'rect' | 'arrow' | 'text';
 
 export default function PhotoAnnotationEditor({
   imageSrc,
@@ -35,6 +36,12 @@ export default function PhotoAnnotationEditor({
   const startPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const snapshot = useRef<ImageData | null>(null);
   const imageObjRef = useRef<HTMLImageElement | null>(null);
+  // Recuadro de texto en edición: posición en el canvas y en pantalla (relativa al contenedor)
+  const [textDraft, setTextDraft] = useState<{ x: number; y: number; left: number; top: number; scale: number; value: string } | null>(null);
+  const textInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Copia síncrona del borrador: evita fijar el mismo texto dos veces (clic en la foto + blur)
+  const textDraftRef = useRef<typeof textDraft>(null);
+  const updateDraft = (d: typeof textDraft) => { textDraftRef.current = d; setTextDraft(d); };
 
   // Load and draw image on canvas
   useEffect(() => {
@@ -102,6 +109,49 @@ export default function PhotoAnnotationEditor({
     };
   };
 
+  // Tamaño de letra del texto según el selector Fino / Med / Gru (en píxeles del canvas)
+  const fontSizeFor = (w: number) => (w <= 3 ? 26 : w <= 6 ? 38 : 54);
+
+  // Dibuja el texto en el canvas: recuadro blanco con borde rojo y texto rojo en negrita
+  const commitText = () => {
+    const draft = textDraftRef.current;
+    updateDraft(null);
+    const value = draft?.value.trim();
+    if (!draft || !value) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+
+    const fontSize = fontSizeFor(lineWidth);
+    const padding = Math.round(fontSize * 0.35);
+    const lineHeight = Math.round(fontSize * 1.2);
+    const lines = value.split(/\r?\n/);
+    ctx.font = `bold ${fontSize}px Montserrat, Arial, sans-serif`;
+    const textWidth = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const boxW = textWidth + padding * 2;
+    const boxH = lineHeight * lines.length + padding * 2;
+    // Mantener el recuadro dentro de la foto
+    const x = Math.max(0, Math.min(draft.x, canvas.width - boxW));
+    const y = Math.max(0, Math.min(draft.y, canvas.height - boxH));
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = Math.max(3, Math.round(fontSize / 10));
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') (ctx as any).roundRect(x, y, boxW, boxH, padding * 0.6);
+    else ctx.rect(x, y, boxW, boxH);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#dc2626';
+    ctx.textBaseline = 'top';
+    lines.forEach((line, i) => ctx.fillText(line, x + padding, y + padding + i * lineHeight + (lineHeight - fontSize) / 2));
+    ctx.restore();
+
+    const currentData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    setHistory(prev => [...prev, currentData]);
+  };
+
   const startDraw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -109,6 +159,24 @@ export default function PhotoAnnotationEditor({
     if (!ctx) return;
 
     const coords = getCanvasCoords(e);
+
+    // Herramienta Texto: abre un recuadro editable en el punto tocado (si había otro, se fija primero)
+    if (currentTool === 'text') {
+      if (textDraftRef.current) commitText();
+      const rect = canvas.getBoundingClientRect();
+      const cont = containerRef.current?.getBoundingClientRect();
+      const scale = rect.width / canvas.width;
+      updateDraft({
+        x: coords.x,
+        y: coords.y,
+        left: rect.left - (cont?.left || 0) + coords.x * scale,
+        top: rect.top - (cont?.top || 0) + coords.y * scale,
+        scale,
+        value: ''
+      });
+      setTimeout(() => textInputRef.current?.focus(), 0);
+      return;
+    }
     startPos.current = coords;
     setIsDrawing(true);
 
@@ -130,7 +198,7 @@ export default function PhotoAnnotationEditor({
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
+    if (!isDrawing || currentTool === 'text') return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -196,7 +264,7 @@ export default function PhotoAnnotationEditor({
   };
 
   const endDraw = () => {
-    if (!isDrawing) return;
+    if (!isDrawing || currentTool === 'text') return;
     setIsDrawing(false);
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -234,6 +302,8 @@ export default function PhotoAnnotationEditor({
   };
 
   const handleSave = () => {
+    // Fijar el texto pendiente antes de exportar la foto
+    if (textDraftRef.current?.value.trim()) commitText();
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -286,8 +356,24 @@ export default function PhotoAnnotationEditor({
           onTouchStart={startDraw}
           onTouchMove={draw}
           onTouchEnd={endDraw}
-          className="max-w-full max-h-[72vh] object-contain rounded-xl shadow-2xl border-2 border-slate-700 cursor-crosshair bg-neutral-900"
+          className={`max-w-full max-h-[72vh] object-contain rounded-xl shadow-2xl border-2 border-slate-700 bg-neutral-900 ${currentTool === 'text' ? 'cursor-text' : 'cursor-crosshair'}`}
         />
+        {textDraft && (
+          <textarea
+            ref={textInputRef}
+            value={textDraft.value}
+            onChange={e => textDraftRef.current && updateDraft({ ...textDraftRef.current, value: e.target.value })}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitText(); }
+              if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); updateDraft(null); }
+            }}
+            onBlur={commitText}
+            rows={Math.max(1, textDraft.value.split('\n').length)}
+            placeholder="Escribe y presiona Enter"
+            className="absolute z-10 bg-white/95 text-red-600 font-bold border-2 border-red-600 rounded-md outline-none resize-none px-1.5 py-0.5 min-w-[160px] shadow-lg placeholder:text-red-300 placeholder:font-semibold"
+            style={{ left: textDraft.left, top: textDraft.top, fontSize: Math.max(12, fontSizeFor(lineWidth) * textDraft.scale), lineHeight: 1.2 }}
+          />
+        )}
       </div>
 
       {/* Bottom Floating Tools Bar */}
@@ -344,11 +430,23 @@ export default function PhotoAnnotationEditor({
             <span className="hidden sm:inline">Rectángulo</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => setCurrentTool('text')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              currentTool === 'text' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-700'
+            }`}
+            title="Recuadro de texto: toca la foto donde quieres escribir"
+          >
+            <Type className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Texto</span>
+          </button>
+
         </div>
 
         {/* Stroke Width Selector */}
         <div className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-2xl border border-slate-700">
-          <span className="text-[11px] text-slate-400 font-medium">Grosor:</span>
+          <span className="text-[11px] text-slate-400 font-medium">{currentTool === 'text' ? 'Tamaño:' : 'Grosor:'}</span>
           {[3, 6, 10].map(w => (
             <button
               key={w}

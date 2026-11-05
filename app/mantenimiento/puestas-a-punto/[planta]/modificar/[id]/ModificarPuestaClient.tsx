@@ -24,6 +24,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { v4 as uuidv4 } from 'uuid';
+import MaquinaSelect, { useMaquinasCatalogo } from '@/components/mtto-autonomo/MaquinaSelect';
+import { insertDetallesPuesta } from '@/lib/mtto-autonomo/utils';
 
 interface Item {
   id: string | number;
@@ -100,19 +102,21 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
   const initialGroups: any[] = [];
   const sortedDetails = [...detallesIniciales].sort((a: any, b: any) => a.numero_item - b.numero_item);
   sortedDetails.forEach((d: any) => {
-    const existing = initialGroups.find(g => g.equipo === d.equipo_herramienta);
+    const idMaquina = d.id_maquina ?? null;
+    const existing = initialGroups.find(g => g.equipo === d.equipo_herramienta && g.id_maquina === idMaquina);
     if (existing) {
       existing.items.push({ id: uuidv4(), id_detalle: d.id_detalle, punto_a_revisar: d.punto_a_revisar, criticidad: d.criticidad, frecuencia: d.frecuencia || 'Cada turno' });
     } else {
       initialGroups.push({
         id: uuidv4(),
         equipo: d.equipo_herramienta,
+        id_maquina: idMaquina,
         items: [{ id: uuidv4(), id_detalle: d.id_detalle, punto_a_revisar: d.punto_a_revisar, criticidad: d.criticidad, frecuencia: d.frecuencia || 'Cada turno' }]
       });
     }
   });
 
-  const [groups, setGroups] = useState<any[]>(initialGroups.length > 0 ? initialGroups : [{ id: uuidv4(), equipo: '', items: [{ id: uuidv4(), punto_a_revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
+  const [groups, setGroups] = useState<any[]>(initialGroups.length > 0 ? initialGroups : [{ id: uuidv4(), equipo: '', id_maquina: null, items: [{ id: uuidv4(), punto_a_revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -130,10 +134,11 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
   }, []);
 
   const updateEnc = (field: string, val: any) => setEnc({ ...enc, [field]: val });
-  const addGroup = () => setGroups([...groups, { id: uuidv4(), equipo: '', items: [{ id: uuidv4(), punto_a_revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
+  const maquinasCatalogo = useMaquinasCatalogo();
+  const addGroup = () => setGroups([...groups, { id: uuidv4(), equipo: '', id_maquina: null, items: [{ id: uuidv4(), punto_a_revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
   const removeGroup = (gId: string) => setGroups(groups.filter(g => g.id !== gId));
-  const updateGroupEquipo = (gId: string, val: string) => {
-    setGroups(groups.map(g => g.id === gId ? { ...g, equipo: val } : g));
+  const updateGroupEquipo = (gId: string, val: { nombre: string; id_maquina: number | null }) => {
+    setGroups(groups.map(g => g.id === gId ? { ...g, equipo: val.nombre, id_maquina: val.id_maquina } : g));
   };
   const addItem = (gId: string) => {
     setGroups(groups.map(g => g.id === gId ? { ...g, items: [...g.items, { id: uuidv4(), punto_a_revisar: '', criticidad: 'Media', frecuencia: 'Diaria' }] } : g));
@@ -188,6 +193,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
         g.items.forEach((it: any) => {
           flatDetails.push({
             equipo_herramienta: g.equipo,
+            id_maquina: g.id_maquina ?? null,
             punto_a_revisar: it.punto_a_revisar,
             criticidad: it.criticidad,
             frecuencia: it.frecuencia || 'Cada turno',
@@ -216,7 +222,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
         const { data: newEnc, error: e1 } = await supabase.from('puestas_a_punto_encabezado').insert([dataToInsert]).select().single();
         if (e1) throw e1;
         const rows = flatDetails.map(d => ({ ...d, id_puesta_a_punto: newEnc.id_puesta_a_punto }));
-        const { error: e2 } = await supabase.from('puestas_a_punto_detalle').insert(rows);
+        const { error: e2 } = await insertDetallesPuesta(rows);
         if (e2) throw e2;
         setMsg({ t: 's', m: `Nueva versión creada.` });
         setTimeout(() => router.push(`/mantenimiento/puestas-a-punto/${encodeURIComponent(planta)}/ver/${newEnc.id_puesta_a_punto}`), 1500);
@@ -234,10 +240,18 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
 
         const { error: e1 } = await supabase.from('puestas_a_punto_encabezado').update(dataToUpdate).eq('id_puesta_a_punto', id);
         if (e1) throw e1;
-        await supabase.from('puestas_a_punto_detalle').delete().eq('id_puesta_a_punto', id);
+        // Insertar primero y borrar las filas anteriores solo si la inserción salió bien,
+        // para que un error no deje la puesta a punto sin actividades
+        const { data: anteriores, error: e2 } = await supabase.from('puestas_a_punto_detalle').select('id_detalle').eq('id_puesta_a_punto', id);
+        if (e2) throw e2;
         const rows = flatDetails.map(d => ({ ...d, id_puesta_a_punto: id }));
-        const { error: e3 } = await supabase.from('puestas_a_punto_detalle').insert(rows);
+        const { error: e3 } = await insertDetallesPuesta(rows);
         if (e3) throw e3;
+        const idsAnteriores = (anteriores || []).map(a => a.id_detalle);
+        if (idsAnteriores.length > 0) {
+          const { error: e4 } = await supabase.from('puestas_a_punto_detalle').delete().in('id_detalle', idsAnteriores);
+          if (e4) throw e4;
+        }
         setMsg({ t: 's', m: "Base de datos actualizada." });
         setTimeout(() => router.push(`/mantenimiento/puestas-a-punto/${encodeURIComponent(planta)}/ver/${id}`), 1500);
       }
@@ -357,6 +371,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
               key={group.id} 
               group={group} 
               updateGroupEquipo={updateGroupEquipo}
+              maquinasCatalogo={maquinasCatalogo}
               addItem={addItem}
               updateItem={updateItem}
               removeItem={removeItem}
@@ -373,7 +388,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
 
 // --- COMPONENTES PARA DRAG & DROP ---
 
-function SortableGroupSection({ group, updateGroupEquipo, addItem, updateItem, removeItem, handleDragEndItem, sensors }: any) {
+function SortableGroupSection({ group, updateGroupEquipo, maquinasCatalogo, addItem, updateItem, removeItem, handleDragEndItem, sensors }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
 
   const style = {
@@ -421,7 +436,9 @@ function SortableGroupSection({ group, updateGroupEquipo, addItem, updateItem, r
                   gId={group.id}
                   rowSpan={group.items.length}
                   equipo={group.equipo}
+                  idMaquina={group.id_maquina ?? null}
                   updateGroupEquipo={updateGroupEquipo}
+                  maquinasCatalogo={maquinasCatalogo}
                   addItem={addItem}
                   updateItem={updateItem}
                   removeItem={removeItem}
@@ -435,7 +452,7 @@ function SortableGroupSection({ group, updateGroupEquipo, addItem, updateItem, r
   );
 }
 
-function SortableItemRow({ item, iIdx, gId, rowSpan, equipo, updateGroupEquipo, addItem, updateItem, removeItem }: any) {
+function SortableItemRow({ item, iIdx, gId, rowSpan, equipo, idMaquina, updateGroupEquipo, maquinasCatalogo, addItem, updateItem, removeItem }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
   const style = {
@@ -452,13 +469,11 @@ function SortableItemRow({ item, iIdx, gId, rowSpan, equipo, updateGroupEquipo, 
     <tr ref={setNodeRef} style={style}>
       {iIdx === 0 && (
         <td rowSpan={rowSpan} style={{ padding: '15px', verticalAlign: 'middle', borderRight: '1px solid #EEF2F5', backgroundColor: '#F8FAFB', textAlign: 'center' }}>
-          <textarea 
-            value={equipo} 
-            onChange={(e) => updateGroupEquipo(gId, e.target.value)} 
-            placeholder="Equipo..." 
-            style={{ 
-              width: '90%', border: 'none', backgroundColor: 'transparent', textAlign: 'center', fontSize: '0.9rem', fontWeight: 700, color: '#1A445B', outline: 'none', resize: 'none', height: '60px' 
-            }} 
+          <MaquinaSelect
+            nombre={equipo || ''}
+            idMaquina={idMaquina}
+            catalogo={maquinasCatalogo}
+            onChange={(val) => updateGroupEquipo(gId, val)}
           />
           <div style={{ marginTop: '5px' }}>
             <button onClick={() => addItem(gId)} style={{ backgroundColor: '#1A445B', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', fontSize: '0.65rem', cursor: 'pointer' }}>+ Item</button>

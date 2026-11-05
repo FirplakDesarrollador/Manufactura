@@ -35,10 +35,12 @@ import {
     Clock,
     Activity
 } from 'lucide-react';
+import CalidadFVDashboard from '@/components/calidad/CalidadFVDashboard';
+import CalidadGeneralIFI from '@/components/calidad/CalidadGeneralIFI';
+import CalidadMsDashboard from '@/components/calidad/CalidadMsDashboard';
+import CalidadSaldosDashboard from '@/components/calidad/CalidadSaldosDashboard';
 import {
     ResponsiveContainer,
-    LineChart,
-    Line,
     BarChart,
     Bar,
     XAxis,
@@ -46,17 +48,11 @@ import {
     Tooltip,
     CartesianGrid,
     Cell,
-    ReferenceLine,
     PieChart,
-    Pie,
-    Legend
+    Pie
 } from 'recharts';
 
 // URLs de Power BI
-const POWERBI_URL_GENERAL =
-    process.env.NEXT_PUBLIC_POWERBI_CALIDAD_GENERAL ||
-    'https://app.powerbi.com/view?r=eyJrIjoiN2MxNmUwZTUtYTY0MC00MmFjLWI2ZjctMDYzNDJlODU4MTk0IiwidCI6ImZhMWRlMDRmLTQ3ODAtNGQ4My1hOTQyLTkzYzdhZThkZWU5ZCIsImMiOjR9';
-
 const POWERBI_URL_MS =
     process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MS ||
     'https://app.powerbi.com/view?r=eyJrIjoiN2ZkMjI1YjAtYmMyYi00ZDQxLWJjZDktZWVkZmFiMGU0NTgzIiwidCI6ImZhMWRlMDRmLTQ3ODAtNGQ4My1hOTQyLTkzYzdhZThkZWU5ZCIsImMiOjR9';
@@ -69,32 +65,8 @@ const POWERBI_URL_MBL = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MBL || '';
 const POWERBI_URL_CEFI = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_CEFI || '';
 const POWERBI_URL_MOLDES = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MOLDES || '';
 
-// Catálogo y colores de Pareto
-const PARETO_COLORS = [
-    '#008080', '#e06634', '#0284c7', '#10b981', '#8b5cf6',
-    '#f59e0b', '#ec4899', '#6366f1', '#ef4444', '#14b8a6',
-    '#84cc16', '#a855f7', '#06b6d4', '#f97316', '#3b82f6',
-    '#e11d48', '#d97706', '#475569', '#64748b', '#94a3b8'
-];
-
-// Meses del año
-const MESES = [
-    { num: '01', nombre: 'enero' },
-    { num: '02', nombre: 'febrero' },
-    { num: '03', nombre: 'marzo' },
-    { num: '04', nombre: 'abril' },
-    { num: '05', nombre: 'mayo' },
-    { num: '06', nombre: 'junio' },
-    { num: '07', nombre: 'julio' },
-    { num: '08', nombre: 'agosto' },
-    { num: '09', nombre: 'septiembre' },
-    { num: '10', nombre: 'octubre' },
-    { num: '11', nombre: 'noviembre' },
-    { num: '12', nombre: 'diciembre' }
-];
-
 // Pestañas Principales Solicitadas en el SubHeader
-type MainTabKey = 'CALIDAD_IFI' | 'SALDOS' | 'PLAN_VIGILANCIA' | 'RRC' | 'QRQC';
+export type MainTabKey = 'CALIDAD_IFI' | 'SALDOS' | 'PLAN_VIGILANCIA' | 'RRC' | 'QRQC';
 
 interface SubHeaderTab {
     id: MainTabKey;
@@ -102,77 +74,12 @@ interface SubHeaderTab {
     icon: React.ReactNode;
 }
 
-const MAIN_SUBHEADER_TABS: SubHeaderTab[] = [
+export const MAIN_SUBHEADER_TABS: SubHeaderTab[] = [
     { id: 'CALIDAD_IFI', label: 'Calidad IFI', icon: <TrendingUp size={15} /> },
     { id: 'SALDOS', label: 'Saldos y Destrucciones', icon: <Trash2 size={15} /> },
     { id: 'PLAN_VIGILANCIA', label: 'Plan de Vigilancia', icon: <ShieldCheck size={15} /> },
     { id: 'RRC', label: 'RRC', icon: <FileSpreadsheet size={15} /> },
     { id: 'QRQC', label: 'QRQC', icon: <Layers size={15} /> }
-];
-
-// Comparativa consolidada de Calidad IFI por Planta (General)
-const COMPARATIVA_PLANTAS_IFI = [
-    { planta: 'MS', nombre: 'Mármol Sintético', calidad: 79.4, meta: 90.0, total: 4860, conformes: 3857, dpu: 0.30 },
-    { planta: 'FV', nombre: 'Fibra de Vidrio', calidad: 85.0, meta: 90.0, total: 320, conformes: 272, dpu: 0.15 },
-    { planta: 'QZ', nombre: 'Quarzstone', calidad: 95.0, meta: 90.0, total: 128, conformes: 122, dpu: 0.05 },
-    { planta: 'MBL', nombre: 'Muebles', calidad: 94.8, meta: 90.0, total: 1450, conformes: 1375, dpu: 0.07 },
-    { planta: 'CEFI', nombre: 'CEFI (Zócalos)', calidad: 95.2, meta: 90.0, total: 820, conformes: 781, dpu: 0.05 },
-    { planta: 'RMOLD', nombre: 'Reparación Moldes', calidad: 92.0, meta: 90.0, total: 50, conformes: 46, dpu: 0.08 }
-];
-
-// Histórico oficial por mes 2026 (MS)
-const HISTORICO_MESES_2026: { mes: string; calidad: number; total: number; buenos: number; defectuosos: number }[] = [
-    { mes: 'enero', calidad: 74.8, total: 4120, buenos: 3082, defectuosos: 1038 },
-    { mes: 'febrero', calidad: 73.0, total: 3980, buenos: 2905, defectuosos: 1075 },
-    { mes: 'marzo', calidad: 81.8, total: 4450, buenos: 3640, defectuosos: 810 },
-    { mes: 'abril', calidad: 82.6, total: 4380, buenos: 3618, defectuosos: 762 },
-    { mes: 'mayo', calidad: 83.0, total: 4520, buenos: 3752, defectuosos: 768 },
-    { mes: 'junio', calidad: 77.3, total: 4210, buenos: 3254, defectuosos: 956 },
-    { mes: 'julio', calidad: 79.4, total: 4340, buenos: 3446, defectuosos: 894 },
-    { mes: 'agosto', calidad: 81.9, total: 4500, buenos: 3685, defectuosos: 815 },
-    { mes: 'septiembre', calidad: 82.7, total: 4480, buenos: 3705, defectuosos: 775 },
-    { mes: 'octubre', calidad: 79.4, total: 4421, buenos: 3512, defectuosos: 909 },
-    { mes: 'noviembre', calidad: 0.0, total: 0, buenos: 0, defectuosos: 0 },
-    { mes: 'diciembre', calidad: 0.0, total: 0, buenos: 0, defectuosos: 0 }
-];
-
-// Histórico diario de octubre 2026 (MS)
-const HISTORICO_DIAS_OCTUBRE: { dia: number; calidad: number; total: number; buenos: number; defectuosos: number }[] = [
-    { dia: 1, calidad: 77.1, total: 340, buenos: 262, defectuosos: 78 },
-    { dia: 2, calidad: 79.5, total: 356, buenos: 283, defectuosos: 73 },
-    { dia: 3, calidad: 73.9, total: 322, buenos: 238, defectuosos: 84 },
-    { dia: 5, calidad: 75.0, total: 360, buenos: 270, defectuosos: 90 },
-    { dia: 6, calidad: 80.9, total: 372, buenos: 301, defectuosos: 71 },
-    { dia: 7, calidad: 80.1, total: 388, buenos: 311, defectuosos: 77 },
-    { dia: 8, calidad: 77.1, total: 363, buenos: 280, defectuosos: 83 },
-    { dia: 9, calidad: 77.6, total: 375, buenos: 291, defectuosos: 84 },
-    { dia: 10, calidad: 89.8, total: 392, buenos: 352, defectuosos: 40 },
-    { dia: 13, calidad: 84.9, total: 385, buenos: 327, defectuosos: 58 },
-    { dia: 14, calidad: 79.3, total: 368, buenos: 292, defectuosos: 76 }
-];
-
-// Causas oficiales de Pareto MS
-const PARETO_DEFECTOS_BASE = [
-    { name: '22. Pintura contaminada', cantidad: 68, pct: 3.45, esMolde: false },
-    { name: '38. Molde fisurado', cantidad: 68, pct: 3.45, esMolde: true },
-    { name: '15. Despique por mala manipulación', cantidad: 62, pct: 3.15, esMolde: false },
-    { name: '31. Pintura chorreada', cantidad: 62, pct: 3.15, esMolde: false },
-    { name: '45. Molde despicado', cantidad: 62, pct: 3.15, esMolde: true },
-    { name: '2. Rayas en poceso', cantidad: 55, pct: 2.79, esMolde: false },
-    { name: '25. Cera glass', cantidad: 55, pct: 2.79, esMolde: false },
-    { name: '37. Molde Rayado', cantidad: 52, pct: 2.64, esMolde: true },
-    { name: '30. Puntos negros', cantidad: 48, pct: 2.44, esMolde: false },
-    { name: '7. Fogueo', cantidad: 45, pct: 2.28, esMolde: false },
-    { name: '34. Poros', cantidad: 42, pct: 2.13, esMolde: false },
-    { name: '20. Mal lijado', cantidad: 38, pct: 1.93, esMolde: false },
-    { name: '10. Piel de naranja', cantidad: 35, pct: 1.78, esMolde: false },
-    { name: '3. Amarillamiento', cantidad: 30, pct: 1.52, esMolde: false },
-    { name: '4. Burbujas', cantidad: 28, pct: 1.42, esMolde: false },
-    { name: '12. Grietas', cantidad: 25, pct: 1.27, esMolde: false },
-    { name: '16. Manchas de desmoldante', cantidad: 22, pct: 1.12, esMolde: false },
-    { name: '28. Falta de brillo', cantidad: 20, pct: 1.02, esMolde: false },
-    { name: '41. Molde desgastado', cantidad: 18, pct: 0.91, esMolde: true },
-    { name: '9. Ampollas', cantidad: 15, pct: 0.76, esMolde: false }
 ];
 
 // Estructura de eventos para el módulo de Saldos y Destrucciones
@@ -321,14 +228,22 @@ const UnderConstructionCard = ({
 
 interface IndicadoresCalidadViewProps {
     showMainHeader?: boolean;
+    // Solo la sección de Mármol Sintético (pestaña Indicadores de Calidad MS); misma vista del tablero de control
+    soloMs?: boolean;
+    // Pestañas controladas desde la página (el Tablero de Control las muestra como su tercer nivel)
+    tab?: MainTabKey;
+    onTabChange?: (tab: MainTabKey) => void;
+    ocultarPestanas?: boolean;
 }
 
-export default function IndicadoresCalidadView({ showMainHeader = false }: IndicadoresCalidadViewProps) {
+export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false, tab, onTabChange, ocultarPestanas = false }: IndicadoresCalidadViewProps) {
     const router = useRouter();
     const [userEmail, setUserEmail] = useState<string>('');
     
     // Pestaña activa principal
-    const [activeTab, setActiveTab] = useState<MainTabKey>('CALIDAD_IFI');
+    const [tabInterno, setTabInterno] = useState<MainTabKey>('CALIDAD_IFI');
+    const activeTab = tab ?? tabInterno;
+    const setActiveTab = (t: MainTabKey) => (onTabChange ? onTabChange(t) : setTabInterno(t));
     const [isLoading, setIsLoading] = useState(false);
 
     // Vistas individuales por planta (HTML nativo vs Power BI)
@@ -345,24 +260,6 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         setPlantViews(prev => ({ ...prev, [plantKey]: view }));
     };
 
-    // Filtros de fecha MS
-    const [selectedYear, setSelectedYear] = useState<string>('2026');
-    const [selectedMonth, setSelectedMonth] = useState<string>('octubre');
-    const [selectedDay, setSelectedDay] = useState<string>('All');
-
-    // Filtros de defectos MS
-    const [filterTotalPiezas, setFilterTotalPiezas] = useState<boolean>(true);
-    const [filterSoloReparacion, setFilterSoloReparacion] = useState<boolean>(false);
-
-    // Búsqueda en tabla de referencias MS
-    const [refSearch, setRefSearch] = useState<string>('');
-    const [expandedRefs, setExpandedRefs] = useState<Record<string, boolean>>({
-        'LVR ECO 46x51': true
-    });
-
-    // Registros en vivo desde Supabase MS
-    const [liveReports, setLiveReports] = useState<any[]>([]);
-    const [hasLiveSupabaseData, setHasLiveSupabaseData] = useState<boolean>(false);
 
     // --- ESTADOS PARA LA PESTAÑA SALDOS Y DESTRUCCIONES ---
     const [saldosReports, setSaldosReports] = useState<SaldoEvento[]>(SALDOS_REAL_DATA);
@@ -381,55 +278,6 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         void checkAuth();
     }, []);
 
-    // Consultar datos de Supabase para MS
-    const fetchSupabaseData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            let query = supabase.from('ms_reporte_defectos').select(`
-                id,
-                created_at,
-                producto_id,
-                defecto,
-                Molde,
-                Reparacion,
-                producto:productos_defectos_ms (Referencia)
-            `);
-
-            if (selectedYear !== 'All') {
-                const monthObj = MESES.find(m => m.nombre === selectedMonth);
-                if (monthObj && selectedMonth !== 'All') {
-                    if (selectedDay !== 'All') {
-                        const dayPadded = selectedDay.padStart(2, '0');
-                        const start = `${selectedYear}-${monthObj.num}-${dayPadded}T00:00:00Z`;
-                        const end = `${selectedYear}-${monthObj.num}-${dayPadded}T23:59:59Z`;
-                        query = query.gte('created_at', start).lte('created_at', end);
-                    } else {
-                        const start = `${selectedYear}-${monthObj.num}-01T00:00:00Z`;
-                        const end = `${selectedYear}-${monthObj.num}-31T23:59:59Z`;
-                        query = query.gte('created_at', start).lte('created_at', end);
-                    }
-                } else {
-                    const start = `${selectedYear}-01-01T00:00:00Z`;
-                    const end = `${selectedYear}-12-31T23:59:59Z`;
-                    query = query.gte('created_at', start).lte('created_at', end);
-                }
-            }
-
-            const { data, error } = await query;
-            if (!error && data && data.length > 0) {
-                setLiveReports(data);
-                setHasLiveSupabaseData(true);
-            } else {
-                setLiveReports([]);
-                setHasLiveSupabaseData(false);
-            }
-        } catch (err) {
-            console.warn('Error consultando Supabase para calidad:', err);
-            setHasLiveSupabaseData(false);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [selectedYear, selectedMonth, selectedDay]);
 
     // Consultar registros reales de Saldos y Destrucciones desde Supabase
     const fetchSaldosSupabase = useCallback(async () => {
@@ -514,234 +362,10 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
     }, []);
 
     useEffect(() => {
-        if (activeTab === 'CALIDAD_IFI') {
-            void fetchSupabaseData();
-        } else if (activeTab === 'SALDOS') {
+        if (activeTab === 'SALDOS') {
             void fetchSaldosSupabase();
         }
-    }, [fetchSupabaseData, fetchSaldosSupabase, activeTab]);
-
-    // Cálculo consolidado de KPIs y métricas MS
-    const metrics = useMemo(() => {
-        if (hasLiveSupabaseData && liveReports.length > 0) {
-            const total = liveReports.length;
-            let countOpaco = 0;
-            let countMoldes = 0;
-            let countDefectos = 0;
-            let countPiezasDefectuosas = 0;
-
-            const defectFreqMap: Record<string, number> = {};
-            const refMap: Record<string, { defectuosas: number; total: number; subdefectos: Record<string, number> }> = {};
-
-            liveReports.forEach(r => {
-                const defs = Array.isArray(r.defecto) ? r.defecto : [];
-                const ref = r.producto?.Referencia || `ID ${r.producto_id}`;
-
-                if (!refMap[ref]) {
-                    refMap[ref] = { defectuosas: 0, total: 0, subdefectos: {} };
-                }
-                refMap[ref].total += 1;
-
-                const validDefs = defs.filter((d: any) => {
-                    const name = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '');
-                    return name.trim().length > 0;
-                });
-
-                let hasQualityDefect = false;
-                validDefs.forEach((d: any) => {
-                    const name = typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '');
-                    const lower = name.toLowerCase();
-
-                    countDefectos += 1;
-                    defectFreqMap[name] = (defectFreqMap[name] || 0) + 1;
-                    refMap[ref].subdefectos[name] = (refMap[ref].subdefectos[name] || 0) + 1;
-
-                    if (lower.includes('opaco')) countOpaco += 1;
-                    if (r.Molde || lower.includes('molde')) countMoldes += 1;
-                    hasQualityDefect = true;
-                });
-
-                if (hasQualityDefect) {
-                    countPiezasDefectuosas += 1;
-                    refMap[ref].defectuosas += 1;
-                }
-            });
-
-            const piezasBuenas = Math.max(0, total - countPiezasDefectuosas);
-            const calidad = total > 0 ? (piezasBuenas / total) * 100 : 80;
-            const dpu = total > 0 ? countDefectos / total : 0;
-            const pctOpaco = total > 0 ? (countOpaco / total) * 100 : 0;
-            const pctMoldes = countDefectos > 0 ? (countMoldes / countDefectos) * 100 : 0;
-
-            const sortedDefects = Object.entries(defectFreqMap)
-                .map(([name, cantidad]) => ({
-                    name,
-                    cantidad,
-                    pct: countDefectos > 0 ? Math.round((cantidad / countDefectos) * 1000) / 10 : 0,
-                    esMolde: name.toLowerCase().includes('molde')
-                }))
-                .sort((a, b) => b.cantidad - a.cantidad);
-
-            const sortedRefs = Object.entries(refMap)
-                .map(([referencia, d]) => ({
-                    referencia,
-                    piezasDefectuosas: d.defectuosas,
-                    reparacion: Math.round(d.defectuosas * 0.55),
-                    subdefectos: Object.entries(d.subdefectos).map(([k, v]) => ({ name: k, cantidad: v }))
-                }))
-                .sort((a, b) => b.piezasDefectuosas - a.piezasDefectuosas);
-
-            return {
-                pctOpaco: pctOpaco.toFixed(1),
-                piezasBuenas,
-                piezasDefectuosas: countPiezasDefectuosas,
-                piezasRevisadas: total,
-                cantidadDefectos: countDefectos,
-                pctMoldes: pctMoldes.toFixed(1),
-                dpu: dpu.toFixed(1),
-                calidad: calidad.toFixed(1),
-                paretoCausas: sortedDefects,
-                totalCausas: sortedDefects.length,
-                referencias: sortedRefs
-            };
-        }
-
-        // Datos oficiales del Power BI (Octubre 2026)
-        const totalPiezas = 4860;
-        const piezasDefectuosas = 1003;
-        const piezasBuenas = 3857;
-        const totalDefectos = 1479;
-
-        const filteredPareto = PARETO_DEFECTOS_BASE.filter(d => {
-            if (filterSoloReparacion && d.esMolde) return false;
-            return true;
-        });
-
-        const referenciasMock = [
-            {
-                referencia: 'LVR ECO 46x51',
-                piezasDefectuosas: 170,
-                reparacion: 95,
-                subdefectos: [
-                    { name: 'Pintura contaminada', cantidad: 45 },
-                    { name: 'Molde fisurado', cantidad: 38 },
-                    { name: 'Poros', cantidad: 30 },
-                    { name: 'Despique por manipulación', cantidad: 25 },
-                    { name: 'Rayas en proceso', cantidad: 20 },
-                    { name: 'Piel de naranja', cantidad: 12 }
-                ]
-            },
-            {
-                referencia: 'LVM Oslo 48x38',
-                piezasDefectuosas: 104,
-                reparacion: 58,
-                subdefectos: [
-                    { name: 'Molde despicado', cantidad: 32 },
-                    { name: 'Pintura chorreada', cantidad: 28 },
-                    { name: 'Cera glass', cantidad: 24 },
-                    { name: 'Puntos negros', cantidad: 20 }
-                ]
-            },
-            {
-                referencia: 'LVM ECO 48x38',
-                piezasDefectuosas: 90,
-                reparacion: 44,
-                subdefectos: [
-                    { name: 'Molde rayado', cantidad: 28 },
-                    { name: 'Fogueo', cantidad: 26 },
-                    { name: 'Amarillamiento', cantidad: 20 },
-                    { name: 'Burbujas', cantidad: 16 }
-                ]
-            },
-            {
-                referencia: 'LVR ECO 48x60',
-                piezasDefectuosas: 57,
-                reparacion: 28,
-                subdefectos: [
-                    { name: 'Mal lijado', cantidad: 22 },
-                    { name: 'Falta de brillo', cantidad: 18 },
-                    { name: 'Poros', cantidad: 17 }
-                ]
-            },
-            {
-                referencia: 'LVM Oslo 48x43',
-                piezasDefectuosas: 43,
-                reparacion: 22,
-                subdefectos: [
-                    { name: 'Pintura contaminada', cantidad: 20 },
-                    { name: 'Grietas', cantidad: 13 },
-                    { name: 'Manchas de desmoldante', cantidad: 10 }
-                ]
-            },
-            {
-                referencia: 'LVR AQUA 80x60 CON FLAUTA',
-                piezasDefectuosas: 41,
-                reparacion: 18,
-                subdefectos: [
-                    { name: 'Molde fisurado', cantidad: 25 },
-                    { name: 'Despique', cantidad: 16 }
-                ]
-            },
-            {
-                referencia: 'LVM Milan 60x45',
-                piezasDefectuosas: 38,
-                reparacion: 16,
-                subdefectos: [
-                    { name: 'Puntos negros', cantidad: 22 },
-                    { name: 'Fogueo', cantidad: 16 }
-                ]
-            },
-            {
-                referencia: 'LVR Siena 94x48',
-                piezasDefectuosas: 34,
-                reparacion: 15,
-                subdefectos: [
-                    { name: 'Cera glass', cantidad: 18 },
-                    { name: 'Rayas', cantidad: 16 }
-                ]
-            }
-        ];
-
-        return {
-            pctOpaco: '7.7',
-            piezasBuenas,
-            piezasDefectuosas,
-            piezasRevisadas: totalPiezas,
-            cantidadDefectos: totalDefectos,
-            pctMoldes: '52.8',
-            dpu: '0.3',
-            calidad: '79.4',
-            paretoCausas: filteredPareto,
-            totalCausas: 70,
-            referencias: referenciasMock
-        };
-    }, [hasLiveSupabaseData, liveReports, filterSoloReparacion]);
-
-    // Filtrar lista de referencias por búsqueda
-    const filteredReferencias = useMemo(() => {
-        if (!refSearch.trim()) return metrics.referencias;
-        const q = refSearch.toLowerCase();
-        return metrics.referencias.filter(
-            r => r.referencia.toLowerCase().includes(q) ||
-                r.subdefectos.some(s => s.name.toLowerCase().includes(q))
-        );
-    }, [metrics.referencias, refSearch]);
-
-    const toggleRefExpanded = (refName: string) => {
-        setExpandedRefs(prev => ({
-            ...prev,
-            [refName]: !prev[refName]
-        }));
-    };
-
-    const resetFilters = () => {
-        setSelectedYear('2026');
-        setSelectedMonth('octubre');
-        setSelectedDay('All');
-        setFilterTotalPiezas(true);
-        setFilterSoloReparacion(false);
-        setRefSearch('');
-    };
+    }, [fetchSaldosSupabase, activeTab]);
 
     // --- CÁLCULOS ESTADÍSTICOS DE SALDOS Y DESTRUCCIONES ---
     const saldosMetrics = useMemo(() => {
@@ -849,12 +473,6 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
         };
     }, [saldosReports, saldosFilterTipo, saldosSelectedDate, saldosSearchTerm]);
 
-    // Función auxiliar para color de semáforo FIRPLAK
-    const getSemaforoColor = (val: number) => {
-        if (val > 90) return 'text-[#59a96a] bg-emerald-50 border-emerald-200';
-        if (val >= 85) return 'text-[#deb841] bg-amber-50 border-amber-200';
-        return 'text-[#d14747] bg-rose-50 border-rose-200';
-    };
 
     return (
         <div className={`flex flex-col font-sans text-[#000000] w-full ${showMainHeader ? 'min-h-screen bg-[#F6F3EE]' : ''}`}>
@@ -867,16 +485,17 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                 />
             )}
 
-            {/* 2. SubHeader Oficial con Pestañas Agrupadas */}
-            <div className="bg-white border-b border-[#e2ded5] py-1.5 px-3 shadow-2xs relative z-30 w-full font-sans">
-                <div className="max-w-7xl mx-auto flex flex-row flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
+            {/* 2. SubHeader Oficial con Pestañas Agrupadas (no aplica en la vista solo MS) */}
+            {!soloMs && !ocultarPestanas && (
+            <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center">
+                <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {MAIN_SUBHEADER_TABS.map(tab => {
                         const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                                className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap flex-shrink-0 ${
                                     isActive
                                         ? 'bg-[#324354] text-white shadow-sm'
                                         : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -889,6 +508,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                     })}
                 </div>
             </div>
+            )}
 
             {/* 3. Contenido Principal */}
             <div className="flex-1 w-full pb-10">
@@ -902,525 +522,23 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 1: CALIDAD GENERAL PLANTAS - IFI */}
                         {/* ------------------------------------------------------------- */}
+                        {!soloMs && (<>
                         <section id="general-plantas" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Calidad General Plantas - IFI
-                                        </h2>
-                                        <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-blue-200">
-                                            Consolidado Corporativo
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Índice de Falla Inicial (IFI) y rendimiento consolidado de las 6 plantas de manufactura
-                                    </p>
-                                </div>
-
-                                {/* Botón de alternancia HTML vs Power BI */}
-                                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                    <button
-                                        onClick={() => togglePlantView('general', 'html')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.general === 'html'
-                                                ? 'bg-[#324354] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <BarChart3 className="w-3.5 h-3.5" />
-                                        <span>Tablero Dinámico</span>
-                                    </button>
-                                    <button
-                                        onClick={() => togglePlantView('general', 'powerbi')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.general === 'powerbi'
-                                                ? 'bg-[#0084d1] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                        <span>Power BI</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {plantViews.general === 'powerbi' ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad General"
-                                        src={POWERBI_URL_GENERAL}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {/* KPI Cards Corporativas */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                        <div className="p-2.5 px-3 rounded-xl bg-amber-50/70 border border-amber-200 shadow-2xs flex flex-col justify-between">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Calidad Promedio</span>
-                                                <span className="text-[10px] font-black bg-amber-200/80 text-amber-800 px-1.5 py-0.2 rounded-full">Meta: 90%</span>
-                                            </div>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-amber-700">89.4 %</p>
-                                                <p className="text-[10px] text-amber-800/80 font-medium">Alerta leve preventiva</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Inspeccionadas</span>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-slate-800">7,628</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">Unidades auditadas</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Piezas Conformes</span>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-slate-800">6,819</p>
-                                                <p className="text-[10px] text-emerald-600 font-bold">Aprobadas primera vez</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-2.5 px-3 rounded-xl bg-emerald-50/70 border border-emerald-200 shadow-2xs flex flex-col justify-between">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wide">Plantas en Meta</span>
-                                                <span className="text-[10px] font-black bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded-full">66.7%</span>
-                                            </div>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-emerald-700">4 de 6</p>
-                                                <p className="text-[10px] text-emerald-800/80 font-medium">QZ, MBL, CEFI, RMOLD</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Gráfico Comparativo de Plantas con Semáforo */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-center">
-                                        <div className="lg:col-span-8 bg-slate-50/80 p-3 sm:p-3.5 rounded-xl border border-slate-200">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <h3 className="text-xs sm:text-sm font-black text-[#324354]">
-                                                    Comparativa de Calidad IFI por Planta vs Meta (90%)
-                                                </h3>
-                                                <span className="text-[10px] text-slate-500 font-bold">Semáforo: Verde &gt;90% | Amarillo 85-90% | Rojo &lt;85%</span>
-                                            </div>
-                                            <div className="h-[195px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={COMPARATIVA_PLANTAS_IFI} margin={{ top: 10, right: 15, left: -15, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2ded5" />
-                                                        <XAxis dataKey="planta" tick={{ fontSize: 11, fontWeight: 'bold', fill: '#324354' }} />
-                                                        <YAxis domain={[50, 100]} tick={{ fontSize: 10 }} />
-                                                        <Tooltip
-                                                            formatter={(val: any) => [`${val} %`, 'Calidad IFI']}
-                                                            labelFormatter={(label) => {
-                                                                const p = COMPARATIVA_PLANTAS_IFI.find(x => x.planta === label);
-                                                                return `${label} - ${p?.nombre || ''}`;
-                                                            }}
-                                                        />
-                                                        <ReferenceLine y={90} stroke="#2563eb" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: 'Meta: 90%', fill: '#2563eb', fontSize: 10, position: 'top' }} />
-                                                        <Bar dataKey="calidad" radius={[6, 6, 0, 0]}>
-                                                            {COMPARATIVA_PLANTAS_IFI.map((entry, idx) => {
-                                                                let color = '#d14747'; // Rojo
-                                                                if (entry.calidad > 90) color = '#59a96a'; // Verde
-                                                                else if (entry.calidad >= 85) color = '#deb841'; // Amarillo
-                                                                return <Cell key={`cell-${idx}`} fill={color} />;
-                                                            })}
-                                                        </Bar>
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-
-                                        <div className="lg:col-span-4 space-y-1.5">
-                                            <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1">Desglose por Planta</h4>
-                                            {COMPARATIVA_PLANTAS_IFI.map(p => {
-                                                const semaforo = p.calidad > 90 ? 'bg-emerald-500' : p.calidad >= 85 ? 'bg-amber-500' : 'bg-rose-500';
-                                                return (
-                                                    <div key={p.planta} className="bg-white py-1.5 px-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs shadow-2xs">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className={`w-2 h-2 rounded-full ${semaforo}`} />
-                                                            <span className="font-extrabold text-[#324354]">{p.planta}</span>
-                                                            <span className="text-slate-400 font-medium hidden sm:inline">• {p.nombre}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2.5">
-                                                            <span className="text-[10px] text-slate-400">{p.conformes}/{p.total} pz</span>
-                                                            <span className="font-black text-slate-900">{p.calidad}%</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            <CalidadGeneralIFI />
                         </section>
 
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Mármol Sintético" plantKey="MS" />
+                        </>)}
 
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 2: MÁRMOL SINTÉTICO (MS) */}
                         {/* ------------------------------------------------------------- */}
                         <section id="marmol-sintetico" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Mármol Sintético (MS)
-                                        </h2>
-                                        <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-emerald-300">
-                                            {hasLiveSupabaseData ? 'Supabase En Vivo' : 'Histórico Base'}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Informe detallado de calidad MS, Pareto de causas, referencias y tendencias de IFI
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    {/* Botón de alternancia HTML vs Power BI */}
-                                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                        <button
-                                            onClick={() => togglePlantView('ms', 'html')}
-                                            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                                plantViews.ms === 'html'
-                                                    ? 'bg-[#324354] text-white shadow-xs'
-                                                    : 'text-slate-600 hover:text-black'
-                                            }`}
-                                        >
-                                            <BarChart3 className="w-3.5 h-3.5" />
-                                            <span>Tablero Dinámico</span>
-                                        </button>
-                                        <button
-                                            onClick={() => togglePlantView('ms', 'powerbi')}
-                                            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                                plantViews.ms === 'powerbi'
-                                                    ? 'bg-[#0084d1] text-white shadow-xs'
-                                                    : 'text-slate-600 hover:text-black'
-                                            }`}
-                                        >
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                            <span>Power BI</span>
-                                        </button>
-                                    </div>
-
-                                    <button
-                                        onClick={fetchSupabaseData}
-                                        disabled={isLoading}
-                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                                        title="Recargar datos MS"
-                                    >
-                                        <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {plantViews.ms === 'powerbi' ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad MS"
-                                        src={POWERBI_URL_MS}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {/* Barra de Filtros MS */}
-                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-50 p-2 sm:p-2.5 rounded-xl border border-slate-200">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            {/* Selector Año */}
-                                            <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-2xs text-xs">
-                                                <span className="text-slate-400 font-bold">Año</span>
-                                                <select
-                                                    value={selectedYear}
-                                                    onChange={e => setSelectedYear(e.target.value)}
-                                                    className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
-                                                >
-                                                    <option value="All">Todos</option>
-                                                    <option value="2026">2026</option>
-                                                    <option value="2025">2025</option>
-                                                </select>
-                                            </div>
-
-                                            {/* Selector Mes */}
-                                            <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-2xs text-xs">
-                                                <span className="text-slate-400 font-bold">Mes</span>
-                                                <select
-                                                    value={selectedMonth}
-                                                    onChange={e => setSelectedMonth(e.target.value)}
-                                                    className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer capitalize"
-                                                >
-                                                    <option value="All">Todos</option>
-                                                    {MESES.map(m => (
-                                                        <option key={m.num} value={m.nombre} className="capitalize">
-                                                            {m.nombre}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            {/* Selector Día */}
-                                            <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-2xs text-xs">
-                                                <span className="text-slate-400 font-bold">Día</span>
-                                                <select
-                                                    value={selectedDay}
-                                                    onChange={e => setSelectedDay(e.target.value)}
-                                                    className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
-                                                >
-                                                    <option value="All">Todos</option>
-                                                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                                                        <option key={d} value={d.toString()}>
-                                                            {d}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-3">
-                                            {/* Checkbox Total Piezas */}
-                                            <label className="flex items-center gap-1 font-bold text-slate-700 cursor-pointer text-xs">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filterTotalPiezas}
-                                                    onChange={e => setFilterTotalPiezas(e.target.checked)}
-                                                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-0 cursor-pointer"
-                                                />
-                                                <span>Total Piezas</span>
-                                            </label>
-
-                                            {/* Checkbox Solo Reparación */}
-                                            <label className="flex items-center gap-1 font-bold text-slate-700 cursor-pointer text-xs">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filterSoloReparacion}
-                                                    onChange={e => setFilterSoloReparacion(e.target.checked)}
-                                                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-0 cursor-pointer"
-                                                />
-                                                <span>Reparación</span>
-                                            </label>
-
-                                            <button
-                                                onClick={resetFilters}
-                                                className="text-[11px] text-blue-600 hover:text-blue-800 font-bold hover:underline"
-                                            >
-                                                Limpiar
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* 8 Tarjetas KPI Oficiales de MS */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">% Opaco</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.pctOpaco} %</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Buenas</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.piezasBuenas.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Defectuosas</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.piezasDefectuosas.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Revisadas</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.piezasRevisadas.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase truncate">Defectos</span>
-                                            <span className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{metrics.cantidadDefectos.toLocaleString('es-CO')}</span>
-                                        </div>
-                                        <div className="p-2 bg-rose-50/70 rounded-xl border border-rose-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold text-rose-800 uppercase truncate">% Moldes</span>
-                                            <span className="text-base sm:text-lg font-black text-rose-900 mt-0.5">{metrics.pctMoldes} %</span>
-                                        </div>
-                                        <div className="p-2 bg-sky-600 text-white rounded-xl shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100 truncate">DPU</span>
-                                            <span className="text-base sm:text-lg font-black mt-0.5">{metrics.dpu}</span>
-                                        </div>
-                                        <div className="p-2 bg-[#0084d1] text-white rounded-xl shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100 truncate">Calidad</span>
-                                            <span className="text-base sm:text-lg font-black mt-0.5">{metrics.calidad} %</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Gráficos MS: Pareto Donut y Detalle por Referencia */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-                                        {/* Pareto de Causas */}
-                                        <div className="lg:col-span-7 bg-white rounded-xl p-3 shadow-xs border border-slate-200 flex flex-col justify-between">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-800">Pareto de causas</h3>
-                                                <span className="text-[10px] text-slate-400 font-bold">{metrics.totalCausas} causas</span>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
-                                                <div className="md:col-span-6 space-y-1 max-h-[195px] overflow-y-auto pr-1 scrollbar-thin">
-                                                    {metrics.paretoCausas.slice(0, 10).map((d, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between text-[11px] py-0.5 border-b border-slate-100 hover:bg-slate-50 px-1 rounded">
-                                                            <div className="flex items-center gap-1.5 truncate mr-1.5">
-                                                                <span
-                                                                    className="w-2 h-2 rounded-full flex-shrink-0"
-                                                                    style={{ backgroundColor: PARETO_COLORS[idx % PARETO_COLORS.length] }}
-                                                                />
-                                                                <span className="truncate text-slate-700 font-medium">{d.name}</span>
-                                                            </div>
-                                                            <div className="text-right flex-shrink-0 font-mono text-[10px]">
-                                                                <span className="font-bold text-slate-900">{d.cantidad}</span>
-                                                                <span className="text-slate-400 ml-0.5">({d.pct}%)</span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                <div className="md:col-span-6 h-[195px] flex items-center justify-center relative">
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <PieChart>
-                                                            <Pie
-                                                                data={metrics.paretoCausas.slice(0, 15)}
-                                                                dataKey="cantidad"
-                                                                nameKey="name"
-                                                                cx="50%"
-                                                                cy="50%"
-                                                                innerRadius={38}
-                                                                outerRadius={68}
-                                                                paddingAngle={2}
-                                                            >
-                                                                {metrics.paretoCausas.slice(0, 15).map((entry, index) => (
-                                                                    <Cell key={`cell-${index}`} fill={PARETO_COLORS[index % PARETO_COLORS.length]} />
-                                                                ))}
-                                                            </Pie>
-                                                            <Tooltip formatter={(value: any, name: any) => [`${value} defectos`, name]} />
-                                                        </PieChart>
-                                                    </ResponsiveContainer>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Detalle por Referencia con Acordeón */}
-                                        <div className="lg:col-span-5 bg-white rounded-xl p-3 shadow-xs border border-slate-200 flex flex-col">
-                                            <div className="flex items-center justify-between gap-2 mb-2">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-800">Detalle por Referencia</h3>
-                                                <div className="relative w-36">
-                                                    <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Buscar..."
-                                                        value={refSearch}
-                                                        onChange={e => setRefSearch(e.target.value)}
-                                                        className="w-full pl-6 pr-2 py-0.5 text-xs bg-slate-50 border border-slate-300 rounded-md outline-none focus:border-[#324354]"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="overflow-y-auto max-h-[195px] scrollbar-thin text-xs">
-                                                <table className="w-full text-left">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 text-[10px] border-b border-slate-200">
-                                                        <tr>
-                                                            <th className="py-1 px-1.5">Referencia</th>
-                                                            <th className="py-1 px-1.5 text-right">Piezas Def.</th>
-                                                            <th className="py-1 px-1.5 text-right">Reparación</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {filteredReferencias.map(ref => {
-                                                            const isExpanded = !!expandedRefs[ref.referencia];
-                                                            return (
-                                                                <React.Fragment key={ref.referencia}>
-                                                                    <tr
-                                                                        onClick={() => toggleRefExpanded(ref.referencia)}
-                                                                        className="hover:bg-slate-50 cursor-pointer font-bold text-slate-800 transition-colors"
-                                                                    >
-                                                                        <td className="py-1 px-1.5 flex items-center gap-1">
-                                                                            {isExpanded ? (
-                                                                                <ChevronDown className="w-3 h-3 text-blue-600 flex-shrink-0" />
-                                                                            ) : (
-                                                                                <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                                                                            )}
-                                                                            <span className="truncate">{ref.referencia}</span>
-                                                                        </td>
-                                                                        <td className="py-1 px-1.5 text-right font-black text-slate-900">{ref.piezasDefectuosas}</td>
-                                                                        <td className="py-1 px-1.5 text-right text-slate-600">{ref.reparacion}</td>
-                                                                    </tr>
-                                                                    {isExpanded && ref.subdefectos && (
-                                                                        <tr className="bg-slate-50/80">
-                                                                            <td colSpan={3} className="py-1 px-4">
-                                                                                <div className="space-y-0.5 border-l-2 border-blue-400 pl-2">
-                                                                                    {ref.subdefectos.map((s, sIdx) => (
-                                                                                        <div key={sIdx} className="flex justify-between text-[10px] text-slate-600">
-                                                                                            <span>• {s.name}</span>
-                                                                                            <span className="font-bold text-slate-800">{s.cantidad}</span>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    )}
-                                                                </React.Fragment>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Gráficos de Tendencia: IFI por Día y por Mes */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-                                        <div className="lg:col-span-8 bg-white rounded-xl p-3 shadow-xs border border-slate-200">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-800">IFI por Día (Octubre 2026)</h3>
-                                                <div className="flex items-center gap-2 text-[10px]">
-                                                    <span className="flex items-center gap-1 font-bold text-slate-600">
-                                                        <span className="w-2.5 h-0.5 bg-[#0284c7]" /> Calidad Real
-                                                    </span>
-                                                    <span className="flex items-center gap-1 font-bold text-slate-600">
-                                                        <span className="w-2.5 h-0.5 bg-[#dc2626] border-dashed" /> Meta 90%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="h-[175px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={HISTORICO_DIAS_OCTUBRE} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis dataKey="dia" tick={{ fontSize: 10 }} />
-                                                        <YAxis domain={[60, 100]} tick={{ fontSize: 10 }} />
-                                                        <Tooltip formatter={(val: any) => [`${val} %`, 'Calidad IFI']} />
-                                                        <ReferenceLine y={90} stroke="#dc2626" strokeDasharray="4 4" strokeWidth={1.5} />
-                                                        <Line type="monotone" dataKey="calidad" stroke="#0284c7" strokeWidth={2} dot={{ r: 2.5, fill: '#0284c7' }} />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-
-                                        <div className="lg:col-span-4 bg-white rounded-xl p-3 shadow-xs border border-slate-200">
-                                            <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5">IFI por Mes (2026)</h3>
-                                            <div className="h-[175px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={HISTORICO_MESES_2026} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis dataKey="mes" tickFormatter={val => val.substring(0, 3)} tick={{ fontSize: 10 }} />
-                                                        <YAxis domain={[60, 100]} tick={{ fontSize: 10 }} />
-                                                        <Tooltip formatter={(val: any) => [`${val} %`, 'Calidad']} />
-                                                        <Bar dataKey="calidad" radius={[4, 4, 0, 0]}>
-                                                            {HISTORICO_MESES_2026.map((entry, index) => {
-                                                                const isSelected = entry.mes === selectedMonth;
-                                                                const fillColor = isSelected ? '#9a3412' : '#d8b4a6';
-                                                                return <Cell key={`bar-${index}`} fill={fillColor} />;
-                                                            })}
-                                                        </Bar>
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            <CalidadMsDashboard powerBiUrl={POWERBI_URL_MS} />
                         </section>
 
+                        {!soloMs && (<>
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Fibra de Vidrio" plantKey="FV" />
 
@@ -1428,106 +546,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                         {/* PLANTA 3: FIBRA DE VIDRIO (FV) */}
                         {/* ------------------------------------------------------------- */}
                         <section id="fibra-vidrio" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Fibra de Vidrio (FV)
-                                        </h2>
-                                        <span className="px-2.5 py-0.5 bg-sky-100 text-sky-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-sky-300">
-                                            Laminación y Acabado
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Control de calidad en laminación, gelcoat, refuerzo estructural y acabado de bañeras y tinas
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                    <button
-                                        onClick={() => togglePlantView('fv', 'html')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.fv === 'html'
-                                                ? 'bg-[#324354] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <BarChart3 className="w-3.5 h-3.5" />
-                                        <span>Tablero Dinámico</span>
-                                    </button>
-                                    <button
-                                        onClick={() => togglePlantView('fv', 'powerbi')}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                                            plantViews.fv === 'powerbi'
-                                                ? 'bg-[#0084d1] text-white shadow-xs'
-                                                : 'text-slate-600 hover:text-black'
-                                        }`}
-                                    >
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                        <span>Power BI</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {plantViews.fv === 'powerbi' ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad FV"
-                                        src={POWERBI_URL_FV}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                        <div className="p-2.5 px-3 rounded-xl bg-amber-50/80 border border-amber-200 shadow-2xs flex flex-col justify-between">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Calidad Real</span>
-                                                <span className="text-[10px] font-black bg-amber-200 text-amber-800 px-1.5 py-0.2 rounded-full">Meta: 90%</span>
-                                            </div>
-                                            <div className="mt-1">
-                                                <p className="text-xl sm:text-2xl font-black text-amber-700">85.0 %</p>
-                                                <p className="text-[10px] text-amber-800 font-medium">Alerta preventiva</p>
-                                            </div>
-                                        </div>
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Piezas Inspeccionadas</span>
-                                            <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">320</p>
-                                        </div>
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Piezas Conformes</span>
-                                            <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">272</p>
-                                        </div>
-                                        <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">DPU Planta</span>
-                                            <p className="text-xl sm:text-2xl font-black text-[#0084d1] mt-1">0.15</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Defectos Típicos FV */}
-                                    <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                        <h4 className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-2">Principales Desviaciones en Planta FV</h4>
-                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                            {[
-                                                { defecto: 'Poros en Gelcoat', cantidad: 22, pct: '45.8%' },
-                                                { defecto: 'Espesor fuera norma', cantidad: 11, pct: '22.9%' },
-                                                { defecto: 'Burbujas en fibra', cantidad: 8, pct: '16.7%' },
-                                                { defecto: 'Rajadura desmolde', cantidad: 4, pct: '8.3%' },
-                                                { defecto: 'Despigmentación', cantidad: 3, pct: '6.3%' }
-                                            ].map((d, idx) => (
-                                                <div key={idx} className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
-                                                    <span className="text-[11px] font-bold text-slate-800 block truncate">{d.defecto}</span>
-                                                    <div className="flex items-center justify-between mt-1">
-                                                        <span className="text-sm font-black text-slate-900">{d.cantidad}</span>
-                                                        <span className="text-[10px] font-black text-slate-400">{d.pct}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            <CalidadFVDashboard powerBiUrl={POWERBI_URL_FV} />
                         </section>
 
                         {/* LINEA DIVISORIA */}
@@ -1855,6 +874,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                                 </div>
                             )}
                         </section>
+                        </>)}
                     </div>
                 )}
 
@@ -1863,6 +883,11 @@ export default function IndicadoresCalidadView({ showMainHeader = false }: Indic
                 {/* ========================================================================= */}
                 {activeTab === 'SALDOS' && (
                     <div className="p-3 md:p-6 max-w-[1900px] w-full mx-auto space-y-5 animate-in fade-in duration-300">
+                        {/* Tablero de saldos y destrucciones (estilo Mármol Sintético) */}
+                        <section id="saldos-destrucciones" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
+                            <CalidadSaldosDashboard />
+                        </section>
+
                         {/* Header con Acción Rápida */}
                         <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#e2ded5] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div>

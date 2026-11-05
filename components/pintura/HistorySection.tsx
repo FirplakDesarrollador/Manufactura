@@ -1,5 +1,5 @@
 'use client'
-import { parseDBDate } from '@/lib/utils/date';
+import { parseDBTimestamp } from '@/lib/utils/date';
 
 import React, { useEffect, useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
@@ -26,7 +26,7 @@ export default function HistorySection() {
     }, [])
 
     const canDelete = (fecha: string, estado: string) => {
-        const registroDate = parseDBDate(fecha)
+        const registroDate = parseDBTimestamp(fecha)
         const now = new Date()
         const diffMinutes = (now.getTime() - registroDate.getTime()) / (1000 * 60)
 
@@ -116,7 +116,7 @@ export default function HistorySection() {
                             {/* Timestamp & Process */}
                             <div className="w-1/5 min-w-[150px] border-l border-gray-100 pl-4 text-center">
                                 <div className="text-[10px] text-gray-500 font-bold mb-1">
-                                    Pintado: {parseDBDate(registro.pintura_fecha).toLocaleString('es-ES', {
+                                    Pintado: {parseDBTimestamp(registro.pintura_fecha).toLocaleString('es-ES', {
                                         weekday: 'short',
                                         day: 'numeric',
                                         month: 'short',

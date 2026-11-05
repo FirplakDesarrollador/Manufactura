@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { RegistroTrazabilidad, KilosReferencia } from '@/types/pintura'
-import { requireUserId } from './helpers'
+import { liberarMolde, requireUserId } from './helpers'
 
 export async function getRegistrosParaVaciado(): Promise<RegistroTrazabilidad[]> {
     const { data, error } = await supabase
@@ -31,17 +31,27 @@ export async function getKilosReferencia(): Promise<KilosReferencia[]> {
     return data || []
 }
 
-export async function registrarVaciado(registrer: string, usuarioEmail: string, maquina: string) {
-    // Vaciado = UPDATE trazabilidad_fv: vaciado_fecha, vaciado_user_id, estado -> 'Vaciado'
+export async function registrarVaciado(registrer: string, usuarioEmail: string) {
+    // Vaciado entrega directo a pulido y libera el molde (antes lo hacía desmolde).
     const userId = await requireUserId(usuarioEmail)
+
+    const { data: registro, error: fetchError } = await supabase
+        .from('trazabilidad_fv')
+        .select('molde_id')
+        .eq('registrer', registrer)
+        .single()
+
+    if (fetchError || !registro) {
+        throw new Error('No se encontró el registro de trazabilidad.')
+    }
 
     const { data, error } = await supabase
         .from('trazabilidad_fv')
         .update({
-            estado: 'Vaciado',
+            estado: 'Pulido',
             vaciado_fecha: new Date().toISOString(),
             vaciado_user_id: userId,
-            vaciado_maquina: maquina
+            vaciado_maquina: null
         })
         .eq('registrer', registrer)
         .select()
@@ -50,6 +60,10 @@ export async function registrarVaciado(registrer: string, usuarioEmail: string, 
     if (error) {
         console.error('Error registrando vaciado:', error)
         throw new Error(`Error al registrar vaciado: [${error.code}] ${error.message}`)
+    }
+
+    if (registro.molde_id) {
+        await liberarMolde(registro.molde_id, usuarioEmail)
     }
 
     return data

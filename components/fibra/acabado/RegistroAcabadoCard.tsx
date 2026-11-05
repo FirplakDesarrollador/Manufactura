@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
+import { parseDBTimestamp } from '@/lib/utils/date'
 import { registrarAcabado } from '@/lib/supabase/queries/fibra_acabado'
 import { Hash, Layers, Clock, Sparkles, Send, ChevronRight } from 'lucide-react'
 
@@ -53,7 +54,7 @@ export default function RegistroAcabadoCard({ registro, usuarioEmail, onRefresh 
                             <div className="flex items-center gap-2 mt-2">
                                 <Clock size={16} className="text-slate-400" />
                                 <p className="text-sm font-bold text-slate-400">
-                                    {currentStatus === 'Pulido' ? 'Pulido' : 'Acabado'}: {new Date(currentStatus === 'Pulido' ? registro.pulido_fecha! : registro.acabado_fecha!).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                                    {currentStatus === 'Pulido' ? 'Pulido' : 'Acabado'}: {parseDBTimestamp(currentStatus === 'Pulido' ? registro.pulido_fecha! : registro.acabado_fecha!).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>

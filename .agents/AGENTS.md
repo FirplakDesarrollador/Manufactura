@@ -123,4 +123,11 @@ En las siguientes **tres vistas/pestañas principales**, siempre deben estar pre
 3. **Tipografía en SVGs de Recharts:** Mantener `fontSize={11}` o `fontSize={12}` en ejes X/Y, Tooltips y Legends para evitar empastamiento visual provocado por la escala del 150%.
 4. **Paleta de Colores Oficial:** Primario Navy (`#324354`), Sage (`#7B8E90`), Verde Semáforo (`#59a96a`), Amarillo (`#deb841`), Rojo (`#d14747`).
 
+---
+
+## 9. Estándar de Interfaz Gráfica (banners, barras, ventanas, formularios)
+
+### Habilidad Asociada: `.claude/skills/firplak-ui/SKILL.md`
+Documento vivo con las reglas visuales de toda la aplicación: banner principal (`Header`), barra de controles responsive, barras de pestañas, ventanas emergentes, modo edición en el mismo panel, fotos, capas (z-index), tarjetas, KPIs y semáforo. Consultarlo antes de crear o modificar cualquier pantalla y actualizarlo cuando se apruebe un patrón nuevo.
+
 

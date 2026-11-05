@@ -4,6 +4,7 @@
 // para que el usuario descargue el archivo final sin tener que abrir Excel y ejecutar nada.
 
 import ExcelJS from "exceljs";
+import { agregarTablaDinamica, calcularTablaDinamica, type TablaDinamicaSpec, type ValorTD } from "./excelTablaDinamica";
 
 export interface SemaforoRow {
     originnum: string;
@@ -137,15 +138,12 @@ const COLOR = {
     hoyBg: "FFFFFF00",
     hoyFont: "FF000000",
     prioridadBg: "FFFF9933",
-    concVerde: "FF90EE90",
-    concAmarillo: "FFFFFF99",
-    concRojo: "FFFFC7CE",
-    concNegro: "FFCB99FF",
 };
 
 // ================= Utilidades de fecha/numero =================
 
-function parseFecha(raw: string | null | undefined): Date | null {
+// También la usa /api/sap/semaforo para avisar de fechas que no se pueden leer
+export function parseFecha(raw: string | null | undefined): Date | null {
     if (!raw) return null;
     const s = String(raw).trim();
     if (!s) return null;
@@ -634,154 +632,81 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
     });
 }
 
-// ================= CONCENTRACION MS =================
+// ================= CONCENTRACION MS (tabla dinámica) =================
+// Tabla dinámica real (como la del archivo manual): filtros CONCENTRACION MS = SI, Estado = Liberado +
+// Planificado y Planta = MS; filas por Molde con la suma de Cant. Pendiente, de mayor a menor.
+// CONCENTRACION MS = SI para lo Liberado y lo Planificado con Fecha Recomendada Liberación hasta fin de mes.
 
-function escribirHojaConcentracionMS(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Date) {
-    ws.views = [{ showGridLines: false }];
+const HOJA_CONCENTRACION = "CONCENTRACION MS";
+const HOJA_DATOS_CONCENTRACION = "DATOS CONCENTRACION";
+const CAMPOS_CONCENTRACION = ["Nro OP", "Descripción Artículo", "Planta", "Estado", "Molde", "Cant. Pendiente", "CONCENTRACION MS"];
 
+function specConcentracionMS(data: SemaforoRow[], hoy: Date): TablaDinamicaSpec {
     const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-    const pesoColor: Record<string, number> = { BLACK: 4, RED: 3, YELLOW: 2, GREEN: 1 };
+    const texto = (v: unknown) => String(v ?? "").trim();
 
-    interface Acc { cant: number; desc: string; peso: number }
-    const grupos = new Map<string, Acc>();
-
-    data.forEach((r) => {
-        if (!esPlanta(r.planta, "MS")) return;
-        const estado = String(r.estado || "").trim().toUpperCase();
-        if (estado !== "LIBERADO" && !estado.includes("PLANIFICADO")) return;
-
-        if (estado.includes("PLANIFICADO")) {
+    const filas: ValorTD[][] = data.map((r) => {
+        let concentracion = "NO";
+        if (esLiberado(r.estado)) concentracion = "SI";
+        else if (esPlanificado(r.estado)) {
             const f = parseFecha(r.fechaRecomendadaLiberacion);
-            if (!f || startOfDay(f) > finMes) return;
+            if (f && startOfDay(f) <= finMes) concentracion = "SI";
         }
-
-        let molde = String(r.molde || "").trim();
-        if (!molde || molde.toUpperCase() === "SIN MOLDE") molde = "(SIN MOLDE)";
-
-        const cant = parseNum(r.cantPendiente);
-        const existente = grupos.get(molde);
-        const colorTxt = String(r.colorProduccionTxt || "").trim().toUpperCase();
-        const pesoActual = pesoColor[colorTxt] ?? 0;
-
-        if (existente) {
-            existente.cant += cant;
-            if (pesoActual > existente.peso) existente.peso = pesoActual;
-        } else {
-            grupos.set(molde, { cant, desc: String(r.descripcion || "").trim(), peso: pesoActual });
-        }
+        return [texto(r.nroOp), texto(r.descripcion), texto(r.planta), texto(r.estado), texto(r.molde) || null, parseNum(r.cantPendiente), concentracion];
     });
 
-    ws.mergeCells("A1:D1");
-    const title = ws.getCell("A1");
-    title.value = `CONCENTRACION MS  -  Liberado + Planificado ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}`;
-    title.font = { bold: true, size: 12, color: { argb: COLOR.tituloFont } };
-    title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.tituloBg } };
-    title.alignment = { horizontal: "center", vertical: "middle" };
-    ws.getRow(1).height = 28;
+    const distintos = (i: number, regla: (v: string) => boolean) => [...new Set(filas.map((f) => String(f[i] ?? "")))].filter((v) => v && regla(v));
+    const estados = distintos(3, (v) => esLiberado(v) || esPlanificado(v));
+    const plantas = distintos(2, (v) => esPlanta(v, "MS"));
+    // Sin estos valores la tabla mostraría otra cosa sin avisar: mejor que falle y se vea el error
+    if (!plantas.length) throw new Error("CONCENTRACION MS: el Semáforo no trae registros de la planta MS");
+    if (!estados.length) throw new Error("CONCENTRACION MS: el Semáforo no trae registros en estado Liberado ni Planificado");
 
-    const headerRow = ws.getRow(3);
-    ["MOLDE", "CANT. PENDIENTE", "SEMAFORO", "DESCRIPCION (1er SKU)"].forEach((h, idx) => {
-        const cell = headerRow.getCell(idx + 1);
-        cell.value = h;
-        cell.font = { bold: true, color: { argb: COLOR.headerFont } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
-        cell.alignment = { horizontal: "center" };
-    });
-
-    const colorRGB: Record<number, string> = { 0: COLOR.zebraImpar, 1: COLOR.concVerde, 2: COLOR.concAmarillo, 3: COLOR.concRojo, 4: COLOR.concNegro };
-    const semNom: Record<number, string> = { 0: "", 1: "VERDE", 2: "AMARILLO", 3: "ROJO", 4: "NEGRO" };
-
-    const ordenado = Array.from(grupos.entries()).sort((a, b) => b[1].cant - a[1].cant);
-
-    let fila = 4;
-    ordenado.forEach(([molde, info]) => {
-        const r = ws.getRow(fila);
-        r.getCell(1).value = molde;
-        r.getCell(2).value = info.cant;
-        r.getCell(2).numFmt = "#,##0";
-        r.getCell(2).alignment = { horizontal: "center" };
-        r.getCell(3).value = semNom[info.peso];
-        r.getCell(3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: colorRGB[info.peso] } };
-        r.getCell(3).alignment = { horizontal: "center" };
-        r.getCell(4).value = info.desc;
-        if (fila % 2 === 0) {
-            [1, 2, 4].forEach((c) => {
-                r.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.zebraPar } };
-            });
-        }
-        fila++;
-    });
-
-    ws.getCell(fila, 1).value = "TOTAL";
-    ws.getCell(fila, 1).font = { bold: true };
-    ws.getCell(fila, 2).value = { formula: `SUM(B4:B${fila - 1})` } as ExcelJS.CellFormulaValue;
-    ws.getCell(fila, 2).numFmt = "#,##0";
-    ws.getCell(fila, 2).font = { bold: true };
-
-    ws.getColumn(1).width = 48;
-    ws.getColumn(2).width = 16;
-    ws.getColumn(3).width = 12;
-    ws.getColumn(4).width = 65;
+    return {
+        hojaDatos: HOJA_DATOS_CONCENTRACION,
+        hojaTabla: HOJA_CONCENTRACION,
+        campos: CAMPOS_CONCENTRACION,
+        numericos: ["Cant. Pendiente"],
+        filas,
+        filtros: [
+            { campo: "CONCENTRACION MS", seleccion: ["SI"] },
+            { campo: "Estado", seleccion: estados },
+            { campo: "Planta", seleccion: plantas },
+        ],
+        campoFilas: "Molde",
+        campoValor: "Cant. Pendiente",
+        nombreTabla: "TablaConcentracionMS",
+    };
 }
 
-// ================= INSTRUCCIONES =================
+// Hoja de datos (oculta) que alimenta la tabla dinámica
+function escribirHojaDatosConcentracion(ws: ExcelJS.Worksheet, spec: TablaDinamicaSpec) {
+    ws.state = "hidden";
+    ws.addRow(spec.campos);
+    ws.getRow(1).font = { bold: true };
+    spec.filas.forEach((f) => ws.addRow(f.map((v) => v ?? undefined)));
+    ws.getColumn(2).width = 50;
+    ws.getColumn(5).width = 45;
+}
 
-function escribirHojaInstrucciones(ws: ExcelJS.Worksheet) {
-    ws.views = [{ showGridLines: false }];
-    ws.getColumn(1).width = 2;
-    ws.getColumn(2).width = 3;
-    for (let c = 3; c <= 7; c++) ws.getColumn(c).width = 22;
-
-    let f = 2;
-    ws.mergeCells(f, 2, f, 7);
-    const title = ws.getCell(f, 2);
-    title.value = "PRIORIDADES DIARIAS PLANTAS  -  Generado automaticamente desde Query - Semáforo";
-    title.font = { bold: true, size: 15, color: { argb: COLOR.tituloFont } };
-    title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.tituloBg } };
-    title.alignment = { horizontal: "center", vertical: "middle" };
-    ws.getRow(f).height = 36;
-    f += 2;
-
-    const seccion = (texto: string) => {
-        ws.mergeCells(f, 2, f, 7);
-        const cell = ws.getCell(f, 2);
-        cell.value = texto;
-        cell.font = { bold: true, size: 11, color: { argb: COLOR.seccionFont } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.seccionBg } };
-        cell.alignment = { vertical: "middle", indent: 1 };
-        ws.getRow(f).height = 22;
-        f++;
-    };
-    const texto = (txt: string, alt: boolean) => {
-        ws.mergeCells(f, 3, f, 7);
-        const cell = ws.getCell(f, 3);
-        cell.value = txt;
-        cell.alignment = { wrapText: true };
-        cell.font = { size: 9 };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: alt ? COLOR.zebraPar : COLOR.zebraImpar } };
-        ws.getRow(f).height = 20;
-        f++;
-    };
-
-    seccion("1. COLUMNA PRIORIDAD  -  Como se calculo");
-    texto("Este archivo ya viene con PRIORIDAD calculada: ATRASADO (fecha ideal < hoy), HOY (fecha ideal = hoy), SODIMAC (cliente Sodimac con fecha futura).", false);
-    texto("ATRASADO -> fila ROJA. Si ademas es Sodimac -> fila ROJA con NEGRITA.", true);
-    texto("HOY -> fila AMARILLA. SODIMAC con fecha futura -> fila AMARILLA con negrita.", false);
-    texto("El supervisor puede cambiar manualmente el valor de PRIORIDAD (lista desplegable) para marcar prioridad especial -> se debe colorear NARANJA manualmente.", true);
-    f++;
-
-    seccion("2. RESUMEN  -  Columnas");
-    texto("B = Atrasadas por Fecha Prometida Entrega Item (AF)", false);
-    texto("C = Atrasadas por Fecha Ideal Entrega Produccion (W)", true);
-    texto("D = Pendiente proximo dia habil", false);
-    texto("E = Planificado pendiente de meses anteriores (Fecha Rec.Lib < inicio mes actual)", true);
-    texto("F = Planificado mes en curso  |  G = Mes+1  |  H = Mes+2  |  I = Total planificado", false);
-    f++;
-
-    seccion("3. NOTAS");
-    texto("Este archivo se genero automaticamente al presionar 'Descargar Prioridades diarias de Plantas' en Consulta SAP. No requiere macros ni configuracion adicional.", false);
-    texto("Las hojas ORIGINAL y SEMAFORO contienen la data cruda descargada de SAP (Query FPK - Semaforo - DJP) usada para calcular todo lo demas.", true);
-    texto("El dia habil siguiente NO incluye festivos colombianos (solo excluye sabados y domingos).", false);
+// Lo que muestra la tabla al abrir el archivo (Excel lo reescribe igual al actualizar la tabla)
+function escribirHojaConcentracionMS(ws: ExcelJS.Worksheet, spec: TablaDinamicaSpec) {
+    const res = calcularTablaDinamica(spec);
+    spec.filtros.forEach((f, i) => {
+        ws.getCell(i + 1, 1).value = f.campo;
+        ws.getCell(i + 1, 2).value = res.textoFiltro(f.campo);
+    });
+    const inicio = spec.filtros.length + 2;
+    ws.getCell(inicio, 1).value = "Etiquetas de fila";
+    ws.getCell(inicio, 2).value = `Suma de ${spec.campoValor}`;
+    res.filasVisibles.forEach((f, i) => {
+        ws.getCell(inicio + 1 + i, 1).value = f.etiqueta;
+        ws.getCell(inicio + 1 + i, 2).value = f.total;
+    });
+    ws.getCell(inicio + 1 + res.filasVisibles.length, 1).value = "Total general";
+    ws.getCell(inicio + 1 + res.filasVisibles.length, 2).value = res.totalGeneral;
+    ws.getColumn(1).width = 55;
+    ws.getColumn(2).width = 24;
 }
 
 // ================= Punto de entrada =================
@@ -792,7 +717,7 @@ export async function generarPrioridadesPlantasBuffer(data: SemaforoRow[]): Prom
     workbook.creator = "Manufactura FIRPLAK";
     workbook.created = new Date();
 
-    // Orden final de pestañas: RESUMEN, MS, FV, INYECCION, MBL, CEFI, SEMAFORO, ORIGINAL, CONCENTRACION MS, INSTRUCCIONES
+    // Orden final de pestañas: RESUMEN, MS, FV, INYECCION, MBL, CEFI, SEMAFORO, ORIGINAL, CONCENTRACION MS (+ DATOS CONCENTRACION oculta)
     const wsResumen = workbook.addWorksheet("RESUMEN");
     escribirHojaResumen(wsResumen, data, hoy);
 
@@ -808,15 +733,14 @@ export async function generarPrioridadesPlantasBuffer(data: SemaforoRow[]): Prom
     const wsOriginal = workbook.addWorksheet("ORIGINAL");
     escribirHojaDatos(wsOriginal, data, {});
 
-    const wsConc = workbook.addWorksheet("CONCENTRACION MS");
-    escribirHojaConcentracionMS(wsConc, data, hoy);
-
-    const wsInstr = workbook.addWorksheet("INSTRUCCIONES");
-    escribirHojaInstrucciones(wsInstr);
+    const specConc = specConcentracionMS(data, hoy);
+    escribirHojaConcentracionMS(workbook.addWorksheet(HOJA_CONCENTRACION), specConc);
+    escribirHojaDatosConcentracion(workbook.addWorksheet(HOJA_DATOS_CONCENTRACION), specConc);
 
     workbook.views = [{ activeTab: 0 }];
 
-    return workbook.xlsx.writeBuffer();
+    // ExcelJS no crea tablas dinámicas: se agrega aparte sobre el archivo generado
+    return agregarTablaDinamica(await workbook.xlsx.writeBuffer(), specConc);
 }
 
 export async function descargarPrioridadesPlantas(data: SemaforoRow[]): Promise<number> {

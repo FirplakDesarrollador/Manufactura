@@ -199,22 +199,27 @@ input::-webkit-credentials-auto-fill-button {
 
   #hdt-steps-table .print\:table-row>div:nth-child(1),
   #hdt-steps-table [role="columnheader"]:nth-child(1) {
-    width: 40% !important;
+    width: 32% !important;
   }
 
   #hdt-steps-table .print\:table-row>div:nth-child(2),
   #hdt-steps-table [role="columnheader"]:nth-child(2) {
-    width: 20% !important;
+    width: 17% !important;
   }
 
   #hdt-steps-table .print\:table-row>div:nth-child(3),
   #hdt-steps-table [role="columnheader"]:nth-child(3) {
-    width: 20% !important;
+    width: 17% !important;
   }
 
   #hdt-steps-table .print\:table-row>div:nth-child(4),
   #hdt-steps-table [role="columnheader"]:nth-child(4) {
-    width: 20% !important;
+    width: 17% !important;
+  }
+
+  #hdt-steps-table .print\:table-row>div:nth-child(5),
+  #hdt-steps-table [role="columnheader"]:nth-child(5) {
+    width: 17% !important;
   }
 
   /* RESET FINAL AGRESIVO */
@@ -246,6 +251,13 @@ input::-webkit-credentials-auto-fill-button {
     max-width: 150px !important;
     height: auto !important;
     filter: grayscale(1) contrast(2) !important;
+  }
+
+  /* Imagen de referencia de los pasos: se imprime como foto, sin el filtro del logo */
+  #hdt-steps-table img {
+    max-width: 100% !important;
+    max-height: 110px !important;
+    filter: none !important;
   }
 
   .print\:table-row,

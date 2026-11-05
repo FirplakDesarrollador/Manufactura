@@ -3,7 +3,8 @@ import { createExternalClient } from '@/lib/supabase/external'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Home, ChevronLeft, Paperclip, ExternalLink } from 'lucide-react'
+import { ChevronLeft, Paperclip, ExternalLink } from 'lucide-react'
+import Header from '@/components/opt-sistemica/Header'
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -103,28 +104,13 @@ export default async function OPTDetailPage({ params }: PageProps) {
 
     return (
         <div className="flex min-h-screen flex-col bg-background">
-            {/* Header */}
-            <header className="bg-primary w-full text-white py-4 px-6 flex justify-between items-center shadow-md mb-6 relative">
-                <div className="flex items-center gap-3">
-                    <Link href="/observations/opt" className="hover:opacity-80 transition-opacity flex items-center gap-1">
-                        <ChevronLeft size={32} />
-                        <span className="font-semibold hidden sm:inline">Atrás</span>
-                    </Link>
-                </div>
-                <div className="flex items-center gap-6">
-                    <Link href="/home" className="hover:opacity-80 transition-opacity flex items-center gap-1">
-                        <Home size={28} />
-                        <span className="font-semibold hidden sm:inline">Inicio</span>
-                    </Link>
-                    <Image
-                        src="/firplak-logo.png"
-                        alt="Firplak Logo"
-                        width={100}
-                        height={32}
-                        className="brightness-0 invert object-contain"
-                    />
-                </div>
-            </header>
+            {/* Banner estándar FIRPLAK (mismo menú lateral de toda la app) */}
+            <Header title="OPT Operativa" subtitle="" compact={true} />
+            <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 pt-3">
+                <Link href="/observations/opt" className="inline-flex items-center gap-1 text-sm font-bold text-[#324354] hover:opacity-80">
+                    <ChevronLeft size={18} /> Volver al historial
+                </Link>
+            </div>
 
             <main className="flex flex-col p-4 sm:p-6 text-primary max-w-4xl mx-auto w-full">
                 {/* Quick View Table Section */}

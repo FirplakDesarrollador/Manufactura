@@ -107,7 +107,7 @@ export default function CargaProductosTable() {
                                         <td className="px-4 py-2.5 font-bold text-[#254153]">
                                             {row.productoSku || row.sku || row.producto_sku || '-'}
                                         </td>
-                                        <td className="px-4 py-2.5 text-gray-600 truncate max-w-[300px]" title={row.productoDescripcion || row.descripcion || row.producto_descripcion}>
+                                        <td className="px-4 py-2.5 text-gray-700 whitespace-normal min-w-[240px] break-words" title={row.productoDescripcion || row.descripcion || row.producto_descripcion}>
                                             {row.productoDescripcion || row.descripcion || row.producto_descripcion || '-'}
                                         </td>
                                         <td className="px-4 py-2.5 text-gray-700">

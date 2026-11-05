@@ -39,3 +39,29 @@ export async function requireUserId(usuarioEmail: string): Promise<number> {
     }
     return userId
 }
+
+/** Libera el molde al salir de vaciado. Conserva reparación o desmanche si ya estaban marcados. */
+export async function liberarMolde(moldeId: number, usuarioEmail: string) {
+    const { data: moldeActual } = await supabase
+        .from('moldes')
+        .select('estado')
+        .eq('id', moldeId)
+        .single()
+
+    const estadoFinal = (moldeActual?.estado === 'En reparacion' || moldeActual?.estado === 'Por desmanchar')
+        ? moldeActual.estado
+        : 'Disponible'
+
+    const { error } = await supabase
+        .from('moldes')
+        .update({
+            estado: estadoFinal,
+            modificado_por: usuarioEmail,
+            modified_at: new Date().toISOString()
+        })
+        .eq('id', moldeId)
+
+    if (error) {
+        console.error('Error liberando molde:', error)
+    }
+}
