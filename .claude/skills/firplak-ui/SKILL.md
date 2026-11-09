@@ -61,6 +61,7 @@ Componente único: `components/opt-sistemica/Header.tsx`. **No crear encabezados
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
 ```
 - Fondo `bg-[#324354]`, alto `h-12` (48 px), capa `z-[100]`.
+- Contenido a **todo el ancho** (`w-full px-3 sm:px-4`), sin `max-w-[1800px] mx-auto`: el menú y el título quedan pegados al borde izquierdo y el nombre al derecho, en cualquier pantalla (aprobado 2026-11-08).
 - Izquierda: menú hamburguesa (`w-6 h-6`) + título en mayúsculas `text-base sm:text-lg font-light tracking-widest`. **Sin subtítulo** (el prop existe por compatibilidad, no se muestra).
 - Centro: logo FIRPLAK `h-9` (blanco, `/logo-firplak-clean.png`).
 - Derecha: solo el primer nombre del usuario `text-sm sm:text-base font-semibold` (sin el texto "Usuario"). **Sin ícono de cerrar sesión en el banner**: se cierra sesión solo desde el menú lateral.
