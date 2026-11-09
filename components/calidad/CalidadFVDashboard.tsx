@@ -289,7 +289,8 @@ export default function CalidadFVDashboard({ powerBiUrl }: { powerBiUrl?: string
                 const valor = selCausa ? (r.piezasRevisadas ? (nCausa / r.piezasRevisadas) * 100 : 0) : r.calidad;
                 return { key, label, valor: Math.round(valor * 10) / 10, total: r.piezasRevisadas, buenas: r.piezasBuenas, conCausa: nCausa };
             })
-            .filter(c => c.total > 0 && (selCausa || c.valor > 0));
+            // Todo período con piezas revisadas se muestra, también los de IFI 0 % (ninguna buena)
+            .filter(c => c.total > 0);
     };
     const columnasPrincipal = useMemo(() => columnasDe(piezas.filter(enRef), granPrincipal),
         // eslint-disable-next-line react-hooks/exhaustive-deps
