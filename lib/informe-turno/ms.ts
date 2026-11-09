@@ -19,7 +19,7 @@ export const RRC_MS: { nombre: string; claves: string[] }[] = [
     { nombre: 'Gelcoat desmoldado', claves: ['gelcoat desmoldado', 'gel desmoldado'] },
     { nombre: 'Despique por mala manipulación', claves: ['mala manip'] },
     { nombre: 'Pintura chorreada', claves: ['pintura chorread', 'chorread'] },
-    { nombre: 'Rajado al desmoldar', claves: ['rajado al desmold', 'rajad'] },
+    { nombre: 'Rajado al desmoldar', claves: ['rajada al desmold', 'rajado al desmold'] },  // sin "rajad" suelto: no suma pegada al molde, gelcoat rajado ni contramolde
     { nombre: 'Pieza dañada al perforar', claves: ['danada al perfor', 'pieza danada'] },
     { nombre: 'Pintura sin catalizador', claves: ['sin catalizador', 'catalizador'] },
     { nombre: 'Burbuja de aire en el acabado', claves: ['burbuja de aire en el acabado', 'burbuja de aire', 'burbuja'] }
@@ -137,6 +137,7 @@ export function causasReflejadoMs(m: ManualMs, a: DatosAutoMs | null): string[] 
         'Avería',
         'Lavado de máquina Ultracaster',
         ausentes ? `Ausentismo de ${ausentes} ${ausentes === 1 ? 'persona' : 'personas'}` : 'Ausentismo de personas',
+        'Operación en formación',
         top.length ? `No calidad por ${top.map(d => `${d.nombre.toLowerCase()} (${d.cantidad})`).join(', ')}` : 'No calidad por'
     ];
 }

@@ -468,8 +468,8 @@ export default function FormularioMs() {
                             tiempoReflejar === 0 ? (
                                 <p className="text-[11px] font-bold text-emerald-700 mt-1">Se cumplió la meta de kilos: no hay tiempo para reflejar.</p>
                             ) : (
-                                <p className={`text-[11px] font-bold mt-1 flex items-center gap-1 ${excedido ? 'text-rose-700' : sumaReflejados >= tiempoReflejar ? 'text-emerald-700' : 'text-[#324354]'}`}>
-                                    {excedido && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                                <p className={`text-sm font-black mt-1.5 flex items-center gap-1.5 ${excedido ? 'text-rose-700' : sumaReflejados >= tiempoReflejar ? 'text-emerald-700' : 'text-[#324354]'}`}>
+                                    {excedido && <AlertTriangle className="w-4 h-4 shrink-0" />}
                                     Tiempo a reflejar: {tiempoReflejar} min · Reflejado: {sumaReflejados} min ·{' '}
                                     {excedido
                                         ? `Se pasa por ${sumaReflejados - tiempoReflejar} min (máximo ${TOLERANCIA_REFLEJADOS_MIN} min). Ajuste los minutos para poder guardar.`
