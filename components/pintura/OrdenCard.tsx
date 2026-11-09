@@ -4,6 +4,10 @@ import { createPortal } from 'react-dom'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
 import { Box, Clipboard, Users, AlertTriangle, FileText } from 'lucide-react'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
+import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
+
+// 'YYYY-MM-DD' → dd/mm/aaaa
+const fechaCorta = (iso: string | null) => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—'
 
 interface OrdenCardProps {
     orden: OrdenFabricacion
@@ -25,6 +29,10 @@ const MiniMetric = ({ label, value, color }: { label: string, value: number, col
 
 export default function OrdenCard({ orden, isActive, onClick, moldes, planta, conDetalle = true }: OrdenCardProps) {
     const [verDetalle, setVerDetalle] = useState(false)
+    // FV: las 4 fechas del Semáforo guardadas al cargar las órdenes
+    const semaforo = useFechasSemaforoFv(planta === 'fv')
+    const fechasSem = semaforo?.mapa.get(String(orden.orden_fabricacion ?? '').trim())
+    const hoyIso = new Date().toLocaleDateString('en-CA')
     const sku = (orden.molde_sku || orden.producto_sku || orden.sku || '').trim().toLowerCase()
     const codeMatch = sku.match(/PMOL\d*-(\d+)/i) || (orden.molde_sku ? orden.molde_sku.match(/PMOL\d*-(\d+)/i) : null)
     const targetCode = codeMatch ? codeMatch[1].replace(/^0+/, '') : ''
@@ -107,6 +115,24 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                             </div>
                         )}
                     </div>
+                    {planta === 'fv' && semaforo && (
+                        // Fechas del Semáforo: T, Real Liberación, W (la que usa Prioridades para atrasos) y AF
+                        semaforo.error ? (
+                            <div className="mt-1 text-[10px] font-bold text-white bg-red-600 px-1.5 py-0.5 rounded">{semaforo.error}</div>
+                        ) : !fechasSem || (!fechasSem.lote && !fechasSem.realLib && !fechasSem.idealW && !fechasSem.prometida) ? (
+                            <div className="mt-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-300 px-1.5 py-0.5 rounded">
+                                {fechasSem?.actualizadas ? 'Esta OF no está en el Semáforo' : 'Sin fechas del Semáforo: use "Cargar Órdenes"'}
+                            </div>
+                        ) : (
+                            <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] leading-tight border border-slate-200 rounded px-1.5 py-1 bg-slate-50"
+                                title={fechasSem.actualizadas ? `Fechas del Semáforo traídas el ${new Date(fechasSem.actualizadas).toLocaleString('es-CO')}` : undefined}>
+                                <span><b className="text-slate-500">Entrega Lote (T):</b> <b className="text-[#324354]">{fechaCorta(fechasSem.lote)}</b></span>
+                                <span><b className="text-slate-500">Real Liberación:</b> <b className="text-[#324354]">{fechaCorta(fechasSem.realLib)}</b></span>
+                                <span><b className="text-slate-500">Ideal Entrega Prod. (W):</b> <b className={fechasSem.idealW && fechasSem.idealW < hoyIso ? 'text-red-600' : 'text-[#324354]'}>{fechaCorta(fechasSem.idealW)}</b></span>
+                                <span><b className="text-slate-500">Prometida (AF):</b> <b className={fechasSem.prometida && fechasSem.prometida < hoyIso ? 'text-red-600' : 'text-[#324354]'}>{fechaCorta(fechasSem.prometida)}</b></span>
+                            </div>
+                        )
+                    )}
                     {(() => {
                         const fullDesc = orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'
                         return (

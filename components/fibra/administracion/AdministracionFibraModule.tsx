@@ -333,6 +333,11 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
             if (response.ok) {
                 toast.success('Órdenes cargadas y sincronizadas exitosamente', { id: toastId })
+                // Las 4 fechas del Semáforo se traen en la misma carga; si fallan se avisa (las órdenes sí quedaron)
+                const resultado = await response.json().catch(() => null)
+                if (resultado?.avisoFechasSemaforo) toast.error(resultado.avisoFechasSemaforo, { duration: 12000 })
+                const { recargarFechasSemaforoFv } = await import('@/lib/fibra/fechasSemaforo')
+                recargarFechasSemaforoFv()
                 await loadData()
             } else {
                 toast.success('Actualizando lista de órdenes...', { id: toastId })
