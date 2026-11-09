@@ -374,7 +374,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
             {/* Controls */}
             <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-4">
-                    <div className="flex-1 min-w-[300px]">
+                    <div className="flex-1 min-w-[220px] max-w-xl">
                         <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Búsqueda Global</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -387,6 +387,22 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                             />
                         </div>
                     </div>
+
+                    {/* Filtrar por proceso (procesos del Mapa de procesos FV): solo las OF con piezas en ese proceso */}
+                    {activeTab === 'of' && (
+                        <div className="w-52">
+                            <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Proceso</label>
+                            <select value={procesoFiltro} onChange={e => setProcesoFiltro(e.target.value)}
+                                className={`w-full px-3 py-2 border rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${procesoFiltro ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-slate-50 border-slate-200 text-[#324354]'}`}>
+                                <option value="">Todos los procesos</option>
+                                {PROCESOS_FILTRO.map(p => (
+                                    <option key={p.id} value={p.id} disabled={conteoProcesos[p.id] === 0 && procesoFiltro !== p.id}>
+                                        {p.label} ({conteoProcesos[p.id]})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="w-48">
                         <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Filtrar Fecha</label>
@@ -410,48 +426,9 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     </button>
 
                     <button
-                        onClick={handleCargarOrdenes}
-                        disabled={syncing}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300"
-                        title="Cargar Órdenes de Fabricación"
-                    >
-                        <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
-                        <span className="font-black text-[10px] uppercase tracking-wider">Cargar Órdenes</span>
-                    </button>
-                </div>
-                {/* Real-time Counter (Requested) */}
-                <div className="max-w-7xl mx-auto mt-3 flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
-                        Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
-                    </span>
-                    {/* Filtrar por proceso (procesos del Mapa de procesos FV): clic para ver solo las OF con piezas ahí */}
-                    {activeTab === 'of' && (
-                        <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-[10px] font-black text-blue-600 uppercase shrink-0">Proceso</span>
-                            <div className="flex gap-1 overflow-x-auto no-scrollbar">
-                                {PROCESOS_FILTRO.map(p => {
-                                    const n = conteoProcesos[p.id]
-                                    const activo = procesoFiltro === p.id
-                                    return (
-                                        <button key={p.id} onClick={() => setProcesoFiltro(activo ? '' : p.id)}
-                                            title={`${n} orden(es) con piezas en ${p.label}`}
-                                            className={`shrink-0 h-7 px-2 rounded-lg border text-[10px] font-bold whitespace-nowrap transition-colors ${activo ? 'bg-blue-600 border-blue-600 text-white' : n > 0 ? 'bg-white border-slate-200 text-[#324354] hover:bg-blue-50' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                                            {p.label} <span className="font-black">{n}</span>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-                    {(searchText || selectedDate || (activeTab === 'of' && procesoFiltro)) && (
-                        <span className="text-[10px] font-bold text-slate-400 italic">
-                            (Filtrado aplicado)
-                        </span>
-                    )}
-                    <button
                         onClick={toggleAllVisible}
                         disabled={activeTab === 'of' ? filteredOrdenes.length === 0 : filteredRegistros.length === 0}
-                        className={`ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${
+                        className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${
                             activeTab === 'of'
                                 ? allOrdenesExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
                                 : allRegistrosExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
@@ -467,11 +444,21 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                 : allRegistrosExpanded ? 'Cerrar todos' : 'Abrir todos'}
                         </span>
                     </button>
+
+                    <button
+                        onClick={handleCargarOrdenes}
+                        disabled={syncing}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300"
+                        title="Cargar Órdenes de Fabricación"
+                    >
+                        <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
+                        <span className="font-black text-[10px] uppercase tracking-wider">Cargar Órdenes</span>
+                    </button>
                 </div>
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex bg-white px-4 border-b border-slate-200">
+            <div className="flex items-center bg-white px-4 border-b border-slate-200">
                 <TabButton
                     active={activeTab === 'of'}
                     label="Órdenes de Fabricación"
@@ -482,6 +469,12 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     label="Registros de Trazabilidad"
                     onClick={() => setActiveTab('trazabilidad')}
                 />
+                {/* Total según los filtros aplicados */}
+                <span className="ml-auto shrink-0 px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm"
+                    title={searchText || selectedDate || (activeTab === 'of' && procesoFiltro) ? 'Con filtros aplicados' : undefined}>
+                    Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
+                    {(searchText || selectedDate || (activeTab === 'of' && procesoFiltro)) && ' (filtrado)'}
+                </span>
             </div>
 
             {/* Main Table Area */}
