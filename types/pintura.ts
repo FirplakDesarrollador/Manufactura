@@ -35,6 +35,11 @@ export interface OrdenFabricacion {
     molde_sku?: string
     molde_descripcion?: string
     fecha_ideal_produccion?: string
+    fecha_entrega_lote?: string | null
+    fecha_real_liberacion?: string | null
+    fecha_ideal_entrega_produccion?: string | null
+    fecha_prometida_entrega?: string | null
+    fechas_semaforo_actualizadas?: string | null
 }
 
 export interface Molde {

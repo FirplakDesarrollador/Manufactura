@@ -22,6 +22,8 @@ export function useMetricasFibra(ordenes: OrdenFabricacion[], trazabilidad: Regi
                 (orden.cliente || orden.cliente_nombre || '').toLowerCase().includes(search)
 
             const matchesDate = !selectedDate ||
+                (orden.fecha_entrega_lote &&
+                    orden.fecha_entrega_lote.includes(selectedDate)) ||
                 (orden.fecha_ideal_produccion &&
                     orden.fecha_ideal_produccion.includes(selectedDate)) ||
                 (!orden.fecha_ideal_produccion &&

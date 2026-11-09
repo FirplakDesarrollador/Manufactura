@@ -53,8 +53,10 @@ export default function DigitadoLoteFibra({ userEmail, extra }: { userEmail: str
         (o.digitado || 0) > 0 ||
         (o.transito || 0) > 0
     )).sort((a, b) => {
-        const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
-        const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
+        const rawA = a.fecha_entrega_lote || a.fecha_ideal_produccion || a.fecha_entrega_estimada
+        const rawB = b.fecha_entrega_lote || b.fecha_ideal_produccion || b.fecha_entrega_estimada
+        const dateA = rawA ? new Date(rawA).getTime() : Infinity
+        const dateB = rawB ? new Date(rawB).getTime() : Infinity
         const valA = isNaN(dateA) ? Infinity : dateA
         const valB = isNaN(dateB) ? Infinity : dateB
         return valA - valB

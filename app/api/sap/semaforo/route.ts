@@ -71,7 +71,7 @@ function fallo(error: string, detalle: string, status = 502) {
 
 export async function GET() {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    const apiUrl = process.env.SEMAFORO_API_URL || "https://toner-villages-acoustic-colony.trycloudflare.com/semaforo";
+    const apiUrl = process.env.SEMAFORO_API_URL || "https://telecommunications-effectively-configured-experience.trycloudflare.com/semaforo";
     const apiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
     let host = 'desconocido';
     try { host = new URL(apiUrl).host } catch { /* URL inválida: la consulta fallará y se informa */ }

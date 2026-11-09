@@ -31,6 +31,8 @@ type OrdenSap = {
     fechaFinalizacion: string
     pedidoVinculado: string
     comentarios: string
+    masaTeorica?: number | string | null
+    gelcoatTeorico?: number | string | null
     componentes: ComponenteSap[]
     faltantes: string[]
 }
@@ -171,6 +173,40 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }
         return m
     }, [articulos])
 
+    const gelcoatCalc = useMemo(() => {
+        if (orden?.gelcoatTeorico != null && Number(orden.gelcoatTeorico) > 0) {
+            return Number(orden.gelcoatTeorico)
+        }
+        if (!orden?.componentes) return null
+        const gelLines = orden.componentes.filter(c => {
+            const d = sinTildes(c.descripcion || '')
+            const no = (c.no || '').toUpperCase()
+            return d.includes('GELCOAT') || d.includes('GEL COAT') || no.startsWith('PGEL')
+        })
+        if (gelLines.length > 0) {
+            const sum = gelLines.reduce((acc, c) => acc + (Number(c.cantRequerida) || Number(c.cantBase) || 0), 0)
+            return sum > 0 ? Number(sum.toFixed(3)) : null
+        }
+        return null
+    }, [orden])
+
+    const masaCalc = useMemo(() => {
+        if (orden?.masaTeorica != null && Number(orden.masaTeorica) > 0) {
+            return Number(orden.masaTeorica)
+        }
+        if (!orden?.componentes) return null
+        const mpLines = orden.componentes.filter(c => {
+            const d = sinTildes(c.descripcion || '')
+            if (RE_MANO_OBRA.test(d)) return false
+            return RE_MATERIA_PESADA.test(d)
+        })
+        if (mpLines.length > 0) {
+            const sum = mpLines.reduce((acc, c) => acc + (Number(c.cantRequerida) || Number(c.cantBase) || 0), 0)
+            return sum > 0 ? Number(sum.toFixed(2)) : null
+        }
+        return null
+    }, [orden])
+
     return (
         <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-5 overflow-y-auto"
             onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -199,7 +235,7 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }
 
                 {/* Datos generales */}
                 {orden && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 shrink-0">
+                    <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-2 shrink-0">
                         {[
                             ['Estado', orden.estado],
                             ['Tipo', orden.tipo],
@@ -207,11 +243,19 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }
                             ['Cant. completada', num(orden.cantCompletada)],
                             ['Almacén', orden.almacen],
                             ['Inicio / Fin', `${orden.fechaInicio} – ${orden.fechaFinalizacion}`],
-                            ['Pedido vinculado', orden.pedidoVinculado || '—']
+                            ['Pedido vinculado', orden.pedidoVinculado || '—'],
+                            ['Masa teórica', masaCalc != null ? `${num(masaCalc)} Kg` : '—'],
+                            ['Gelcoat teórico', gelcoatCalc != null ? `${num(gelcoatCalc)} Kg` : '—']
                         ].map(([label, valor]) => (
                             <div key={label} className={`bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 min-w-0 ${label === 'Inicio / Fin' ? 'col-span-2' : ''}`}>
                                 <div className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap">{label}</div>
-                                <div className={`text-sm font-black truncate ${label === 'Estado' && valor === 'Cancelado' ? 'text-red-600' : 'text-[#324354]'}`} title={String(valor)}>{valor}</div>
+                                <div className={`text-sm font-black truncate ${
+                                    label === 'Estado' && valor === 'Cancelado'
+                                        ? 'text-red-600'
+                                        : label === 'Masa teórica' || label === 'Gelcoat teórico'
+                                            ? 'text-emerald-700'
+                                            : 'text-[#324354]'
+                                }`} title={String(valor)}>{valor}</div>
                             </div>
                         ))}
                     </div>

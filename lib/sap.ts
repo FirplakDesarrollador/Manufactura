@@ -6,18 +6,21 @@ export interface SAPLoginResponse {
   SessionTimeout: number;
 }
 
+export const SAP_BASE_URL = 'https://200.7.96.194:50000/b1s/v1';
+export const SAP_LOGIN_URL = 'https://200.7.96.194:50000/b1s/v1/Login';
+export const SAP_COMPANY_DB = 'Firplak_SA';
+export const SAP_USERNAME = 'manager';
+export const SAP_PASSWORD = '2023Fir#.*';
+
 export async function loginToSAP() {
   // Asegurarnos de que no rechace certificados auto-firmados
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-  const url = process.env.SAP_API_URL;
-  const username = process.env.SAP_USERNAME;
-  const password = process.env.SAP_PASSWORD;
-  const db = process.env.SAP_COMPANY_DB;
-
-  if (!url || !username || !password || !db) {
-    throw new Error("Faltan variables de entorno para conectar con SAP");
-  }
+  const rawBase = process.env.SAP_BASE_URL ? `${process.env.SAP_BASE_URL.replace(/\/$/, '')}/Login` : null;
+  const url = process.env.SAP_API_URL || rawBase || SAP_LOGIN_URL;
+  const username = process.env.SAP_USERNAME || SAP_USERNAME;
+  const password = process.env.SAP_PASSWORD || SAP_PASSWORD;
+  const db = process.env.SAP_COMPANY_DB || SAP_COMPANY_DB;
 
   const response = await fetch(url, {
     method: "POST",
@@ -41,7 +44,7 @@ export async function loginToSAP() {
   // Extraemos las cookies del response si están disponibles
   const setCookie = response.headers.get("set-cookie") || "";
   let routeId = "";
-  
+
   const routeIdMatch = setCookie.match(/ROUTEID=([^;]+)/);
   if (routeIdMatch) {
     routeId = routeIdMatch[1];

@@ -248,7 +248,7 @@ export default function MapaProcesosFibraModule() {
             const { piezas } = piezasPorEtapa(o)
             for (const p of PROCESOS) {
                 const n = p.etapas.reduce((s, e) => s + (piezas[e] || 0), 0)
-                if (n > 0) m[p.id].push({ of: String(o.orden_fabricacion ?? ''), ordenId: o.id, piezas: n, nombre: nombreCorto(o.producto_descripcion), descripcion: o.producto_descripcion || '', fecha: (o.fecha_ideal_produccion || o.fecha_entrega_estimada || '').slice(0, 10) })
+                if (n > 0) m[p.id].push({ of: String(o.orden_fabricacion ?? ''), ordenId: o.id, piezas: n, nombre: nombreCorto(o.producto_descripcion), descripcion: o.producto_descripcion || '', fecha: (o.fecha_entrega_lote || o.fecha_ideal_produccion || o.fecha_entrega_estimada || '').slice(0, 10) })
             }
             for (const k of Object.keys(otros)) if ((piezas[k] || 0) > 0) otros[k]++
         }

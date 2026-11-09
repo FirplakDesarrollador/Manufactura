@@ -55,7 +55,7 @@ export async function GET() {
 
         const cloudflareBaseUrl = process.env.SEMAFORO_API_URL 
             ? process.env.SEMAFORO_API_URL.replace(/\/semaforo\/?$/, '')
-            : "https://toner-villages-acoustic-colony.trycloudflare.com";
+            : "https://telecommunications-effectively-configured-experience.trycloudflare.com";
         const cloudflareApiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
 
         let fibraExtraMap = new Map<string, any>();
@@ -442,8 +442,10 @@ export async function GET() {
                 const fechas = await fechasSemaforoPorOf()
                 const ahora = new Date().toISOString()
                 const sinFecha = { fecha_entrega_lote: null, fecha_real_liberacion: null, fecha_ideal_entrega_produccion: null, fecha_prometida_entrega: null }
+                // Incluir numero_pedido para que el upsert no viole la restricción not-null en Postgres
                 const lote = cleanFibraBatch.map(r => ({
                     orden_fabricacion: r.orden_fabricacion,
+                    numero_pedido: r.numero_pedido,
                     ...(fechas.get(String(r.orden_fabricacion).trim()) ?? sinFecha),
                     fechas_semaforo_actualizadas: ahora
                 }))

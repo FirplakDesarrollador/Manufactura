@@ -123,8 +123,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         })
 
         return filtered.sort((a, b) => {
-            const dateAStr = a.fecha_ideal_produccion || a.fecha_entrega_estimada
-            const dateBStr = b.fecha_ideal_produccion || b.fecha_entrega_estimada
+            const dateAStr = a.fecha_entrega_lote || a.fecha_ideal_produccion || a.fecha_entrega_estimada
+            const dateBStr = b.fecha_entrega_lote || b.fecha_ideal_produccion || b.fecha_entrega_estimada
             const dateA = dateAStr ? new Date(dateAStr).getTime() : Infinity
             const dateB = dateBStr ? new Date(dateBStr).getTime() : Infinity
             const valA = isNaN(dateA) ? Infinity : dateA

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { loginToSAP } from '@/lib/sap';
+import { loginToSAP, SAP_BASE_URL } from '@/lib/sap';
 import { crearFaltantes } from '@/lib/sapFaltantes';
+import { supabase } from '@/lib/supabase';
 
 const TIPOS_ORDEN: Record<string, string> = { bopotStandard: 'Estándar', bopotSpecial: 'Especial', bopotDisassembly: 'Desmontaje' };
 const ESTADOS_ORDEN: Record<string, string> = { boposPlanned: 'Planificado', boposReleased: 'Liberado', boposClosed: 'Cerrado', boposCancelled: 'Cancelado' };
@@ -26,7 +27,8 @@ export async function GET(request: Request, props: { params: Promise<{ docNum: s
         }
 
         const loginData = await loginToSAP();
-        const url = `${process.env.SAP_API_URL?.replace('/Login', '')}/ProductionOrders?$filter=DocumentNumber eq ${docNum}`;
+        const baseUrl = process.env.SAP_BASE_URL || (process.env.SAP_API_URL ? process.env.SAP_API_URL.replace(/\/Login\/?$/, '') : SAP_BASE_URL);
+        const url = `${baseUrl}/ProductionOrders?$filter=DocumentNumber eq ${docNum}`;
 
         const response = await fetch(url, {
             method: 'GET',
@@ -51,6 +53,65 @@ export async function GET(request: Request, props: { params: Promise<{ docNum: s
         const origen = sapOrder.ProductionOrderOrigin ? f.traducir(sapOrder.ProductionOrderOrigin, ORIGENES, 'Origen') : '';
         const lineas: any[] = Array.isArray(sapOrder.ProductionOrderLines) ? sapOrder.ProductionOrderLines : [];
         if (!Array.isArray(sapOrder.ProductionOrderLines)) f.agregar('Componentes');
+
+        // Cálculo de Gelcoat teórico desde las líneas de la orden
+        const gelcoatLines = lineas.filter((line: any) => {
+            const desc = (line.ItemName || '').toUpperCase();
+            const no = (line.ItemNo || '').toUpperCase();
+            return desc.includes('GELCOAT') || desc.includes('GEL COAT') || no.startsWith('PGEL');
+        });
+        const gelcoatSuma = gelcoatLines.reduce((acc: number, line: any) => {
+            const q = Number(line.PlannedQuantity ?? line.BaseQuantity ?? 0);
+            return acc + (Number.isFinite(q) ? q : 0);
+        }, 0);
+
+        let gelcoatTeorico: number | null = gelcoatSuma > 0 ? Number(gelcoatSuma.toFixed(3)) : null;
+        let masaTeorica: number | null = null;
+
+        // Consultar enriquecimiento en Supabase
+        try {
+            const [fvRes, ofRes] = await Promise.allSettled([
+                supabase.from('ordenes_fabricacion_fv')
+                    .select('producto_masa')
+                    .eq('orden_fabricacion', String(docNum))
+                    .maybeSingle(),
+                supabase.from('ordenes_fabricacion')
+                    .select('kilos_gelcoat')
+                    .eq('orden_fabricacion', String(docNum))
+                    .maybeSingle()
+            ]);
+
+            if (fvRes.status === 'fulfilled' && fvRes.value.data?.producto_masa) {
+                const m = Number(fvRes.value.data.producto_masa);
+                if (m > 0) masaTeorica = m;
+            }
+
+            if (gelcoatTeorico == null && ofRes.status === 'fulfilled' && ofRes.value.data?.kilos_gelcoat) {
+                const g = Number(ofRes.value.data.kilos_gelcoat);
+                if (g > 0) gelcoatTeorico = g;
+            }
+        } catch (sbErr) {
+            console.warn('Error consultando Supabase para masa/gelcoat:', sbErr);
+        }
+
+        // Si la masa teórica aún no está en Supabase, calcularla sumando las materias primas del cuerpo del producto
+        if (masaTeorica == null) {
+            const lineasMasa = lineas.filter((line: any) => {
+                const desc = (line.ItemName || '').toUpperCase();
+                const no = (line.ItemNo || '').toUpperCase();
+                if (/\b(MANO\s+DE\s+OBRA|CIF|MINUTO|MIN)\b/i.test(desc) || no.startsWith('PZCO')) return false;
+                return /\b(RESINA|GELCOAT|GEL\s?COAT|PALATAL|MATT?|FIBRA|CARBONATO|CARGA)\b/i.test(desc) ||
+                       no.startsWith('PGEL') || no.startsWith('CMPD01') || no.startsWith('PINP01');
+            });
+
+            if (lineasMasa.length > 0) {
+                const sumaMasa = lineasMasa.reduce((acc: number, line: any) => {
+                    const q = Number(line.PlannedQuantity ?? line.BaseQuantity ?? 0);
+                    return acc + (Number.isFinite(q) ? q : 0);
+                }, 0);
+                if (sumaMasa > 0) masaTeorica = Number(sumaMasa.toFixed(2));
+            }
+        }
 
         // Mapear los datos de SAP al formato esperado por el frontend
         const mappedOrder = {
@@ -81,6 +142,8 @@ export async function GET(request: Request, props: { params: Promise<{ docNum: s
             cantRechazada: sapOrder.RejectedQuantity ?? 0,
             fechaCierreReal: formatDate(sapOrder.ClosingDate),
             asientoContable: sapOrder.JournalRemarks || '',
+            masaTeorica,
+            gelcoatTeorico,
             componentes: lineas.map((line: any, index: number) => {
                 const n = index + 1;
                 return {
