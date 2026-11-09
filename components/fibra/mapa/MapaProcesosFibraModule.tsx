@@ -11,7 +11,8 @@ import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapMod
 import { DestinoMovimientoFv, getPiezasMapaFv, asignarMesaFv, moverPiezaFibra, registrarPiezaProgramadoFv, PiezaMapaFv } from '@/lib/supabase/queries/fibra_administracion'
 import { moldesDisponiblesOrden } from '@/lib/fibra/moldesOrden'
 import { toast } from 'sonner'
-import { MapPin as MapaIcon, RefreshCw, AlertTriangle, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Search, X, ChevronDown, FileDown, Loader2 } from 'lucide-react'
+import ImportarPosicionesFv from './ImportarPosicionesFv'
+import { MapPin as MapaIcon, RefreshCw, AlertTriangle, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Search, X, ChevronDown, FileDown, Loader2, ClipboardPaste } from 'lucide-react'
 
 // Mapa de procesos FV, dibujado con las proporciones del layout de la planta. Cada proceso tiene sus mesas físicas
 // y el supervisor ubica cada pieza arrastrándola a su mesa (clic abre el detalle de la orden). Al soltarla en una
@@ -122,6 +123,8 @@ const MESAS: Mesa[] = ZONAS.flatMap(z => Array.from({ length: z.n }, (_, i) => {
     return { id: `${z.id}-${i + 1}`, zona: z, caja: [x, y, x + MESA_ANCHO, y + MESA_ALTO] as Caja }
 }))
 const MESA = Object.fromEntries(MESAS.map(m => [m.id, m])) as Record<string, Mesa>
+// Mesas físicas de cada zona (sin las casillas automáticas), para ubicar OF desde Excel
+const MESAS_ZONA: Record<string, string[]> = Object.fromEntries(ZONAS.filter(z => !z.auto).map(z => [z.id, MESAS.filter(m => m.zona.id === z.id).map(m => m.id)]))
 
 // Tramos: en la app la pieza solo cambia de estado en los puntos de notificación, así que cada estado puede estar
 // en las mesas de los procesos que recorre hasta la siguiente notificación. `proceso` es donde se listan sus piezas sin mesa.
@@ -195,6 +198,7 @@ export default function MapaProcesosFibraModule() {
     // OF de Programado soltada en el mapa: falta escoger el molde para registrarla
     const [registroNuevo, setRegistroNuevo] = useState<{ pieza: PiezaMesa; destino: DestinoMovimientoFv; mesa: string | null; lugar: string } | null>(null)
     const [moldeElegido, setMoldeElegido] = useState<number | null>(null)
+    const [importar, setImportar] = useState(false)
 
     const cargar = async () => {
         setCargando(true)
@@ -580,11 +584,18 @@ export default function MapaProcesosFibraModule() {
                         <MapaIcon className="w-4 h-4" />
                         <h2 className="text-sm font-black whitespace-nowrap">Mapa de procesos FV</h2>
                     </div>
+                    <div className="flex items-center gap-1.5">
                     <button onClick={descargarArqueo} disabled={descargandoArqueo}
                         title="Excel con la hoja FV de Prioridades (Semáforo de SAP) y el proceso actual de cada unidad de cada OF"
                         className="h-7 px-3 flex items-center gap-1.5 rounded-lg bg-[#324354] text-white text-[11px] font-bold hover:bg-[#254153] disabled:opacity-50 whitespace-nowrap">
                         {descargandoArqueo ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} Descargar arqueo
                     </button>
+                    <button onClick={() => setImportar(true)} disabled={cargando}
+                        title="Pegar las filas del Excel (Nro OP … PROCESO) y ubicar cada pieza en su proceso"
+                        className="h-7 px-3 flex items-center gap-1.5 rounded-lg border border-[#324354] text-[#324354] bg-white text-[11px] font-bold hover:bg-[#F6F3EE] disabled:opacity-50 whitespace-nowrap">
+                        <ClipboardPaste size={14} /> Ubicar desde Excel
+                    </button>
+                    </div>
                     <div className="ml-auto flex items-center gap-1.5 text-[10px] text-slate-500 whitespace-nowrap min-[1200px]:justify-self-end">
                         <div className="relative">
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -684,6 +695,11 @@ export default function MapaProcesosFibraModule() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {importar && (
+                <ImportarPosicionesFv ordenes={ordenes} piezas={piezasMapa} mesasZona={MESAS_ZONA} usuarioActual={usuarioActual}
+                    onCerrar={() => setImportar(false)} onListo={cargar} />
             )}
 
             {detalleOf != null && (
