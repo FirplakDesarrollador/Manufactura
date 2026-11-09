@@ -930,7 +930,11 @@ export default function ConsultaSAPPage() {
 
             const toastId = toast.loading("Generando archivo 'Prioridades Diarias de Plantas'...");
             const { descargarPrioridadesPlantas } = await import('@/lib/prioridadesPlantas');
-            const totalFilas = await descargarPrioridadesPlantas(dataToExport);
+            // Hoja FV: proceso actual de cada unidad según el control de piso de la app (si falla, el error queda en la hoja)
+            const { procesosActualesFv } = await import('@/lib/fibra/procesoActual');
+            const procesosFv = await procesosActualesFv().catch((e: any) => ({ error: e?.message || String(e) }));
+            if (!(procesosFv instanceof Map)) toast.error(`No se pudo leer el proceso actual de Fibra: ${procesosFv.error}`);
+            const totalFilas = await descargarPrioridadesPlantas(dataToExport, procesosFv);
             toast.success(`Archivo 'Prioridades Diarias de Plantas' generado exitosamente (${totalFilas.toLocaleString('es-CO')} registros procesados en pestañas de planta)`, { id: toastId });
         } catch (err: any) {
             console.error("Error al generar Prioridades Diarias:", err);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { fechasSemaforoPorOf } from '@/lib/sap/fechasSemaforo';
 
 async function fetchSapQueryPages(baseUrl: string, sessionId: string, queryName: string): Promise<any[]> {
     const headers = {
@@ -391,6 +392,7 @@ export async function GET() {
 
         const fibraRows = mappedRows.filter(r => isFibraSku(r.producto_sku, r.producto_descripcion));
         let totalFibraUpserted = 0;
+        let avisoFechasSemaforo: string | null = null;
 
         if (fibraRows.length > 0) {
             const { data: nonPendingFibra } = await supabase
@@ -433,6 +435,35 @@ export async function GET() {
                 }
             }
             console.log(`Upserted ${cleanFibraBatch.length} Fibra orders to ordenes_fabricacion_fibra.`);
+
+            // 4.1 Las 4 fechas del Semáforo (T, Real Liberación, W y AF) en cada OF de Fibra. Va aparte del guardado
+            // principal: si el Semáforo no responde, las órdenes se cargan igual y las fechas guardadas no se tocan.
+            try {
+                const fechas = await fechasSemaforoPorOf()
+                const ahora = new Date().toISOString()
+                const sinFecha = { fecha_entrega_lote: null, fecha_real_liberacion: null, fecha_ideal_entrega_produccion: null, fecha_prometida_entrega: null }
+                const lote = cleanFibraBatch.map(r => ({
+                    orden_fabricacion: r.orden_fabricacion,
+                    ...(fechas.get(String(r.orden_fabricacion).trim()) ?? sinFecha),
+                    fechas_semaforo_actualizadas: ahora
+                }))
+                for (let i = 0; i < lote.length; i += BATCH_SIZE) {
+                    const { error: errFechas } = await supabase
+                        .from('ordenes_fabricacion_fibra')
+                        .upsert(lote.slice(i, i + BATCH_SIZE), { onConflict: 'orden_fabricacion' })
+                    if (errFechas) {
+                        avisoFechasSemaforo = /fecha_entrega_lote|fechas_semaforo|column/i.test(errFechas.message)
+                            ? 'Faltan las columnas de fechas del Semáforo: ejecute fibra_fechas_semaforo.sql en Supabase.'
+                            : `No se pudieron guardar las fechas del Semáforo: ${errFechas.message}`
+                        break
+                    }
+                }
+                const sinDatos = lote.filter(r => !fechas.has(String(r.orden_fabricacion).trim())).length
+                if (!avisoFechasSemaforo && sinDatos > 0) avisoFechasSemaforo = `${sinDatos} OF de Fibra no están en el Semáforo: quedaron sin sus 4 fechas.`
+            } catch (errSem: any) {
+                avisoFechasSemaforo = `No se actualizaron las fechas del Semáforo (se conservan las anteriores): ${errSem?.message || errSem}`
+            }
+            if (avisoFechasSemaforo) console.warn('Fechas Semáforo:', avisoFechasSemaforo)
         }
 
         let totalFibraCerradas = 0
@@ -487,6 +518,7 @@ export async function GET() {
             totalMarmol: msUpsertBatch.length,
             totalFibra: totalFibraUpserted,
             totalFibraCerradas,
+            avisoFechasSemaforo,
             data: mappedRows,
             response: mappedRows
         }, { status: 200 });
