@@ -20,7 +20,7 @@ interface Usuario {
 
 const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     hdt: ['acceso_general', 'crear', 'editar', 'estadisticas'],
-    fibra: ['cedi', 'pulido', 'ensayo', 'empaque', 'pintura', 'vaciado', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'administracion'],
+    fibra: ['cedi', 'pulido', 'ensayo', 'empaque', 'pintura', 'vaciado', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'administracion', 'planos'],
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
     calidad: ['ms', 'editar', 'eliminar', 'configurar_defectos', 'saldos_y_destrucciones'],
@@ -37,7 +37,8 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     estadisticas_produccion: true,
     indicadores_productividad: true,
     asistencia: true,
-    mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador']
+    mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador'],
+    esquema_personal: ['editar']
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -59,7 +60,8 @@ const PERMISSION_LABELS: Record<string, string> = {
     estadisticas_produccion: 'Indicadores del Sistema',
     indicadores_productividad: 'Tablero de Control',
     asistencia: 'Asistencia',
-    mantenimiento: 'Mantenimiento (LILAC)'
+    mantenimiento: 'Mantenimiento (LILAC)',
+    esquema_personal: 'Esquema de Personal (además de jefes y coordinadores)'
 };
 
 const SUBMODULO_LABELS: Record<string, string> = {
