@@ -11,6 +11,7 @@ import {
 } from '@/lib/supabase/queries/fibra_administracion'
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
+import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import {
     RefreshCw,
     Search,
@@ -24,6 +25,22 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Procesos del Mapa de procesos FV (mismo orden del flujo); una OF está en un proceso si tiene al menos una pieza ahí
+const PROCESOS_FILTRO: { id: string; label: string; etapas: string[] }[] = [
+    { id: 'programado', label: 'Programado', etapas: ['programado'] },
+    { id: 'pintura', label: 'Pintura', etapas: ['pintura'] },
+    { id: 'vaciado', label: 'Vaciado', etapas: ['vaciado'] },
+    { id: 'pulido', label: 'Pulido', etapas: ['pulido'] },
+    { id: 'ensayo', label: 'Ensayo', etapas: ['acabado'] },
+    { id: 'reparacion', label: 'Reparación', etapas: ['reparacion', 'reparacion_larga'] },
+    { id: 'huacales', label: 'Huacales', etapas: ['empaque'] },
+    { id: 'digitado', label: 'Digitado', etapas: ['digitado'] },
+    { id: 'transito', label: 'Tránsito', etapas: ['transito'] },
+    { id: 'cedi', label: 'CEDI', etapas: ['cedi'] },
+    { id: 'saldo', label: 'Saldo', etapas: ['saldo'] },
+    { id: 'destruccion', label: 'Destrucción', etapas: ['destruccion'] }
+]
+
 export default function AdministracionFibraModule({ userEmail }: { userEmail?: string }) {
     // userEmail available for future use
     void userEmail;
@@ -34,6 +51,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [procesoFiltro, setProcesoFiltro] = useState('')
     const [expandedRegistros, setExpandedRegistros] = useState<Set<string | number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
     // Orden cuyo detalle de SAP (lista de materiales, comentarios…) está abierto
@@ -108,7 +126,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         }
     }, [searchText])
 
-    const filteredOrdenes = useMemo(() => {
+    const ordenesBuscadas = useMemo(() => {
         const search = searchText.toLowerCase()
         const filtered = ordenes.filter(o => {
             const matchesSearch = !search ||
@@ -132,6 +150,27 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
             return valA - valB
         })
     }, [ordenes, searchText, selectedDate])
+
+    // Procesos en que tiene piezas cada orden (según la búsqueda y la fecha, sin el filtro de proceso)
+    const procesosPorOrden = useMemo(() => {
+        const m = new Map<number, Set<string>>()
+        for (const o of ordenesBuscadas) {
+            const { piezas } = piezasPorEtapa(o)
+            m.set(o.id, new Set(PROCESOS_FILTRO.filter(p => p.etapas.some(e => (piezas[e] || 0) > 0)).map(p => p.id)))
+        }
+        return m
+    }, [ordenesBuscadas])
+
+    const conteoProcesos = useMemo(() => {
+        const c: Record<string, number> = {}
+        for (const p of PROCESOS_FILTRO) c[p.id] = 0
+        for (const s of procesosPorOrden.values()) for (const id of s) c[id]++
+        return c
+    }, [procesosPorOrden])
+
+    const filteredOrdenes = useMemo(() =>
+        procesoFiltro ? ordenesBuscadas.filter(o => procesosPorOrden.get(o.id)?.has(procesoFiltro)) : ordenesBuscadas,
+        [ordenesBuscadas, procesosPorOrden, procesoFiltro])
 
     const filteredRegistros = useMemo(() => {
         const search = searchText.toLowerCase()
@@ -294,6 +333,11 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
             if (response.ok) {
                 toast.success('Órdenes cargadas y sincronizadas exitosamente', { id: toastId })
+                // Las 4 fechas del Semáforo se traen en la misma carga; si fallan se avisa (las órdenes sí quedaron)
+                const resultado = await response.json().catch(() => null)
+                if (resultado?.avisoFechasSemaforo) toast.error(resultado.avisoFechasSemaforo, { duration: 12000 })
+                const { recargarFechasSemaforoFv } = await import('@/lib/fibra/fechasSemaforo')
+                recargarFechasSemaforoFv()
                 await loadData()
             } else {
                 toast.success('Actualizando lista de órdenes...', { id: toastId })
@@ -330,7 +374,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
             {/* Controls */}
             <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-4">
-                    <div className="flex-1 min-w-[300px]">
+                    <div className="flex-1 min-w-[220px] max-w-xl">
                         <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Búsqueda Global</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -343,6 +387,22 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                             />
                         </div>
                     </div>
+
+                    {/* Filtrar por proceso (procesos del Mapa de procesos FV): solo las OF con piezas en ese proceso */}
+                    {activeTab === 'of' && (
+                        <div className="w-52">
+                            <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Proceso</label>
+                            <select value={procesoFiltro} onChange={e => setProcesoFiltro(e.target.value)}
+                                className={`w-full px-3 py-2 border rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${procesoFiltro ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-slate-50 border-slate-200 text-[#324354]'}`}>
+                                <option value="">Todos los procesos</option>
+                                {PROCESOS_FILTRO.map(p => (
+                                    <option key={p.id} value={p.id} disabled={conteoProcesos[p.id] === 0 && procesoFiltro !== p.id}>
+                                        {p.label} ({conteoProcesos[p.id]})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="w-48">
                         <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Filtrar Fecha</label>
@@ -358,7 +418,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     </div>
 
                     <button
-                        onClick={() => { setSearchText(''); setSelectedDate(null); }}
+                        onClick={() => { setSearchText(''); setSelectedDate(null); setProcesoFiltro(''); }}
                         className="p-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
                         title="Limpiar filtros"
                     >
@@ -366,29 +426,9 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     </button>
 
                     <button
-                        onClick={handleCargarOrdenes}
-                        disabled={syncing}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300"
-                        title="Cargar Órdenes de Fabricación"
-                    >
-                        <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
-                        <span className="font-black text-[10px] uppercase tracking-wider">Cargar Órdenes</span>
-                    </button>
-                </div>
-                {/* Real-time Counter (Requested) */}
-                <div className="max-w-7xl mx-auto mt-3 flex items-center gap-2">
-                    <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
-                        Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
-                    </span>
-                    {(searchText || selectedDate) && (
-                        <span className="text-[10px] font-bold text-slate-400 italic">
-                            (Filtrado aplicado)
-                        </span>
-                    )}
-                    <button
                         onClick={toggleAllVisible}
                         disabled={activeTab === 'of' ? filteredOrdenes.length === 0 : filteredRegistros.length === 0}
-                        className={`ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${
+                        className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${
                             activeTab === 'of'
                                 ? allOrdenesExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
                                 : allRegistrosExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
@@ -404,11 +444,21 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                 : allRegistrosExpanded ? 'Cerrar todos' : 'Abrir todos'}
                         </span>
                     </button>
+
+                    <button
+                        onClick={handleCargarOrdenes}
+                        disabled={syncing}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300"
+                        title="Cargar Órdenes de Fabricación"
+                    >
+                        <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
+                        <span className="font-black text-[10px] uppercase tracking-wider">Cargar Órdenes</span>
+                    </button>
                 </div>
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex bg-white px-4 border-b border-slate-200">
+            <div className="flex items-center bg-white px-4 border-b border-slate-200">
                 <TabButton
                     active={activeTab === 'of'}
                     label="Órdenes de Fabricación"
@@ -419,6 +469,12 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     label="Registros de Trazabilidad"
                     onClick={() => setActiveTab('trazabilidad')}
                 />
+                {/* Total según los filtros aplicados */}
+                <span className="ml-auto shrink-0 px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm"
+                    title={searchText || selectedDate || (activeTab === 'of' && procesoFiltro) ? 'Con filtros aplicados' : undefined}>
+                    Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
+                    {(searchText || selectedDate || (activeTab === 'of' && procesoFiltro)) && ' (filtrado)'}
+                </span>
             </div>
 
             {/* Main Table Area */}

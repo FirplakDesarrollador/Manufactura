@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { EvaluacionHoraHora } from "@/lib/store";
-import { fetchEvaluaciones, updateEvaluacion, deleteEvaluacion } from "@/lib/db/horaHora";
+import { fetchEvaluaciones, updateEvaluacion, deleteEvaluacion, insertEvaluacion } from "@/lib/db/horaHora";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Eye, Search, X, TrendingUp, BarChart2, ShieldCheck, ShieldX, Clock, Trash2, PenLine, Edit2, User, Save, CheckCircle2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { ArrowLeft, Eye, Search, X, TrendingUp, BarChart2, ShieldCheck, ShieldX, Clock, Trash2, PenLine, Edit2, User, Save, CheckCircle2, ArrowUp, ArrowDown, ArrowUpDown, CloudUpload, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -496,6 +496,10 @@ export default function Historico() {
     const [selected, setSelected] = useState<EvaluacionHoraHora | null>(null);
     const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
     const [nameMap, setNameMap] = useState<Record<string, string>>({});
+    // Registros que solo están en este equipo (el guardado en la base falló) y error al cargar
+    const [pendientes, setPendientes] = useState<Set<string>>(new Set());
+    const [subiendo, setSubiendo] = useState<string | null>(null);
+    const [errorCarga, setErrorCarga] = useState<string | null>(null);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({
         key: 'tiempoInicio',
         direction: 'desc'
@@ -511,18 +515,19 @@ export default function Historico() {
 
     useEffect(() => {
         // Fetch from Supabase, merge with localStorage
+        // Registros guardados en este equipo que no llegaron a la base se muestran como pendientes por subir
+        let locales: EvaluacionHoraHora[] = [];
+        try { locales = JSON.parse(localStorage.getItem("historialHoraHora") || "[]"); } catch { locales = []; }
         fetchEvaluaciones().then(records => {
-            if (records.length > 0) {
-                setData(records);
-            } else {
-                // No records in Supabase, try localStorage
-                const raw = localStorage.getItem("historialHoraHora");
-                if (raw) setData(JSON.parse(raw).reverse());
-            }
+            const enBase = new Set(records.map(r => r.id));
+            const soloLocales = locales.filter(l => l?.id && !enBase.has(l.id));
+            setPendientes(new Set(soloLocales.map(l => l.id)));
+            setData([...records, ...soloLocales]);
         }).catch((err) => {
             console.error('Error fetching from Supabase:', err);
-            const raw = localStorage.getItem("historialHoraHora");
-            if (raw) setData(JSON.parse(raw).reverse());
+            setErrorCarga(`No se pudieron cargar los registros de la base de datos: ${err?.message || err}. Solo se muestran los guardados en este equipo.`);
+            setPendientes(new Set(locales.map(l => l.id)));
+            setData([...locales].reverse());
         });
 
         // Get logged-in user
@@ -570,14 +575,19 @@ export default function Historico() {
     };
 
     const filteredAndSortedData = useMemo(() => {
-        let result = [...data].filter(item =>
-            (item.linea || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.operario || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.planta || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.puesto || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.creadoPor || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.consecutivo?.toString() || "").includes(searchTerm)
-        );
+        // Busca sin tildes en todo lo que se ve en la fila (incluye correo, nombre del que lo hizo y fecha dd/mm/aaaa)
+        const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const q = norm(searchTerm.trim());
+        let result = [...data].filter(item => {
+            if (!q) return true;
+            const fecha = item.tiempoInicio ? new Date(item.tiempoInicio) : null;
+            const fechaTxt = fecha && !isNaN(fecha.getTime())
+                ? `${format(fecha, "dd/MM/yyyy")} ${format(fecha, "d/M/yyyy")} ${format(fecha, "d/M/yy")} ${format(fecha, "dd/MM/yy")}` : "";
+            return norm([
+                item.linea, item.operario, item.planta, item.puesto, item.creadoPor, item.creadoPorEmail,
+                item.realizadoPor, resolveUserName(item.creadoPor), item.supervisor, item.consecutivo?.toString(), fechaTxt
+            ].filter(Boolean).join(" | ")).includes(q);
+        });
 
         if (sortConfig) {
             result.sort((a, b) => {
@@ -641,14 +651,45 @@ export default function Historico() {
         setEditing(null);
     };
 
-    const handleDeleteRecord = async (id: string) => {
+    const quitarDeEsteEquipo = (id: string) => {
         try {
-            await deleteEvaluacion(id);
-        } catch (err) {
-            console.error('Error deleting from Supabase:', err);
+            const historial = JSON.parse(localStorage.getItem("historialHoraHora") || "[]");
+            localStorage.setItem("historialHoraHora", JSON.stringify(historial.filter((h: any) => h?.id !== id)));
+        } catch { /* sin almacenamiento local */ }
+    };
+
+    const handleDeleteRecord = async (id: string) => {
+        if (!pendientes.has(id)) {
+            try {
+                await deleteEvaluacion(id);
+            } catch (err: any) {
+                alert(`No se pudo eliminar el registro: ${err?.message || err}`);
+                return;
+            }
         }
+        quitarDeEsteEquipo(id);
+        setPendientes(prev => { const n = new Set(prev); n.delete(id); return n; });
         setData(prev => prev.filter(e => e.id !== id));
         setEditing(null);
+    };
+
+    // Sube a la base un registro que solo quedó guardado en este equipo
+    const subirPendiente = async (item: EvaluacionHoraHora) => {
+        setSubiendo(item.id);
+        try {
+            const consecutivo = await insertEvaluacion(item);
+            const actualizado = { ...item, consecutivo };
+            try {
+                const historial = JSON.parse(localStorage.getItem("historialHoraHora") || "[]");
+                localStorage.setItem("historialHoraHora", JSON.stringify(historial.map((h: any) => h?.id === item.id ? actualizado : h)));
+            } catch { /* sin almacenamiento local */ }
+            setPendientes(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+            setData(prev => prev.map(e => e.id === item.id ? actualizado : e));
+        } catch (err: any) {
+            alert(`No se pudo subir el registro a la base de datos: ${err?.message || err?.details || err}`);
+        } finally {
+            setSubiendo(null);
+        }
     };
 
     const [editing, setEditing] = useState<EvaluacionHoraHora | null>(null);
@@ -680,6 +721,18 @@ export default function Historico() {
                         </p>
                     </div>
                 </div>
+
+                {errorCarga && (
+                    <div className="mb-3 p-3 bg-red-50 border border-red-400 text-red-800 rounded-lg font-bold text-sm flex items-center gap-2" role="alert">
+                        <AlertTriangle size={18} /> {errorCarga}
+                    </div>
+                )}
+                {pendientes.size > 0 && (
+                    <div className="mb-3 p-3 bg-amber-50 border border-amber-400 text-amber-900 rounded-lg text-sm flex items-center gap-2" role="alert">
+                        <AlertTriangle size={18} className="shrink-0" />
+                        <span><b>{pendientes.size} registro(s) solo están guardados en este equipo</b>: no llegaron a la base de datos y nadie más los ve. Use el botón <b>Subir</b> de cada fila (marcadas en ámbar).</span>
+                    </div>
+                )}
 
                 <div className="bg-white rounded-none shadow-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
@@ -735,9 +788,17 @@ export default function Historico() {
                                 ) : filteredAndSortedData.map((item) => {
                                     const isOwner = currentUserEmail && (item.creadoPorEmail === currentUserEmail || item.creadoPor === currentUserEmail);
                                     return (
-                                        <TableRow key={item.id} className="hover:bg-slate-50 transition-colors">
+                                        <TableRow key={item.id} className={`transition-colors ${pendientes.has(item.id) ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50'}`}>
                                             <TableCell className="py-4">
-                                                <span className="font-black text-[#254153] text-sm">{item.consecutivo || "—"}</span>
+                                                {pendientes.has(item.id) ? (
+                                                    <button onClick={() => subirPendiente(item)} disabled={subiendo === item.id}
+                                                        title="Este registro solo está en este equipo: subirlo a la base de datos"
+                                                        className="flex items-center gap-1 h-7 px-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold disabled:opacity-50">
+                                                        <CloudUpload size={14} /> {subiendo === item.id ? 'Subiendo…' : 'Subir'}
+                                                    </button>
+                                                ) : (
+                                                    <span className="font-black text-[#254153] text-sm">{item.consecutivo || "—"}</span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <div className="font-medium text-slate-800">{format(new Date(item.tiempoInicio), "dd/MM/yyyy")}</div>

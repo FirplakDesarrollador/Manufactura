@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Boxes, MessageSquareText, ArrowRightLeft, FileImage, Loader2, RefreshCw, AlertTriangle, List, Layers } from 'lucide-react'
+import { X, Boxes, MessageSquareText, ArrowRightLeft, FileImage, Loader2, RefreshCw, AlertTriangle, List, Layers, Factory } from 'lucide-react'
 
 // Detalle de una orden de fabricación consultado en SAP (misma ruta que Consulta SAP).
 // Lo que SAP no entregue llega en `faltantes` y se muestra como error, nunca con valores por defecto.
@@ -35,7 +35,7 @@ type OrdenSap = {
     faltantes: string[]
 }
 
-type Pestana = 'ldm' | 'comentarios' | 'traslados' | 'planos'
+type Pestana = 'piso' | 'ldm' | 'comentarios' | 'traslados' | 'planos'
 type VistaLdm = 'lista' | 'grupos'
 
 const PESTANAS: { id: Pestana; label: string; icon: React.ElementType; pronto?: boolean }[] = [
@@ -119,8 +119,14 @@ function TablaComponentes({ filas }: { filas: ComponenteSap[] }) {
     )
 }
 
-export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { ordenFabricacion: string | number; onClose: () => void }) {
-    const [pestana, setPestana] = useState<Pestana>('ldm')
+// `piso` (opcional): primera pestaña con la información de la orden en el control de piso (tarjeta y procesos por pieza)
+export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }: {
+    ordenFabricacion: string | number
+    onClose: () => void
+    piso?: { label: string; contenido: React.ReactNode }
+}) {
+    const [pestana, setPestana] = useState<Pestana>(piso ? 'piso' : 'ldm')
+    const pestanas: typeof PESTANAS = piso ? [{ id: 'piso', label: piso.label, icon: Factory }, ...PESTANAS] : PESTANAS
     const [vista, setVista] = useState<VistaLdm>('lista')
     const [orden, setOrden] = useState<OrdenSap | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -221,7 +227,7 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { or
                 {/* Pestañas */}
                 <div className="flex items-center gap-2 border-b border-[#e2ded5] pb-2 shrink-0">
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide min-w-0">
-                        {PESTANAS.map(p => {
+                        {pestanas.map(p => {
                             const Icono = p.icon
                             const activa = pestana === p.id
                             return (
@@ -249,7 +255,9 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose }: { or
 
                 {/* Contenido (única zona con desplazamiento) */}
                 <div className="flex-1 min-h-0 overflow-auto">
-                    {cargando ? (
+                    {piso && pestana === 'piso' ? (
+                        piso.contenido
+                    ) : cargando ? (
                         <div className="h-full min-h-[200px] flex items-center justify-center gap-2 text-slate-500 font-bold text-sm">
                             <Loader2 className="w-5 h-5 animate-spin" /> Consultando la orden en SAP...
                         </div>
