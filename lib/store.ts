@@ -203,6 +203,7 @@ export const useStore = create<AppState>((set) => ({
                 finalEvaluacion.consecutivo = maxConsecutivo + 1;
                 historial.push(finalEvaluacion);
                 localStorage.setItem('historialHoraHora', JSON.stringify(historial));
+                alert(`NO se pudo guardar el Hora a Hora en la base de datos (${err?.message || err?.details || err}).\n\nQuedó guardado SOLO en este equipo. Abra Historial en este mismo equipo, con internet, y use el botón "Subir" de la fila marcada en ámbar.`);
             });
         });
 

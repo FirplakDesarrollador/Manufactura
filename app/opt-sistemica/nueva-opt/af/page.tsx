@@ -6,6 +6,7 @@ import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import SelectorPlantaSP from '@/components/opt-sistemica/SelectorPlantaSP';
 import { createExternalClient } from '@/lib/supabase/external';
 import AutoResizeTextarea from '@/components/opt-sistemica/AutoResizeTextarea';
 
@@ -26,6 +27,7 @@ export default function AFPage() {
 
   const [personas, setPersonas] = useState<string[]>([]);
   const [personaEvaluada, setPersonaEvaluada] = useState('');
+  const [planta, setPlanta] = useState('');
 
   const [responses, setResponses] = useState<Record<string, { value: 'SI' | 'NO' | null, comment: string }>>(
     questions.reduce((acc, q) => ({ ...acc, [q.id]: { value: null, comment: '' } }), {})
@@ -83,6 +85,11 @@ export default function AFPage() {
   };
 
   const handleSave = async () => {
+    if (!planta) {
+      setError('Por favor selecciona la planta o área donde se realiza la OPT.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (!personaEvaluada) {
       setError('Por favor selecciona la persona a quien se le realiza la OPT.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -107,6 +114,7 @@ export default function AFPage() {
           user_email: session.user.email,
           modulo_tipo: 'AF',
           persona_evaluada: personaEvaluada,
+          planta,
           percentage: parseFloat(percentage),
           responses: responses,
           action_plans: actionPlans
@@ -309,6 +317,7 @@ export default function AFPage() {
                 defaultValue={personaEvaluada}
                 onValueChange={setPersonaEvaluada}
               />
+              <SelectorPlantaSP value={planta} onChange={setPlanta} />
             </div>
 
             {questions.map((q) => (

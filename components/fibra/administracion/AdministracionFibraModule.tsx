@@ -11,6 +11,7 @@ import {
 } from '@/lib/supabase/queries/fibra_administracion'
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
+import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import {
     RefreshCw,
     Search,
@@ -24,6 +25,22 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Procesos del Mapa de procesos FV (mismo orden del flujo); una OF está en un proceso si tiene al menos una pieza ahí
+const PROCESOS_FILTRO: { id: string; label: string; etapas: string[] }[] = [
+    { id: 'programado', label: 'Programado', etapas: ['programado'] },
+    { id: 'pintura', label: 'Pintura', etapas: ['pintura'] },
+    { id: 'vaciado', label: 'Vaciado', etapas: ['vaciado'] },
+    { id: 'pulido', label: 'Pulido', etapas: ['pulido'] },
+    { id: 'ensayo', label: 'Ensayo', etapas: ['acabado'] },
+    { id: 'reparacion', label: 'Reparación', etapas: ['reparacion', 'reparacion_larga'] },
+    { id: 'huacales', label: 'Huacales', etapas: ['empaque'] },
+    { id: 'digitado', label: 'Digitado', etapas: ['digitado'] },
+    { id: 'transito', label: 'Tránsito', etapas: ['transito'] },
+    { id: 'cedi', label: 'CEDI', etapas: ['cedi'] },
+    { id: 'saldo', label: 'Saldo', etapas: ['saldo'] },
+    { id: 'destruccion', label: 'Destrucción', etapas: ['destruccion'] }
+]
+
 export default function AdministracionFibraModule({ userEmail }: { userEmail?: string }) {
     // userEmail available for future use
     void userEmail;
@@ -34,6 +51,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [procesoFiltro, setProcesoFiltro] = useState('')
     const [expandedRegistros, setExpandedRegistros] = useState<Set<string | number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
     // Orden cuyo detalle de SAP (lista de materiales, comentarios…) está abierto
@@ -108,7 +126,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         }
     }, [searchText])
 
-    const filteredOrdenes = useMemo(() => {
+    const ordenesBuscadas = useMemo(() => {
         const search = searchText.toLowerCase()
         const filtered = ordenes.filter(o => {
             const matchesSearch = !search ||
@@ -132,6 +150,27 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
             return valA - valB
         })
     }, [ordenes, searchText, selectedDate])
+
+    // Procesos en que tiene piezas cada orden (según la búsqueda y la fecha, sin el filtro de proceso)
+    const procesosPorOrden = useMemo(() => {
+        const m = new Map<number, Set<string>>()
+        for (const o of ordenesBuscadas) {
+            const { piezas } = piezasPorEtapa(o)
+            m.set(o.id, new Set(PROCESOS_FILTRO.filter(p => p.etapas.some(e => (piezas[e] || 0) > 0)).map(p => p.id)))
+        }
+        return m
+    }, [ordenesBuscadas])
+
+    const conteoProcesos = useMemo(() => {
+        const c: Record<string, number> = {}
+        for (const p of PROCESOS_FILTRO) c[p.id] = 0
+        for (const s of procesosPorOrden.values()) for (const id of s) c[id]++
+        return c
+    }, [procesosPorOrden])
+
+    const filteredOrdenes = useMemo(() =>
+        procesoFiltro ? ordenesBuscadas.filter(o => procesosPorOrden.get(o.id)?.has(procesoFiltro)) : ordenesBuscadas,
+        [ordenesBuscadas, procesosPorOrden, procesoFiltro])
 
     const filteredRegistros = useMemo(() => {
         const search = searchText.toLowerCase()
@@ -358,7 +397,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     </div>
 
                     <button
-                        onClick={() => { setSearchText(''); setSelectedDate(null); }}
+                        onClick={() => { setSearchText(''); setSelectedDate(null); setProcesoFiltro(''); }}
                         className="p-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
                         title="Limpiar filtros"
                     >
@@ -376,11 +415,30 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     </button>
                 </div>
                 {/* Real-time Counter (Requested) */}
-                <div className="max-w-7xl mx-auto mt-3 flex items-center gap-2">
-                    <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
+                <div className="max-w-7xl mx-auto mt-3 flex items-center gap-2 min-w-0">
+                    <span className="shrink-0 px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
                         Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
                     </span>
-                    {(searchText || selectedDate) && (
+                    {/* Filtrar por proceso (procesos del Mapa de procesos FV): clic para ver solo las OF con piezas ahí */}
+                    {activeTab === 'of' && (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[10px] font-black text-blue-600 uppercase shrink-0">Proceso</span>
+                            <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                                {PROCESOS_FILTRO.map(p => {
+                                    const n = conteoProcesos[p.id]
+                                    const activo = procesoFiltro === p.id
+                                    return (
+                                        <button key={p.id} onClick={() => setProcesoFiltro(activo ? '' : p.id)}
+                                            title={`${n} orden(es) con piezas en ${p.label}`}
+                                            className={`shrink-0 h-7 px-2 rounded-lg border text-[10px] font-bold whitespace-nowrap transition-colors ${activo ? 'bg-blue-600 border-blue-600 text-white' : n > 0 ? 'bg-white border-slate-200 text-[#324354] hover:bg-blue-50' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                            {p.label} <span className="font-black">{n}</span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    {(searchText || selectedDate || (activeTab === 'of' && procesoFiltro)) && (
                         <span className="text-[10px] font-bold text-slate-400 italic">
                             (Filtrado aplicado)
                         </span>

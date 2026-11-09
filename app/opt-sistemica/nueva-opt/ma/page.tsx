@@ -6,6 +6,7 @@ import { supabase } from '@/lib/opt-sistemica/supabase';
 import Header from '@/components/opt-sistemica/Header';
 import FirplakLogo from '@/components/opt-sistemica/FirplakLogo';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import SelectorPlantaSP from '@/components/opt-sistemica/SelectorPlantaSP';
 import { createExternalClient } from '@/lib/supabase/external';
 import AutoResizeTextarea from '@/components/opt-sistemica/AutoResizeTextarea';
 import { Wrench, Search, Upload, Info, CheckCircle2, AlertTriangle, XCircle, Eye } from 'lucide-react';
@@ -45,6 +46,7 @@ export default function MantenimientoAutonomoPage() {
   // Persona a quien se le realiza la OPT
   const [personas, setPersonas] = useState<string[]>([]);
   const [personaEvaluada, setPersonaEvaluada] = useState('');
+  const [planta, setPlanta] = useState('');
 
   // Data sources
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -302,6 +304,11 @@ export default function MantenimientoAutonomoPage() {
   }, [chkResponses, staticResponses]);
 
   const handleSave = async () => {
+    if (!planta) {
+      setError('Por favor selecciona la planta o área donde se realiza la OPT.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (!personaEvaluada) {
       setError('Por favor selecciona la persona a quien se le realiza la OPT.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -397,6 +404,7 @@ export default function MantenimientoAutonomoPage() {
           user_email: session.user.email,
           modulo_tipo: 'MA',
           persona_evaluada: personaEvaluada,
+          planta,
           percentage: parseFloat(percentage),
           responses: responses,
           action_plans: actionPlans
@@ -490,6 +498,7 @@ export default function MantenimientoAutonomoPage() {
             defaultValue={personaEvaluada}
             onValueChange={setPersonaEvaluada}
           />
+          <SelectorPlantaSP value={planta} onChange={setPlanta} />
         </div>
 
         {/* Sección 1: Selección de Máquina */}
