@@ -56,7 +56,22 @@ export async function deleteOrdenFabricacion(id: number) {
     }
 }
 
+// Si la pieza ocupaba su molde (Pintura/Vaciado) y tras editarla o borrarla ya no lo ocupa, libera el molde
+// (así no quedan moldes "En uso" sin pieza).
+async function leerOcupacionMolde(registrer: string) {
+    const { data } = await supabase.from('trazabilidad_fv').select('estado, molde_id').eq('registrer', registrer).maybeSingle()
+    return data as { estado: string; molde_id: number | null } | null
+}
+async function liberarMoldeSiQuedoSinPieza(antes: { estado: string; molde_id: number | null } | null, despues: { estado?: string; molde_id?: number | null } | null) {
+    if (!antes?.molde_id || !['Pintura', 'Vaciado'].includes(antes.estado)) return
+    const sigueOcupando = despues && ['Pintura', 'Vaciado'].includes(despues.estado ?? antes.estado) && (despues.molde_id ?? antes.molde_id) === antes.molde_id
+    if (sigueOcupando) return
+    const { data: { user } } = await supabase.auth.getUser()
+    await liberarMolde(antes.molde_id, user?.email || 'Administración FV')
+}
+
 export async function updateRegistroTrazabilidad(idOrRegistrer: string | number, data: Partial<RegistroTrazabilidad>) {
+    const antes = await leerOcupacionMolde(String(idOrRegistrer))
     const allowedKeys = [
         'pintura_fecha',
         'orden_fabricacion_id',
@@ -114,9 +129,13 @@ export async function updateRegistroTrazabilidad(idOrRegistrer: string | number,
         console.error('Error updating registro trazabilidad:', error)
         throw error
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nuevo = filteredData as any
+    await liberarMoldeSiQuedoSinPieza(antes, { estado: nuevo.estado, molde_id: nuevo.molde_id })
 }
 
 export async function deleteRegistroTrazabilidad(idOrRegistrer: string | number) {
+    const antes = await leerOcupacionMolde(String(idOrRegistrer))
     const { error } = await supabase
         .from('trazabilidad_fv')
         .delete()
@@ -126,6 +145,7 @@ export async function deleteRegistroTrazabilidad(idOrRegistrer: string | number)
         console.error('Error deleting registro trazabilidad:', error)
         throw error
     }
+    await liberarMoldeSiQuedoSinPieza(antes, null)
 }
 
 // Movimiento manual desde el Mapa de procesos FV: pasa todas las piezas de una OF que están en los estados de origen
@@ -236,6 +256,30 @@ export async function moverPiezaFibra(registrer: string, destino: DestinoMovimie
     // El molde se libera cuando la pieza sale de Pintura/Vaciado hacia Pulido o más adelante
     const conMolde = destino === 'pintura' || destino === 'vaciado'
     if ((actual?.estado === 'Vaciado' || actual?.estado === 'Pintura') && !conMolde && actual.molde_id) await liberarMolde(actual.molde_id, usuarioEmail)
+}
+
+// Devuelve una pieza a Programado (pendiente por pintar) desde cualquier proceso: se borra su registro de
+// trazabilidad, con lo que se pierde el historial de la pieza y del molde con que se pintó. Si la pieza aún
+// ocupaba el molde (Pintura/Vaciado) se libera. Las vueltas del molde no se tocan.
+export async function devolverPiezaAProgramadoFv(registrer: string, usuarioEmail: string) {
+    await requireUserId(usuarioEmail)
+    const { data: actual, error: errorLeer } = await supabase
+        .from('trazabilidad_fv')
+        .select('estado, molde_id')
+        .eq('registrer', registrer)
+        .maybeSingle()
+    if (errorLeer) throw new Error(`No se pudo leer la pieza: [${errorLeer.code}] ${errorLeer.message}`)
+    if (!actual) throw new Error('La pieza ya no existe en la trazabilidad. Actualice el mapa.')
+
+    const { data, error } = await supabase
+        .from('trazabilidad_fv')
+        .delete()
+        .eq('registrer', registrer)
+        .select('registrer')
+    if (error) throw new Error(`No se pudo devolver la pieza a Programado: [${error.code}] ${error.message}`)
+    if (!data || data.length === 0) throw new Error('No se devolvió la pieza. Revise los permisos o vuelva a intentar.')
+
+    if ((actual.estado === 'Pintura' || actual.estado === 'Vaciado') && actual.molde_id) await liberarMolde(actual.molde_id, usuarioEmail)
 }
 
 // Desde Programado (el pintor no la registró): el supervisor escoge el molde en el mapa. Se registra igual que en

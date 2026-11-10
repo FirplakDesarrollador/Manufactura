@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loginToSAP, SAP_BASE_URL } from '@/lib/sap';
+import { fetchSAP, SAP_BASE_URL } from '@/lib/sap';
 import { crearFaltantes } from '@/lib/sapFaltantes';
 import { supabase } from '@/lib/supabase';
 
@@ -26,17 +26,11 @@ export async function GET(request: Request, props: { params: Promise<{ docNum: s
             return NextResponse.json({ error: 'Número de orden inválido' }, { status: 400 });
         }
 
-        const loginData = await loginToSAP();
         const baseUrl = process.env.SAP_BASE_URL || (process.env.SAP_API_URL ? process.env.SAP_API_URL.replace(/\/Login\/?$/, '') : SAP_BASE_URL);
         const url = `${baseUrl}/ProductionOrders?$filter=DocumentNumber eq ${docNum}`;
 
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Cookie': loginData.cookieHeader,
-                'Content-Type': 'application/json'
-            }
-        });
+        // Sesión de SAP reutilizada (sin iniciar sesión en cada consulta)
+        const response = await fetchSAP(url, { method: 'GET' });
 
         if (!response.ok) {
             return NextResponse.json({ error: `Error SAP: ${response.status}` }, { status: response.status });

@@ -8,7 +8,7 @@ import OrdenCard from '@/components/pintura/OrdenCard'
 import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
-import { DestinoMovimientoFv, getPiezasMapaFv, asignarMesaFv, moverPiezaFibra, registrarPiezaProgramadoFv, PiezaMapaFv } from '@/lib/supabase/queries/fibra_administracion'
+import { DestinoMovimientoFv, getPiezasMapaFv, asignarMesaFv, moverPiezaFibra, registrarPiezaProgramadoFv, devolverPiezaAProgramadoFv, PiezaMapaFv } from '@/lib/supabase/queries/fibra_administracion'
 import { moldesDisponiblesOrden } from '@/lib/fibra/moldesOrden'
 import { toast } from 'sonner'
 import ImportarPosicionesFv from './ImportarPosicionesFv'
@@ -368,6 +368,7 @@ export default function MapaProcesosFibraModule() {
     }
     const puedeEnProceso = (p: Proceso) => {
         if (arrastre?.nueva) return !!(p.crear || p.destino)
+        if (arrastre && p.id === 'programado') return true
         if (!arrastre || !p.destino) return false
         return !tramoDeEstado(arrastre.estado)?.zonas.some(z => ZONAS.find(x => x.id === z)?.proceso === p.id)
     }
@@ -409,6 +410,16 @@ export default function MapaProcesosFibraModule() {
             setRegistroNuevo({ pieza, destino: p.crear ?? p.destino!, mesa: null, lugar: p.label })
             return
         }
+        if (p.id === 'programado') {
+            if (!confirm(`⚠ ADVERTENCIA: ¿Devolver 1 pieza de la OF ${pieza.of} (${pieza.nombre}) a Programado (pendiente por pintar)?\n\n` +
+                `Se borra el registro de la pieza (${pieza.estado}): SE PIERDE LA TRAZABILIDAD DEL MOLDE con que se pintó y todo su historial de procesos. No se puede deshacer.\n\n` +
+                `Si la pieza aún ocupa el molde, el molde queda Disponible.`)) return
+            ejecutar(async () => {
+                await devolverPiezaAProgramadoFv(pieza.registrer, await usuarioActual())
+                toast.success(`OF ${pieza.of}: 1 pieza devuelta a Programado`)
+            })
+            return
+        }
         const destino = p.destino!
         if (!confirm(`¿Pasar 1 pieza de la OF ${pieza.of} (${pieza.nombre}) a ${p.label}?\n\nQuedará registrado en la trazabilidad con su usuario y la hora.`)) return
         ejecutar(async () => {
@@ -434,6 +445,14 @@ export default function MapaProcesosFibraModule() {
         onDrop: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); alSoltar() }
     } : {}
 
+    // Nombre cortado en letras completas (sin "…" ni media letra): cada letra es un elemento de un renglón
+    // que envuelve; la que no cabe entera baja al segundo renglón, que queda oculto.
+    const nombreCortado = (texto: string, clase: string) => (
+        <span className={`flex flex-wrap overflow-hidden h-[1.25em] leading-[1.25em] ${clase}`}>
+            {Array.from(texto).map((c, i) => <span key={i} className="shrink-0">{c === ' ' ? ' ' : c}</span>)}
+        </span>
+    )
+
     // Pieza: clic abre el detalle; clic sostenido y arrastrar la lleva a una mesa o a otro proceso
     const chipPieza = (x: PiezaMesa, estilo: string, enMesa: boolean) => (
         <button key={x.registrer} onClick={() => setDetalleOf(x.of)}
@@ -444,12 +463,12 @@ export default function MapaProcesosFibraModule() {
             className={`${enMesa ? 'w-full h-full flex flex-col items-center justify-center text-center px-0.5 overflow-hidden' : 'max-w-full flex items-baseline gap-0.5 text-[9px] px-1 leading-[14px] whitespace-nowrap'} font-bold rounded cursor-grab active:cursor-grabbing ${arrastre?.registrer === x.registrer ? 'opacity-40' : ''} ${coincide(x) ? 'bg-[#59a96a] text-white ring-2 ring-[#3b8f50]' : estilo}`}>
             {enMesa ? (
                 <>
-                    {x.nombre && <span className="block w-full truncate text-[11px] leading-tight">{x.nombre}</span>}
-                    <span className="block font-mono text-xl font-black leading-none">{x.of.slice(-4)}</span>
+                    {x.nombre && nombreCortado(x.nombre, 'w-full justify-center text-[10px]')}
+                    <span className="block font-mono text-lg font-black leading-none">{x.of.slice(-4)}</span>
                 </>
             ) : (
                 <>
-                    {x.nombre && <span className="truncate min-w-0">{x.nombre}</span>}
+                    {x.nombre && nombreCortado(x.nombre, 'min-w-0')}
                     <span className="font-mono shrink-0">{x.of.slice(-4)}</span>
                 </>
             )}
@@ -563,7 +582,7 @@ export default function MapaProcesosFibraModule() {
                                     onDragEnd={terminarArrastre}
                                     title={`OF ${x.of} · ${x.descripcion || 'sin descripción'} · ${x.piezas} pieza(s) pendientes · F. Ideal Producción ${x.fecha ? x.fecha.split('-').reverse().join('/') : 'sin fecha'}${x.fecha && x.fecha < hoyIso ? ' (ATRASADA)' : ''} · clic para ver el detalle · arrastrar a una mesa o proceso para registrar 1 pieza (se pide el molde)`}
                                     className={`w-full min-w-0 flex items-baseline gap-0.5 text-[9px] font-bold px-1 rounded leading-[14px] whitespace-nowrap cursor-grab active:cursor-grabbing ${arrastre?.registrer === 'nueva:' + x.of ? 'opacity-40' : ''} ${coincide(x) ? 'bg-[#59a96a] text-white ring-2 ring-[#3b8f50]' : estilo.chip}`}>
-                                    {x.nombre && <span className="truncate min-w-0 flex-1 text-left">{x.nombre}</span>}
+                                    {x.nombre && nombreCortado(x.nombre, 'min-w-0 flex-1')}
                                     <span className={`font-mono font-black shrink-0 ml-auto ${x.fecha && x.fecha < hoyIso && !coincide(x) ? 'text-red-600' : ''}`}>{x.of.slice(-4)}</span>
                                     {x.piezas > 1 && <sup className="shrink-0 text-[7px]">×{x.piezas}</sup>}
                                 </button>

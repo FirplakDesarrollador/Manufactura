@@ -26,7 +26,7 @@ const MESAS_ESTADO: Record<string, string[]> = {
     Guacales: ['acabado2', 'huacales'], Reparacion: ['reparacion'], Reparacion_larga: ['reparacion']
 }
 
-const lugarPieza = (estado: string, mesa: string | null) => {
+export const lugarPieza = (estado: string, mesa: string | null) => {
     const prefijo = mesa ? mesa.split('-')[0] : ''
     const mesaValida = !!prefijo && (MESAS_ESTADO[estado] || []).includes(prefijo)
     return (mesaValida && LUGAR_MESA[prefijo]) || LUGAR_ESTADO[estado] || `Estado "${estado}" sin proceso conocido`
