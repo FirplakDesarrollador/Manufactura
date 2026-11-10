@@ -103,14 +103,14 @@ const ESTILO: Record<TipoProceso, { caja: string; chip: string; badge: string; l
 // Todas las mesas miden lo mismo (como las de Ensayo y Ensamble); los recuadros se ajustan a sus mesas.
 const MESA_ANCHO = 92, MESA_ALTO = 60, GAP = 6
 // auto = paso virtual o de espera: no hay mesa específica, las piezas llenan las casillas en orden (la más antigua primero)
-type Zona = { id: string; proceso: string; label: string; n: number; cols: number; x: number; y: number; auto?: boolean; fueraDeCupo?: boolean; destino?: DestinoMovimientoFv; crear?: DestinoMovimientoFv }
+type Zona = { id: string; proceso: string; label: string; n: number; cols: number; x: number; y: number; auto?: boolean; fueraDeCupo?: boolean; destino?: DestinoMovimientoFv; crear?: DestinoMovimientoFv; regreso?: DestinoMovimientoFv }
 const ZONAS: Zona[] = [
     // La mesa de Pintura recibe piezas pintadas pero no cuenta en el cupo de Vaciado (6 mesas)
-    { id: 'pintura', proceso: 'pintura', label: 'Pintura', n: 1, cols: 1, x: 1518, y: 98, fueraDeCupo: true, crear: 'pintura' },
-    { id: 'curadop', proceso: 'curado', label: 'Zona Curado · pintadas, van para Vaciado', n: 4, cols: 4, x: 1078, y: 98, auto: true, crear: 'pintura' },
-    { id: 'curadov', proceso: 'curado', label: 'Zona Curado · vaciadas, van para Desmolde', n: 12, cols: 4, x: 1078, y: 172, auto: true, crear: 'vaciado' },
-    { id: 'vaciado', proceso: 'vaciado', label: 'Vaciado', n: 2, cols: 2, x: 864, y: 98, crear: 'vaciado' },
-    { id: 'desmolde', proceso: 'nivelacion', label: 'Desmolde · Herrajes · Nivelación', n: 4, cols: 2, x: 1262, y: 476, crear: 'vaciado' },
+    { id: 'pintura', proceso: 'pintura', label: 'Pintura', n: 1, cols: 1, x: 1518, y: 98, fueraDeCupo: true, crear: 'pintura', regreso: 'pintura' },
+    { id: 'curadop', proceso: 'curado', label: 'Zona Curado · pintadas, van para Vaciado', n: 4, cols: 4, x: 1078, y: 98, auto: true, crear: 'pintura', regreso: 'pintura' },
+    { id: 'curadov', proceso: 'curado', label: 'Zona Curado · vaciadas, van para Desmolde', n: 12, cols: 4, x: 1078, y: 172, auto: true, crear: 'vaciado', regreso: 'vaciado' },
+    { id: 'vaciado', proceso: 'vaciado', label: 'Vaciado', n: 2, cols: 2, x: 864, y: 98, crear: 'vaciado', regreso: 'pintura' },
+    { id: 'desmolde', proceso: 'nivelacion', label: 'Desmolde · Herrajes · Nivelación', n: 4, cols: 2, x: 1262, y: 476, crear: 'vaciado', regreso: 'vaciado' },
     { id: 'pulido', proceso: 'pulido', label: 'Pulido', n: 6, cols: 3, x: 954, y: 476, destino: 'pulido' },
     { id: 'acabado', proceso: 'ensamble', label: 'Acabado 1', n: 4, cols: 2, x: 740, y: 476, destino: 'ensayo' },
     { id: 'ensamble1', proceso: 'ensamble', label: 'Ensamble 1', n: 2, cols: 1, x: 642, y: 476, destino: 'ensayo' },
@@ -149,6 +149,17 @@ const TRAMOS: Tramo[] = [
     { id: 'cedi', proceso: 'cedi', estados: ['Cedi'], zonas: ['cedi'] }
 ]
 const TODOS_ESTADOS = TRAMOS.flatMap(t => t.estados)
+// regreso = estado que toma una pieza de otro tramo al soltarla en Pintura, Zona Curado, Vaciado o Desmolde,
+// sea hacia adelante (p. ej. Pintura → Curado de abajo = Vaciado) o devolviéndola desde un proceso posterior
+const ESTADO_REGRESO: Record<string, string> = { pintura: 'Pintura', vaciado: 'Vaciado' }
+const indiceTramo = (estado: string) => TRAMOS.findIndex(t => t.estados.includes(estado))
+const cambiaEstadoEn = (z: Zona, estado: string) => {
+    if (!z.regreso) return false
+    const desde = indiceTramo(estado), hacia = indiceTramo(ESTADO_REGRESO[z.regreso])
+    return hacia >= 0 && desde >= 0 && desde !== hacia
+}
+// ¿Es devolución (viene de un proceso posterior)?
+const esRegreso = (z: Zona, estado: string) => cambiaEstadoEn(z, estado) && indiceTramo(estado) > indiceTramo(ESTADO_REGRESO[z.regreso!])
 const tramoDeEstado = (estado: string) => TRAMOS.find(t => t.estados.includes(estado))
 const mesasDeTramo = (t: Tramo) => MESAS.filter(m => t.zonas.includes(m.zona.id) && !m.zona.fueraDeCupo).length
 const tramoDeProceso = (procesoId: string) => TRAMOS.find(t => t.proceso === procesoId)
@@ -333,7 +344,7 @@ export default function MapaProcesosFibraModule() {
             }
             total[t.id]++
             const m = p.mesa ? MESA[p.mesa] : undefined
-            if (m && t.zonas.includes(m.zona.id) && !m.zona.auto && !enMesa[m.id]) enMesa[m.id] = info
+            if (m && t.zonas.includes(m.zona.id) && !enMesa[m.id]) enMesa[m.id] = info
             else pendientes[t.id].push(info)
         }
         // Las piezas sin mesa fija llenan en orden las casillas de los pasos virtuales y de espera del tramo;
@@ -412,16 +423,13 @@ export default function MapaProcesosFibraModule() {
     const puedeEnMesa = (m: Mesa) => {
         if (!arrastre) return false
         if (SOLO_POR_MODULO.has(m.zona.proceso) && tramoDeEstado(arrastre.estado)?.id !== 'cedi') return false
-        if (m.zona.auto) {
-            if (arrastre.nueva) return !!(m.zona.crear || m.zona.destino)
-            const t = tramoDeEstado(arrastre.estado)
-            if (t && t.zonas.includes(m.zona.id)) return mesas.zonaDe[arrastre.registrer] !== m.zona.id
-            return !!m.zona.destino
-        }
-        if (mesas.enMesa[m.id] || arrastre.mesa === m.id) return false
+        // En las zonas automáticas (Curado, Digitado, Tránsito…) también se puede fijar la casilla exacta: solo bloquea
+        // una pieza que la tenga fijada; las que llenan en orden se corren a la siguiente casilla libre
+        const ocupante = mesas.enMesa[m.id]
+        if ((ocupante && (!m.zona.auto || ocupante.mesa === m.id)) || arrastre.mesa === m.id) return false
         if (arrastre.nueva) return !!(m.zona.crear || m.zona.destino)
         const t = tramoDeEstado(arrastre.estado)
-        return (!!t && t.zonas.includes(m.zona.id)) || !!m.zona.destino
+        return (!!t && t.zonas.includes(m.zona.id)) || !!m.zona.destino || cambiaEstadoEn(m.zona, arrastre.estado)
     }
     const puedeEnProceso = (p: Proceso) => {
         if (SOLO_POR_MODULO.has(p.id)) return false
@@ -436,7 +444,7 @@ export default function MapaProcesosFibraModule() {
         const pieza = arrastre
         terminarArrastre()
         if (!pieza || !puedeEnMesa(m)) return
-        const mesaId = m.zona.auto ? null : m.id
+        const mesaId = m.id
         if (pieza.nueva) {
             setMoldeElegido(null)
             abrirRegistroNuevo({ pieza, destino: m.zona.crear ?? m.zona.destino!, mesa: mesaId, lugar: m.zona.label })
@@ -450,8 +458,12 @@ export default function MapaProcesosFibraModule() {
             })
             return
         }
-        const destino = m.zona.destino!
-        if (!confirm(`¿Pasar 1 pieza de la OF ${pieza.of} (${pieza.nombre}) a ${m.zona.label}?\n\nCambia de proceso y quedará registrado en la trazabilidad con su usuario y la hora.`)) return
+        const regreso = !m.zona.destino && esRegreso(m.zona, pieza.estado)
+        const destino = m.zona.destino ?? m.zona.regreso!
+        if (!confirm(regreso
+            ? `¿Devolver 1 pieza de la OF ${pieza.of} (${pieza.nombre}) de ${pieza.estado} a ${m.zona.label.split(' · ')[0]} (estado ${ESTADO_REGRESO[destino]})?\n\n` +
+              `La pieza vuelve a ocupar su molde (queda En uso). Si otra pieza ya ocupa ese molde, no se podrá devolver. Quedará registrado en la trazabilidad y en el historial.`
+            : `¿Pasar 1 pieza de la OF ${pieza.of} (${pieza.nombre}) a ${m.zona.label}?\n\nCambia de proceso y quedará registrado en la trazabilidad con su usuario y la hora.`)) return
         ejecutar(async () => {
             await moverPiezaFibra(pieza.registrer, destino, await usuarioActual(), mesaId)
             toast.success(`OF ${pieza.of}: 1 pieza pasó a ${m.zona.label}`)
@@ -550,7 +562,7 @@ export default function MapaProcesosFibraModule() {
         const valido = puedeEnMesa(m)
         const zona = 'mesa:' + m.id
         return (
-            <div key={m.id} style={pos(m.caja)} title={ocupada ? undefined : m.zona.auto ? `${m.zona.label} · se llena en orden` : `${m.zona.label} · mesa libre`}
+            <div key={m.id} style={pos(m.caja)} title={ocupada ? undefined : m.zona.auto ? `${m.zona.label} · se llena en orden (o suelte la pieza aquí para dejarla en esta casilla)` : `${m.zona.label} · mesa libre`}
                 {...zonaDrop(zona, valido, () => soltarEnMesa(m))}
                 className={`absolute z-[5] rounded border border-dashed p-0.5 flex items-stretch ${claro ? 'border-[#25323f]/30 bg-white/30' : 'border-white/40 bg-white/10'} ${valido ? (sobre === zona ? 'ring-2 ring-[#59a96a] bg-[#59a96a]/30' : 'ring-1 ring-[#59a96a]/70') : ''}`}>
                 {ocupada && chipPieza(ocupada, claro ? ESTILO.notificacion.chip : ESTILO['sin-notificacion'].chip, true)}
