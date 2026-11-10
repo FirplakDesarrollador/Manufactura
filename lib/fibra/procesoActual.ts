@@ -6,8 +6,8 @@ import { supabase } from '@/lib/supabase'
 
 // Prefijo de la mesa (mesa_fv = "<zona>-<n>") → ubicación física
 const LUGAR_MESA: Record<string, string> = {
-    pintura: 'Pintura', curadop: 'Zona Curado', curadov: 'Zona Curado', vaciado: 'Vaciado',
-    desmolde: 'Desmolde · Herrajes · Nivelación', pulido: 'Pulido', acabado: 'Acabado 1',
+    pintura: 'Pintura', curadop: 'Zona Curado', curadov: 'Desmolde', instherrajes: 'Instalación Herrajes', vaciado: 'Vaciado',
+    desmolde: 'Nivelación', pulido: 'Pulido', acabado: 'Acabado 1',
     ensamble1: 'Ensamble 1', ensamble2: 'Ensamble 2', ensayo: 'Ensayo', acabado2: 'Acabado 2',
     huacales: 'Huacales', reparacion: 'Reparación', digitado: 'Digitado', transito: 'Tránsito', cedi: 'CEDI'
 }
@@ -21,7 +21,7 @@ const LUGAR_ESTADO: Record<string, string> = {
 // Mesas válidas para cada estado (mismos tramos del mapa): una mesa vieja de otro tramo no cuenta
 const MESAS_ESTADO: Record<string, string[]> = {
     Pintura: ['pintura', 'curadop', 'vaciado'],
-    Vaciado: ['curadov', 'desmolde', 'pulido'], Desgelcada: ['curadov', 'desmolde', 'pulido'], Pulido: ['curadov', 'desmolde', 'pulido'],
+    Vaciado: ['curadov', 'instherrajes', 'desmolde', 'pulido'], Desgelcada: ['curadov', 'instherrajes', 'desmolde', 'pulido'], Pulido: ['curadov', 'instherrajes', 'desmolde', 'pulido'],
     Ensayo: ['acabado', 'ensamble1', 'ensamble2', 'ensayo'], Acabado: ['acabado', 'ensamble1', 'ensamble2', 'ensayo'],
     Guacales: ['acabado2', 'huacales'], Reparacion: ['reparacion'], Reparacion_larga: ['reparacion']
 }

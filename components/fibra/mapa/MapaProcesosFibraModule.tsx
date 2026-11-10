@@ -31,6 +31,7 @@ type Proceso = {
     // Procesos unificados en un solo rectángulo: cada nombre conserva su espacio (en columnas o en filas)
     nombres?: string[]
     enColumnas?: boolean
+    tituloIzq?: boolean  // el nombre va a la izquierda del recuadro (Desmolde, Instalación Herrajes)
     aislado?: boolean  // proceso que aún no está en el flujo
     sinContador?: boolean  // solo se dibuja el proceso, sin contador de OF ni mensajes
     tipo: TipoProceso
@@ -56,14 +57,17 @@ const punto = (x: number, y: number): React.CSSProperties => ({
 // El nombre de cada proceso va encima de su recuadro (franja de 20 del plano); el recuadro solo lleva las mesas
 const PROCESOS: Proceso[] = [
     { id: 'vaciado', label: 'Vaciado', tipo: 'notificacion', etapas: ['vaciado'], crear: 'vaciado', caja: [858, 92, 1060, 164] },
-    { id: 'curado', label: 'Zona Curado', sinContador: true, tipo: 'espera', etapas: [], caja: [1072, 92, 1470, 370] },
+    { id: 'curado', label: 'Zona Curado', sinContador: true, tipo: 'espera', etapas: [], caja: [1072, 92, 1470, 164] },
+    // Debajo de Zona Curado: Desmolde (8 casillas) e Instalación Herrajes (5), tiempos de espera de las piezas vaciadas
+    { id: 'desmoldez', label: 'Desmolde', tituloIzq: true, sinContador: true, tipo: 'espera', etapas: [], caja: [1072, 170, 1470, 308] },
+    { id: 'herrajesz', label: 'Instalación\nHerrajes', tituloIzq: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [974, 322, 1470, 394] },
     { id: 'pintura', label: 'Pintura', tipo: 'notificacion', etapas: ['pintura'], crear: 'pintura', caja: [1484, 92, 1644, 164] },
     { id: 'huacales', label: 'Huacales', tipo: 'notificacion', etapas: ['empaque'], destino: 'huacales', caja: [6, 470, 208, 608] },
     { id: 'acabado2', label: 'Acabado 2', sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [216, 470, 418, 608] },
     { id: 'ensayo', label: 'Ensayo', tipo: 'notificacion', etapas: ['acabado'], destino: 'ensayo', caja: [426, 470, 530, 608] },
     { id: 'ensamble', label: 'Ensamble 2 · Ensamble 1 · Acabado 1', nombres: ['Ensamble\n2', 'Ensamble\n1', 'Acabado\n1'], enColumnas: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [538, 470, 936, 608] },
     { id: 'pulido', label: 'Pulido', tipo: 'notificacion', etapas: ['pulido'], destino: 'pulido', caja: [948, 470, 1248, 608] },
-    { id: 'nivelacion', label: 'Desmolde · Herrajes · Nivelación', nombres: ['Desmolde', 'Herrajes', 'Nivelación'], enColumnas: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [1256, 470, 1458, 608] },
+    { id: 'nivelacion', label: 'Nivelación', sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [1256, 470, 1458, 608] },
     { id: 'reparacion', label: 'Reparación', tipo: 'notificacion', etapas: ['reparacion', 'reparacion_larga'], destino: 'reparacion', caja: [216, 644, 516, 716] },
     { id: 'soldadura', label: 'Soldadura', aislado: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [1256, 644, 1362, 716] },
     // Pasos virtuales (no son procesos físicos): Programado → Pintura … Huacales → Digitado → Tránsito → CEDI
@@ -81,7 +85,9 @@ const FLECHAS: { x: number; y: number; dir: 'izq' | 'der' | 'arriba' | 'abajo' }
     { x: 1066, y: 115, dir: 'izq' }, { x: 1066, y: 141, dir: 'der' },      // Zona Curado ⇄ Vaciado
     { x: 1477, y: 128, dir: 'izq' },                                       // Pintura → Zona Curado
     { x: 1630, y: 170, dir: 'arriba' },                                    // Programado → Pintura
-    { x: 1357, y: 404, dir: 'abajo' },                                     // Zona Curado → Desmolde · Herrajes · Nivelación (centrada)
+    { x: 1066, y: 239, dir: 'der' },                                      // Vaciado → Desmolde (flecha en L)
+    { x: 1271, y: 315, dir: 'abajo' },                                     // Desmolde → Instalación Herrajes
+    { x: 1357, y: 424, dir: 'abajo' },                                     // Instalación Herrajes → Desmolde · Herrajes · Nivelación
     ...[1252, 942, 534, 422, 212].map(x => ({ x, y: 580, dir: 'izq' as const })),
     { x: 180, y: 426, dir: 'arriba' },                                     // Huacales → Digitado
     { x: 440, y: 335, dir: 'arriba' },                                     // Digitado → Tránsito
@@ -108,9 +114,10 @@ const ZONAS: Zona[] = [
     // La mesa de Pintura recibe piezas pintadas pero no cuenta en el cupo de Vaciado (6 mesas)
     { id: 'pintura', proceso: 'pintura', label: 'Pintura', n: 1, cols: 1, x: 1518, y: 98, fueraDeCupo: true, crear: 'pintura', regreso: 'pintura' },
     { id: 'curadop', proceso: 'curado', label: 'Zona Curado · pintadas, van para Vaciado', n: 4, cols: 4, x: 1078, y: 98, auto: true, crear: 'pintura', regreso: 'pintura' },
-    { id: 'curadov', proceso: 'curado', label: 'Zona Curado · vaciadas, van para Desmolde', n: 12, cols: 4, x: 1078, y: 172, auto: true, crear: 'vaciado', regreso: 'vaciado' },
+    { id: 'curadov', proceso: 'desmoldez', label: 'Desmolde · vaciadas, esperan desmolde', n: 8, cols: 4, x: 1078, y: 176, auto: true, crear: 'vaciado', regreso: 'vaciado' },
+    { id: 'instherrajes', proceso: 'herrajesz', label: 'Instalación Herrajes', n: 5, cols: 5, x: 980, y: 328, auto: true, crear: 'vaciado', regreso: 'vaciado' },
     { id: 'vaciado', proceso: 'vaciado', label: 'Vaciado', n: 2, cols: 2, x: 864, y: 98, crear: 'vaciado', regreso: 'pintura' },
-    { id: 'desmolde', proceso: 'nivelacion', label: 'Desmolde · Herrajes · Nivelación', n: 4, cols: 2, x: 1262, y: 476, crear: 'vaciado', regreso: 'vaciado' },
+    { id: 'desmolde', proceso: 'nivelacion', label: 'Nivelación', n: 4, cols: 2, x: 1262, y: 476, crear: 'vaciado', regreso: 'vaciado' },
     { id: 'pulido', proceso: 'pulido', label: 'Pulido', n: 6, cols: 3, x: 954, y: 476, destino: 'pulido' },
     { id: 'acabado', proceso: 'ensamble', label: 'Acabado 1', n: 4, cols: 2, x: 740, y: 476, destino: 'ensayo' },
     { id: 'ensamble1', proceso: 'ensamble', label: 'Ensamble 1', n: 2, cols: 1, x: 642, y: 476, destino: 'ensayo' },
@@ -139,7 +146,7 @@ const TRAMOS: Tramo[] = [
     // Pintadas que esperan vaciado: 2 mesas de Vaciado + 4 de la fila de arriba de Zona Curado = 6
     { id: 'vaciado', proceso: 'vaciado', estados: ['Pintura'], zonas: ['pintura', 'curadop', 'vaciado'] },
     // Ya vaciadas, van para Pulido: 12 de Zona Curado abajo + 4 de Desmolde + 6 de Pulido = 22
-    { id: 'pulido', proceso: 'pulido', estados: ['Vaciado', 'Desgelcada', 'Pulido'], zonas: ['curadov', 'desmolde', 'pulido'] },
+    { id: 'pulido', proceso: 'pulido', estados: ['Vaciado', 'Desgelcada', 'Pulido'], zonas: ['curadov', 'instherrajes', 'desmolde', 'pulido'] },
     { id: 'ensayo', proceso: 'ensayo', estados: ['Ensayo', 'Acabado'], zonas: ['acabado', 'ensamble1', 'ensamble2', 'ensayo'] },
     // Guacales = salió de Ensayo y espera el huacal; Empaque = huacal registrado, espera el Digitado
     { id: 'guacales', proceso: 'huacales', estados: ['Guacales'], zonas: ['acabado2', 'huacales'] },
@@ -172,7 +179,7 @@ const enFila = (zona: string, n: number) => Array.from({ length: n }, (_, i) => 
 const ORDEN_LLENADO: Record<string, string[]> = {
     vaciado: [...enFila('vaciado', 2), ...enFila('curadop', 4), 'pintura-1'],
     // Pulido (por columnas), Desmolde (por columnas) y Zona Curado de abajo desde la esquina inferior derecha
-    pulido: [...porColumnas('pulido', 3, 2), ...porColumnas('desmolde', 2, 2), ...enFila('curadov', 12).reverse()],
+    pulido: [...porColumnas('pulido', 3, 2), ...porColumnas('desmolde', 2, 2), ...enFila('instherrajes', 5).reverse(), ...enFila('curadov', 8).reverse()],
     ensayo: [...enFila('ensayo', 2), ...enFila('ensamble2', 2), ...enFila('ensamble1', 2), ...porColumnas('acabado', 2, 2)],
     guacales: [...porColumnas('huacales', 2, 2), ...porColumnas('acabado2', 2, 2)],
     reparacion: enFila('reparacion', 3),
@@ -613,6 +620,12 @@ export default function MapaProcesosFibraModule() {
     const etiqueta = (p: Proceso) => {
         const [x1, y1, x2] = p.caja
         const tramo = tramoDeProceso(p.id)
+        if (p.tituloIzq) return (
+            <div key={'nombre-' + p.id} style={pos([x1 - 170, p.id === 'desmoldez' ? y1 + 76 : y1, x1 - 8, p.caja[3]])}
+                className="absolute flex items-center justify-end text-right pointer-events-none z-[6]">
+                <span className="text-[12px] font-black text-[#25323f] leading-tight whitespace-pre-line">{p.label}</span>
+            </div>
+        )
         return (
             <div key={'nombre-' + p.id} style={pos([x1, y1 - 40, x2, y1 - 2])}
                 className={`absolute flex flex-wrap justify-center items-end content-end gap-x-1 gap-y-0.5 text-center pointer-events-none [&_button]:pointer-events-auto [&>div]:pointer-events-auto ${listaAbierta && tramo?.id === listaAbierta ? 'z-30' : 'z-[6]'} ${p.aislado ? 'opacity-60' : ''}`}>
@@ -760,13 +773,14 @@ export default function MapaProcesosFibraModule() {
                                 </span>
                             </div>
 
-                            {/* Zona Curado: arriba las pintadas que van para Vaciado, abajo las vaciadas que van para Desmolde */}
-                            <div className="absolute h-[2px] bg-slate-500/70" style={pos([1078, 164, 1464, 166])} />
 
                             {MESAS.map(mesa)}
 
-                            {/* Zona Curado → Desmolde · Herrajes · Nivelación: centrada sobre Desmolde y separada del recuadro gris */}
-                            <div className="absolute w-[3px] bg-[#00b050] -translate-x-1/2" style={{ ...punto(1357, 378), height: `${((404 - 378) / ALTO) * 100}%` }} />
+                            {/* Vaciado → Desmolde: baja desde Vaciado y entra por la izquierda de Desmolde */}
+                            <div className="absolute w-[3px] bg-[#00b050] -translate-x-1/2" style={{ ...punto(900, 166), height: `${((240 - 166) / ALTO) * 100}%` }} />
+                            <div className="absolute h-[3px] bg-[#00b050] -translate-y-1/2" style={{ ...punto(899, 239), width: `${((1062 - 899) / ANCHO) * 100}%` }} />
+                            {/* Instalación Herrajes → Desmolde · Herrajes · Nivelación (centrada sobre Desmolde) */}
+                            <div className="absolute w-[3px] bg-[#00b050] -translate-x-1/2" style={{ ...punto(1357, 396), height: `${((420 - 396) / ALTO) * 100}%` }} />
 
                             {FLECHAS.map((f, i) => {
                                 const Icono = ICONO_FLECHA[f.dir]
