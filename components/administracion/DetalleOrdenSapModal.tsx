@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { X, Boxes, MessageSquareText, ArrowRightLeft, FileImage, Loader2, RefreshCw, AlertTriangle, List, Layers, Factory } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 // Detalle de una orden de fabricación consultado en SAP (misma ruta que Consulta SAP).
 // Lo que SAP no entregue llega en `faltantes` y se muestra como error, nunca con valores por defecto.
@@ -141,26 +142,75 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }
         return () => window.removeEventListener('keydown', onKey)
     }, [onClose])
 
+    // Copia guardada en Supabase (sap_ordenes_detalle): la ventana abre al instante con ella y por detrás consulta
+    // SAP; si SAP responde, se muestra y se guarda lo nuevo. Si SAP falla, queda la copia con su fecha y el aviso.
+    const [consultadoAt, setConsultadoAt] = useState<string | null>(null)
+    const [actualizando, setActualizando] = useState(false)
+    const [avisoCopia, setAvisoCopia] = useState<string | null>(null)
+
     useEffect(() => {
         let vigente = true
         setCargando(true)
         setError(null)
         setOrden(null)
+        setConsultadoAt(null)
+        setAvisoCopia(null)
         const docNum = String(ordenFabricacion ?? '').trim()
         if (!/^\d+$/.test(docNum)) {
             setError(`La orden "${docNum}" no es un número de orden de SAP válido`)
             setCargando(false)
             return
         }
-        fetch(`/api/sap/production-orders/${docNum}`)
-            .then(async r => {
+        const forzado = recarga > 0
+        let hayCopia = false
+
+        const leerCopia = async () => {
+            if (forzado) return
+            const { data, error: errCopia } = await supabase.from('sap_ordenes_detalle')
+                .select('datos, consultado_at').eq('orden_fabricacion', docNum).maybeSingle()
+            if (!vigente) return
+            if (errCopia) {
+                setAvisoCopia(/sap_ordenes_detalle|relation|schema cache/i.test(errCopia.message)
+                    ? 'No se guardan copias de SAP: ejecute sap_ordenes_detalle.sql en Supabase.'
+                    : `No se pudo leer la copia guardada: ${errCopia.message}`)
+                return
+            }
+            if (data?.datos) {
+                hayCopia = true
+                setOrden(data.datos as OrdenSap)
+                setConsultadoAt(data.consultado_at)
+                setCargando(false)
+            }
+        }
+
+        const consultarSap = async () => {
+            setActualizando(true)
+            try {
+                const r = await fetch(`/api/sap/production-orders/${docNum}`)
                 const data = await r.json().catch(() => ({}))
                 if (!vigente) return
-                if (!r.ok) setError(data.error || `Error al consultar SAP (${r.status})`)
-                else setOrden(data)
-            })
-            .catch(() => { if (vigente) setError('Error de conexión con SAP') })
-            .finally(() => { if (vigente) setCargando(false) })
+                if (!r.ok) throw new Error(data.error || `Error al consultar SAP (${r.status})`)
+                const ahora = new Date().toISOString()
+                setOrden(data)
+                setConsultadoAt(ahora)
+                setError(null)
+                const { data: { user } } = await supabase.auth.getUser()
+                const { error: errGuardar } = await supabase.from('sap_ordenes_detalle')
+                    .upsert({ orden_fabricacion: docNum, datos: data, consultado_at: ahora, consultado_por: user?.email ?? null }, { onConflict: 'orden_fabricacion' })
+                if (errGuardar && vigente) setAvisoCopia(/sap_ordenes_detalle|relation|schema cache/i.test(errGuardar.message)
+                    ? 'No se guardan copias de SAP: ejecute sap_ordenes_detalle.sql en Supabase.'
+                    : `No se pudo guardar la copia de SAP: ${errGuardar.message}`)
+            } catch (e) {
+                if (!vigente) return
+                const msg = e instanceof Error ? e.message : 'Error de conexión con SAP'
+                if (hayCopia) setAvisoCopia(`No se pudo actualizar desde SAP (${msg}). Se muestra la copia guardada.`)
+                else setError(msg === 'Failed to fetch' ? 'Error de conexión con SAP' : msg)
+            } finally {
+                if (vigente) { setActualizando(false); setCargando(false) }
+            }
+        }
+
+        leerCopia().catch(() => {}).finally(() => { if (vigente) consultarSap() })
         return () => { vigente = false }
     }, [ordenFabricacion, recarga])
 
@@ -222,9 +272,14 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setRecarga(n => n + 1)} disabled={cargando}
+                        {consultadoAt && (
+                            <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap" title="Fecha de la última consulta a SAP de esta orden">
+                                {actualizando ? 'Actualizando desde SAP…' : `Datos de SAP del ${new Date(consultadoAt).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}`}
+                            </span>
+                        )}
+                        <button onClick={() => setRecarga(n => n + 1)} disabled={cargando || actualizando}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                            <RefreshCw className={`w-3.5 h-3.5 ${cargando ? 'animate-spin' : ''}`} /> Consultar de nuevo
+                            <RefreshCw className={`w-3.5 h-3.5 ${cargando || actualizando ? 'animate-spin' : ''}`} /> Consultar de nuevo
                         </button>
                         <button onClick={onClose}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs bg-[#324354] text-white hover:bg-[#254153]">
@@ -258,6 +313,12 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }
                                 }`} title={String(valor)}>{valor}</div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {avisoCopia && (
+                    <div className="px-3 py-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-xs font-semibold rounded-lg flex items-start gap-2 shrink-0" role="alert">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" /> <span>{avisoCopia}</span>
                     </div>
                 )}
 

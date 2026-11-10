@@ -10,6 +10,7 @@ import EncabezadoFibra, { useMetricasFibra } from './EncabezadoFibra'
 import HistorySection from './HistorySection'
 import ModalBuscarMolde from '../pintura/ModalBuscarMolde'
 import { moldesDisponiblesOrden } from '@/lib/fibra/moldesOrden'
+import { recargarFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
 
 
 
@@ -143,9 +144,12 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
     const handleSyncSap = async () => {
         setSyncing(true)
         try {
-            await fetch('/api/sap/ordenes-liberadas', { cache: 'no-store' })
-            await loadOrdenes()
-            setNotification({ message: 'Órdenes actualizadas y sincronizadas desde SAP correctamente', type: 'success' })
+            const res = await fetch('/api/sap/ordenes-liberadas', { cache: 'no-store' })
+            const json = await res.json().catch(() => null)
+            await Promise.all([loadOrdenes(), recargarFechasSemaforoFv()])
+            setNotification(json?.avisoFechasSemaforo
+                ? { message: `Órdenes actualizadas. ${json.avisoFechasSemaforo}`, type: 'error' }
+                : { message: 'Órdenes actualizadas y sincronizadas desde SAP correctamente', type: 'success' })
         } catch (e) {
             await loadOrdenes()
             setNotification({ message: 'Órdenes recargadas', type: 'success' })

@@ -17,6 +17,7 @@ import ParametrosFibraModule from '@/components/fibra/parametros/ParametrosFibra
 import AdministracionFibraModule from '@/components/fibra/administracion/AdministracionFibraModule'
 import MapaProcesosFibraModule from '@/components/fibra/mapa/MapaProcesosFibraModule'
 import PlanosFibraModule from '@/components/fibra/planos/PlanosFibraModule'
+import MoldesFibraModule from '@/components/fibra/moldes/MoldesFibraModule'
 
 
 
@@ -369,6 +370,22 @@ export default function FibraPage() {
                             <span>Planos</span>
                         </button>
 
+                        {/* Moldes: consulta para cualquier usuario de la planta; liberar pide el permiso de Administración */}
+                        <button
+                            onClick={() => setActiveModule('moldes')}
+                            title={sidebarOpen ? undefined : 'Moldes'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'moldes'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {/* Cajas apiladas: moldes */}
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l4-2 4 2v5l-4 2-4-2zM13 7l4-2 4 2v5l-4 2-4-2zM8 14l4-2 4 2v5l-4 2-4-2z" />
+                            </svg>
+                            <span>Moldes</span>
+                        </button>
+
                         {/* Mapa de procesos: solo consulta, sin permiso propio */}
                         <button
                             onClick={() => setActiveModule('mapa')}
@@ -392,6 +409,8 @@ export default function FibraPage() {
                     <div className="h-full overflow-y-auto">
                         {activeModule === 'mapa' ? (
                             <MapaProcesosFibraModule />
+                        ) : activeModule === 'moldes' ? (
+                            <MoldesFibraModule puedeLiberar={hasPermission('administracion')} />
                         ) : activeModule === 'planos' ? (
                             <PlanosFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'pintura' && hasPermission('pintura') ? (
