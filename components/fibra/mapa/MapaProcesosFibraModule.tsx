@@ -149,14 +149,17 @@ const TRAMOS: Tramo[] = [
     { id: 'cedi', proceso: 'cedi', estados: ['Cedi'], zonas: ['cedi'] }
 ]
 const TODOS_ESTADOS = TRAMOS.flatMap(t => t.estados)
-// regreso = estado al que vuelve una pieza que se devuelve a la zona desde un proceso posterior (hacia adelante,
-// Pintura/Vaciado/Desmolde se registran desde sus módulos)
+// regreso = estado que toma una pieza de otro tramo al soltarla en Pintura, Zona Curado, Vaciado o Desmolde,
+// sea hacia adelante (p. ej. Pintura → Curado de abajo = Vaciado) o devolviéndola desde un proceso posterior
 const ESTADO_REGRESO: Record<string, string> = { pintura: 'Pintura', vaciado: 'Vaciado' }
-const esRegreso = (z: Zona, estado: string) => {
+const indiceTramo = (estado: string) => TRAMOS.findIndex(t => t.estados.includes(estado))
+const cambiaEstadoEn = (z: Zona, estado: string) => {
     if (!z.regreso) return false
-    const desde = TRAMOS.findIndex(t => t.estados.includes(estado)), hacia = TRAMOS.findIndex(t => t.estados.includes(ESTADO_REGRESO[z.regreso!]))
-    return hacia >= 0 && desde > hacia
+    const desde = indiceTramo(estado), hacia = indiceTramo(ESTADO_REGRESO[z.regreso])
+    return hacia >= 0 && desde >= 0 && desde !== hacia
 }
+// ¿Es devolución (viene de un proceso posterior)?
+const esRegreso = (z: Zona, estado: string) => cambiaEstadoEn(z, estado) && indiceTramo(estado) > indiceTramo(ESTADO_REGRESO[z.regreso!])
 const tramoDeEstado = (estado: string) => TRAMOS.find(t => t.estados.includes(estado))
 const mesasDeTramo = (t: Tramo) => MESAS.filter(m => t.zonas.includes(m.zona.id) && !m.zona.fueraDeCupo).length
 const tramoDeProceso = (procesoId: string) => TRAMOS.find(t => t.proceso === procesoId)
@@ -426,7 +429,7 @@ export default function MapaProcesosFibraModule() {
         if ((ocupante && (!m.zona.auto || ocupante.mesa === m.id)) || arrastre.mesa === m.id) return false
         if (arrastre.nueva) return !!(m.zona.crear || m.zona.destino)
         const t = tramoDeEstado(arrastre.estado)
-        return (!!t && t.zonas.includes(m.zona.id)) || !!m.zona.destino || esRegreso(m.zona, arrastre.estado)
+        return (!!t && t.zonas.includes(m.zona.id)) || !!m.zona.destino || cambiaEstadoEn(m.zona, arrastre.estado)
     }
     const puedeEnProceso = (p: Proceso) => {
         if (SOLO_POR_MODULO.has(p.id)) return false
