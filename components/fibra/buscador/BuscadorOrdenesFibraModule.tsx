@@ -1,5 +1,6 @@
 'use client'
 
+import { ordenarPorFechaT } from '@/lib/fibra/ordenT'
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
@@ -77,7 +78,7 @@ export default function BuscadorOrdenesFibraModule() {
             getAllMoldes()
         ])
         if (error) setError(`No se pudieron cargar las órdenes: ${error.message}`)
-        else setOrdenes(data || [])
+        else setOrdenes(await ordenarPorFechaT(data || []))  // más atrasado primero por la T del Semáforo
         setTrazabilidad(trazaHoy)
         setMoldes(moldesData)
         setCargando(false)

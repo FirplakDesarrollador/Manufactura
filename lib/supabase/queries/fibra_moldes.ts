@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { lugarPieza } from '@/lib/fibra/procesoActual'
 import { liberarMolde, requireUserId } from './helpers'
+import { moverPiezaFibra } from './fibra_administracion'
+import { registrarMovimientosFv, OrigenMovimientoFv } from '@/lib/fibra/movimientos'
 
 // Módulo Moldes (Control de piso FV): todos los moldes agrupados por tipo, con su estado y dónde está la pieza
 // que lo ocupa. Una pieza ocupa su molde mientras está en Pintura o Vaciado (en FV y en MS); al salir de Vaciado
@@ -94,12 +96,51 @@ export async function getMoldesUbicados(): Promise<MoldeUbicado[]> {
     })
 }
 
-// Libera uno o varios moldes (quedan Disponibles; si están en reparación o por desmanchar conservan ese estado)
-export async function liberarMoldes(ids: number[], usuarioEmail: string) {
+// Pieza de Fibra que ocupa cada molde (Pintura/Vaciado), para el selector de molde del mapa
+export async function ocupacionMoldesFv(moldeIds: number[]): Promise<Map<number, OcupacionMolde & { registrer: string }>> {
+    const res = new Map<number, OcupacionMolde & { registrer: string }>()
+    if (moldeIds.length === 0) return res
+    const { data, error } = await supabase.from('trazabilidad_fv')
+        .select('registrer, molde_id, estado, mesa_fv, orden_fabricacion_id, pintura_fecha')
+        .in('molde_id', moldeIds).in('estado', ESTADOS_CON_MOLDE)
+    if (error) throw new Error(`No se pudo revisar qué piezas ocupan los moldes: [${error.code}] ${error.message}`)
+    const ids = [...new Set((data || []).map(p => p.orden_fabricacion_id).filter(Boolean))]
+    const { data: ofs } = ids.length ? await supabase.from('ordenes_fabricacion_fv').select('id, orden_fabricacion').in('id', ids) : { data: [] }
+    const ofPorId = new Map((ofs || []).map(o => [o.id, String(o.orden_fabricacion ?? '')]))
+    for (const p of data || []) {
+        const actual = res.get(p.molde_id)
+        if (actual && (actual.fecha || '') > (p.pintura_fecha || '')) continue
+        res.set(p.molde_id, {
+            planta: 'FV', registrer: String(p.registrer), of: ofPorId.get(p.orden_fabricacion_id) || '¿?', estado: p.estado,
+            lugar: lugarPieza(p.estado, p.mesa_fv ?? null), fecha: p.pintura_fecha
+        })
+    }
+    return res
+}
+
+// Libera un molde para volver a pintar con él. Si una pieza de Fibra lo ocupa (Pintura/Vaciado), esa pieza pasa a
+// Pulido (se asume desmoldada): así la trazabilidad y el estado del molde quedan de acuerdo y Pintura lo acepta.
+// Una pieza de Mármol no se mueve desde aquí. Todo queda en el historial de movimientos.
+export async function liberarMoldeFv(moldeId: number, usuarioEmail: string, origen: OrigenMovimientoFv) {
     await requireUserId(usuarioEmail)
-    for (const id of ids) await liberarMolde(id, usuarioEmail)
-    const { data, error } = await supabase.from('moldes').select('id, estado').in('id', ids)
-    if (error) throw new Error(`No se pudo comprobar la liberación: ${error.message}`)
-    const siguen = (data || []).filter(m => m.estado === 'En uso').length
-    if (siguen > 0) throw new Error(`${siguen} molde(s) siguen En uso: revise los permisos o vuelva a intentar.`)
+    const { data: piezas, error } = await supabase.from('trazabilidad_fv')
+        .select('registrer, estado').eq('molde_id', moldeId).in('estado', ESTADOS_CON_MOLDE)
+    if (error) throw new Error(`No se pudo revisar las piezas del molde: [${error.code}] ${error.message}`)
+    for (const p of piezas || []) {
+        await moverPiezaFibra(String(p.registrer), 'pulido', usuarioEmail, null, origen, `Liberar molde: la pieza estaba en ${p.estado}`)
+    }
+    const { data: antes } = await supabase.from('moldes').select('estado').eq('id', moldeId).maybeSingle()
+    await liberarMolde(moldeId, usuarioEmail)
+    const { data: despues, error: errDespues } = await supabase.from('moldes').select('estado').eq('id', moldeId).maybeSingle()
+    if (errDespues) throw new Error(`No se pudo comprobar la liberación: ${errDespues.message}`)
+    if (despues?.estado === 'En uso') throw new Error('El molde sigue En uso: revise los permisos o vuelva a intentar.')
+    await registrarMovimientosFv([{
+        origen, accion: 'liberar_molde', moldeId, estadoAntes: antes?.estado ?? null, estadoDespues: despues?.estado ?? null,
+        detalle: { piezas_pasadas_a_pulido: (piezas || []).map(p => ({ registrer: String(p.registrer), estado: p.estado })) }
+    }])
+}
+
+// Libera varios moldes (módulo Moldes)
+export async function liberarMoldes(ids: number[], usuarioEmail: string) {
+    for (const id of ids) await liberarMoldeFv(id, usuarioEmail, 'moldes')
 }

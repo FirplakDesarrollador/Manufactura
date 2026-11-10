@@ -8,11 +8,15 @@ import OrdenCard from '@/components/pintura/OrdenCard'
 import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
-import { DestinoMovimientoFv, getPiezasMapaFv, asignarMesaFv, moverPiezaFibra, registrarPiezaProgramadoFv, devolverPiezaAProgramadoFv, PiezaMapaFv } from '@/lib/supabase/queries/fibra_administracion'
-import { moldesDisponiblesOrden } from '@/lib/fibra/moldesOrden'
+import { DestinoMovimientoFv, getPiezasMapaFv, asignarMesaFv, moverPiezaFibra, registrarPiezaProgramadoFv, devolverPiezaAProgramadoFv, registrarKitReparacionFv, PiezaMapaFv } from '@/lib/supabase/queries/fibra_administracion'
+import { esKitReparacion } from '@/lib/fibra/kitReparacion'
+import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
+import { moldesDeOrden } from '@/lib/fibra/moldesOrden'
+import { ocupacionMoldesFv, liberarMoldeFv, OcupacionMolde } from '@/lib/supabase/queries/fibra_moldes'
 import { toast } from 'sonner'
 import ImportarPosicionesFv from './ImportarPosicionesFv'
-import { MapPin as MapaIcon, RefreshCw, AlertTriangle, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Search, X, ChevronDown, FileDown, Loader2, ClipboardPaste } from 'lucide-react'
+import HistorialMovimientosFv from './HistorialMovimientosFv'
+import { MapPin as MapaIcon, RefreshCw, AlertTriangle, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Search, X, ChevronDown, FileDown, Loader2, ClipboardPaste, Unlock, History } from 'lucide-react'
 
 // Mapa de procesos FV, dibujado con las proporciones del layout de la planta. Cada proceso tiene sus mesas físicas
 // y el supervisor ubica cada pieza arrastrándola a su mesa (clic abre el detalle de la orden). Al soltarla en una
@@ -71,11 +75,13 @@ const PROCESOS: Proceso[] = [
 const PROCESO = Object.fromEntries(PROCESOS.map(p => [p.id, p])) as Record<string, Proceso>
 
 // Flechas de flujo (centro en px del plano)
+// Títulos en 2 renglones (como Ensamble 2 / Ensamble 1)
+const DOS_RENGLONES = new Set(['huacales', 'acabado2', 'ensayo', 'pulido'])
 const FLECHAS: { x: number; y: number; dir: 'izq' | 'der' | 'arriba' | 'abajo' }[] = [
     { x: 1066, y: 115, dir: 'izq' }, { x: 1066, y: 141, dir: 'der' },      // Zona Curado ⇄ Vaciado
     { x: 1477, y: 128, dir: 'izq' },                                       // Pintura → Zona Curado
     { x: 1630, y: 170, dir: 'arriba' },                                    // Programado → Pintura
-    { x: 1440, y: 424, dir: 'abajo' },                                     // Zona Curado → Desmolde · Herrajes · Nivelación
+    { x: 1357, y: 404, dir: 'abajo' },                                     // Zona Curado → Desmolde · Herrajes · Nivelación (centrada)
     ...[1252, 942, 534, 422, 212].map(x => ({ x, y: 580, dir: 'izq' as const })),
     { x: 180, y: 426, dir: 'arriba' },                                     // Huacales → Digitado
     { x: 440, y: 335, dir: 'arriba' },                                     // Digitado → Tránsito
@@ -199,6 +205,7 @@ export default function MapaProcesosFibraModule() {
     const [registroNuevo, setRegistroNuevo] = useState<{ pieza: PiezaMesa; destino: DestinoMovimientoFv; mesa: string | null; lugar: string } | null>(null)
     const [moldeElegido, setMoldeElegido] = useState<number | null>(null)
     const [importar, setImportar] = useState(false)
+    const [historial, setHistorial] = useState(false)
 
     const cargar = async () => {
         setCargando(true)
@@ -228,7 +235,41 @@ export default function MapaProcesosFibraModule() {
         if ((detalleOf != null || registroNuevo) && moldes == null) getAllMoldes().then(setMoldes)
     }, [detalleOf, registroNuevo, moldes])
     const ordenNueva = registroNuevo ? ordenes.find(o => o.id === registroNuevo.pieza.ordenId) : undefined
-    const moldesNueva = ordenNueva && moldes ? moldesDisponiblesOrden(ordenNueva, moldes) : []
+    // Moldes de la referencia: libres (Disponible y sin pieza en Pintura/Vaciado) y ocupados (se pueden liberar)
+    const moldesRef = useMemo(() => ordenNueva && moldes ? moldesDeOrden(ordenNueva, moldes) : [], [ordenNueva, moldes])
+    const [ocupacion, setOcupacion] = useState<Map<number, OcupacionMolde & { registrer: string }> | null>(null)
+    const [errorOcupacion, setErrorOcupacion] = useState<string | null>(null)
+    useEffect(() => {
+        if (!registroNuevo || moldes == null) { setOcupacion(null); return }
+        let vigente = true
+        setErrorOcupacion(null)
+        ocupacionMoldesFv(moldesRef.map(m => m.id))
+            .then(o => { if (vigente) setOcupacion(o) })
+            .catch(e => { if (vigente) { setOcupacion(new Map()); setErrorOcupacion(e instanceof Error ? e.message : String(e)) } })
+        return () => { vigente = false }
+    }, [registroNuevo, moldes, moldesRef])
+    const moldesNueva = ocupacion ? moldesRef.filter(m => m.estado === 'Disponible' && !ocupacion.has(m.id)).sort((a, b) => a.vueltas_actuales - b.vueltas_actuales) : []
+    const moldesOcupados = ocupacion ? moldesRef.filter(m => m.estado === 'En uso' || ocupacion.has(m.id)) : []
+    const [liberandoMolde, setLiberandoMolde] = useState<number | null>(null)
+    const liberarParaPintar = async (m: Molde) => {
+        const o = ocupacion?.get(m.id)
+        const texto = o
+            ? `¿Liberar el molde ${m.serial}?\n\nLo ocupa la pieza de la OF ${o.of} en ${o.lugar} (${o.estado}). Esa pieza pasará a PULIDO (se asume que ya se desmoldó) y quedará en el historial.\n\nEl molde quedará Disponible para pintar la OF ${registroNuevo?.pieza.of}.`
+            : `¿Liberar el molde ${m.serial}?\n\nEstá En uso pero ninguna pieza lo ocupa. Quedará Disponible y el cambio quedará en el historial.`
+        if (!confirm(texto)) return
+        setLiberandoMolde(m.id)
+        try {
+            await liberarMoldeFv(m.id, await usuarioActual(), 'mapa')
+            toast.success(`Molde ${m.serial} liberado`)
+            setMoldes(await getAllMoldes())
+            setMoldeElegido(m.id)
+            cargar()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : String(e), { duration: 10000 })
+        } finally {
+            setLiberandoMolde(null)
+        }
+    }
 
     const confirmarRegistroNuevo = () => {
         const r = registroNuevo, moldeId = moldeElegido
@@ -240,6 +281,19 @@ export default function MapaProcesosFibraModule() {
             await registrarPiezaProgramadoFv(r.pieza.ordenId, moldeId, r.destino, await usuarioActual(), r.mesa)
             toast.success(`OF ${r.pieza.of}: pieza registrada en ${r.lugar}`)
         })
+    }
+    // OF soltada desde Programado: pide el molde; un kit de reparación no usa molde y se registra de una vez
+    const abrirRegistroNuevo = (r: { pieza: PiezaMesa; destino: DestinoMovimientoFv; mesa: string | null; lugar: string }) => {
+        if (esKitReparacion(r.pieza.descripcion)) {
+            if (!confirm(`¿Registrar 1 kit de reparación de la OF ${r.pieza.of} en ${r.lugar}?\n\nNo usa molde. Quedará en el historial con su usuario y la hora.`)) return
+            ejecutar(async () => {
+                await registrarKitReparacionFv(r.pieza.ordenId, r.destino, await usuarioActual(), r.mesa)
+                toast.success(`OF ${r.pieza.of}: kit registrado en ${r.lugar}`)
+            })
+            return
+        }
+        setMoldeElegido(null)
+        setRegistroNuevo(r)
     }
     const ordenDetalle = detalleOf != null ? ordenes.find(o => String(o.orden_fabricacion ?? '') === detalleOf) : undefined
 
@@ -353,8 +407,11 @@ export default function MapaProcesosFibraModule() {
     }
 
     // ¿Dónde se puede soltar la pieza que se arrastra?
+    // Tránsito → CEDI (y cualquier entrada a CEDI) solo se registra desde el módulo CEDI, nunca arrastrando en el mapa
+    const SOLO_POR_MODULO = new Set(['cedi'])
     const puedeEnMesa = (m: Mesa) => {
         if (!arrastre) return false
+        if (SOLO_POR_MODULO.has(m.zona.proceso) && tramoDeEstado(arrastre.estado)?.id !== 'cedi') return false
         if (m.zona.auto) {
             if (arrastre.nueva) return !!(m.zona.crear || m.zona.destino)
             const t = tramoDeEstado(arrastre.estado)
@@ -367,6 +424,7 @@ export default function MapaProcesosFibraModule() {
         return (!!t && t.zonas.includes(m.zona.id)) || !!m.zona.destino
     }
     const puedeEnProceso = (p: Proceso) => {
+        if (SOLO_POR_MODULO.has(p.id)) return false
         if (arrastre?.nueva) return !!(p.crear || p.destino)
         if (arrastre && p.id === 'programado') return true
         if (!arrastre || !p.destino) return false
@@ -381,7 +439,7 @@ export default function MapaProcesosFibraModule() {
         const mesaId = m.zona.auto ? null : m.id
         if (pieza.nueva) {
             setMoldeElegido(null)
-            setRegistroNuevo({ pieza, destino: m.zona.crear ?? m.zona.destino!, mesa: mesaId, lugar: m.zona.label })
+            abrirRegistroNuevo({ pieza, destino: m.zona.crear ?? m.zona.destino!, mesa: mesaId, lugar: m.zona.label })
             return
         }
         const t = tramoDeEstado(pieza.estado)
@@ -407,7 +465,7 @@ export default function MapaProcesosFibraModule() {
         if (!pieza || !puedeEnProceso(p)) return
         if (pieza.nueva) {
             setMoldeElegido(null)
-            setRegistroNuevo({ pieza, destino: p.crear ?? p.destino!, mesa: null, lugar: p.label })
+            abrirRegistroNuevo({ pieza, destino: p.crear ?? p.destino!, mesa: null, lugar: p.label })
             return
         }
         if (p.id === 'programado') {
@@ -454,12 +512,21 @@ export default function MapaProcesosFibraModule() {
     )
 
     // Pieza: clic abre el detalle; clic sostenido y arrastrar la lleva a una mesa o a otro proceso
-    const chipPieza = (x: PiezaMesa, estilo: string, enMesa: boolean) => (
+    // Atrasada a cliente: su Fecha Entrega Lote (T del Semáforo) ya pasó. Se resalta todo el recuadro en rojo
+    // FIRPLAK opaco, en cualquier proceso; el verde de la búsqueda tiene prioridad.
+    const fechasSem = useFechasSemaforoFv()
+    const hoyT = new Date().toLocaleDateString('en-CA')
+    const fechaT = (of: string) => fechasSem?.mapa.get(of.trim())?.lote?.slice(0, 10) || null
+    const atrasadaT = (of: string) => { const t = fechaT(of); return !!t && t < hoyT }
+    const ROJO_ATRASO = 'bg-[#d14747]/85 text-white ring-1 ring-[#a93a3a] hover:bg-[#d14747]'
+    const chipPieza = (x: PiezaMesa, estiloBase: string, enMesa: boolean) => {
+        const estilo = atrasadaT(x.of) ? ROJO_ATRASO : estiloBase
+        return (
         <button key={x.registrer} onClick={() => setDetalleOf(x.of)}
             draggable={!moviendo}
             onDragStart={e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', x.registrer); setArrastre(x); setListaAbierta(null) }}
             onDragEnd={terminarArrastre}
-            title={`OF ${x.of} · ${x.descripcion || 'sin descripción'} · pieza ${x.registrer} (${x.estado}) · clic para ver el detalle · clic sostenido y arrastrar a una mesa o a otro proceso`}
+            title={`OF ${x.of} · ${x.descripcion || 'sin descripción'} · pieza ${x.registrer} (${x.estado}) · Entrega Lote (T) ${fechaT(x.of)?.split('-').reverse().join('/') || 'sin fecha'}${atrasadaT(x.of) ? ' (ATRASADA A CLIENTE)' : ''} · clic para ver el detalle · clic sostenido y arrastrar a una mesa o a otro proceso`}
             className={`${enMesa ? 'w-full h-full flex flex-col items-center justify-center text-center px-0.5 overflow-hidden' : 'max-w-full flex items-baseline gap-0.5 text-[9px] px-1 leading-[14px] whitespace-nowrap'} font-bold rounded cursor-grab active:cursor-grabbing ${arrastre?.registrer === x.registrer ? 'opacity-40' : ''} ${coincide(x) ? 'bg-[#59a96a] text-white ring-2 ring-[#3b8f50]' : estilo}`}>
             {enMesa ? (
                 <>
@@ -473,7 +540,8 @@ export default function MapaProcesosFibraModule() {
                 </>
             )}
         </button>
-    )
+        )
+    }
 
     const mesa = (m: Mesa) => {
         const ocupada = mesas.enMesa[m.id]
@@ -543,11 +611,21 @@ export default function MapaProcesosFibraModule() {
                         style={p.id === 'ensamble' ? { gridTemplateColumns: '1fr 1fr 2fr' } : undefined}>
                         {p.nombres.map(n => <span key={n} className="text-[11px] font-black text-[#25323f] leading-tight px-0.5 text-center whitespace-pre-line">{n}</span>)}
                     </div>
+                ) : DOS_RENGLONES.has(p.id) ? (
+                    // Huacales, Acabado 2, Ensayo y Pulido: en 2 renglones como Ensamble 2 / Ensamble 1
+                    // (nombre arriba; abajo el número o el contador)
+                    <div className="flex flex-col items-center w-full">
+                        <span className="text-[11px] font-black text-[#25323f] leading-tight text-center whitespace-pre-line">{p.label.replace(/ (\d+)$/, '\n$1')}</span>
+                        <div className="flex items-center justify-center gap-1">
+                            {tramo && avisoSinMesa(tramo, ESTILO[p.tipo].chip)}
+                            {contadorProceso(p)}
+                        </div>
+                    </div>
                 ) : (
                     <span className="text-[12px] font-black text-[#25323f] leading-tight min-w-0">{p.label}</span>
                 )}
-                {tramo && avisoSinMesa(tramo, ESTILO[p.tipo].chip)}
-                {contadorProceso(p)}
+                {!DOS_RENGLONES.has(p.id) && tramo && avisoSinMesa(tramo, ESTILO[p.tipo].chip)}
+                {!DOS_RENGLONES.has(p.id) && contadorProceso(p)}
             </div>
         )
     }
@@ -580,10 +658,10 @@ export default function MapaProcesosFibraModule() {
                                         setArrastre({ registrer: 'nueva:' + x.of, of: x.of, ordenId: x.ordenId, estado: '', mesa: null, nombre: x.nombre, descripcion: x.descripcion, nueva: true })
                                     }}
                                     onDragEnd={terminarArrastre}
-                                    title={`OF ${x.of} · ${x.descripcion || 'sin descripción'} · ${x.piezas} pieza(s) pendientes · F. Ideal Producción ${x.fecha ? x.fecha.split('-').reverse().join('/') : 'sin fecha'}${x.fecha && x.fecha < hoyIso ? ' (ATRASADA)' : ''} · clic para ver el detalle · arrastrar a una mesa o proceso para registrar 1 pieza (se pide el molde)`}
-                                    className={`w-full min-w-0 flex items-baseline gap-0.5 text-[9px] font-bold px-1 rounded leading-[14px] whitespace-nowrap cursor-grab active:cursor-grabbing ${arrastre?.registrer === 'nueva:' + x.of ? 'opacity-40' : ''} ${coincide(x) ? 'bg-[#59a96a] text-white ring-2 ring-[#3b8f50]' : estilo.chip}`}>
+                                    title={`OF ${x.of} · ${x.descripcion || 'sin descripción'} · ${x.piezas} pieza(s) pendientes · Entrega Lote (T) ${fechaT(x.of)?.split('-').reverse().join('/') || 'sin fecha'}${atrasadaT(x.of) ? ' (ATRASADA A CLIENTE)' : ''} · clic para ver el detalle · arrastrar a una mesa o proceso para registrar 1 pieza (se pide el molde)`}
+                                    className={`w-full min-w-0 flex items-baseline gap-0.5 text-[9px] font-bold px-1 rounded leading-[14px] whitespace-nowrap cursor-grab active:cursor-grabbing ${arrastre?.registrer === 'nueva:' + x.of ? 'opacity-40' : ''} ${coincide(x) ? 'bg-[#59a96a] text-white ring-2 ring-[#3b8f50]' : atrasadaT(x.of) ? ROJO_ATRASO : estilo.chip}`}>
                                     {x.nombre && nombreCortado(x.nombre, 'min-w-0 flex-1')}
-                                    <span className={`font-mono font-black shrink-0 ml-auto ${x.fecha && x.fecha < hoyIso && !coincide(x) ? 'text-red-600' : ''}`}>{x.of.slice(-4)}</span>
+                                    <span className="font-mono font-black shrink-0 ml-auto">{x.of.slice(-4)}</span>
                                     {x.piezas > 1 && <sup className="shrink-0 text-[7px]">×{x.piezas}</sup>}
                                 </button>
                             ))}
@@ -613,6 +691,11 @@ export default function MapaProcesosFibraModule() {
                         title="Pegar las filas del Excel (Nro OP … PROCESO) y ubicar cada pieza en su proceso"
                         className="h-7 px-3 flex items-center gap-1.5 rounded-lg border border-[#324354] text-[#324354] bg-white text-[11px] font-bold hover:bg-[#F6F3EE] disabled:opacity-50 whitespace-nowrap">
                         <ClipboardPaste size={14} /> Ubicar desde Excel
+                    </button>
+                    <button onClick={() => setHistorial(true)}
+                        title="Quién movió qué pieza, cuándo y de dónde a dónde (mapa, Excel, Moldes y Administración)"
+                        className="h-7 px-3 flex items-center gap-1.5 rounded-lg border border-[#324354] text-[#324354] bg-white text-[11px] font-bold hover:bg-[#F6F3EE] whitespace-nowrap">
+                        <History size={14} /> Historial
                     </button>
                     </div>
                     <div className="ml-auto flex items-center gap-1.5 text-[10px] text-slate-500 whitespace-nowrap min-[1200px]:justify-self-end">
@@ -653,13 +736,16 @@ export default function MapaProcesosFibraModule() {
                             {PROCESOS.map(caja)}
                             {PROCESOS.map(etiqueta)}
 
-                            {/* Leyenda */}
-                            <div className="absolute flex items-end justify-center gap-3 text-[10px] font-semibold text-slate-600" style={pos([530, 694, 1250, 716])}>
+                            {/* Leyenda: 2 renglones (3 + 2) dentro del hueco entre Reparación y Soldadura, sin montarse en los recuadros */}
+                            <div className="absolute grid grid-cols-[auto_auto_auto] content-end justify-center gap-x-4 gap-y-0.5 text-[9px] leading-tight font-semibold text-slate-600 overflow-hidden" style={pos([540, 672, 1240, 716])}>
                                 {(Object.keys(ESTILO) as TipoProceso[]).map(t => (
-                                    <span key={t} className="flex items-center gap-1.5 whitespace-nowrap">
-                                        <span className={`w-3 h-3 rounded-sm border shrink-0 ${ESTILO[t].caja}`} /> {ESTILO[t].label}
+                                    <span key={t} className="flex items-center gap-1 whitespace-nowrap">
+                                        <span className={`w-2.5 h-2.5 rounded-sm border shrink-0 ${ESTILO[t].caja}`} /> {ESTILO[t].label}
                                     </span>
                                 ))}
+                                <span className="flex items-center gap-1 whitespace-nowrap" title="La Fecha Entrega Lote (columna T del Semáforo) ya pasó">
+                                    <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-[#d14747]/85 ring-1 ring-[#a93a3a]" /> Atrasada a cliente (T vencida)
+                                </span>
                             </div>
 
                             {/* Zona Curado: arriba las pintadas que van para Vaciado, abajo las vaciadas que van para Desmolde */}
@@ -667,8 +753,8 @@ export default function MapaProcesosFibraModule() {
 
                             {MESAS.map(mesa)}
 
-                            {/* Zona Curado → Desmolde · Herrajes · Nivelación */}
-                            <div className="absolute w-[3px] bg-[#00b050] -translate-x-1/2" style={{ ...punto(1440, 370), height: `${((424 - 370) / ALTO) * 100}%` }} />
+                            {/* Zona Curado → Desmolde · Herrajes · Nivelación: centrada sobre Desmolde y separada del recuadro gris */}
+                            <div className="absolute w-[3px] bg-[#00b050] -translate-x-1/2" style={{ ...punto(1357, 378), height: `${((404 - 378) / ALTO) * 100}%` }} />
 
                             {FLECHAS.map((f, i) => {
                                 const Icono = ICONO_FLECHA[f.dir]
@@ -690,22 +776,50 @@ export default function MapaProcesosFibraModule() {
                             <p className="text-xs text-slate-600">{registroNuevo.pieza.descripcion}</p>
                             <p className="text-xs font-bold text-slate-700 mt-1">Se registra como en Pintura (molde en uso) y la pieza queda en <b>{registroNuevo.lugar}</b>.</p>
                         </div>
-                        <div className="text-[10px] font-black uppercase text-slate-500">Molde</div>
-                        <div className="flex-1 min-h-0 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
-                            {moldes == null ? (
-                                <div className="p-4 text-center text-sm text-slate-500 font-bold">Cargando moldes...</div>
-                            ) : moldesNueva.length === 0 ? (
-                                <div className="p-3 bg-red-50 text-red-800 text-sm font-bold flex items-start gap-2" role="alert">
-                                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" /> No hay moldes disponibles para esta orden. Libere o revise los moldes en Pintura.
-                                </div>
-                            ) : moldesNueva.map(m => (
-                                <label key={m.id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${moldeElegido === m.id ? 'bg-[#324354]/10' : 'hover:bg-slate-50'}`}>
-                                    <input type="radio" name="molde-nuevo" checked={moldeElegido === m.id} onChange={() => setMoldeElegido(m.id)} />
-                                    <span className="font-mono font-black text-[#324354] text-sm">{m.serial}</span>
-                                    <span className="text-xs text-slate-600 truncate flex-1">{m.molde_descripcion}</span>
-                                    <span className="text-[10px] font-bold text-slate-500 shrink-0">{m.vueltas_actuales} vueltas</span>
-                                </label>
-                            ))}
+                        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
+                            <div className="text-[10px] font-black uppercase text-slate-500">Moldes disponibles</div>
+                            <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
+                                {moldes == null || ocupacion == null ? (
+                                    <div className="p-4 text-center text-sm text-slate-500 font-bold">Cargando moldes...</div>
+                                ) : moldesNueva.length === 0 ? (
+                                    <div className="p-3 bg-red-50 text-red-800 text-sm font-bold flex items-start gap-2 rounded-xl" role="alert">
+                                        <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                                        {moldesOcupados.length > 0 ? 'No hay moldes libres para esta orden. Libere uno de los ocupados de abajo.' : 'Esta referencia no tiene moldes libres ni ocupados (revise los moldes en reparación en el módulo Moldes).'}
+                                    </div>
+                                ) : moldesNueva.map(m => (
+                                    <label key={m.id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${moldeElegido === m.id ? 'bg-[#324354]/10' : 'hover:bg-slate-50'}`}>
+                                        <input type="radio" name="molde-nuevo" checked={moldeElegido === m.id} onChange={() => setMoldeElegido(m.id)} />
+                                        <span className="font-mono font-black text-[#324354] text-sm">{m.serial}</span>
+                                        <span className="text-xs text-slate-600 truncate flex-1">{m.molde_descripcion}</span>
+                                        <span className="text-[10px] font-bold text-slate-500 shrink-0">{m.vueltas_actuales} vueltas</span>
+                                    </label>
+                                ))}
+                            </div>
+                            {errorOcupacion && (
+                                <div className="p-2 bg-red-50 border border-red-300 text-red-800 text-xs font-bold rounded-lg" role="alert">{errorOcupacion}</div>
+                            )}
+                            {moldesOcupados.length > 0 && (
+                                <>
+                                    <div className="text-[10px] font-black uppercase text-slate-500 mt-1">Moldes ocupados · liberar para pintar</div>
+                                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
+                                        {moldesOcupados.map(m => {
+                                            const o = ocupacion?.get(m.id)
+                                            return (
+                                                <div key={m.id} className="flex items-center gap-2 px-3 py-2">
+                                                    <span className="font-mono font-black text-[#324354] text-sm">{m.serial}</span>
+                                                    <span className={`text-xs flex-1 min-w-0 ${o ? 'text-blue-800 font-semibold' : 'text-red-700 font-bold'}`}>
+                                                        {o ? `OF ${o.of} · ${o.lugar}` : 'En uso sin pieza'}
+                                                    </span>
+                                                    <button onClick={() => liberarParaPintar(m)} disabled={liberandoMolde != null || moviendo}
+                                                        className="shrink-0 h-6 px-2 flex items-center gap-1 rounded-md bg-red-600 text-white text-[10px] font-black hover:bg-red-700 disabled:opacity-40">
+                                                        {liberandoMolde === m.id ? <Loader2 size={11} className="animate-spin" /> : <Unlock size={11} />} Liberar
+                                                    </button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </>
+                            )}
                         </div>
                         <div className="flex justify-end gap-2 pt-2 border-t border-[#e2ded5]">
                             <button onClick={() => setRegistroNuevo(null)} className="px-3 py-1.5 rounded-lg font-bold text-xs bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">Cancelar</button>
@@ -715,6 +829,8 @@ export default function MapaProcesosFibraModule() {
                     </div>
                 </div>
             )}
+
+            {historial && <HistorialMovimientosFv onCerrar={() => setHistorial(false)} ofInicial={busqueda.trim()} />}
 
             {importar && (
                 <ImportarPosicionesFv ordenes={ordenes} piezas={piezasMapa} mesasZona={MESAS_ZONA} usuarioActual={usuarioActual}

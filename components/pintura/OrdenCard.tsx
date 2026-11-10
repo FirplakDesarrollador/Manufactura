@@ -126,10 +126,12 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                         ) : (
                             <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] leading-tight border border-slate-200 rounded px-1.5 py-1 bg-slate-50"
                                 title={fechasSem.actualizadas ? `Fechas del Semáforo traídas el ${new Date(fechasSem.actualizadas).toLocaleString('es-CO')}` : undefined}>
-                                <span><b className="text-slate-500">Entrega Lote (T):</b> <b className="text-[#324354]">{fechaCorta(fechasSem.lote)}</b></span>
+                                {/* Orden de las columnas del Semáforo: O, T, W, AF */}
                                 <span><b className="text-slate-500">Real Liberación (O):</b> <b className="text-[#324354]">{fechaCorta(fechasSem.realLib)}</b></span>
-                                <span><b className="text-slate-500">Ideal Entrega Prod. (W):</b> <b className={fechasSem.idealW && fechasSem.idealW < hoyIso ? 'text-red-600' : 'text-[#324354]'}>{fechaCorta(fechasSem.idealW)}</b></span>
-                                <span><b className="text-slate-500">Prometida (AF):</b> <b className={fechasSem.prometida && fechasSem.prometida < hoyIso ? 'text-red-600' : 'text-[#324354]'}>{fechaCorta(fechasSem.prometida)}</b></span>
+                                {/* Solo la T (la que ordena todos los módulos) se marca en rojo cuando está atrasada */}
+                                <span><b className="text-slate-500">Entrega Lote (T):</b> <b className={fechasSem.lote && fechasSem.lote < hoyIso ? 'text-red-600' : 'text-[#324354]'}>{fechaCorta(fechasSem.lote)}</b></span>
+                                <span title="NS = Nivel de Servicio"><b className="text-slate-500">Ideal Entrega Prod. [NS] (W):</b> <b className="text-[#324354]">{fechaCorta(fechasSem.idealW)}</b></span>
+                                <span><b className="text-slate-500">Prometida (AF):</b> <b className="text-[#324354]">{fechaCorta(fechasSem.prometida)}</b></span>
                             </div>
                         )
                     )}

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
 import { liberarMolde, requireUserId } from './helpers'
 import { registrarPintura } from './fibra'
+import { fotoPiezaFv, registrarMovimientosFv, MovimientoFv, OrigenMovimientoFv } from '@/lib/fibra/movimientos'
 
 export async function updateOrdenFabricacion(id: number, data: Partial<OrdenFabricacion>) {
     // Only allow fields that exist in the actual table
@@ -59,8 +60,8 @@ export async function deleteOrdenFabricacion(id: number) {
 // Si la pieza ocupaba su molde (Pintura/Vaciado) y tras editarla o borrarla ya no lo ocupa, libera el molde
 // (así no quedan moldes "En uso" sin pieza).
 async function leerOcupacionMolde(registrer: string) {
-    const { data } = await supabase.from('trazabilidad_fv').select('estado, molde_id').eq('registrer', registrer).maybeSingle()
-    return data as { estado: string; molde_id: number | null } | null
+    const { data } = await supabase.from('trazabilidad_fv').select('estado, molde_id, orden_fabricacion_id').eq('registrer', registrer).maybeSingle()
+    return data as { estado: string; molde_id: number | null; orden_fabricacion_id: number | null } | null
 }
 async function liberarMoldeSiQuedoSinPieza(antes: { estado: string; molde_id: number | null } | null, despues: { estado?: string; molde_id?: number | null } | null) {
     if (!antes?.molde_id || !['Pintura', 'Vaciado'].includes(antes.estado)) return
@@ -132,6 +133,12 @@ export async function updateRegistroTrazabilidad(idOrRegistrer: string | number,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nuevo = filteredData as any
     await liberarMoldeSiQuedoSinPieza(antes, { estado: nuevo.estado, molde_id: nuevo.molde_id })
+    await registrarMovimientosFv([{
+        origen: 'administracion', accion: 'editar_registro', registrer: String(idOrRegistrer),
+        ordenId: nuevo.orden_fabricacion_id ?? antes?.orden_fabricacion_id ?? null,
+        estadoAntes: antes?.estado ?? null, estadoDespues: nuevo.estado ?? antes?.estado ?? null,
+        moldeId: nuevo.molde_id ?? antes?.molde_id ?? null, detalle: { campos: filteredData }
+    }])
 }
 
 export async function deleteRegistroTrazabilidad(idOrRegistrer: string | number) {
@@ -146,6 +153,10 @@ export async function deleteRegistroTrazabilidad(idOrRegistrer: string | number)
         throw error
     }
     await liberarMoldeSiQuedoSinPieza(antes, null)
+    await registrarMovimientosFv([{
+        origen: 'administracion', accion: 'eliminar_registro', registrer: String(idOrRegistrer),
+        ordenId: antes?.orden_fabricacion_id ?? null, estadoAntes: antes?.estado ?? null, moldeId: antes?.molde_id ?? null
+    }])
 }
 
 // Movimiento manual desde el Mapa de procesos FV: pasa todas las piezas de una OF que están en los estados de origen
@@ -192,6 +203,10 @@ export async function moverPiezasOrdenFibra(ordenId: number, estadosOrigen: stri
     // Al salir de vaciado se libera el molde, igual que en Pulido
     for (const p of piezas) if (p.estado === 'Vaciado' && p.molde_id) await liberarMolde(p.molde_id, usuarioEmail)
 
+    await registrarMovimientosFv(piezas.map(p => ({
+        origen: 'mapa' as const, accion: 'mover' as const, registrer: String(p.registrer), ordenId,
+        estadoAntes: p.estado, estadoDespues: d.estado, moldeId: p.molde_id ?? null, detalle: { destino, toda_la_orden: true }
+    })))
     return movidas.length
 }
 
@@ -220,7 +235,9 @@ export async function getPiezasMapaFv(ordenIds: number[], estados: string[]): Pr
     return piezas
 }
 
-export async function asignarMesaFv(registrer: string, mesa: string | null) {
+// ----- Operaciones sin historial (las usan las funciones públicas de abajo, que registran el movimiento) -----
+
+async function ponerMesa(registrer: string, mesa: string | null) {
     const { data, error } = await supabase
         .from('trazabilidad_fv')
         .update({ mesa_fv: mesa })
@@ -233,16 +250,25 @@ export async function asignarMesaFv(registrer: string, mesa: string | null) {
     if (!data || data.length === 0) throw new Error('No se actualizó la pieza. Revise los permisos o vuelva a intentar.')
 }
 
-// Mueve una sola pieza a otro proceso (cambia su estado y lo registra en la trazabilidad) y la deja en la mesa
-// indicada o sin mesa. Si sale de Vaciado se libera el molde, igual que en Pulido.
-export async function moverPiezaFibra(registrer: string, destino: DestinoMovimientoFv, usuarioEmail: string, mesa: string | null = null) {
+const OCUPAN_MOLDE = ['Pintura', 'Vaciado']
+
+// Cambia el estado de la pieza y deja la fecha y el usuario del proceso. El molde se libera cuando la pieza sale
+// de Pintura/Vaciado hacia Pulido o más adelante; si vuelve a Pintura/Vaciado desde un proceso posterior, el molde
+// vuelve a quedar En uso (y no se permite si ya lo ocupa otra pieza).
+async function cambiarEstadoPieza(registrer: string, antes: FotoPiezaFvLocal, destino: DestinoMovimientoFv, usuarioEmail: string, mesa: string | null) {
     const userId = await requireUserId(usuarioEmail)
     const d = DESTINOS_MOVIMIENTO_FV[destino]
-    const { data: actual } = await supabase
-        .from('trazabilidad_fv')
-        .select('estado, molde_id')
-        .eq('registrer', registrer)
-        .maybeSingle()
+    const entraAMolde = OCUPAN_MOLDE.includes(d.estado) && !OCUPAN_MOLDE.includes(antes.estado) && antes.moldeId != null
+    if (entraAMolde) {
+        const { data: otra, error: errOtra } = await supabase.from('trazabilidad_fv')
+            .select('registrer, estado, orden_fabricacion_id').eq('molde_id', antes.moldeId as number)
+            .in('estado', OCUPAN_MOLDE).neq('registrer', registrer).limit(1)
+        if (errOtra) throw new Error(`No se pudo revisar el molde de la pieza: ${errOtra.message}`)
+        if (otra && otra.length > 0) {
+            const { data: o } = await supabase.from('ordenes_fabricacion_fv').select('orden_fabricacion').eq('id', otra[0].orden_fabricacion_id).maybeSingle()
+            throw new Error(`No se puede devolver la pieza a ${d.estado}: su molde lo ocupa ahora otra pieza (OF ${o?.orden_fabricacion ?? '¿?'} en ${otra[0].estado}). Libere ese molde primero.`)
+        }
+    }
     const { data, error } = await supabase
         .from('trazabilidad_fv')
         .update({ estado: d.estado, [d.fecha]: new Date().toISOString(), [d.usuario]: userId, mesa_fv: mesa })
@@ -253,23 +279,54 @@ export async function moverPiezaFibra(registrer: string, destino: DestinoMovimie
         throw new Error(`No se pudo mover la pieza: [${error.code}] ${error.message}`)
     }
     if (!data || data.length === 0) throw new Error('No se movió la pieza. Revise los permisos o vuelva a intentar.')
-    // El molde se libera cuando la pieza sale de Pintura/Vaciado hacia Pulido o más adelante
-    const conMolde = destino === 'pintura' || destino === 'vaciado'
-    if ((actual?.estado === 'Vaciado' || actual?.estado === 'Pintura') && !conMolde && actual.molde_id) await liberarMolde(actual.molde_id, usuarioEmail)
+    if (OCUPAN_MOLDE.includes(antes.estado) && !OCUPAN_MOLDE.includes(d.estado) && antes.moldeId) await liberarMolde(antes.moldeId, usuarioEmail)
+    if (entraAMolde) {
+        const { error: errMolde } = await supabase.from('moldes')
+            .update({ estado: 'En uso', modificado_por: usuarioEmail, modified_at: new Date().toISOString() })
+            .eq('id', antes.moldeId as number).eq('estado', 'Disponible')
+        if (errMolde) throw new Error(`La pieza se movió, pero no se pudo marcar su molde En uso: ${errMolde.message}`)
+    }
+}
+
+type FotoPiezaFvLocal = { estado: string; mesa: string | null; moldeId: number | null; ordenId: number | null }
+async function fotoObligatoria(registrer: string): Promise<FotoPiezaFvLocal> {
+    const foto = await fotoPiezaFv(registrer)
+    if (!foto) throw new Error('La pieza ya no existe en la trazabilidad. Actualice el mapa.')
+    return foto
+}
+
+// ----- Funciones públicas: cada una deja el movimiento en el historial (movimientos_fv) -----
+
+// Ubica la pieza en una mesa (o la deja sin mesa) dentro de su mismo proceso
+export async function asignarMesaFv(registrer: string, mesa: string | null, origen: OrigenMovimientoFv = 'mapa') {
+    const antes = await fotoObligatoria(registrer)
+    await ponerMesa(registrer, mesa)
+    await registrarMovimientosFv([{
+        origen, accion: mesa ? 'cambiar_mesa' : 'quitar_mesa', registrer, ordenId: antes.ordenId,
+        estadoAntes: antes.estado, estadoDespues: antes.estado, mesaAntes: antes.mesa, mesaDespues: mesa, moldeId: antes.moldeId
+    }])
+}
+
+// Mueve una sola pieza a otro proceso (cambia su estado y lo registra en la trazabilidad) y la deja en la mesa
+// indicada o sin mesa.
+export async function moverPiezaFibra(registrer: string, destino: DestinoMovimientoFv, usuarioEmail: string, mesa: string | null = null, origen: OrigenMovimientoFv = 'mapa', motivo?: string) {
+    const antes = await fotoObligatoria(registrer)
+    await cambiarEstadoPieza(registrer, antes, destino, usuarioEmail, mesa)
+    await registrarMovimientosFv([{
+        origen, accion: 'mover', registrer, ordenId: antes.ordenId,
+        estadoAntes: antes.estado, estadoDespues: DESTINOS_MOVIMIENTO_FV[destino].estado,
+        mesaAntes: antes.mesa, mesaDespues: mesa, moldeId: antes.moldeId,
+        detalle: { destino, ...(motivo ? { motivo } : {}) }
+    }])
 }
 
 // Devuelve una pieza a Programado (pendiente por pintar) desde cualquier proceso: se borra su registro de
-// trazabilidad, con lo que se pierde el historial de la pieza y del molde con que se pintó. Si la pieza aún
-// ocupaba el molde (Pintura/Vaciado) se libera. Las vueltas del molde no se tocan.
-export async function devolverPiezaAProgramadoFv(registrer: string, usuarioEmail: string) {
+// trazabilidad. Queda en el historial (movimientos_fv) con su estado, mesa y molde. Si la pieza aún ocupaba el
+// molde (Pintura/Vaciado) se libera. Las vueltas del molde no se tocan.
+export async function devolverPiezaAProgramadoFv(registrer: string, usuarioEmail: string, origen: OrigenMovimientoFv = 'mapa') {
     await requireUserId(usuarioEmail)
-    const { data: actual, error: errorLeer } = await supabase
-        .from('trazabilidad_fv')
-        .select('estado, molde_id')
-        .eq('registrer', registrer)
-        .maybeSingle()
-    if (errorLeer) throw new Error(`No se pudo leer la pieza: [${errorLeer.code}] ${errorLeer.message}`)
-    if (!actual) throw new Error('La pieza ya no existe en la trazabilidad. Actualice el mapa.')
+    const antes = await fotoObligatoria(registrer)
+    const { data: completo } = await supabase.from('trazabilidad_fv').select('*').eq('registrer', registrer).maybeSingle()
 
     const { data, error } = await supabase
         .from('trazabilidad_fv')
@@ -279,18 +336,66 @@ export async function devolverPiezaAProgramadoFv(registrer: string, usuarioEmail
     if (error) throw new Error(`No se pudo devolver la pieza a Programado: [${error.code}] ${error.message}`)
     if (!data || data.length === 0) throw new Error('No se devolvió la pieza. Revise los permisos o vuelva a intentar.')
 
-    if ((actual.estado === 'Pintura' || actual.estado === 'Vaciado') && actual.molde_id) await liberarMolde(actual.molde_id, usuarioEmail)
+    if (OCUPAN_MOLDE.includes(antes.estado) && antes.moldeId) await liberarMolde(antes.moldeId, usuarioEmail)
+    await registrarMovimientosFv([{
+        origen, accion: 'devolver_programado', registrer, ordenId: antes.ordenId,
+        estadoAntes: antes.estado, estadoDespues: 'Programado', mesaAntes: antes.mesa, moldeId: antes.moldeId,
+        // Copia del registro borrado: así no se pierde la trazabilidad de la pieza ni del molde
+        detalle: { registro_borrado: completo ?? null }
+    }])
+}
+
+// Kit de reparación (lib/fibra/kitReparacion.ts): se registra sin molde y queda en el proceso indicado
+// (desde Pintura: Digitado). Respeta la cantidad de la orden igual que Pintura.
+export async function registrarKitReparacionFv(ordenId: number, destino: DestinoMovimientoFv, usuarioEmail: string, mesa: string | null = null, origen: OrigenMovimientoFv = 'mapa') {
+    const userId = await requireUserId(usuarioEmail)
+    const { data: orden, error: errOrden } = await supabase.from('ordenes_fabricacion_fv')
+        .select('id, orden_fabricacion, cantidad, programado').eq('id', ordenId).single()
+    if (errOrden || !orden) throw new Error(`No se encontró la orden: ${errOrden?.message || ordenId}`)
+    const { count, error: errCount } = await supabase.from('trazabilidad_fv')
+        .select('*', { count: 'exact', head: true }).eq('orden_fabricacion_id', ordenId)
+    if (errCount) throw new Error(`No se pudieron contar las piezas de la orden: ${errCount.message}`)
+    const permitidas = orden.cantidad || orden.programado || 0
+    if (permitidas > 0 && (count || 0) >= permitidas) {
+        throw new Error(`La orden ${orden.orden_fabricacion} ya tiene registradas sus ${permitidas} pieza(s).`)
+    }
+    const ahora = new Date()
+    const registrer = `${ahora.getTime()}KIT`
+    const { error } = await supabase.from('trazabilidad_fv').insert({
+        pintura_fecha: ahora.toISOString(), orden_fabricacion_id: ordenId, molde_id: null, pintura_user_id: userId,
+        pintura_linea: 'Linea 1', contramolde: false, enviar_reparar_molde: false, registrer, estado: 'Pintura', kilos_vaciados: 0
+    })
+    if (error) {
+        throw new Error(error.code === '23502' && /molde_id/.test(error.message)
+            ? 'La base de datos exige molde en cada pieza: no se puede registrar el kit sin molde (hay que permitir molde_id vacío en trazabilidad_fv).'
+            : `No se pudo registrar el kit: [${error.code}] ${error.message}`)
+    }
+    const recien: FotoPiezaFvLocal = { estado: 'Pintura', mesa: null, moldeId: null, ordenId }
+    if (destino === 'pintura') { if (mesa) await ponerMesa(registrer, mesa) }
+    else await cambiarEstadoPieza(registrer, recien, destino, usuarioEmail, mesa)
+    await registrarMovimientosFv([{
+        origen, accion: 'registrar_desde_programado', registrer, ordenId, of: String(orden.orden_fabricacion ?? ''),
+        estadoAntes: 'Programado', estadoDespues: DESTINOS_MOVIMIENTO_FV[destino].estado, mesaDespues: mesa,
+        detalle: { destino, kit_reparacion: true, sin_molde: true }
+    }])
 }
 
 // Desde Programado (el pintor no la registró): el supervisor escoge el molde en el mapa. Se registra igual que en
 // Pintura (molde en uso, vueltas, kilos) y luego la pieza pasa al proceso y a la mesa donde se soltó.
-export async function registrarPiezaProgramadoFv(ordenId: number, moldeId: number, destino: DestinoMovimientoFv, usuarioEmail: string, mesa: string | null = null) {
+export async function registrarPiezaProgramadoFv(ordenId: number, moldeId: number, destino: DestinoMovimientoFv, usuarioEmail: string, mesa: string | null = null, origen: OrigenMovimientoFv = 'mapa') {
     const pieza = await registrarPintura({ orden_fabricacion_id: ordenId, molde_id: moldeId, linea: 'Linea 1', usuario_email: usuarioEmail })
     const registrer = String(pieza?.registrer || '')
     if (!registrer) throw new Error('Se registró la pintura pero no se recibió el código de la pieza. Actualice el mapa y ubíquela a mano.')
+    const recien: FotoPiezaFvLocal = { estado: 'Pintura', mesa: null, moldeId, ordenId }
     if (destino === 'pintura') {
-        if (mesa) await asignarMesaFv(registrer, mesa)
+        if (mesa) await ponerMesa(registrer, mesa)
     } else {
-        await moverPiezaFibra(registrer, destino, usuarioEmail, mesa)
+        await cambiarEstadoPieza(registrer, recien, destino, usuarioEmail, mesa)
     }
+    const movimientos: MovimientoFv[] = [{
+        origen, accion: 'registrar_desde_programado', registrer, ordenId,
+        estadoAntes: 'Programado', estadoDespues: DESTINOS_MOVIMIENTO_FV[destino].estado, mesaDespues: mesa, moldeId,
+        detalle: { destino }
+    }]
+    await registrarMovimientosFv(movimientos)
 }

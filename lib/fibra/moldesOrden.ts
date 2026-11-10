@@ -4,6 +4,11 @@ import { Molde, OrdenFabricacion } from '@/types/pintura'
 // coincide por SKU o serial del molde, por el código numérico del SKU (PMOL02-0087-… → serial "0087-xx")
 // o porque la descripción del molde contiene todas las palabras de la descripción de la orden.
 export function moldesDisponiblesOrden(orden: OrdenFabricacion, todos: Molde[]): Molde[] {
+    return moldesDeOrden(orden, todos).filter(m => m.estado === 'Disponible')
+}
+
+// Todos los moldes de la referencia de la orden, en cualquier estado (para ofrecer liberar uno ocupado)
+export function moldesDeOrden(orden: OrdenFabricacion, todos: Molde[]): Molde[] {
     const sku = (orden.molde_sku || orden.producto_sku || orden.sku || '').trim().toLowerCase()
     const targetDesc = (orden.molde_descripcion || orden.producto_descripcion || '').trim().toLowerCase()
 
@@ -13,7 +18,7 @@ export function moldesDisponiblesOrden(orden: OrdenFabricacion, todos: Molde[]):
 
     return todos
         .filter(m => {
-            if (m.estado !== 'Disponible') return false
+            if (m.estado === 'Destruido') return false
 
             const mSku = (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase()
             const mSerial = (m.serial || '').trim().toLowerCase()
