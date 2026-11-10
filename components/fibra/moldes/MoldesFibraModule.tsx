@@ -89,10 +89,13 @@ export default function MoldesFibraModule({ puedeLiberar }: { puedeLiberar: bool
         if (lista.length === 0) return
         const conPieza = lista.filter(m => m.ocupacion)
         const detalle = lista.slice(0, 15).map(m => `• ${m.serial} · ${m.tipo}${m.ocupacion ? ` (OF ${m.ocupacion.of} en ${m.ocupacion.lugar})` : ''}`).join('\n')
-        const aviso = conPieza.length > 0
-            ? `\n\n⚠ ADVERTENCIA: ${conPieza.length === 1 ? 'este molde tiene una pieza registrada' : `${conPieza.length} moldes tienen pieza registrada`} en Pintura/Vaciado. ` +
-              'Al liberarlo se podrá pintar otra pieza en él aunque esa pieza siga registrada con este molde.'
-            : ''
+        const conPiezaFv = conPieza.filter(m => m.ocupacion?.planta === 'FV')
+        const conPiezaMs = conPieza.filter(m => m.ocupacion?.planta === 'MS')
+        const aviso = (conPiezaFv.length > 0
+            ? `\n\n⚠ ADVERTENCIA: ${conPiezaFv.length === 1 ? 'la pieza de Fibra que ocupa el molde pasará' : `las ${conPiezaFv.length} piezas de Fibra que ocupan estos moldes pasarán`} a PULIDO (se asume que ya se desmoldaron).`
+            : '') + (conPiezaMs.length > 0
+            ? `\n\n⚠ ${conPiezaMs.length} molde(s) tienen pieza de Mármol: esa pieza no se mueve desde aquí.`
+            : '') + '\n\nTodo queda en el historial de movimientos.'
         if (!confirm(`¿Liberar ${lista.length} molde(s)? Quedarán Disponibles para pintar.\n\n${detalle}${lista.length > 15 ? `\n… y ${lista.length - 15} más` : ''}${aviso}`)) return
         setLiberando(true)
         try {

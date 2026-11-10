@@ -11,6 +11,8 @@ import HistorySection from './HistorySection'
 import ModalBuscarMolde from '../pintura/ModalBuscarMolde'
 import { moldesDisponiblesOrden } from '@/lib/fibra/moldesOrden'
 import { recargarFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
+import { esKitReparacion } from '@/lib/fibra/kitReparacion'
+import { registrarKitReparacionFv } from '@/lib/supabase/queries/fibra_administracion'
 
 
 
@@ -100,7 +102,9 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             setMoldesDisponibles(available)
             setSelectedMolde(null)
 
-            if (available.length === 0) {
+            if (esKitReparacion(selectedOrden.producto_descripcion)) {
+                setDebugInfo('')
+            } else if (available.length === 0) {
                 setDebugInfo(`No se encontraron moldes Disponibles para la orden: "${sku}" (${selectedOrden.molde_descripcion || selectedOrden.producto_descripcion})`)
             } else {
                 setDebugInfo('')
@@ -182,7 +186,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             alert('Error: Debe seleccionar una Orden de Fabricación.')
             return
         }
-        if (!selectedMolde) {
+        const kit = esKitReparacion(selectedOrden.producto_descripcion)
+        if (!selectedMolde && !kit) {
             alert('Error: Debe seleccionar un Molde.')
             return
         }
@@ -208,15 +213,20 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         setSubmitting(true)
         try {
             // 2. Proceso de registro (verificado en el backend)
-            await registrarPintura({
-                orden_fabricacion_id: selectedOrden.id,
-                molde_id: selectedMolde.id,
-                linea: 'Linea 1', // Valor por defecto válido para la DB, ya que en Fibra no aplica.
-                usuario_email: userEmail
-            })
+            if (kit) {
+                // Kit de reparación: sin molde y directo a Digitado (no pasa por los procesos de la planta)
+                await registrarKitReparacionFv(selectedOrden.id, 'digitado', userEmail, null, 'pintura')
+            } else {
+                await registrarPintura({
+                    orden_fabricacion_id: selectedOrden.id,
+                    molde_id: selectedMolde!.id,
+                    linea: 'Linea 1', // Valor por defecto válido para la DB, ya que en Fibra no aplica.
+                    usuario_email: userEmail
+                })
+            }
 
             // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
-            setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
+            setNotification({ message: kit ? 'Kit de reparación registrado: pasó directo a Digitado' : '¡Registro creado exitosamente!', type: 'success' })
             
             // Actualizar localmente la orden para prevenir spam rápido
             setSelectedOrden(prev => prev ? { ...prev, programado: (prev.programado || 0) - 1 } : null)
@@ -288,7 +298,12 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
 
                         {/* Mold Selector with Search */}
                         <div className="w-full sm:w-1/2">
-                                                        <div className="relative">
+                            {selectedOrden && esKitReparacion(selectedOrden.producto_descripcion) ? (
+                                <div className="w-full min-h-9 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg flex items-center">
+                                    Kit de reparación: no necesita molde. Al pintar pasa directo a Digitado.
+                                </div>
+                            ) : (
+                            <div className="relative">
                                 <div 
                                     onClick={() => !!selectedOrden && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
                                     className={`w-full h-9 px-3 text-sm bg-white text-gray-900 font-semibold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
@@ -348,6 +363,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                                     </div>
                                 )}
                             </div>
+                            )}
                         </div>
                     </div>
 
@@ -355,7 +371,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                         {/* Submit Button */}
                         <button
                             onClick={handleSubmit}
-                            disabled={!selectedOrden || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
+                            disabled={!selectedOrden || (!selectedMolde && !esKitReparacion(selectedOrden.producto_descripcion)) || submitting || (selectedOrden.programado || 0) <= 0}
                             className="flex-1 lg:min-w-[130px] h-9 bg-cyan-600 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

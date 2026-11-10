@@ -5,9 +5,11 @@ import { AlertTriangle, CheckCircle2, ClipboardPaste, Loader2, X } from 'lucide-
 import { OrdenFabricacion } from '@/types/pintura'
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
 import { moldesDisponiblesOrden } from '@/lib/fibra/moldesOrden'
+import { ocupacionMoldesFv } from '@/lib/supabase/queries/fibra_moldes'
+import { esKitReparacion } from '@/lib/fibra/kitReparacion'
 import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import {
-    DESTINOS_MOVIMIENTO_FV, DestinoMovimientoFv, PiezaMapaFv, asignarMesaFv, moverPiezaFibra, registrarPiezaProgramadoFv
+    DESTINOS_MOVIMIENTO_FV, DestinoMovimientoFv, PiezaMapaFv, asignarMesaFv, moverPiezaFibra, registrarPiezaProgramadoFv, registrarKitReparacionFv
 } from '@/lib/supabase/queries/fibra_administracion'
 
 // Ubicar en el mapa las OF a partir del listado de Excel (columna PROCESO): se pegan las filas y la app
@@ -112,6 +114,11 @@ export default function ImportarPosicionesFv({ ordenes, piezas, mesasZona, usuar
             let pendientes = piezasPorEtapa(o).piezas.programado || 0
             for (const parte of partes) {
                 if (!parte.lugar) continue
+                // CEDI lo registra Logística en su módulo: nunca desde el mapa ni desde el Excel
+                if (parte.lugar.destino === 'cedi') {
+                    avisos.push(`OF ${f.of}: "${parte.texto}" no se aplica: el paso a CEDI solo lo registra Logística en el módulo CEDI.`)
+                    continue
+                }
                 const estado = DESTINOS_MOVIMIENTO_FV[parte.lugar.destino].estado
                 for (let k = 0; k < parte.n; k++) {
                     const i = propias.findIndex(p => !usadas.has(p.registrer) && p.estado === estado)
@@ -147,15 +154,22 @@ export default function ImportarPosicionesFv({ ordenes, piezas, mesasZona, usuar
             setCorriendo(i)
             try {
                 if (a.pieza) {
-                    if (mismoEstado(a)) await asignarMesaFv(a.pieza.registrer, a.mesa)
-                    else await moverPiezaFibra(a.pieza.registrer, a.lugar.destino, email, a.mesa)
+                    if (mismoEstado(a)) await asignarMesaFv(a.pieza.registrer, a.mesa, 'importar_excel')
+                    else await moverPiezaFibra(a.pieza.registrer, a.lugar.destino, email, a.mesa, 'importar_excel')
                     res.push({ accion: a, ok: true, mensaje: mismoEstado(a) ? 'Posición actualizada' : `Pieza ${a.pieza.registrer} movida` })
+                } else if (esKitReparacion(a.descripcion)) {
+                    // Kit de reparación: sin molde
+                    await registrarKitReparacionFv(a.ordenId, a.lugar.destino, email, a.mesa, 'importar_excel')
+                    res.push({ accion: a, ok: true, mensaje: 'Kit de reparación registrado (sin molde)' })
                 } else {
                     // Moldes al momento de registrar: cada registro deja su molde en uso
                     const orden = ordenes.find(o => o.id === a.ordenId)!
-                    const molde = moldesDisponiblesOrden(orden, await getAllMoldes())[0]
-                    if (!molde) throw new Error('No hay molde disponible para esta orden')
-                    await registrarPiezaProgramadoFv(a.ordenId, molde.id, a.lugar.destino, email, a.mesa)
+                    // Solo moldes Disponibles que ninguna pieza ocupe en Pintura/Vaciado (si no, Pintura los rechaza)
+                    const candidatos = moldesDisponiblesOrden(orden, await getAllMoldes())
+                    const ocupados = await ocupacionMoldesFv(candidatos.map(m => m.id))
+                    const molde = candidatos.find(m => !ocupados.has(m.id))
+                    if (!molde) throw new Error('No hay molde libre para esta orden: libere uno en el módulo Moldes o arrastrando la OF en el mapa')
+                    await registrarPiezaProgramadoFv(a.ordenId, molde.id, a.lugar.destino, email, a.mesa, 'importar_excel')
                     res.push({ accion: a, ok: true, mensaje: `Pieza registrada (molde ${molde.serial})` })
                 }
             } catch (e) {

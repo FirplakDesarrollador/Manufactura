@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { ordenarPorFechaT } from '@/lib/fibra/ordenT'
 import { RegistroTrazabilidad, KilosReferencia } from '@/types/pintura'
 import { liberarMolde, requireUserId } from './helpers'
 
@@ -14,7 +15,7 @@ export async function getRegistrosParaVaciado(): Promise<RegistroTrazabilidad[]>
         return []
     }
 
-    return data || []
+    return ordenarPorFechaT(data || [])  // más atrasado primero por la T del Semáforo
 }
 
 export async function getKilosReferencia(): Promise<KilosReferencia[]> {
