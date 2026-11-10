@@ -82,7 +82,7 @@ const PROCESO = Object.fromEntries(PROCESOS.map(p => [p.id, p])) as Record<strin
 // Títulos en 2 renglones (como Ensamble 2 / Ensamble 1)
 const DOS_RENGLONES = new Set(['huacales', 'acabado2', 'ensayo', 'pulido'])
 const FLECHAS: { x: number; y: number; dir: 'izq' | 'der' | 'arriba' | 'abajo' }[] = [
-    { x: 1066, y: 115, dir: 'izq' }, { x: 1066, y: 141, dir: 'der' },      // Zona Curado ⇄ Vaciado
+    { x: 1066, y: 128, dir: 'izq' },                                       // Zona Curado → Vaciado
     { x: 1477, y: 128, dir: 'izq' },                                       // Pintura → Zona Curado
     { x: 1630, y: 170, dir: 'arriba' },                                    // Programado → Pintura
     { x: 1066, y: 239, dir: 'der' },                                      // Vaciado → Desmolde (flecha en L)
