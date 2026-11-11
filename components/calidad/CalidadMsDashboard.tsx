@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, ChevronRight, ExternalLink, Loader2, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, ChevronDown, ChevronRight, ExternalLink, Loader2, Search, X } from 'lucide-react';
 import {
     ResponsiveContainer,
     LineChart,
@@ -116,6 +116,9 @@ const etiquetaPorcion = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
 };
 
 // Mármol Sintético (MS): tablero dinámico estilo Power BI (filtros Año/Mes/Semana/Día y filtro cruzado entre gráficas)
+// % de piezas defectuosas sobre el total de piezas (Detalle por Referencia); sin piezas → "—"
+const pctDef = (defectuosas: number, total: number) => total > 0 ? `${((defectuosas / total) * 100).toFixed(1)} %` : '—';
+
 export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string }) {
     const hoy = hoyBogota();
     const anioActual = Number(hoy.slice(0, 4));
@@ -138,6 +141,10 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
 
     // Tabla de referencias
     const [refSearch, setRefSearch] = useState('');
+    // Orden de la tabla Detalle por Referencia (clic en el título de la columna; otro clic invierte el orden)
+    type ColRef = 'referencia' | 'pct' | 'def' | 'total' | 'rep';
+    const [ordenRef, setOrdenRef] = useState<{ col: ColRef; asc: boolean } | null>(null);
+    const ordenarRef = (col: ColRef) => setOrdenRef(o => o?.col === col ? { col, asc: !o.asc } : { col, asc: col === 'referencia' });
     const [expandedRefs, setExpandedRefs] = useState<Record<string, boolean>>({});
     const [verTotal, setVerTotal] = useState(true);
     const [verReparacion, setVerReparacion] = useState(false);
@@ -237,10 +244,18 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [piezas, selPeriodo, selCausa]);
     const referenciasVisibles = useMemo(() => {
-        if (!refSearch.trim()) return referencias;
-        const q = refSearch.toLowerCase();
-        return referencias.filter(r => r.referencia.toLowerCase().includes(q) || r.subdefectos.some(s => s.name.toLowerCase().includes(q)));
-    }, [referencias, refSearch]);
+        const q = refSearch.trim().toLowerCase();
+        const lista = q ? referencias.filter(r => r.referencia.toLowerCase().includes(q) || r.subdefectos.some(s => s.name.toLowerCase().includes(q))) : referencias;
+        if (!ordenRef) return lista;
+        const valor = (r: typeof lista[number]): number | string => ordenRef.col === 'referencia' ? r.referencia
+            : ordenRef.col === 'pct' ? (r.totalPiezas > 0 ? r.piezasDefectuosas / r.totalPiezas : -1)
+            : ordenRef.col === 'def' ? r.piezasDefectuosas : ordenRef.col === 'total' ? r.totalPiezas : r.reparacion;
+        return [...lista].sort((a, b) => {
+            const va = valor(a), vb = valor(b);
+            const c = typeof va === 'string' ? va.localeCompare(String(vb), 'es', { numeric: true }) : va - (vb as number);
+            return ordenRef.asc ? c : -c;
+        });
+    }, [referencias, refSearch, ordenRef]);
 
     // Tendencias: filtradas por referencia; con una causa elegida muestran el % de piezas con esa causa
     // Por año (vista secundaria): promedio de los valores mensuales de cada año
@@ -394,6 +409,21 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
         selCausa && { texto: selCausa, quitar: () => setSelCausa(null) },
         selRef && { texto: selRef, quitar: () => setSelRef(null) }
     ].filter(Boolean) as { texto: string; quitar: () => void }[];
+
+    // Título de columna con flechas para ordenar
+    const thOrden = (col: ColRef, texto: string, ayuda?: string) => {
+        const activa = ordenRef?.col === col;
+        const Icono = !activa ? ArrowUpDown : ordenRef!.asc ? ArrowUp : ArrowDown;
+        return (
+            <th className={`py-1 px-1.5 ${col === 'referencia' ? 'text-left' : 'text-right'}`}>
+                <button type="button" onClick={() => ordenarRef(col)} title={ayuda ? `${ayuda} · clic para ordenar` : 'Clic para ordenar'}
+                    className={`inline-flex items-center gap-0.5 font-bold hover:text-[#324354] ${activa ? 'text-[#324354]' : ''}`}>
+                    {texto}
+                    <Icono className={`w-2.5 h-2.5 ${activa ? '' : 'opacity-40'}`} />
+                </button>
+            </th>
+        );
+    };
 
     return (
         // Alto de cada fila de gráficas según la pantalla: el recuadro de MS mide ≈ 810 px de pantalla con el zoom de 100 %
@@ -562,10 +592,12 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 text-[10px] border-b border-slate-200">
                                         <tr>
-                                            <th className="py-1 px-1.5">Referencia</th>
-                                            <th className="py-1 px-1.5 text-right">{selCausa ? 'Con la causa' : 'Piezas Def.'}</th>
-                                            {verTotal && <th className="py-1 px-1.5 text-right">Total Piezas</th>}
-                                            {verReparacion && <th className="py-1 px-1.5 text-right">Reparación</th>}
+                                            {thOrden('referencia', 'Referencia')}
+                                            {/* % de piezas defectuosas sobre el total de piezas de la referencia */}
+                                            {thOrden('pct', '% Def.', 'Piezas defectuosas ÷ total de piezas de la referencia')}
+                                            {thOrden('def', selCausa ? 'Con la causa' : 'Piezas Def.')}
+                                            {verTotal && thOrden('total', 'Total Piezas')}
+                                            {verReparacion && thOrden('rep', 'Reparación')}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -592,6 +624,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                                                 <span className="truncate">{ref.referencia}</span>
                                                             </span>
                                                         </td>
+                                                        <td className="py-1 px-1.5 text-right font-black text-[#324354]">{pctDef(ref.piezasDefectuosas, ref.totalPiezas)}</td>
                                                         <td className="py-1 px-1.5 text-right font-black text-slate-900">{ref.piezasDefectuosas}</td>
                                                         {verTotal && <td className="py-1 px-1.5 text-right text-slate-600">{ref.totalPiezas}</td>}
                                                         {verReparacion && <td className="py-1 px-1.5 text-right text-slate-600">{ref.reparacion}</td>}
@@ -599,6 +632,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                                     {abierta && ref.subdefectos.map(s => (
                                                         <tr key={s.name} className="bg-slate-50/80 text-[10px] text-slate-600">
                                                             <td className="py-0.5 pl-6 pr-1.5 border-l-2 border-blue-400 truncate">• {s.name}</td>
+                                                            <td className="py-0.5 px-1.5 text-right font-bold text-[#324354]">{pctDef(s.piezasDefectuosas, s.totalPiezas)}</td>
                                                             <td className="py-0.5 px-1.5 text-right font-bold text-slate-800">{s.piezasDefectuosas}</td>
                                                             {verTotal && <td className="py-0.5 px-1.5 text-right">{s.totalPiezas}</td>}
                                                             {verReparacion && <td className="py-0.5 px-1.5 text-right">{s.reparacion}</td>}
