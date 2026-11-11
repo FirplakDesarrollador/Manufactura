@@ -60,7 +60,7 @@ const PROCESOS: Proceso[] = [
     { id: 'curado', label: 'Zona Curado', sinContador: true, tipo: 'espera', etapas: [], caja: [1072, 92, 1470, 164] },
     // Debajo de Zona Curado: Desmolde (8 casillas) e Instalación Herrajes (5), tiempos de espera de las piezas vaciadas
     { id: 'desmoldez', label: 'Desmolde', tituloIzq: true, sinContador: true, tipo: 'espera', etapas: [], caja: [1072, 170, 1470, 308] },
-    { id: 'herrajesz', label: 'Instalación\nHerrajes', tituloIzq: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [974, 322, 1470, 394] },
+    { id: 'herrajesz', label: 'Instalación\nHerrajes', tituloIzq: true, tipo: 'notificacion', etapas: ['herrajes'], crear: 'herrajes', caja: [974, 322, 1470, 394] },
     { id: 'pintura', label: 'Pintura', tipo: 'notificacion', etapas: ['pintura'], crear: 'pintura', caja: [1484, 92, 1644, 164] },
     { id: 'huacales', label: 'Huacales', tipo: 'notificacion', etapas: ['empaque'], destino: 'huacales', caja: [6, 470, 208, 608] },
     { id: 'acabado2', label: 'Acabado 2', sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [216, 470, 418, 608] },
@@ -98,10 +98,12 @@ const ICONO_FLECHA = { izq: ArrowLeft, der: ArrowRight, arriba: ArrowUp, abajo: 
 
 // Colores del layout: amarillo = punto de notificación, azul = sin notificación, gris = espera
 const ESTILO: Record<TipoProceso, { caja: string; chip: string; badge: string; label: string }> = {
-    'notificacion': { caja: 'bg-[#FFC000] border-[#d9a400] text-[#25323f]', chip: 'bg-white/85 text-[#25323f] hover:bg-white', badge: 'bg-[#25323f] text-white', label: 'Punto de notificación' },
-    'sin-notificacion': { caja: 'bg-[#4472C4] border-[#2f5597] text-white', chip: 'bg-white/20 text-white hover:bg-white/35', badge: 'bg-white text-[#2f5597]', label: 'Proceso sin notificación' },
-    'espera': { caja: 'bg-[#d9d9d9] border-[#bfbfbf] text-[#25323f]', chip: 'bg-white/85 text-[#25323f] hover:bg-white', badge: 'bg-[#25323f] text-white', label: 'Tiempo de espera' },
-    'virtual': { caja: 'bg-white border-dashed border-slate-400 text-[#25323f]', chip: 'bg-slate-100 text-[#25323f] hover:bg-slate-200', badge: 'bg-[#25323f] text-white', label: 'Paso virtual' }
+    // Todas las piezas (OF) en blanco; solo las atrasadas a cliente van en rojo. Colores del manual Firplak con contraste: amarillo semáforo = punto de notificación, navy = proceso sin
+    // notificación, sage claro = tiempo de espera (crema/blanco = paso virtual)
+    'notificacion': { caja: 'bg-[#deb841] border-[#b8962c] text-[#25323f]', chip: 'bg-white text-[#25323f] shadow-sm hover:bg-[#F6F3EE]', badge: 'bg-[#324354] text-white', label: 'Punto de notificación' },
+    'sin-notificacion': { caja: 'bg-[#324354] border-[#25323f] text-white', chip: 'bg-white text-[#25323f] shadow-sm hover:bg-[#F6F3EE]', badge: 'bg-[#324354] text-white', label: 'Proceso sin notificación' },
+    'espera': { caja: 'bg-[#c3cdce] border-[#7B8E90] text-[#25323f]', chip: 'bg-white text-[#25323f] shadow-sm hover:bg-[#F6F3EE]', badge: 'bg-[#324354] text-white', label: 'Tiempo de espera' },
+    'virtual': { caja: 'bg-white border-dashed border-slate-400 text-[#25323f]', chip: 'bg-white text-[#25323f] shadow-sm ring-1 ring-[#e2ded5] hover:bg-[#F6F3EE]', badge: 'bg-[#25323f] text-white', label: 'Paso virtual' }
 }
 
 // ===== Mesas =====
@@ -117,7 +119,7 @@ const ZONAS: Zona[] = [
     { id: 'curadov', proceso: 'desmoldez', label: 'Desmolde · vaciadas, esperan desmolde', n: 8, cols: 4, x: 1078, y: 176, auto: true, crear: 'vaciado', regreso: 'vaciado' },
     { id: 'instherrajes', proceso: 'herrajesz', label: 'Instalación Herrajes', n: 5, cols: 5, x: 980, y: 328, auto: true, crear: 'vaciado', regreso: 'vaciado' },
     { id: 'vaciado', proceso: 'vaciado', label: 'Vaciado', n: 2, cols: 2, x: 864, y: 98, crear: 'vaciado', regreso: 'pintura' },
-    { id: 'desmolde', proceso: 'nivelacion', label: 'Nivelación', n: 4, cols: 2, x: 1262, y: 476, crear: 'vaciado', regreso: 'vaciado' },
+    { id: 'desmolde', proceso: 'nivelacion', label: 'Nivelación', n: 4, cols: 2, x: 1262, y: 476, crear: 'herrajes', regreso: 'herrajes' },
     { id: 'pulido', proceso: 'pulido', label: 'Pulido', n: 6, cols: 3, x: 954, y: 476, destino: 'pulido' },
     { id: 'acabado', proceso: 'ensamble', label: 'Acabado 1', n: 4, cols: 2, x: 740, y: 476, destino: 'ensayo' },
     { id: 'ensamble1', proceso: 'ensamble', label: 'Ensamble 1', n: 2, cols: 1, x: 642, y: 476, destino: 'ensayo' },
@@ -146,7 +148,10 @@ const TRAMOS: Tramo[] = [
     // Pintadas que esperan vaciado: 2 mesas de Vaciado + 4 de la fila de arriba de Zona Curado = 6
     { id: 'vaciado', proceso: 'vaciado', estados: ['Pintura'], zonas: ['pintura', 'curadop', 'vaciado'] },
     // Ya vaciadas, van para Pulido: 12 de Zona Curado abajo + 4 de Desmolde + 6 de Pulido = 22
-    { id: 'pulido', proceso: 'pulido', estados: ['Vaciado', 'Desgelcada', 'Pulido'], zonas: ['curadov', 'instherrajes', 'desmolde', 'pulido'] },
+    // Vaciadas que esperan herrajes: 8 de Desmolde (solo visual, sin notificación) + 5 de Instalación Herrajes = 13
+    { id: 'herrajes', proceso: 'herrajesz', estados: ['Vaciado', 'Desgelcada'], zonas: ['curadov', 'instherrajes'] },
+    // Con herrajes, van para Pulido: 4 de Nivelación + 6 de Pulido = 10 ('Pulido' = estado anterior al punto de Herrajes)
+    { id: 'pulido', proceso: 'pulido', estados: ['Herrajes', 'Pulido'], zonas: ['desmolde', 'pulido'] },
     { id: 'ensayo', proceso: 'ensayo', estados: ['Ensayo', 'Acabado'], zonas: ['acabado', 'ensamble1', 'ensamble2', 'ensayo'] },
     // Guacales = salió de Ensayo y espera el huacal; Empaque = huacal registrado, espera el Digitado
     { id: 'guacales', proceso: 'huacales', estados: ['Guacales'], zonas: ['acabado2', 'huacales'] },
@@ -158,7 +163,7 @@ const TRAMOS: Tramo[] = [
 const TODOS_ESTADOS = TRAMOS.flatMap(t => t.estados)
 // regreso = estado que toma una pieza de otro tramo al soltarla en Pintura, Zona Curado, Vaciado o Desmolde,
 // sea hacia adelante (p. ej. Pintura → Curado de abajo = Vaciado) o devolviéndola desde un proceso posterior
-const ESTADO_REGRESO: Record<string, string> = { pintura: 'Pintura', vaciado: 'Vaciado' }
+const ESTADO_REGRESO: Record<string, string> = { pintura: 'Pintura', vaciado: 'Vaciado', herrajes: 'Herrajes' }
 const indiceTramo = (estado: string) => TRAMOS.findIndex(t => t.estados.includes(estado))
 const cambiaEstadoEn = (z: Zona, estado: string) => {
     if (!z.regreso) return false
@@ -179,7 +184,8 @@ const enFila = (zona: string, n: number) => Array.from({ length: n }, (_, i) => 
 const ORDEN_LLENADO: Record<string, string[]> = {
     vaciado: [...enFila('vaciado', 2), ...enFila('curadop', 4), 'pintura-1'],
     // Pulido (por columnas), Desmolde (por columnas) y Zona Curado de abajo desde la esquina inferior derecha
-    pulido: [...porColumnas('pulido', 3, 2), ...porColumnas('desmolde', 2, 2), ...enFila('instherrajes', 5).reverse(), ...enFila('curadov', 8).reverse()],
+    herrajes: [...enFila('instherrajes', 5), ...enFila('curadov', 8).reverse()],
+    pulido: [...porColumnas('pulido', 3, 2), ...porColumnas('desmolde', 2, 2)],
     ensayo: [...enFila('ensayo', 2), ...enFila('ensamble2', 2), ...enFila('ensamble1', 2), ...porColumnas('acabado', 2, 2)],
     guacales: [...porColumnas('huacales', 2, 2), ...porColumnas('acabado2', 2, 2)],
     reparacion: enFila('reparacion', 3),
@@ -572,7 +578,7 @@ export default function MapaProcesosFibraModule() {
             <div key={m.id} style={pos(m.caja)} title={ocupada ? undefined : m.zona.auto ? `${m.zona.label} · se llena en orden (o suelte la pieza aquí para dejarla en esta casilla)` : `${m.zona.label} · mesa libre`}
                 {...zonaDrop(zona, valido, () => soltarEnMesa(m))}
                 className={`absolute z-[5] rounded border border-dashed p-0.5 flex items-stretch ${claro ? 'border-[#25323f]/30 bg-white/30' : 'border-white/40 bg-white/10'} ${valido ? (sobre === zona ? 'ring-2 ring-[#59a96a] bg-[#59a96a]/30' : 'ring-1 ring-[#59a96a]/70') : ''}`}>
-                {ocupada && chipPieza(ocupada, claro ? ESTILO.notificacion.chip : ESTILO['sin-notificacion'].chip, true)}
+                {ocupada && chipPieza(ocupada, ESTILO[tipo].chip, true)}
             </div>
         )
     }
@@ -588,12 +594,12 @@ export default function MapaProcesosFibraModule() {
             <div className="relative shrink-0" {...zonaDrop('sin:' + t.id, valido, () => quitarMesa(t))}>
                 <button onClick={() => setListaAbierta(listaAbierta === t.id ? null : t.id)}
                     title={sobrecupo ? `Hay ${mesas.total[t.id]} piezas y solo ${capacidad} mesas` : 'Piezas sin mesa: abra la lista y arrástrelas a su mesa'}
-                    className={`flex items-center gap-0.5 text-[9px] font-black px-1 rounded leading-4 ${sobrecupo ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'} ${sobre === 'sin:' + t.id ? 'ring-2 ring-[#59a96a]' : ''}`}>
+                    className={`flex items-center gap-0.5 text-[9px] font-black px-1 rounded leading-4 ${sobrecupo ? 'bg-[#d14747] text-white' : 'bg-[#deb841] text-[#25323f]'} ${sobre === 'sin:' + t.id ? 'ring-2 ring-[#59a96a]' : ''}`}>
                     {lista.length} sin mesa <ChevronDown className="w-3 h-3" />
                 </button>
                 {listaAbierta === t.id && lista.length > 0 && (
-                    <div className="absolute left-0 top-full mt-0.5 z-30 w-44 max-h-48 overflow-y-auto bg-white border border-amber-500 rounded-lg shadow-xl p-1 space-y-0.5">
-                        <div className="text-[9px] font-black uppercase text-amber-800 px-0.5">{sobrecupo ? `Sobran ${mesas.total[t.id] - capacidad} pieza(s)` : 'Arrástrelas a su mesa'}</div>
+                    <div className="absolute left-0 top-full mt-0.5 z-30 w-44 max-h-48 overflow-y-auto bg-white border border-[#deb841] rounded-lg shadow-xl p-1 space-y-0.5">
+                        <div className="text-[9px] font-black uppercase text-[#324354] px-0.5">{sobrecupo ? `Sobran ${mesas.total[t.id] - capacidad} pieza(s)` : 'Arrástrelas a su mesa'}</div>
                         {lista.map(x => <div key={x.registrer}>{chipPieza(x, estilo, false)}</div>)}
                     </div>
                 )}
@@ -622,8 +628,15 @@ export default function MapaProcesosFibraModule() {
         const tramo = tramoDeProceso(p.id)
         if (p.tituloIzq) return (
             <div key={'nombre-' + p.id} style={pos([x1 - 170, p.id === 'desmoldez' ? y1 + 76 : y1, x1 - 8, p.caja[3]])}
-                className="absolute flex items-center justify-end text-right pointer-events-none z-[6]">
+                className={`absolute flex flex-col items-end justify-center gap-0.5 text-right pointer-events-none [&_button]:pointer-events-auto [&>div]:pointer-events-auto ${listaAbierta && tramo?.id === listaAbierta ? 'z-30' : 'z-[6]'}`}>
                 <span className="text-[12px] font-black text-[#25323f] leading-tight whitespace-pre-line">{p.label}</span>
+                {/* Instalación Herrajes (punto de notificación): contador y lista de las que no caben en las casillas */}
+                {tramo && (
+                    <div className="flex items-center justify-end gap-1">
+                        {avisoSinMesa(tramo, ESTILO[p.tipo].chip)}
+                        {contadorProceso(p)}
+                    </div>
+                )}
             </div>
         )
         return (

@@ -13,7 +13,7 @@ const LUGAR_MESA: Record<string, string> = {
 }
 // Estado de la pieza → proceso (cuando no tiene mesa)
 const LUGAR_ESTADO: Record<string, string> = {
-    Pintura: 'Pintura', Desgelcada: 'Desgelcada', Vaciado: 'Vaciado', Estanteria: 'Estantería', Pulido: 'Pulido',
+    Pintura: 'Pintura', Desgelcada: 'Desgelcada', Vaciado: 'Vaciado', Herrajes: 'Instalación Herrajes', Estanteria: 'Estantería', Pulido: 'Pulido',
     Ensayo: 'Ensayo', Acabado: 'Ensayo', Guacales: 'Huacales', Empaque: 'Digitado', Reparacion: 'Reparación', Reparacion_larga: 'Reparación',
     Digitado: 'Digitado', Transito: 'Tránsito', Cedi: 'CEDI', Saldo: 'Saldo', Destruccion: 'Destrucción'
 }
@@ -21,7 +21,8 @@ const LUGAR_ESTADO: Record<string, string> = {
 // Mesas válidas para cada estado (mismos tramos del mapa): una mesa vieja de otro tramo no cuenta
 const MESAS_ESTADO: Record<string, string[]> = {
     Pintura: ['pintura', 'curadop', 'vaciado'],
-    Vaciado: ['curadov', 'instherrajes', 'desmolde', 'pulido'], Desgelcada: ['curadov', 'instherrajes', 'desmolde', 'pulido'], Pulido: ['curadov', 'instherrajes', 'desmolde', 'pulido'],
+    Vaciado: ['curadov', 'instherrajes'], Desgelcada: ['curadov', 'instherrajes'],
+    Herrajes: ['desmolde', 'pulido'], Pulido: ['desmolde', 'pulido'],
     Ensayo: ['acabado', 'ensamble1', 'ensamble2', 'ensayo'], Acabado: ['acabado', 'ensamble1', 'ensamble2', 'ensayo'],
     Guacales: ['acabado2', 'huacales'], Reparacion: ['reparacion'], Reparacion_larga: ['reparacion']
 }

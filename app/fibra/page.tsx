@@ -8,6 +8,7 @@ import PinturaFibraModule from '@/components/fibra/PinturaFibraModule'
 import DashboardFibraModule from '@/components/fibra/dashboard/DashboardFibraModule'
 import VaciadoFibraModule from '@/components/fibra/vaciado/VaciadoFibraModule'
 import PulidoFibraModule from '@/components/fibra/pulido/PulidoFibraModule'
+import HerrajesFibraModule from '@/components/fibra/herrajes/HerrajesFibraModule'
 import EnsayoFibraModule from '@/components/fibra/ensayo/EnsayoFibraModule'
 import ReparacionFibraModule from '@/components/fibra/reparacion/ReparacionFibraModule'
 import EmpaqueFibraModule from '@/components/fibra/empaque/EmpaqueFibraModule'
@@ -87,6 +88,8 @@ export default function FibraPage() {
         const modulos = combinedUser.permisos?.modulos;
         const fibraPerms = (combinedUser.permisos as any)?.fibra;
         const checkPerm = (m: string) => {
+            // Herrajes: permiso propio o el de Vaciado / Pulido (los mismos operarios)
+            if (m === 'herrajes') return ['herrajes', 'vaciado', 'pulido'].some(k => modulos?.[k] === true || fibraPerms?.[k] === true)
             if (m === 'ensayo') {
                 return modulos?.ensayo === true || fibraPerms?.ensayo === true || modulos?.acabado === true || fibraPerms?.acabado === true
             }
@@ -95,7 +98,7 @@ export default function FibraPage() {
 
         if (modulos || fibraPerms) {
             if (!checkPerm('pintura')) {
-                const priorityModules = ['pintura', 'vaciado', 'pulido', 'ensayo', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
+                const priorityModules = ['pintura', 'vaciado', 'herrajes', 'pulido', 'ensayo', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
                 const firstAllowed = priorityModules.find(m => checkPerm(m));
                 if (firstAllowed) {
                     setActiveModule(firstAllowed);
@@ -139,6 +142,7 @@ export default function FibraPage() {
     const hasPermission = (moduleName: string) => {
         const fibra = (user.permisos as any)?.fibra
         const modulos = user.permisos?.modulos
+        if (moduleName === 'herrajes') return ['herrajes', 'vaciado', 'pulido'].some(k => modulos?.[k] === true || fibra?.[k] === true)
         if (moduleName === 'ensayo') {
             return modulos?.ensayo === true || fibra?.ensayo === true || modulos?.acabado === true || fibra?.acabado === true
         }
@@ -204,9 +208,32 @@ export default function FibraPage() {
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11ZM5 2l5 5M2 13h15M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z" />
+                                    {/* Vaciado: rodillo aireador de fibra de vidrio (rodillo con ranuras, alambre doblado y mango) */}
+                                    <rect x="2.5" y="3" width="13" height="5.5" rx="2.75" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeWidth={1.5} d="M6 3.5v4.5M9 3.5v4.5M12 3.5v4.5" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.5 5.75H19v5.75l-6 2.5V16" />
+                                    <path strokeLinecap="round" strokeWidth={3.5} d="M13 16.5v4.5" />
                                 </svg>
                                 <span>Vaciado</span>
+                            </button>
+                        )}
+
+                        {hasPermission('herrajes') && (
+                            <button
+                                onClick={() => setActiveModule('herrajes')}
+                                title={sidebarOpen ? undefined : 'Herrajes'}
+                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'herrajes'
+                                    ? 'bg-[#254153] text-white'
+                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                    }`}
+                            >
+                                {/* Instalación Herrajes: matriz (bastidor) metálica con travesaños y pernos */}
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <rect x="3" y="4" width="18" height="16" rx="1.5" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4v16M15 4v16M3 12h18" />
+                                    <path strokeLinecap="round" strokeWidth={3} d="M9 12h.01M15 12h.01" />
+                                </svg>
+                                <span>Herrajes</span>
                             </button>
                         )}
 
@@ -220,7 +247,10 @@ export default function FibraPage() {
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3v3.5M21 12h-3.5M12 21v-3.5M3 12h3.5M18.4 5.6l-2.5 2.5M18.4 18.4l-2.5-2.5M5.6 18.4l2.5-2.5M5.6 5.6l2.5 2.5" />
+                                    {/* Pulidora: cuerpo, cabezal, disco y mango lateral */}
+                                    <rect x="2" y="8" width="11" height="5" rx="2.5" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9h3.5v3H13M8 13v5M5 10.5h3" />
+                                    <ellipse cx="19.5" cy="10.5" rx="1.5" ry="6" strokeWidth={2} />
                                 </svg>
                                 <span>Pulido</span>
                             </button>
@@ -236,7 +266,9 @@ export default function FibraPage() {
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                    {/* Ensayo: bañera de hidromasaje completa, con grifería y burbujas de los chorros */}
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.5 11.5h19v2.5a5 5 0 0 1-5 5h-9a5 5 0 0 1-5-5zM7 19l-1 2M17 19l1 2M5 11.5V5.5a2 2 0 0 1 3.6-1.2" />
+                                    <path strokeLinecap="round" strokeWidth={2.5} d="M11 8.5h.01M14.5 7h.01M18 8.5h.01" />
                                 </svg>
                                 <span>Ensayo</span>
                             </button>
@@ -417,6 +449,8 @@ export default function FibraPage() {
                             <PinturaFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'vaciado' && hasPermission('vaciado') ? (
                             <VaciadoFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'herrajes' && hasPermission('herrajes') ? (
+                            <HerrajesFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'pulido' && hasPermission('pulido') ? (
                             <PulidoFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'ensayo' && hasPermission('ensayo') ? (

@@ -13,12 +13,12 @@ interface TarjetaPiezaFibraProps {
     orden?: OrdenFabricacion
     moldes: Molde[]
     acciones: React.ReactNode
-    franja?: string   // color de fondo de la franja de la pieza
+    franja?: string   // ya no cambia el color: la franja es gris Firplak en todos los módulos (se deja por compatibilidad)
 }
 
-export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones, franja = 'bg-amber-50/40' }: TarjetaPiezaFibraProps) {
+export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones }: TarjetaPiezaFibraProps) {
     return (
-        <div className="bg-white border-2 border-gray-300 rounded-lg">
+        <div className="bg-white border-2 border-[#e2ded5] rounded-lg">
             {orden ? (
                 // La tarjeta de la orden solo informa: sin borde propio ni selección
                 <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none [&>button]:cursor-default [&>button:hover]:bg-white">
@@ -34,21 +34,22 @@ export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones, f
                 </div>
             )}
 
-            <div className={`rounded-b-md border-t-2 border-gray-200 px-3 py-2 flex flex-col lg:flex-row lg:items-center gap-3 ${franja}`}>
+            {/* Franja de la pieza: gris cálido Firplak (crema con borde #e2ded5) en todos los módulos */}
+            <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-2 flex flex-col lg:flex-row lg:items-center gap-3">
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                        <Layers size={18} className="text-amber-600 shrink-0" />
+                        <Layers size={18} className="text-[#7B8E90] shrink-0" />
                         <div>
-                            <p className="text-[10px] text-gray-500 uppercase font-black leading-none">Serial</p>
-                            <p className="text-lg font-black text-amber-700 leading-tight">{registro.molde_serial}</p>
+                            <p className="text-[10px] text-[#7B8E90] uppercase font-black leading-none">Serial</p>
+                            <p className="text-lg font-black text-[#324354] leading-tight">{registro.molde_serial}</p>
                         </div>
                     </div>
                     <TrazabilidadPiezaFibra registro={registro} />
                     <div className="flex items-center gap-2">
-                        <Scale size={16} className="text-emerald-600 shrink-0" />
+                        <Scale size={16} className="text-[#7B8E90] shrink-0" />
                         <div>
-                            <p className="text-[10px] text-gray-500 uppercase font-black leading-none">Masa teórica</p>
-                            <p className="text-xs font-bold text-gray-900 leading-tight mt-0.5">
+                            <p className="text-[10px] text-[#7B8E90] uppercase font-black leading-none">Masa teórica</p>
+                            <p className="text-xs font-bold text-[#324354] leading-tight mt-0.5">
                                 {registro.molde_masa_teorica ? `${Number(registro.molde_masa_teorica).toFixed(2)} Kg` : 'N/A'}
                             </p>
                         </div>

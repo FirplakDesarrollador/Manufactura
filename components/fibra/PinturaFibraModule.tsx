@@ -267,7 +267,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                     <HistorySection />
                 ) : (
                     <div className="space-y-2">
-                        <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
+                        <div className="text-[#324354] text-xs font-black mb-2 uppercase">
                             Ordenes encontradas: {filteredOrdenes.length}
                         </div>
 

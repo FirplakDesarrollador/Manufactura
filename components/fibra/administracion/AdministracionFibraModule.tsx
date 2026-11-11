@@ -30,6 +30,7 @@ const PROCESOS_FILTRO: { id: string; label: string; etapas: string[] }[] = [
     { id: 'programado', label: 'Programado', etapas: ['programado'] },
     { id: 'pintura', label: 'Pintura', etapas: ['pintura'] },
     { id: 'vaciado', label: 'Vaciado', etapas: ['vaciado'] },
+    { id: 'herrajes', label: 'Herrajes', etapas: ['herrajes'] },
     { id: 'pulido', label: 'Pulido', etapas: ['pulido'] },
     { id: 'ensayo', label: 'Ensayo', etapas: ['acabado'] },
     { id: 'reparacion', label: 'Reparación', etapas: ['reparacion', 'reparacion_larga'] },
@@ -243,7 +244,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         try {
             const { type, item } = editModal
             if (type === 'of') {
-                const sumEtapas = (item.pintura || 0) + (item.pulido || 0) + (item.reparacion || 0) + (item.saldo || 0) + (item.empaque || 0) + (item.transito || 0) + (item.vaciado || 0) + (item.estanteria || 0) + (item.acabado || 0) + (item.reparacion_larga || 0) + (item.digitado || 0) + (item.cedi || 0)
+                const sumEtapas = (item.pintura || 0) + (item.pulido || 0) + (item.reparacion || 0) + (item.saldo || 0) + (item.empaque || 0) + (item.transito || 0) + (item.vaciado || 0) + (item.herrajes || 0) + (item.estanteria || 0) + (item.acabado || 0) + (item.reparacion_larga || 0) + (item.digitado || 0) + (item.cedi || 0)
                 if (item.cantidad !== undefined && item.cantidad < sumEtapas) {
                     alert(`No se puede actualizar: La cantidad fijada (${item.cantidad}) es inferior a las piezas ya existentes en las etapas (${sumEtapas}).`)
                     setSaving(false)
@@ -265,7 +266,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
     const handleTransfer = async (registro: RegistroTrazabilidad, targetOrden: OrdenFabricacion) => {
         const targetCantidad = Math.max(0, targetOrden.cantidad || targetOrden.cantidad_programada || 0)
-        const targetSumEtapas = (targetOrden.pintura || 0) + (targetOrden.pulido || 0) + (targetOrden.reparacion || 0) + (targetOrden.saldo || 0) + (targetOrden.empaque || 0) + (targetOrden.transito || 0) + (targetOrden.vaciado || 0) + (targetOrden.estanteria || 0) + (targetOrden.acabado || 0) + (targetOrden.reparacion_larga || 0) + (targetOrden.digitado || 0) + (targetOrden.cedi || 0)
+        const targetSumEtapas = (targetOrden.pintura || 0) + (targetOrden.pulido || 0) + (targetOrden.reparacion || 0) + (targetOrden.saldo || 0) + (targetOrden.empaque || 0) + (targetOrden.transito || 0) + (targetOrden.vaciado || 0) + (targetOrden.herrajes || 0) + (targetOrden.estanteria || 0) + (targetOrden.acabado || 0) + (targetOrden.reparacion_larga || 0) + (targetOrden.digitado || 0) + (targetOrden.cedi || 0)
 
         if (targetCantidad > 0 && targetSumEtapas >= targetCantidad) {
             toast.error(`No se puede transferir: La orden de destino ${targetOrden.orden_fabricacion} ya cuenta con la cantidad máxima permitida (${targetCantidad} piezas).`)
@@ -696,6 +697,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             <option value="Pintura">Pintura</option>
                                             <option value="Desgelcada">Desgelcada</option>
                                             <option value="Vaciado">Vaciado</option>
+                                            <option value="Herrajes">Herrajes</option>
                                             <option value="Pulido">Pulido</option>
                                             <option value="Ensayo">Ensayo</option>
                                             <option value="Guacales">Guacales</option>
@@ -833,6 +835,7 @@ const TRACE_STAGES: Array<{
 }> = [
     { label: 'Pintura', dateKey: 'pintura_fecha', userKey: 'pintura_user_name' },
     { label: 'Vaciado', dateKey: 'vaciado_fecha', userKey: 'vaciado_user_name' },
+    { label: 'Herrajes', dateKey: 'herrajes_fecha', userKey: 'herrajes_user_name' },
     { label: 'Pulido', dateKey: 'pulido_fecha', userKey: 'pulido_user_name' },
     { label: 'Ensayo', dateKey: 'acabado_fecha', userKey: 'acabado_user_name' },
     { label: 'Reparacion', dateKey: 'reparacion_fecha', userKey: 'reparacion_user_name' },
