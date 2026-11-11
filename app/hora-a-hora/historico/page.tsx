@@ -755,45 +755,45 @@ export default function Historico() {
                             <TableHeader className="bg-[#254153] hover:bg-[#254153]">
                                 <TableRow className="hover:bg-[#254153] border-none select-none">
                                     <TableHead 
-                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors w-[5%] whitespace-normal leading-tight"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[5%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('consecutivo')}
                                     >
                                         # <SortIcon columnKey="consecutivo" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors w-[11%] whitespace-normal leading-tight"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[11%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('tiempoInicio')}
                                     >
                                         Fecha <SortIcon columnKey="tiempoInicio" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('plantaPuesto')}
                                     >
                                         Planta / Puesto <SortIcon columnKey="plantaPuesto" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('operario')}
                                     >
                                         Operario <SortIcon columnKey="operario" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('realizadoPor')}
                                     >
                                         Realizado por <SortIcon columnKey="realizadoPor" />
                                     </TableHead>
-                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[9%] whitespace-normal leading-tight" onClick={() => requestSort('rendimiento')}>
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[9%] whitespace-normal leading-tight" onClick={() => requestSort('rendimiento')}>
                                         Rendimiento <SortIcon columnKey="rendimiento" />
                                     </TableHead>
-                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[8%] whitespace-normal leading-tight" onClick={() => requestSort('calidad')}>
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[8%] whitespace-normal leading-tight" onClick={() => requestSort('calidad')}>
                                         Calidad <SortIcon columnKey="calidad" />
                                     </TableHead>
-                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[6%] whitespace-normal leading-tight" onClick={() => requestSort('hdt')}>
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[6%] whitespace-normal leading-tight" onClick={() => requestSort('hdt')}>
                                         HDT <SortIcon columnKey="hdt" />
                                     </TableHead>
-                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider text-right w-[4%]"></TableHead>
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider text-right w-[4%] bg-[#254153]"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
