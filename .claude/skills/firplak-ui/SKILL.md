@@ -202,6 +202,12 @@ Inicio, Control de piso, Calidad, Sistema de Producción, Mantenimiento y Nueva 
 - Nombre `text-[13px] sm:text-sm 2xl:text-base font-bold`; "(Atajo)" `text-[10px] md:text-xs italic`.
 - Cuadrícula `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4`; `<main>` con `px-4 py-4 md:py-6` (sin `pt-28`/`pt-32`: el `Header` ya deja su espacio); pie `py-2 text-xs`.
 
+### 6.2 Tarjeta de orden FV (`components/pintura/OrdenCard.tsx`, `planta === 'fv'`)
+- Solo colores Firplak: textos navy `#324354` (valores) y sage `#7B8E90` (etiquetas, Pedido, SKU, Cliente); fondos crema `#F6F3EE`; bordes `#e2ded5`; rojo `#d14747` solo para atraso o exceso; verde `#59a96a` solo para CEDI (terminado). Nada de cyan, naranja, morado ni amarillo de Tailwind.
+- Encabezado en 2 renglones paralelos: OF / Pedido a la izquierda, descripción completa (`text-[13px] font-black uppercase`, sin cortar) / SKU a la derecha y el botón de detalle SAP al final del renglón.
+- Fechas del Semáforo en recuadros (nombre `text-[9px]` arriba, fecha `text-[13px] font-black` abajo): **Liberación** (O), **Prometida Cliente** (T, roja si pasó) y **Nivel de Servicio** (W). La columna del Semáforo va en el `title`, no en pantalla.
+- Moldes: lista compacta de 5 renglones (nombre sage a la izquierda, número navy a la derecha), arriba y sin espacio vacío.
+
 ## 7. Gráficas
 
 Seguir `.agents/skills/visualizacion-graficas/SKILL.md` (tamaños para los Dell Pro 14). Resumen: Recharts, ejes `fontSize` 10–12, línea de meta `ReferenceLine` punteada.
@@ -316,3 +322,4 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - 2026-10-31 · **Informe de Turno** (`/informe-turno`, deja de estar en construcción) con la primera planta: **RMOLD** (Reparación de Moldes), formulario de cierre diario que reemplaza el Excel Productividad Moldes. Tablero de Control → pestaña **RMOLD** (entre Sistema de Producción y Variación) con productividad, nivel de servicio y paros.
 - 2026-11-02 · Menús de módulos más pequeños (§6.1) para que los 15 módulos del inicio se vean completos a zoom 100 %: tarjetas de 165 px (220 px en 2xl), ícono, letra y espacios reducidos en Inicio, Control de piso, Calidad, Sistema de Producción, Mantenimiento y Nueva OPT.
 - 2026-11-02 · Control de Piso FV pasa al `Header` estándar; menú de módulos de planta recogible a barra de íconos (§2.0).
+- 2026-11-10 · Tarjeta de orden FV (§6.2): encabezado OF | descripción en 2 renglones, 3 fechas del Semáforo con nombres cortos, Moldes compacto y todo en colores Firplak; detalle SAP junto a la descripción.

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { ordenarPorFechaT } from '@/lib/fibra/ordenT'
+import { esKitReparacion } from '@/lib/fibra/kitReparacion'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { liberarMolde, requireUserId } from './helpers'
 
@@ -7,7 +8,8 @@ export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> 
     const { data, error } = await supabase
         .from('query_trazabilidad_fv')
         .select('*')
-        .in('estado', ['Pulido', 'Vaciado'])
+        // Herrajes = pasó por Instalación Herrajes; Pulido = estado anterior al cambio; Vaciado solo kits de reparación
+        .in('estado', ['Herrajes', 'Pulido', 'Vaciado'])
         .order('pintura_fecha', { ascending: false })
 
     if (error) {
@@ -15,7 +17,7 @@ export async function getRegistrosParaPulido(): Promise<RegistroTrazabilidad[]> 
         return []
     }
 
-    return ordenarPorFechaT(data || [])  // más atrasado primero por la T del Semáforo
+    return ordenarPorFechaT((data || []).filter(r => r.estado !== 'Vaciado' || esKitReparacion(r.producto_descripcion)))  // más atrasado primero por la T del Semáforo
 }
 
 export async function registrarPulido(registrer: string, usuarioEmail: string, nuevoEstado: string) {

@@ -76,7 +76,7 @@ export default function ModuloPiezasFibra({ cargarPiezas, tituloLista, sinPiezas
 
             <div className="flex-1 md:overflow-y-auto p-2 sm:p-4">
                 <div className="space-y-2">
-                    <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
+                    <div className="text-[#324354] text-xs font-black mb-2 uppercase">
                         {tituloLista}: {filteredRegistros.length}
                     </div>
                     {loading ? (

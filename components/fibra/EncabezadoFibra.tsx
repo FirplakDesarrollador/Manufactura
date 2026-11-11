@@ -109,21 +109,21 @@ interface EncabezadoFibraProps {
 export default function EncabezadoFibra({ metrics, searchText, onSearchChange, selectedDate, onDateChange, onClear, onSyncSap, syncing, loading, placeholder = 'Producto / OF / Pedido / ...', extra }: EncabezadoFibraProps) {
     return (
         <>
-            {/* Summary Cards */}
+            {/* Indicadores con colores Firplak: navy = órdenes, amarillo = procesos de planta, verde = salida, Kg en navy sólido */}
             <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200">
                 <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
-                    <StatCard label="Cantidad" value={metrics.cantidad} color="bg-blue-50 text-blue-600" />
-                    <StatCard label="Programado" value={metrics.programado} color="bg-indigo-50 text-indigo-600" />
-                    <StatCard label="Pintura" value={metrics.pintura} color="bg-orange-50 text-orange-600" />
-                    <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-yellow-50 text-yellow-600" />
-                    <StatCard label="Vaciado" value={metrics.vaciado} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard label="Pulido" value={metrics.pulido} color="bg-cyan-50 text-cyan-600" />
-                    <StatCard label="Ensayo" value={metrics.acabado} color="bg-purple-50 text-purple-600" />
-                    <StatCard label="Huacales" value={metrics.huacales} color="bg-lime-50 text-lime-700" />
-                    <StatCard label="Digitado" value={metrics.digitado} color="bg-slate-50 text-slate-600" />
-                    <StatCard label="Transito" value={metrics.transito} color="bg-amber-50 text-amber-600" />
-                    <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-green-50 text-green-600" />
-                    <StatCard label="Kg Hoy" value={metrics.kilogramos.toFixed(1)} color="bg-blue-600 text-white" />
+                    <StatCard label="Cantidad" value={metrics.cantidad} color="bg-[#324354]/10 text-[#324354]" />
+                    <StatCard label="Programado" value={metrics.programado} color="bg-[#324354]/10 text-[#324354]" />
+                    <StatCard label="Pintura" value={metrics.pintura} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Desgelcada" value={metrics.desgelcada} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Vaciado" value={metrics.vaciado} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Pulido" value={metrics.pulido} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Ensayo" value={metrics.acabado} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Huacales" value={metrics.huacales} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Digitado" value={metrics.digitado} color="bg-[#59a96a]/15 text-[#2f7a40]" />
+                    <StatCard label="Transito" value={metrics.transito} color="bg-[#59a96a]/15 text-[#2f7a40]" />
+                    <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-[#59a96a]/15 text-[#2f7a40]" />
+                    <StatCard label="Kg Hoy" value={metrics.kilogramos.toFixed(1)} color="bg-[#324354] text-white" />
                 </div>
             </div>
 
@@ -131,7 +131,7 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
             <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-2 sm:gap-3">
                     <div className="basis-full md:basis-0 flex-1 min-w-0 md:min-w-[300px]">
-                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Búsqueda Global</label>
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Búsqueda Global</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                             <input
@@ -139,20 +139,20 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
                                 placeholder={placeholder}
                                 value={searchText}
                                 onChange={(e) => onSearchChange(e.target.value)}
-                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-cyan-500"
+                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
                             />
                         </div>
                     </div>
 
                     <div className="w-40 sm:w-48">
-                        <label className="text-[10px] font-black text-cyan-600 uppercase mb-1 block">Filtrar Fecha</label>
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Filtrar Fecha</label>
                         <div className="relative">
                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                             <input
                                 type="date"
                                 value={selectedDate || ''}
                                 onChange={(e) => onDateChange(e.target.value)}
-                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-cyan-500"
+                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
                             />
                         </div>
                     </div>
@@ -169,7 +169,7 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
                     <button
                         onClick={onSyncSap}
                         disabled={syncing || loading}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors shadow-sm disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider h-8 self-end"
+                        className="flex items-center gap-1.5 px-3 py-2 bg-[#324354] text-white rounded-lg hover:bg-[#254153] transition-colors shadow-sm disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider h-8 self-end"
                         title="Sincronizar y recargar órdenes desde SAP"
                     >
                         <RefreshCw size={15} className={syncing || loading ? 'animate-spin' : ''} />
@@ -186,7 +186,7 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
 
 function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
     return (
-        <div className={`flex-1 min-w-[64px] sm:min-w-[76px] px-1 sm:px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
+        <div className={`flex-1 min-w-[64px] sm:min-w-[76px] px-1 sm:px-1.5 py-1.5 rounded-lg border border-[#e2ded5] shadow-sm flex flex-col items-center justify-center ${color}`}>
             <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
             <span className="text-sm font-black tracking-tight">{value}</span>
         </div>

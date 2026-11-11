@@ -12,6 +12,7 @@ const PASOS: { label: string; fecha: (r: RegistroTrazabilidad) => string | undef
     { label: 'Contramolde', fecha: r => r.contramolde_fecha, usuario: r => r.contramolde_user_name },
     { label: 'Vaciado', fecha: r => r.vaciado_fecha || r.fecha_vaciado, usuario: r => r.vaciado_user_name },
     { label: 'Desmolde', fecha: r => r.desmolde_fecha },
+    { label: 'Herrajes', fecha: r => r.herrajes_fecha, usuario: r => r.herrajes_user_name },
     { label: 'Pulido', fecha: r => r.pulido_fecha, usuario: r => r.pulido_user_name },
     // En la base, el ensayo queda en acabado_fecha
     { label: 'Ensayo', fecha: r => r.acabado_fecha, usuario: r => r.acabado_user_name },
@@ -50,15 +51,15 @@ export default function TrazabilidadPiezaFibra({ registro }: { registro: Registr
 
     return (
         <div ref={ref} className="relative flex items-center gap-2">
-            <Clock size={16} className="text-amber-600 shrink-0" />
+            <Clock size={16} className="text-[#7B8E90] shrink-0" />
             <div>
-                <p className="text-[10px] text-gray-500 uppercase font-black leading-none">{ultimo ? `Último proceso: ${ultimo.label}` : 'Trazabilidad'}</p>
-                <p className="text-xs font-bold text-gray-900 leading-tight mt-0.5">{ultimo ? formato(ultimo.fecha) : 'Sin registros'}</p>
+                <p className="text-[10px] text-[#7B8E90] uppercase font-black leading-none">{ultimo ? `Último proceso: ${ultimo.label}` : 'Trazabilidad'}</p>
+                <p className="text-xs font-bold text-[#324354] leading-tight mt-0.5">{ultimo ? formato(ultimo.fecha) : 'Sin registros'}</p>
             </div>
             {pasos.length > 1 && (
                 <button
                     onClick={() => setAbierta(v => !v)}
-                    className="h-7 px-2 ml-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-700 flex items-center gap-1"
+                    className="h-7 px-2 ml-1 rounded-lg border border-[#e2ded5] bg-white hover:bg-[#F6F3EE] text-[11px] font-bold text-[#324354] flex items-center gap-1"
                     title="Ver la fecha y hora de cada proceso de la pieza"
                 >
                     Trazabilidad ({pasos.length})
@@ -77,7 +78,7 @@ export default function TrazabilidadPiezaFibra({ registro }: { registro: Registr
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {pasos.map(p => (
-                                <tr key={p.label} className={p === ultimo ? 'bg-amber-50' : ''}>
+                                <tr key={p.label} className={p === ultimo ? 'bg-[#F6F3EE]' : ''}>
                                     <td className="px-2 py-1 font-bold text-[#324354]">{p.label}</td>
                                     <td className="px-2 py-1 font-mono whitespace-nowrap">{formato(p.fecha)}</td>
                                     <td className="px-2 py-1 text-slate-600 truncate max-w-[110px]" title={p.usuario || ''}>{p.usuario || '—'}</td>

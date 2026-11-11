@@ -165,6 +165,8 @@ export const DESTINOS_MOVIMIENTO_FV = {
     // Pintura y Vaciado solo para piezas nuevas desde Programado (registrarPiezaProgramadoFv)
     pintura: { estado: 'Pintura', fecha: 'pintura_fecha', usuario: 'pintura_user_id' },
     vaciado: { estado: 'Vaciado', fecha: 'vaciado_fecha', usuario: 'vaciado_user_id' },
+    // Instalación Herrajes (entre Vaciado y Pulido): libera el molde
+    herrajes: { estado: 'Herrajes', fecha: 'herrajes_fecha', usuario: 'herrajes_user_id' },
     // Cada destino deja el estado y la fecha que dejaría el registro normal del proceso anterior:
     // pasar a Ensayo = Pulido registrado; a Huacales (Guacales) = Ensayo registrado; a Digitado (Empaque) = huacal
     // registrado; a Tránsito = Digitado registrado; a CEDI = CEDI registrado

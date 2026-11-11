@@ -22,6 +22,7 @@ export const ETAPAS: Etapa[] = [
     { key: 'pintura', label: 'Pintura' },
     { key: 'desgelcada', label: 'Desgelcada' },
     { key: 'vaciado', label: 'Vaciado' },
+    { key: 'herrajes', label: 'Herrajes' },
     { key: 'estanteria', label: 'Estantería' },
     { key: 'pulido', label: 'Pulido' },
     { key: 'acabado', label: 'Acabado' },

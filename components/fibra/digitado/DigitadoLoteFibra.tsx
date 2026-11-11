@@ -46,6 +46,7 @@ export default function DigitadoLoteFibra({ userEmail, extra }: { userEmail: str
 
     // Órdenes con piezas que se pueden digitar (o ya digitadas / en tránsito)
     const filteredOrdenes = useMemo(() => baseFilteredOrdenes.filter(o => (
+        (o.herrajes || 0) > 0 ||
         (o.pulido || 0) > 0 ||
         (o.desgelcada || 0) > 0 ||
         (o.empaque || 0) > 0 ||

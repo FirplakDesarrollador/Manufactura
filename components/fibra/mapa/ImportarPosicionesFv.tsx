@@ -19,7 +19,8 @@ import {
 
 type Lugar = { label: string; destino: DestinoMovimientoFv; zonas: string[] }
 // VACIADO = la pieza está en la mesa de vaciado, aún sin notificar el vaciado (estado Pintura).
-// Desmolde, Herrajes y Nivelación van después del vaciado (estado Vaciado) hasta que se notifique Pulido.
+// Desmolde y Herrajes = vaciada, esperando el registro de Herrajes (estado Vaciado, casillas de Desmolde / Instalación
+// Herrajes); Nivelación = herrajes ya registrados (estado Herrajes) hasta que se notifique Pulido.
 const LUGARES: { patron: RegExp; lugar: Lugar }[] = [
     { patron: /ACABADO\s*2/, lugar: { label: 'Acabado 2', destino: 'huacales', zonas: ['acabado2'] } },
     { patron: /ENSAMBLE\s*2/, lugar: { label: 'Ensamble 2', destino: 'ensayo', zonas: ['ensamble2'] } },
@@ -28,9 +29,9 @@ const LUGARES: { patron: RegExp; lugar: Lugar }[] = [
     { patron: /ACABADO/, lugar: { label: 'Acabado 1', destino: 'ensayo', zonas: ['acabado'] } },
     { patron: /ENSAYO/, lugar: { label: 'Ensayo', destino: 'ensayo', zonas: ['ensayo'] } },
     { patron: /[GH]?UACAL/, lugar: { label: 'Huacales', destino: 'huacales', zonas: ['huacales'] } },
-    { patron: /HERRAJE/, lugar: { label: 'Herrajes', destino: 'vaciado', zonas: ['desmolde'] } },
-    { patron: /NIVELACION/, lugar: { label: 'Nivelación', destino: 'vaciado', zonas: ['desmolde'] } },
-    { patron: /DESMOLDE/, lugar: { label: 'Desmolde', destino: 'vaciado', zonas: ['desmolde'] } },
+    { patron: /HERRAJE/, lugar: { label: 'Instalación Herrajes', destino: 'vaciado', zonas: [] } },
+    { patron: /NIVELACION/, lugar: { label: 'Nivelación', destino: 'herrajes', zonas: ['desmolde'] } },
+    { patron: /DESMOLDE/, lugar: { label: 'Desmolde', destino: 'vaciado', zonas: [] } },
     { patron: /PULIDO/, lugar: { label: 'Pulido', destino: 'pulido', zonas: ['pulido'] } },
     { patron: /VACIADO/, lugar: { label: 'Vaciado', destino: 'pintura', zonas: ['vaciado'] } },
     { patron: /PINTURA/, lugar: { label: 'Pintura', destino: 'pintura', zonas: ['pintura'] } },
