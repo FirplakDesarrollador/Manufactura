@@ -105,7 +105,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             if (esKitReparacion(selectedOrden.producto_descripcion)) {
                 setDebugInfo('')
             } else if (available.length === 0) {
-                setDebugInfo(`No se encontraron moldes Disponibles para la orden: "${sku}" (${selectedOrden.molde_descripcion || selectedOrden.producto_descripcion})`)
+                setDebugInfo(`Sin molde específico asignado: puede elegir o buscar cualquier molde de la lista.`)
             } else {
                 setDebugInfo('')
             }
@@ -115,6 +115,22 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             setDebugInfo('')
         }
     }, [selectedOrden, allMoldes])
+
+    // Moldes para el selector: busca entre todos los moldes si hay texto, o muestra los asociados a la orden
+    const moldesOpciones = useMemo(() => {
+        const q = moldSearchText.trim().toLowerCase()
+        if (q) {
+            return allMoldes.filter(m => 
+                (m.serial || '').toLowerCase().includes(q) ||
+                (m.molde_descripcion || '').toLowerCase().includes(q) ||
+                (m.molde_sku || '').toLowerCase().includes(q)
+            )
+        }
+        if (moldesDisponibles.length > 0) {
+            return moldesDisponibles
+        }
+        return allMoldes
+    }, [moldSearchText, moldesDisponibles, allMoldes])
 
     // Filtro base y métricas compartidos con los demás módulos de piso FV
     const { baseFilteredOrdenes, metrics } = useMetricasFibra(ordenes, trazabilidad, searchText, selectedDate)
@@ -310,9 +326,9 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                                         ${!selectedOrden ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
                                     `}
                                 >
-                                    <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
+                                    <span className={selectedMolde ? 'text-gray-900 font-bold' : 'text-gray-400'}>
                                         {selectedMolde 
-                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
+                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v) · ${selectedMolde.estado}` 
                                             : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
                                     </span>
                                     <Search size={15} className="text-gray-400" />
@@ -330,10 +346,13 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                                                 className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500"
                                             />
                                         </div>
-                                        <div className="max-h-[200px] overflow-y-auto">
-                                            {moldesDisponibles
-                                                .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
-                                                .map((molde) => (
+                                        <div className="max-h-[220px] overflow-y-auto">
+                                            {moldesOpciones.length === 0 ? (
+                                                <div className="px-4 py-3 text-xs text-gray-400 text-center">
+                                                    No se encontraron moldes
+                                                </div>
+                                            ) : (
+                                                moldesOpciones.map((molde) => (
                                                     <div
                                                         key={molde.id}
                                                         onClick={() => {
@@ -342,24 +361,38 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                                                             setIsMoldDropdownOpen(false)
                                                             setMoldSearchText('')
                                                         }}
-                                                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
+                                                        className={`px-4 py-2.5 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0 ${
+                                                            selectedMolde?.id === molde.id ? 'bg-cyan-50/70' : ''
+                                                        }`}
                                                     >
-                                                        <span className="text-sm font-bold">{molde.serial}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-gray-800">{molde.serial}</span>
+                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                                molde.estado === 'Disponible' ? 'bg-emerald-100 text-emerald-800' :
+                                                                molde.estado === 'En uso' ? 'bg-amber-100 text-amber-800' :
+                                                                molde.estado === 'Reparación' ? 'bg-red-100 text-red-800' :
+                                                                'bg-slate-100 text-slate-700'
+                                                            }`}>
+                                                                {molde.estado}
+                                                            </span>
+                                                        </div>
                                                         <span className="text-xs text-cyan-600 font-bold">{molde.vueltas_actuales}v</span>
                                                     </div>
-                                                ))}
+                                                ))
+                                            )}
                                         </div>
                                     </div>
                                 )}
                                 
                                 {debugInfo && (
-                                    <div className="text-[10px] text-red-500 font-bold px-1 mt-1 animate-pulse">
+                                    <div className="text-[10px] text-amber-600 font-bold px-1 mt-1">
                                         {debugInfo}
                                     </div>
                                 )}
                                 {selectedMolde && (
-                                    <div className="text-[10px] text-gray-500 px-1 mt-1 italic">
-                                        Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}
+                                    <div className="text-[10px] text-gray-500 px-1 mt-1 flex items-center justify-between">
+                                        <span>Estado: <b className={selectedMolde.estado === 'Disponible' ? 'text-emerald-600' : 'text-amber-600'}>{selectedMolde.estado}</b></span>
+                                        <span className="italic">Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}</span>
                                     </div>
                                 )}
                             </div>

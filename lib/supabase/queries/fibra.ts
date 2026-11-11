@@ -265,7 +265,7 @@ export async function registrarPintura(pinturaData: {
         throw new Error(`No se encontró el usuario. Correo: ${pinturaData.usuario_email}.`)
     }
 
-    // 5. Verificar que el molde no esté en proceso
+    // 5. Verificar proceso del molde (en Fibra no es restrictivo; se permite continuar)
     const { data: trazaReciente, error: trazaError } = await supabase
         .from('trazabilidad_fv')
         .select('estado')
@@ -275,7 +275,7 @@ export async function registrarPintura(pinturaData: {
         .maybeSingle()
 
     if (!trazaError && trazaReciente && (trazaReciente.estado === 'Pintura' || trazaReciente.estado === 'Vaciado')) {
-        throw new Error(`Acción no permitida: El molde ${molde.serial} ya está en proceso de ${trazaReciente.estado}.`)
+        console.warn(`Aviso Fibra: El molde ${molde.serial} tiene registro previo en ${trazaReciente.estado}, pero se permite continuar según configuración operativa.`)
     }
 
     // 6. Actualizar molde

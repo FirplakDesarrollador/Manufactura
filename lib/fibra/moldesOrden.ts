@@ -1,13 +1,14 @@
 import { Molde, OrdenFabricacion } from '@/types/pintura'
 
-// Moldes disponibles para una orden FV (lo usan Pintura y el Mapa de procesos):
+// Moldes para una orden FV (lo usan Pintura y el Mapa de procesos):
 // coincide por SKU o serial del molde, por el código numérico del SKU (PMOL02-0087-… → serial "0087-xx")
 // o porque la descripción del molde contiene todas las palabras de la descripción de la orden.
+// NOTA FIBRA: No es restrictivo por estado para permitir seleccionar cualquier molde aunque no esté en 'Disponible'.
 export function moldesDisponiblesOrden(orden: OrdenFabricacion, todos: Molde[]): Molde[] {
-    return moldesDeOrden(orden, todos).filter(m => m.estado === 'Disponible')
+    return moldesDeOrden(orden, todos)
 }
 
-// Todos los moldes de la referencia de la orden, en cualquier estado (para ofrecer liberar uno ocupado)
+// Todos los moldes de la referencia de la orden, en cualquier estado (ordenando Disponibles primero)
 export function moldesDeOrden(orden: OrdenFabricacion, todos: Molde[]): Molde[] {
     const sku = (orden.molde_sku || orden.producto_sku || orden.sku || '').trim().toLowerCase()
     const targetDesc = (orden.molde_descripcion || orden.producto_descripcion || '').trim().toLowerCase()
@@ -47,5 +48,10 @@ export function moldesDeOrden(orden: OrdenFabricacion, todos: Molde[]): Molde[] 
 
             return false
         })
-        .sort((a, b) => a.vueltas_actuales - b.vueltas_actuales)
+        .sort((a, b) => {
+            // Priorizar 'Disponible' primero por conveniencia visual, pero permitir todos
+            if (a.estado === 'Disponible' && b.estado !== 'Disponible') return -1
+            if (a.estado !== 'Disponible' && b.estado === 'Disponible') return 1
+            return a.vueltas_actuales - b.vueltas_actuales
+        })
 }
