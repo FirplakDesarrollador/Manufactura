@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
 import { Box, Clipboard, Users, AlertTriangle, FileText } from 'lucide-react'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
+import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
 
 // 'YYYY-MM-DD' → dd/mm/aaaa
@@ -104,7 +105,8 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                                     <Clipboard size={16} className="shrink-0" />
                                     <span className="text-base font-black text-[#324354] whitespace-nowrap">OF: {orden.orden_fabricacion}</span>
                                 </div>
-                                <div className="text-xs font-bold text-[#7B8E90] whitespace-nowrap mt-0.5">Pedido: {orden.pedido || (orden as any).numero_pedido || 'Sin pedido'}</div>
+                                {/* Solo la orden de venta: sin la línea/lote (lo que va desde el primer guion) */}
+                                <div className="text-xs font-bold text-[#7B8E90] whitespace-nowrap mt-0.5">Pedido: {String(orden.pedido || (orden as any).numero_pedido || '').split('-')[0].trim() || 'Sin pedido'}</div>
                             </div>
                             <div className="min-w-0 pl-3 border-l border-[#e2ded5]">
                                 {/* Descripción completa (sin cortar): si es larga, baja a otro renglón */}
@@ -112,7 +114,8 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                                     title={orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'}>
                                     {orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'}
                                 </div>
-                                <div className="text-[10px] font-semibold text-[#7B8E90] mt-0.5 truncate">SKU: {sku || 'No definido'}</div>
+                                {/* SKU del producto de la OF (no el del molde) */}
+                                <div className="text-[10px] font-semibold text-[#7B8E90] mt-0.5 truncate">SKU: {orden.producto_sku?.trim() || orden.sku?.trim() || 'No definido'}</div>
                             </div>
                             {/* Detalle de la orden en SAP, al lado de la descripción */}
                             {conDetalle ? (
@@ -290,7 +293,8 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
             {/* El modal va fuera de la tarjeta (portal) y no propaga clics a ella */}
             {verDetalle && typeof document !== 'undefined' && createPortal(
                 <div onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
-                    <DetalleOrdenSapModal ordenFabricacion={orden.orden_fabricacion} onClose={() => setVerDetalle(false)} />
+                    <DetalleOrdenSapModal ordenFabricacion={orden.orden_fabricacion} onClose={() => setVerDetalle(false)}
+                        piso={planta === 'fv' ? { label: 'Trazabilidad', contenido: <OrderProcessesPanel orden={orden} registros={[]} /> } : undefined} />
                 </div>,
                 document.body
             )}

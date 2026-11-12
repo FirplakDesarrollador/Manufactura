@@ -233,7 +233,8 @@ export default function BuscadorOrdenesFibraModule() {
                 </div>
             </div>
 
-            {detalleOf != null && <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)} />}
+            {detalleOf != null && <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)}
+                piso={{ label: 'Trazabilidad', contenido: <OrderProcessesPanel orden={{ orden_fabricacion: detalleOf } as any} registros={[]} /> }} />}
         </div>
     )
 }
