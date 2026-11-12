@@ -14,9 +14,13 @@ interface SearchableSelectProps {
     value?: string
     disabled?: boolean
     className?: string
+    // Opcional: opciones sugeridas que se muestran primero con su título; el resto va debajo con tituloResto
+    destacados?: string[]
+    tituloDestacados?: string
+    tituloResto?: string
 }
 
-export function SearchableSelect({ name, options, placeholder, required, label, onValueChange, defaultValue = '', value, disabled = false, className = '' }: SearchableSelectProps) {
+export function SearchableSelect({ name, options, placeholder, required, label, onValueChange, defaultValue = '', value, disabled = false, className = '', destacados, tituloDestacados, tituloResto }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState('')
     const [selectedValue, setSelectedValue] = React.useState(value !== undefined ? value : defaultValue)
@@ -39,6 +43,17 @@ export function SearchableSelect({ name, options, placeholder, required, label, 
         if (!term) return unique;
         return unique.filter(option => normalize(String(option)).includes(term));
     }, [searchTerm, options]);
+    // Con sugeridos: primero los sugeridos que pasan el filtro y luego el resto (sin repetir)
+    const grupoDestacado = React.useMemo(() => {
+        if (!destacados?.length) return [] as string[];
+        const term = normalize(searchTerm);
+        return Array.from(new Set(destacados.filter(Boolean))).filter(o => !term || normalize(o).includes(term));
+    }, [destacados, searchTerm]);
+    const grupoResto = React.useMemo(() => {
+        if (!grupoDestacado.length) return filteredOptions;
+        const d = new Set(grupoDestacado);
+        return filteredOptions.filter(o => !d.has(o));
+    }, [filteredOptions, grupoDestacado]);
 
     React.useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -112,8 +127,23 @@ export function SearchableSelect({ name, options, placeholder, required, label, 
                             />
                         </div>
                         <div className="overflow-y-auto flex-1 p-1">
-                            {filteredOptions.length > 0 ? (
-                                filteredOptions.map((option, index) => (
+                            {grupoDestacado.length > 0 && (
+                                <>
+                                    {tituloDestacados && <div className="px-3 pt-1.5 pb-1 text-[10px] font-black uppercase tracking-wide text-[#324354] bg-[#F6F3EE] rounded-sm">{tituloDestacados}</div>}
+                                    {grupoDestacado.map((option, index) => (
+                                        <div
+                                            key={`d-${option}-${index}`}
+                                            className={`px-3 py-2 cursor-pointer hover:bg-slate-100 hover:text-slate-900 transition-colors text-sm rounded-sm ${selectedValue === option ? 'bg-slate-100 font-bold text-primary' : 'text-slate-800 font-semibold'}`}
+                                            onClick={() => handleSelect(option)}
+                                        >
+                                            {option}
+                                        </div>
+                                    ))}
+                                    {grupoResto.length > 0 && tituloResto && <div className="mt-1 px-3 pt-1.5 pb-1 text-[10px] font-black uppercase tracking-wide text-slate-500 border-t border-slate-100">{tituloResto}</div>}
+                                </>
+                            )}
+                            {grupoResto.length > 0 || grupoDestacado.length > 0 ? (
+                                grupoResto.map((option, index) => (
                                     <div
                                         key={`${option}-${index}`}
                                         className={`px-3 py-2 cursor-pointer hover:bg-slate-100 hover:text-slate-900 transition-colors text-sm rounded-sm ${selectedValue === option ? 'bg-slate-100 font-bold text-primary' : 'text-slate-700'}`}

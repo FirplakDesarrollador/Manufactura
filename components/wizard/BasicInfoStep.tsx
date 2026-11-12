@@ -37,15 +37,14 @@ const PLANTA_TALENTO_HUMANO: Record<string, string[]> = {
     CALID: ["calidad", "marmol (calidad)", "muebles (calidad)", "fibra (calidad)"],
 };
 // Nombres de Talento Humano sin espacios sobrantes (algunos traen dobles o al final y no se encontraban al buscar)
-const limpiarNombre = (n: string) => String(n || "").replace(/s+/g, " ").trim();
+const limpiarNombre = (n: string) => String(n || "").replace(/\s+/g, " ").trim();
 const sinTildes = (s: string) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
     const { evaluacionActual, iniciarEvaluacion, actualizarEvaluacion } = useStore();
     const [operarios, setOperarios] = useState<string[]>([]);
-    // Operarios con su planta: el campo Operario muestra los de la planta elegida (o todos, para préstamos)
+    // Operarios con su planta: el campo Operario sugiere primero los de la planta elegida y debajo todo el personal
     const [empleados, setEmpleados] = useState<{ nombre: string; planta: string }[]>([]);
-    const [verTodos, setVerTodos] = useState(false);
     const [puestos, setPuestos] = useState<string[]>([]);
     const [activePopup, setActivePopup] = useState<boolean>(false);
     const [currentUserName, setCurrentUserName] = useState<string>("");
@@ -165,10 +164,10 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
         onNext();
     };
 
-    // Operarios de la planta elegida (según Talento Humano); sin planta o con "ver todos", todo el personal activo
+    // Sugeridos: personal de la planta elegida según Talento Humano. Se puede elegir cualquier persona de Firplak
+    // (pudo ser trasladada sin que la cambiaran en el Gestor de Personal)
     const plantasTH = PLANTA_TALENTO_HUMANO[formData.planta] || [];
     const delaPlanta = [...new Set(empleados.filter(e => plantasTH.includes(e.planta)).map(e => e.nombre))].sort((a, b) => a.localeCompare(b, "es"));
-    const operariosPlanta = verTodos || !plantasTH.length || !delaPlanta.length ? operarios : delaPlanta;
 
     return (
         <Card className="shadow-lg border-t-4 border-t-primary animate-in slide-in-from-bottom-4 fade-in duration-500 overflow-visible">
@@ -230,18 +229,15 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                             <SearchableSelect 
                                 name="operario" 
                                 label="Operario" 
-                                options={operariosPlanta} 
-                                placeholder="Seleccione un operario" 
+                                options={operarios}
+                                destacados={delaPlanta}
+                                tituloDestacados={`Sugeridos · personal de ${formData.planta} en Talento Humano`}
+                                tituloResto="Todo el personal de Firplak (trasladados o préstamos)"
+                                placeholder="Seleccione un operario"
                                 required={true}
                                 defaultValue={formData.operario}
                                 onValueChange={(val) => handleSelect("operario", val)}
                             />
-                            {formData.planta && PLANTA_TALENTO_HUMANO[formData.planta] && (
-                                <label className="flex items-center gap-2 mt-1.5 text-xs text-slate-500 cursor-pointer select-none">
-                                    <input type="checkbox" checked={verTodos} onChange={e => setVerTodos(e.target.checked)} className="accent-[#324354]" />
-                                    {verTodos ? `Mostrando todo el personal (${operarios.length})` : `Personal de ${formData.planta} (${operariosPlanta.length}). Marque para ver todo el personal (préstamos)`}
-                                </label>
-                            )}
                         </div>
 
                         <div className="space-y-2 relative">
