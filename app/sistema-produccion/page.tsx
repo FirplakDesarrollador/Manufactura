@@ -235,6 +235,22 @@ export default function SistemaProduccionPage() {
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Auditorías</span>
                             </button>
                         </div>
+
+                        {/* 10. Reglas de Medición del Sistema */}
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <button
+                                onClick={() => router.push('/sistema-produccion/reglas')}
+                                className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
+                                    {/* Libro con visto bueno: reglas del sistema */}
+                                    <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253M14.5 11.5l1.5 1.5 3-3" />
+                                    </svg>
+                                </div>
+                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Reglas de Medición del Sistema</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </main>

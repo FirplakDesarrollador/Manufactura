@@ -215,6 +215,11 @@ export default function Header({
                 { label: 'Fibra de Vidrio', path: '/fibra' }
               ]
             },
+            { label: 'Tablero de Control', path: '/indicadores-productividad', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            )},
             { 
               label: 'Informe de Turno',
               path: '/informe-turno',
@@ -300,11 +305,6 @@ export default function Header({
                 { label: 'Principio de Máquina', path: '/mantenimiento/principio-maquina' }
               ]
             },
-            { label: 'Tablero de Control', path: '/indicadores-productividad', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            )},
             { label: 'Inventarios', path: '/inventarios', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4" />
