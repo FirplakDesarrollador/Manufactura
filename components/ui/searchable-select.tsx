@@ -98,7 +98,7 @@ export function SearchableSelect({ name, options, placeholder, required, label, 
                 </div>
 
                 {isOpen && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-md max-h-60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-md max-h-80 flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
                         <div className="p-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80 sticky top-0">
                             <Search size={16} className="text-slate-400" />
                                 <input

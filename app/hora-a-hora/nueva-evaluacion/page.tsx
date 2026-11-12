@@ -56,7 +56,8 @@ export default function NuevaEvaluacion() {
         // Step 0 validation is handled internally by BasicInfoStep
         if (currentStep === 1) {
             const planta = evaluacionActual?.planta || "";
-            const esCicloReducido = planta === "FV" || planta === "RTM";
+            // Ciclos largos (FV, RTM y moldes): basta 1 ciclo; las demás plantas piden 10
+            const esCicloReducido = ["FV", "RTM", "RMOLD", "MOLD"].includes(planta);
             const minCiclos = esCicloReducido ? 1 : 10;
             if (!evaluacionActual?.ciclos || evaluacionActual.ciclosTotales < minCiclos) {
                 toast.error(`Debes registrar al menos ${minCiclos} ciclo${minCiclos > 1 ? "s" : ""} válido${minCiclos > 1 ? "s" : ""} para continuar.`);

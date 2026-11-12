@@ -18,11 +18,34 @@ const PROCESOS_POR_PLANTA: Record<string, string[]> = {
     "RTM": ["PINTURA", "INYECCION", "DESMOLDE", "PULIDO", "ACABADO", "EMPAQUE", "ACABADO QZ", "PERFORADO QZ"],
     "MBL": ["CORTE", "ENCHAPE", "RANURADO", "PERFORADO", "EMPAQUE", "CAJAS"],
     "CEFI": ["CORTE", "ENCHAPE", "RANURADO", "PERFORADO", "EMPAQUE", "CAJAS", "MECANIZADO"],
+    // Moldes: RMOLD = Reparación de Moldes y MOLD = Fabricación de Moldes (códigos de Configuración → Nomenclatura de plantas)
+    "RMOLD": ["REPARACION", "PULIDO", "ENCERADO"],
+    "MOLD": ["FABRICACION", "LAMINADO", "PULIDO", "ACABADO"],
+    // CALID = Calidad (código de Configuración → Nomenclatura de plantas)
+    "CALID": ["INSPECCION", "AUDITORIA", "LIBERACION"],
 };
+
+// Planta del formulario → nombre(s) de la planta en Talento Humano (para listar sus operarios)
+const PLANTA_TALENTO_HUMANO: Record<string, string[]> = {
+    MS: ["marmol sintetico", "marmol (calidad)"],
+    FV: ["fibra de vidrio", "fibra (calidad)"],
+    RTM: ["quarzstone"],
+    MBL: ["muebles", "muebles (calidad)"],
+    CEFI: ["cefi"],
+    RMOLD: ["rr moldes"],
+    MOLD: ["moldes"],
+    CALID: ["calidad", "marmol (calidad)", "muebles (calidad)", "fibra (calidad)"],
+};
+// Nombres de Talento Humano sin espacios sobrantes (algunos traen dobles o al final y no se encontraban al buscar)
+const limpiarNombre = (n: string) => String(n || "").replace(/s+/g, " ").trim();
+const sinTildes = (s: string) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
     const { evaluacionActual, iniciarEvaluacion, actualizarEvaluacion } = useStore();
     const [operarios, setOperarios] = useState<string[]>([]);
+    // Operarios con su planta: el campo Operario muestra los de la planta elegida (o todos, para préstamos)
+    const [empleados, setEmpleados] = useState<{ nombre: string; planta: string }[]>([]);
+    const [verTodos, setVerTodos] = useState(false);
     const [puestos, setPuestos] = useState<string[]>([]);
     const [activePopup, setActivePopup] = useState<boolean>(false);
     const [currentUserName, setCurrentUserName] = useState<string>("");
@@ -36,14 +59,15 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                 // Fetch Operarios (todos los activos)
                 const { data: dataOp, error: errOp } = await externalSupabase
                     .from('empleados')
-                    .select('nombreCompleto')
+                    .select('nombreCompleto, planta')
                     .eq('activo', true)
                     .order('nombreCompleto', { ascending: true });
                 
                 if (errOp) {
                     console.error('Error fetching operarios:', errOp);
                 } else if (dataOp) {
-                    setOperarios(dataOp.map(d => d.nombreCompleto));
+                    setOperarios([...new Set(dataOp.map(d => limpiarNombre(d.nombreCompleto)))]);
+                    setEmpleados(dataOp.map(d => ({ nombre: limpiarNombre(d.nombreCompleto), planta: sinTildes(d.planta) })));
                 }
 
                 // Fetch Puestos (cargos)
@@ -141,8 +165,13 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
         onNext();
     };
 
+    // Operarios de la planta elegida (según Talento Humano); sin planta o con "ver todos", todo el personal activo
+    const plantasTH = PLANTA_TALENTO_HUMANO[formData.planta] || [];
+    const delaPlanta = [...new Set(empleados.filter(e => plantasTH.includes(e.planta)).map(e => e.nombre))].sort((a, b) => a.localeCompare(b, "es"));
+    const operariosPlanta = verTodos || !plantasTH.length || !delaPlanta.length ? operarios : delaPlanta;
+
     return (
-        <Card className="shadow-lg border-t-4 border-t-primary animate-in slide-in-from-bottom-4 fade-in duration-500">
+        <Card className="shadow-lg border-t-4 border-t-primary animate-in slide-in-from-bottom-4 fade-in duration-500 overflow-visible">
             <CardHeader>
                 <CardTitle className="text-2xl text-slate-800">Datos Generales</CardTitle>
                 <CardDescription>
@@ -201,12 +230,18 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                             <SearchableSelect 
                                 name="operario" 
                                 label="Operario" 
-                                options={operarios} 
+                                options={operariosPlanta} 
                                 placeholder="Seleccione un operario" 
                                 required={true}
                                 defaultValue={formData.operario}
                                 onValueChange={(val) => handleSelect("operario", val)}
                             />
+                            {formData.planta && PLANTA_TALENTO_HUMANO[formData.planta] && (
+                                <label className="flex items-center gap-2 mt-1.5 text-xs text-slate-500 cursor-pointer select-none">
+                                    <input type="checkbox" checked={verTodos} onChange={e => setVerTodos(e.target.checked)} className="accent-[#324354]" />
+                                    {verTodos ? `Mostrando todo el personal (${operarios.length})` : `Personal de ${formData.planta} (${operariosPlanta.length}). Marque para ver todo el personal (préstamos)`}
+                                </label>
+                            )}
                         </div>
 
                         <div className="space-y-2 relative">
