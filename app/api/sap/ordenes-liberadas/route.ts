@@ -23,6 +23,11 @@ async function fetchSapQueryPages(baseUrl: string, sessionId: string, queryName:
     return rows
 }
 
+// Carga automática (vercel.json): lunes a viernes a las 12:00 m. y 4:00 p. m. hora Colombia (17:00 y 21:00 UTC).
+// Es la misma carga del botón "Cargar Órdenes" / "Actualizar SAP".
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
 export async function GET() {
     try {
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';

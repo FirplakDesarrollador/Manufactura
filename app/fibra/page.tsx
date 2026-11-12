@@ -17,6 +17,7 @@ import CediFibraModule from '@/components/fibra/cedi/CediFibraModule'
 import ParametrosFibraModule from '@/components/fibra/parametros/ParametrosFibraModule'
 import AdministracionFibraModule from '@/components/fibra/administracion/AdministracionFibraModule'
 import MapaProcesosFibraModule from '@/components/fibra/mapa/MapaProcesosFibraModule'
+import TrasladosFibraModule from '@/components/fibra/traslados/TrasladosFibraModule'
 import PlanosFibraModule from '@/components/fibra/planos/PlanosFibraModule'
 import MoldesFibraModule from '@/components/fibra/moldes/MoldesFibraModule'
 
@@ -418,6 +419,22 @@ export default function FibraPage() {
                             <span>Moldes</span>
                         </button>
 
+                        {/* Traslados: OF liberadas vs. sus traslados en SAP (solo consulta, sin permiso propio) */}
+                        <button
+                            onClick={() => setActiveModule('traslados')}
+                            title={sidebarOpen ? undefined : 'Traslados'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'traslados'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {/* Flechas de ida y vuelta: traslado entre almacenes */}
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h12m0 0l-4-4m4 4l-4 4M17 17H5m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            <span>Traslados</span>
+                        </button>
+
                         {/* Mapa de procesos: solo consulta, sin permiso propio */}
                         <button
                             onClick={() => setActiveModule('mapa')}
@@ -439,7 +456,9 @@ export default function FibraPage() {
                 {/* Main Content */}
                 <main className="flex-1 min-w-0 h-[calc(100vh-3rem)] bg-white overflow-hidden relative">
                     <div className="h-full overflow-y-auto">
-                        {activeModule === 'mapa' ? (
+                        {activeModule === 'traslados' ? (
+                            <TrasladosFibraModule />
+                        ) : activeModule === 'mapa' ? (
                             <MapaProcesosFibraModule />
                         ) : activeModule === 'moldes' ? (
                             <MoldesFibraModule puedeLiberar={hasPermission('administracion')} />

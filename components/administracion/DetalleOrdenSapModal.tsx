@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { X, ArrowDown, ArrowUp, ArrowUpDown, Boxes, MessageSquareText, ArrowRightLeft, FileImage, Loader2, RefreshCw, AlertTriangle, List, Layers, Factory, MonitorSmartphone, Clipboard, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
+import { grupoMaterial, sinTildes, RE_MANO_OBRA, RE_MATERIA_PESADA } from '@/lib/gruposMateriales'
 
 const fechaCorta = (iso: string | null | undefined) => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—'
 
@@ -66,20 +67,8 @@ const GRUPOS: { id: Grupo; label: string; color: string }[] = [
     { id: 'mp', label: 'Materias Primas Pesadas', color: 'border-l-amber-500' },
     { id: 'mo', label: 'Mano de Obra', color: 'border-l-emerald-500' }
 ]
-const RE_MANO_OBRA = /\bMANO\s+(DE\s+)?OBRA\b|\bCIF\b/
-const RE_MATERIA_PESADA = new RegExp('\\b(' + [
-    'RESINAS?', 'PEROXIDOS?', 'GEL\\s?COAT', 'GRANICALCIO', 'OMYA', 'CARBONATOS?', 'ROVING', 'WOVEN', 'WOVING',
-    'CERAS?', 'ESTIRENO', 'CATALIZADOR', 'MEKP', 'COBALTO', 'ACELERANTE', 'PIGMENTOS?', 'PASTA\\s+PIGMENT\\w*',
-    'MASILLA', 'TALCO', 'MICROESFERAS?', 'SILICE', 'ARENA', 'DESMOLDANTE', 'ALCOHOL\\s+POLIVINILICO', 'ACETONA',
-    'MATT?', 'FIBRA\\s+(DE\\s+)?VIDRIO', 'TRIHIDRATO', 'ALUMINA', 'CARGA\\s+MINERAL'
-].join('|') + ')\\b')
-
-const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
 function grupoDe(c: ComponenteSap): Grupo {
-    const d = sinTildes(c.descripcion || '')
-    if (RE_MANO_OBRA.test(d)) return 'mo'
-    if (RE_MATERIA_PESADA.test(d)) return 'mp'
-    return 'acc'
+    return grupoMaterial(c.descripcion || '')
 }
 
 const num = (v: number | string) => {
