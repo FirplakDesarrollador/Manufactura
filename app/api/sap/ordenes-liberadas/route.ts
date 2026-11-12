@@ -206,7 +206,8 @@ export async function GET() {
                 usuario: item.U_name || item.U_NAME || item.usuario || 'Sistema SAP',
 
                 orden_fabricacion: String(docNum),
-                numero_pedido: item.numero_pedido || String(docNum),
+                // Orden de venta: la trae el endpoint de Fibra de Sistemas (la consulta general no la tiene). Nunca el Nº de la OF
+                numero_pedido: String(extraFibra?.numero_pedido || item.numero_pedido || item.OriginNum || "").split("-")[0].trim(), // solo la OV (sin "-004-004")
                 producto_sku: item.ItemCode || item.producto_sku || '',
                 producto_descripcion: prodDesc,
                 color: item.color || '',
@@ -418,7 +419,7 @@ export async function GET() {
                 .filter(item => !nonPendingFibraSet.has(String(item.orden_fabricacion)))
                 .map(r => ({
                     orden_fabricacion: String(r.orden_fabricacion),
-                    numero_pedido: String(r.numero_pedido || r.orden_fabricacion),
+                    numero_pedido: String(r.numero_pedido || ""),
                     producto_sku: r.producto_sku,
                     cantidad: r.cantidad,
                     fecha_entrega_estimada: r.fecha_entrega_estimada,

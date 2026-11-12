@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
-import OrdenCard from '@/components/pintura/OrdenCard'
 import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
@@ -878,22 +877,8 @@ export default function MapaProcesosFibraModule() {
 
             {detalleOf != null && (
                 <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)}
-                    piso={{
-                        label: 'Control de piso',
-                        // Misma tarjeta y procesos por pieza de Órdenes de Fabricación (solo consulta)
-                        contenido: ordenDetalle ? (
-                            <div className="space-y-2">
-                                <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none [&>button]:cursor-default [&>button:hover]:bg-white">
-                                    <OrdenCard planta="fv" conDetalle={false} orden={ordenDetalle} isActive={false} onClick={() => { }} moldes={moldes || []} />
-                                </div>
-                                <OrderProcessesPanel orden={ordenDetalle} registros={[]} />
-                            </div>
-                        ) : (
-                            <div className="px-4 py-6 bg-red-50 border border-red-400 text-red-800 text-sm font-bold rounded-xl flex items-center gap-2" role="alert">
-                                <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" /> La OF {detalleOf} no está en las órdenes de Fibra cargadas. Actualice el mapa.
-                            </div>
-                        )
-                    }} />
+                    // Trazabilidad: procesos por pieza de la orden (como en Administración, solo consulta)
+                    piso={{ label: 'Trazabilidad', contenido: <OrderProcessesPanel orden={ordenDetalle ?? ({ orden_fabricacion: detalleOf } as any)} registros={[]} /> }} />
             )}
         </div>
     )
