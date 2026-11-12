@@ -4,9 +4,21 @@ import React, { useEffect, useState } from 'react';
 import { AlertTriangle, BookOpenCheck, Loader2, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PLANTAS_SP } from '@/lib/sistema-produccion/cumplimiento';
+import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+
+// Planta de Talento Humano → planta del Sistema de Producción (para prellenar la planta de quien se agrega)
+const PLANTA_TH_A_SP: Record<string, string> = {
+    'fibra de vidrio': 'FV', 'marmol sintetico': 'MS', 'muebles': 'MBLES', 'cefi': 'CEFI', 'calidad': 'CALIDAD',
+    'marmol (calidad)': 'CALIDAD', 'muebles (calidad)': 'CALIDAD', 'fibra (calidad)': 'CALIDAD', 'moldes': 'MOLDES', 'cedi': 'CEDI',
+    'almacen': 'ALMACEN', 'mantenimiento': 'MANTENIMIENTO', 'rr moldes': 'RR MOLDES', 'servicios': 'SERVICIOS',
+    'manufactura': 'TRANSVERSAL', 'ingenieria': 'TRANSVERSAL', 'i+d+i': 'TRANSVERSAL',
+};
+const norm = (x: string) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const limpio = (x: string) => String(x || '').replace(/\s+/g, ' ').trim();
 import {
-    ESTADOS_REGLA, GARANTES_SP, ORDEN_ESTADOS, REGLAS_INICIALES, ROLES_SP,
-    esGaranteSP, type EstadoRegla, type ReglasSP, type RolSP
+    ESTADOS_REGLA, GARANTES_SP, NOMBRE_ROL, ORDEN_ESTADOS, REGLAS_INICIALES, ROLES_SP,
+    TRANSVERSAL, completarReglas, esGaranteSP, type EstadoRegla, type ReglasSP, type RolSP
 } from '@/lib/sistema-produccion/reglas';
 
 // Reglas de Medición del Sistema de Producción: consulta para todos; los garantes la editan (modo edición ámbar).
@@ -17,6 +29,14 @@ export default function ReglasMedicionView() {
     const [email, setEmail] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [guardando, setGuardando] = useState(false);
+    const [conFestivo, setConFestivo] = useState(false);
+    // Personal activo de Talento Humano: nombre completo y planta
+    const [personal, setPersonal] = useState<{ nombre: string; planta: string }[]>([]);
+    useEffect(() => {
+        supabaseTalentoHumano.from('empleados').select('nombreCompleto, planta').eq('activo', true).order('nombreCompleto')
+            .then(({ data }) => setPersonal((data || []).map(e => ({ nombre: limpio(e.nombreCompleto), planta: norm(e.planta) }))));
+    }, []);
+    const enPersonal = new Set(personal.map(p => norm(p.nombre)));
     const [nuevaPersona, setNuevaPersona] = useState<Record<RolSP, string>>({ 'Líder': '', 'Supervisor': '', 'Jefe': '' });
 
     useEffect(() => {
@@ -26,10 +46,10 @@ export default function ReglasMedicionView() {
             const { data, error: e } = await supabase.from('sp_reglas_medicion').select('datos, actualizado_por, actualizado_at').eq('clave', 'reglas').maybeSingle();
             if (e) {
                 setError(/sp_reglas_medicion|relation|schema cache/i.test(e.message) ? 'Falta crear la tabla de reglas: ejecute sp_reglas_medicion.sql en Supabase. Se muestran los valores iniciales del Excel ILU.' : e.message);
-                setReglas(REGLAS_INICIALES); return;
+                setReglas(completarReglas(REGLAS_INICIALES)); return;
             }
-            if (data?.datos) { setReglas(data.datos as ReglasSP); setMeta({ por: data.actualizado_por, at: data.actualizado_at, guardadas: true }); }
-            else setReglas(REGLAS_INICIALES);
+            if (data?.datos) { setReglas(completarReglas(data.datos as ReglasSP)); setMeta({ por: data.actualizado_por, at: data.actualizado_at, guardadas: true }); }
+            else setReglas(completarReglas(REGLAS_INICIALES));
         })();
     }, []);
 
@@ -41,11 +61,29 @@ export default function ReglasMedicionView() {
     const cambiarRol = (i: number, rol: RolSP) => setBorrador(b => b && ({ ...b, herramientas: b.herramientas.map((h, k) => k === i ? { ...h, roles: { ...h.roles, [rol]: ciclo(h.roles[rol]) } } : h) }));
     const cambiarPlanta = (i: number, p: string) => setBorrador(b => b && ({ ...b, herramientas: b.herramientas.map((h, k) => k === i ? { ...h, plantas: { ...h.plantas, [p]: ciclo(h.plantas[p] || 'por_definir') } } : h) }));
     const cambiarNum = (campo: 'metaIndividual' | 'limiteSuperior' | 'limiteInferior', v: string) => setBorrador(b => b && ({ ...b, [campo]: Math.max(0, Math.min(100, Number(v) || 0)) }));
-    const agregarPersona = (rol: RolSP) => {
-        const n = nuevaPersona[rol].trim(); if (!n) return;
-        setBorrador(b => b && ({ ...b, personas: { ...b.personas, [rol]: [...(b.personas[rol] || []), n] } }));
+    const agregarPersona = (rol: RolSP, nombre?: string) => {
+        const n = limpio(nombre ?? nuevaPersona[rol]); if (!n) return;
+        const planta = PLANTA_TH_A_SP[personal.find(p => norm(p.nombre) === norm(n))?.planta || ''] || '';
+        setBorrador(b => b && ({
+            ...b,
+            personas: { ...b.personas, [rol]: (b.personas[rol] || []).some(x => norm(x) === norm(n)) ? b.personas[rol] : [...(b.personas[rol] || []), n] },
+            plantaPersona: { ...(b.plantaPersona || {}), [n]: b.plantaPersona?.[n] || planta },
+        }));
         setNuevaPersona(p => ({ ...p, [rol]: '' }));
     };
+    // Frecuencia por semana (vacío = sin frecuencia definida)
+    const cambiarFrecuencia = (i: number, rol: RolSP, campo: 'semana' | 'festivo', v: string) => setBorrador(b => b && ({
+        ...b, herramientas: b.herramientas.map((h, k) => {
+            if (k !== i) return h;
+            const fr = { ...(h.frecuencia || {}) };
+            const actual = fr[rol] || { semana: 0, festivo: null };
+            const n = v === '' ? null : Math.max(0, Math.min(20, Math.round(Number(v) || 0)));
+            const nuevo = { ...actual, [campo]: n };
+            if (campo === 'semana' && n === null) delete fr[rol]; else fr[rol] = { semana: nuevo.semana ?? 0, festivo: nuevo.festivo ?? null };
+            return { ...h, frecuencia: fr };
+        })
+    }));
+    const cambiarPlantaPersona = (nombre: string, planta: string) => setBorrador(b => b && ({ ...b, plantaPersona: { ...(b.plantaPersona || {}), [nombre]: planta } }));
     const quitarPersona = (rol: RolSP, i: number) => setBorrador(b => b && ({ ...b, personas: { ...b.personas, [rol]: b.personas[rol].filter((_, k) => k !== i) } }));
 
     const guardar = async () => {
@@ -58,6 +96,28 @@ export default function ReglasMedicionView() {
         if (e) { setError(/row-level security|policy/i.test(e.message) ? 'Solo los garantes del Sistema de Producción pueden guardar las reglas.' : e.message); return; }
         setReglas(borrador); setBorrador(null); setMeta({ por: email, at: ahora, guardadas: true });
     };
+
+    // Revisiones esperadas por semana: frecuencia del rol × personas de ese rol en cada planta (solo si la herramienta aplica al rol
+    // y no está marcada "No aplica" para la planta). Columnas: plantas, transversales y sin planta definida.
+    const columnasTotal = [...PLANTAS_SP.map(p => ({ key: p.value, label: p.value === 'MANTENIMIENTO' ? 'MANT.' : p.value, titulo: p.label })),
+        { key: TRANSVERSAL, label: 'Transv.', titulo: 'Transversales (cubren varias plantas)' }, { key: '', label: 'Sin planta', titulo: 'Personas sin planta definida' }];
+    const totales = (r?.herramientas || []).map(h => {
+        const porCol: Record<string, number> = {};
+        columnasTotal.forEach(c => { porCol[c.key] = 0; });
+        ROLES_SP.forEach(rol => {
+            const fr = h.frecuencia?.[rol];
+            if (!fr || h.roles[rol] !== 'aplica') return;
+            const cant = conFestivo && fr.festivo != null ? fr.festivo : fr.semana;
+            (r?.personas[rol] || []).forEach(n => {
+                const pl = r?.plantaPersona?.[n] || '';
+                if (pl && pl !== TRANSVERSAL && h.plantas[pl] === 'no_aplica') return;
+                porCol[pl in porCol ? pl : ''] += cant;
+            });
+        });
+        return { codigo: h.codigo, nombre: h.nombre, porCol, total: Object.values(porCol).reduce((a, b) => a + b, 0) };
+    }).filter(t => t.total > 0);
+    const totalCol = (k: string) => totales.reduce((a, t) => a + t.porCol[k], 0);
+    const granTotal = totales.reduce((a, t) => a + t.total, 0);
 
     if (!r) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
 
@@ -155,7 +215,7 @@ export default function ReglasMedicionView() {
                             <th className="px-2 py-1 text-center border-l border-white/20" colSpan={PLANTAS_SP.length}>Plantas</th>
                         </tr>
                         <tr className="bg-[#254153] text-white text-[10px] uppercase whitespace-nowrap">
-                            {ROLES_SP.map((x, i) => <th key={x} className={`px-1.5 py-1 text-center ${i === 0 ? 'border-l border-white/20' : ''}`}>{x}</th>)}
+                            {ROLES_SP.map((x, i) => <th key={x} className={`px-1.5 py-1 text-center ${i === 0 ? 'border-l border-white/20' : ''}`} title={NOMBRE_ROL[x].varios}>{NOMBRE_ROL[x].corto}</th>)}
                             {PLANTAS_SP.map((p, i) => <th key={p.value} className={`px-1 py-1 text-center ${i === 0 ? 'border-l border-white/20' : ''}`} title={p.label}>{p.value === 'MANTENIMIENTO' ? 'MANT.' : p.value}</th>)}
                         </tr>
                     </thead>
@@ -175,27 +235,132 @@ export default function ReglasMedicionView() {
                 </table>
             </div>
 
+            {/* Frecuencia mínima por semana (por herramienta y rol); en semanas con festivo puede bajar */}
+            <div className="rounded-xl border border-slate-200 overflow-x-auto">
+                <div className="px-3 py-2 bg-[#F6F3EE] border-b border-slate-200 flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="text-xs font-black uppercase text-[#324354]">Frecuencia mínima por semana</h3>
+                    <span className="text-[10px] text-slate-500">Cantidad que cada persona debe cumplir por semana · entre paréntesis, en semanas con festivo · "—" sin frecuencia definida</span>
+                </div>
+                <table className="w-full text-xs border-collapse min-w-[640px]">
+                    <thead>
+                        <tr className="bg-[#324354] text-white text-[10px] uppercase tracking-wider">
+                            <th className="px-2 py-1.5 text-left">Herramienta</th>
+                            {ROLES_SP.map(rol => <th key={rol} className="px-2 py-1.5 text-center">{NOMBRE_ROL[rol].varios}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {r.herramientas.map((h, i) => (
+                            <tr key={h.codigo} className="hover:bg-[#F6F3EE]">
+                                <td className="px-2 py-1.5 font-black text-[#324354]">{h.nombre}</td>
+                                {ROLES_SP.map(rol => {
+                                    const fr = h.frecuencia?.[rol];
+                                    const aplica = h.roles[rol] === 'aplica';
+                                    return (
+                                        <td key={rol} className="px-2 py-1.5 text-center">
+                                            {editando ? (
+                                                <div className="inline-flex items-center gap-1">
+                                                    <input type="number" min={0} max={20} value={fr?.semana ?? ''} placeholder="—" title="Por semana"
+                                                        onChange={e => cambiarFrecuencia(i, rol, 'semana', e.target.value)}
+                                                        className="w-12 h-6 px-1 text-center bg-white border border-amber-300 rounded text-xs font-black outline-none focus:ring-2 focus:ring-amber-200" />
+                                                    <span className="text-[10px] text-slate-500">festivo</span>
+                                                    <input type="number" min={0} max={20} value={fr?.festivo ?? ''} placeholder="—" title="En semanas con festivo" disabled={!fr}
+                                                        onChange={e => cambiarFrecuencia(i, rol, 'festivo', e.target.value)}
+                                                        className="w-12 h-6 px-1 text-center bg-white border border-amber-300 rounded text-xs font-black outline-none focus:ring-2 focus:ring-amber-200 disabled:opacity-40" />
+                                                </div>
+                                            ) : fr ? (
+                                                <span className={`font-black ${aplica ? 'text-[#324354]' : 'text-slate-400'}`} title={aplica ? '' : 'Tiene frecuencia, pero la herramienta no aplica a este rol'}>
+                                                    {fr.semana} / semana{fr.festivo != null && fr.festivo !== fr.semana ? <span className="text-[#7a5f0e]"> ({fr.festivo} con festivo)</span> : fr.festivo != null ? <span className="text-slate-500"> (igual con festivo)</span> : null}
+                                                </span>
+                                            ) : <span className="text-slate-300">—</span>}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Total de revisiones esperadas por semana, por planta */}
+            <div className="rounded-xl border border-slate-200 overflow-x-auto">
+                <div className="px-3 py-2 bg-[#F6F3EE] border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 className="text-xs font-black uppercase text-[#324354]">Revisiones esperadas por semana · por planta</h3>
+                        <p className="text-[10px] text-slate-500">Frecuencia × personas de cada rol en la planta (según la planta de cada persona, abajo). Solo herramientas con frecuencia definida.</p>
+                    </div>
+                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]">
+                        {([[false, 'Semana normal'], [true, 'Semana con festivo']] as const).map(([v, t]) => (
+                            <button key={t} onClick={() => setConFestivo(v)} className={`px-2 py-0.5 rounded-md font-bold ${conFestivo === v ? 'bg-[#324354] text-white' : 'text-slate-600 hover:text-black'}`}>{t}</button>
+                        ))}
+                    </div>
+                </div>
+                {totales.length === 0 ? (
+                    <div className="p-6 text-center text-xs font-bold italic text-slate-400">Defina frecuencias y plantas de las personas para ver los totales.</div>
+                ) : (
+                    <table className="w-full text-xs border-collapse min-w-[1000px]">
+                        <thead>
+                            <tr className="bg-[#324354] text-white text-[10px] uppercase whitespace-nowrap">
+                                <th className="px-2 py-1.5 text-left">Herramienta</th>
+                                {columnasTotal.map(c => <th key={c.key || 'sin'} className="px-1.5 py-1.5 text-center" title={c.titulo}>{c.label}</th>)}
+                                <th className="px-2 py-1.5 text-center bg-[#254153]">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {totales.map(t => (
+                                <tr key={t.codigo} className="hover:bg-[#F6F3EE]">
+                                    <td className="px-2 py-1.5 font-black text-[#324354] whitespace-nowrap">{t.nombre}</td>
+                                    {columnasTotal.map(c => <td key={c.key || 'sin'} className={`px-1.5 py-1.5 text-center font-bold ${t.porCol[c.key] ? 'text-[#324354]' : 'text-slate-300'}`}>{t.porCol[c.key] || '—'}</td>)}
+                                    <td className="px-2 py-1.5 text-center font-black text-[#324354] bg-[#F6F3EE]">{t.total}</td>
+                                </tr>
+                            ))}
+                            <tr className="bg-[#324354]/10 font-black text-[#324354]">
+                                <td className="px-2 py-1.5 uppercase text-[10px]">Total por planta</td>
+                                {columnasTotal.map(c => <td key={c.key || 'sin'} className="px-1.5 py-1.5 text-center">{totalCol(c.key) || '—'}</td>)}
+                                <td className="px-2 py-1.5 text-center bg-[#324354] text-white">{granTotal}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
             {/* Personas por rol */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {ROLES_SP.map(rol => (
                     <div key={rol} className="rounded-xl border border-slate-200 p-3">
                         <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-xs font-black uppercase text-[#324354]">{rol === 'Líder' ? 'Líderes' : rol === 'Supervisor' ? 'Supervisores' : 'Jefes'}</h3>
+                            <h3 className="text-xs font-black uppercase text-[#324354]">{NOMBRE_ROL[rol].varios}</h3>
                             <span className="text-[10px] font-bold text-slate-500">{(r.personas[rol] || []).length} persona(s)</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                             {(r.personas[rol] || []).map((n, k) => (
                                 <span key={`${n}-${k}`} className="flex items-center gap-1 text-[11px] font-semibold bg-[#F6F3EE] border border-[#e2ded5] text-[#324354] rounded-lg px-2 py-0.5">
                                     {n}
+                                    {personal.length > 0 && !enPersonal.has(norm(n)) && (
+                                        <span title="No está activo en la base de personal (Talento Humano): revise el nombre o retírelo" className="text-[#d14747]"><AlertTriangle size={11} /></span>
+                                    )}
+                                    {editando ? (
+                                        <select value={r.plantaPersona?.[n] || ''} onChange={e => cambiarPlantaPersona(n, e.target.value)} title="Planta de la persona"
+                                            className="ml-1 h-5 text-[10px] font-bold bg-white border border-amber-300 rounded outline-none">
+                                            <option value="">Sin planta</option>
+                                            {PLANTAS_SP.map(p => <option key={p.value} value={p.value}>{p.value}</option>)}
+                                            <option value={TRANSVERSAL}>Transversal</option>
+                                        </select>
+                                    ) : (
+                                        <span className={`ml-1 text-[9px] font-black px-1 rounded ${r.plantaPersona?.[n] ? 'bg-[#324354]/10 text-[#324354]' : 'bg-[#deb841]/30 text-[#7a5f0e]'}`}
+                                            title={r.plantaPersona?.[n] ? 'Planta' : 'Planta por definir'}>
+                                            {r.plantaPersona?.[n] === TRANSVERSAL ? 'Transv.' : r.plantaPersona?.[n] || '¿planta?'}
+                                        </span>
+                                    )}
                                     {editando && <button onClick={() => quitarPersona(rol, k)} title="Quitar" className="text-[#7B8E90] hover:text-[#d14747]"><Trash2 size={11} /></button>}
                                 </span>
                             ))}
                         </div>
                         {editando && (
-                            <div className="flex gap-1.5 mt-2">
-                                <input value={nuevaPersona[rol]} onChange={e => setNuevaPersona(p => ({ ...p, [rol]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && agregarPersona(rol)}
-                                    placeholder="Nombre" className="flex-1 h-7 px-2 bg-white border border-amber-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-amber-200" />
-                                <button onClick={() => agregarPersona(rol)} className="h-7 px-2 rounded-lg bg-[#324354] text-white text-xs font-bold"><Plus size={13} /></button>
+                            // Solo nombres completos de la base de personal (Talento Humano); al elegir se agrega con su planta
+                            <div className="mt-2">
+                                <SearchableSelect key={`${rol}-${(r.personas[rol] || []).length}`} name={`agregar-${rol}`} options={personal.map(p => p.nombre)}
+                                    placeholder="Agregar persona (base de personal)" className="h-7 px-2 py-1 text-xs border-amber-300"
+                                    onValueChange={v => v && agregarPersona(rol, v)} />
                             </div>
                         )}
                     </div>
