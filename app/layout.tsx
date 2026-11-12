@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat, Jost } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import NombresVisibles from "@/components/NombresVisibles";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -30,6 +31,8 @@ export default function RootLayout({
       <body className={`${montserrat.variable} ${jost.variable} antialiased`}>
         {children}
         <Toaster position="top-right" richColors />
+        {/* Nombres que se muestran distinto en pantalla (Carolina Escobar → Estiven Londoño); no cambia los registros */}
+        <NombresVisibles />
       </body>
     </html>
   );

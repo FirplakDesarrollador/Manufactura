@@ -86,6 +86,8 @@ export default function Header({
   const getFirstName = (email: string) => {
     if (!email) return '';
     const part = email.split('@')[0]; // Toma la parte previa al @ (ej. hector.chinchilla)
+    // Correos de cargo (no de persona): se muestra el nombre de quien lo usa hoy
+    if (part.toLowerCase() === 'coordinacioncalidad') return 'Estiven';
     const firstName = part.split('.')[0].split('-')[0]; // Toma el primer nombre antes de un punto o guion (ej. hector)
     return firstName.charAt(0).toUpperCase() + firstName.slice(1); // Capitaliza (ej. Hector)
   };
