@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import IndicadoresCalidadView, { MAIN_SUBHEADER_TABS, type MainTabKey } from "@/components/calidad/IndicadoresCalidadView";
 import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView";
 import RmoldDashboard from "@/components/indicadores/RmoldDashboard";
+import CumplimientoSPDashboard from "@/components/sistema-produccion/CumplimientoSPDashboard";
 
 // Plant keys supported
 type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
@@ -170,8 +171,8 @@ const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode
     { id: "nivel-servicio", label: "Nivel de Servicio", icon: <BarChart3 size={14} /> },
     { id: "productividad", label: "Productividad", icon: <TrendingUp size={14} /> },
     { id: "calidad", label: "Calidad", icon: <ShieldCheck size={14} /> },
-    { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={14} /> },
     { id: "sistema-produccion", label: "Sistema de Producción", icon: <Building2 size={14} /> },
+    { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={14} /> },
     { id: "rmold", label: "RMOLD", icon: <Hammer size={14} /> },
     { id: "variacion", label: "Variación", icon: <Activity size={14} /> },
     { id: "ausentismo", label: "Ausentismo", icon: <UserX size={14} /> }
@@ -180,7 +181,6 @@ const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode
 // Pestañas nuevas que aún no tienen tablero
 const VISTAS_EN_CONSTRUCCION: Partial<Record<VistaTablero, string>> = {
     mantenimiento: "Indicadores de mantenimiento (preventivo, correctivo, TPM y disponibilidad de máquinas).",
-    "sistema-produccion": "Indicadores del Sistema de Producción (5S, auditorías y bitácora).",
     variacion: "Variación de los indicadores frente a la meta y al periodo anterior."
 };
 
@@ -480,6 +480,12 @@ export default function IndicadoresProductividadPage() {
                         <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">En construcción</span>
                         <h2 className="text-lg font-black text-[#324354]">{PESTANAS_TABLERO.find(p => p.id === viewMode)?.label}</h2>
                         <p className="text-sm text-slate-500 max-w-md">{VISTAS_EN_CONSTRUCCION[viewMode]}</p>
+                    </div>
+                ) : viewMode === "sistema-produccion" ? (
+                    // Mismo tablero de Estadísticas de Producción (un solo componente: lo que cambie en uno se ve en el otro)
+                    <div className="w-full animate-in fade-in duration-300">
+                        {/* Recuadro completo de 820 px de pantalla (1 px CSS ≈ 1,5 px de pantalla: 820 ÷ 1,5 ≈ 547 px CSS) */}
+                        <CumplimientoSPDashboard altoPx={547} />
                     </div>
                 ) : viewMode === "rmold" ? (
                     <div className="w-full animate-in fade-in duration-300">
