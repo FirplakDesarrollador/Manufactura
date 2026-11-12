@@ -92,7 +92,7 @@ export const REGLAS_INICIALES: ReglasSP = {
         { codigo: 'MA', nombre: 'Mantenimiento Autónomo', fuente: 'App · Agendamiento OPT Sistémica', nota: 'Existe en la app, pero no en el Excel ILU: sin regla definida.', roles: roles('por_definir', 'por_definir', 'por_definir'), plantas: plantas('NNNNNNNNNNN') },
         { codigo: 'BE', nombre: 'Bajas Estadísticas', fuente: 'App · Agendamiento OPT Sistémica', nota: 'Existe en la app, pero no en el Excel ILU: sin regla definida.', roles: roles('por_definir', 'por_definir', 'por_definir'), plantas: plantas('NNNNNNNNNNN') },
     ],
-    // Nombres completos de la base de personal (Talento Humano). Juan David Montoya, Edisson Hernandez y Carolina Escobar
+    // Nombres completos de la base de personal (Talento Humano). Juan David Montoya y Edisson Hernandez
     // no están activos en la base: quedan con su nombre del Excel y se marcan en pantalla.
     personas: {
         'Líder': [
@@ -119,7 +119,7 @@ export const REGLAS_INICIALES: ReglasSP = {
             'Erica Isabel Marulanda Becerra',
         ],
         'Jefe': [
-            'Carolina Escobar',
+            'Ederson Estiven Londoño Alvarez',
             'Hector José Chinchilla Trigos',
             'Roberto Elías Aguilar Sierra',
             'Jakeline Chaverra Soto',
@@ -130,6 +130,7 @@ export const REGLAS_INICIALES: ReglasSP = {
     },
     // Planta de cada persona (Talento Humano cuando coincidió; Manufactura, Ingeniería e I+D+I = transversal)
     plantaPersona: {
+        'Ederson Estiven Londoño Alvarez': TRANSVERSAL,
         'Jhonny Rafael Ortiz Tovar': 'MS',
         'Henry Jose Estevez del Prado': 'MS',
         'Juan Camilo Vélez Serna': 'CALIDAD',
@@ -158,6 +159,8 @@ export const REGLAS_INICIALES: ReglasSP = {
 
 // Nombre corto del Excel → nombre completo de la base de personal (para reglas guardadas antes del cambio)
 export const RENOMBRES_PERSONAS: Record<string, string> = {
+    // Carolina Escobar en la app es Estiven Londoño (cambio de puesto sin cambio de correo)
+    'Carolina Escobar': 'Ederson Estiven Londoño Alvarez',
     'Jhony Ortiz': 'Jhonny Rafael Ortiz Tovar',
     'Henrry Estevez': 'Henry Jose Estevez del Prado',
     'Camilo Velez': 'Juan Camilo Vélez Serna',

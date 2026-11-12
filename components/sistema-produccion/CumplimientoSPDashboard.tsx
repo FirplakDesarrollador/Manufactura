@@ -10,7 +10,7 @@ import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import FiltroPbi from '@/components/calidad/FiltroPbi';
 import {
     HistoricoSP, META_SP, PLANTAS_SP, PlanEvaluado, PlanSP, RegistroSP,
-    colorSemaforo, hoyIso, marcarEjecutadas, nombreHerramienta, nombrePlanta, planVencido, promedio, semanaDe
+    aliasPersonaSP, colorSemaforo, hoyIso, marcarEjecutadas, nombreHerramienta, nombrePlanta, planVencido, promedio, semanaDe
 } from '@/lib/sistema-produccion/cumplimiento';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -152,7 +152,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             if (!vivo) return;
             setPlanes((p.data as PlanSP[]) || []);
             setRegistros((r.data as RegistroSP[]) || []);
-            setHistorico(((h.data as HistoricoSP[]) || []).map(x => ({ ...x, cumplimiento: Number(x.cumplimiento) })));
+            setHistorico(((h.data as HistoricoSP[]) || []).map(x => ({ ...x, persona: x.persona ? aliasPersonaSP(x.persona) : x.persona, cumplimiento: Number(x.cumplimiento) })));
             setEmpleados((e.data as Empleado[]) || []);
             setErrores(errs);
             setLoading(false);
@@ -185,7 +185,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         const evaluados = marcarEjecutadas(planes, registros) as PlanEvaluado[];
         return evaluados
             .filter(p => planVencido(p, hoy) && (!finHistorico || p.fecha_programada! > finHistorico))
-            .map(p => ({ ...p, persona: personaDe(p.responsable_email), rolP: rolDeCargo(empPorCorreo.get(norm(p.responsable_email))?.cargo) }));
+            .map(p => ({ ...p, persona: aliasPersonaSP(personaDe(p.responsable_email)), rolP: rolDeCargo(empPorCorreo.get(norm(p.responsable_email))?.cargo) }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [planes, registros, finHistorico, hoy, empPorCorreo]);
 
