@@ -10,6 +10,7 @@ export interface OrdenFabricacion {
     sku?: string
     // Summary fields
     vaciado?: number
+    herrajes?: number  // piezas con Instalación Herrajes registrada (esperan Pulido)
     pulido?: number
     saldo?: number
     empaque?: number
@@ -35,6 +36,11 @@ export interface OrdenFabricacion {
     molde_sku?: string
     molde_descripcion?: string
     fecha_ideal_produccion?: string
+    fecha_entrega_lote?: string | null
+    fecha_real_liberacion?: string | null
+    fecha_ideal_entrega_produccion?: string | null
+    fecha_prometida_entrega?: string | null
+    fechas_semaforo_actualizadas?: string | null
 }
 
 export interface Molde {
@@ -67,6 +73,9 @@ export interface RegistroTrazabilidad {
     contramolde: boolean
     contramolde_fecha?: string
     vaciado_fecha?: string
+    herrajes_fecha?: string
+    herrajes_user_id?: number
+    herrajes_user_name?: string
     fecha_vaciado?: string
     acabado_fecha?: string
     desmolde_fecha?: string

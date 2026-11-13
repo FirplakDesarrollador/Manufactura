@@ -108,3 +108,11 @@ export const planVencido = (p: PlanEvaluado, hoy: string) =>
   !!p.fecha_programada && (p.fecha_programada < hoy || (p.fecha_programada === hoy && p.ejecutada));
 
 export const promedio = (vals: number[]) => (vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null);
+
+// Personas con otro nombre en los registros: "Carolina Escobar" (histórico Excel y usuario de la app) es Estiven Londoño;
+// fue un cambio de puesto y el correo no se cambió. Se muestran y suman como la misma persona.
+export function aliasPersonaSP(nombre: string | null | undefined): string {
+  const n = String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[.\s]+/g, ' ').trim()
+  if (n.startsWith('carolina escobar')) return 'Ederson Estiven Londoño Alvarez'
+  return String(nombre || '')
+}

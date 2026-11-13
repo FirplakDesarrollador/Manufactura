@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { OrdenMueble, TareaMuebleActiva } from '@/types/muebles'
-import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2, User, ArrowRight, ChevronLeft, Play } from 'lucide-react'
+import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2 } from 'lucide-react'
 import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
-import { getEmpleadoById } from '@/lib/supabase/queries/talento_humano'
-import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
 import { toast } from 'sonner'
 
 interface TrazabilidadModalProps {
@@ -37,16 +35,10 @@ export default function TrazabilidadModal({
     onStartTask,
     onReportDefect
 }: TrazabilidadModalProps) {
-    const [step, setStep] = useState<'identificacion' | 'registro'>('identificacion')
-    const [identificacion, setIdentificacion] = useState('')
     const [cantidad, setCantidad] = useState(1)
     const [loading, setLoading] = useState(false)
     const [validationError, setValidationError] = useState<string | null>(null)
     const [available, setAvailable] = useState<number>(0)
-    const [empleado, setEmpleado] = useState<{ nombreCompleto: string, foto: string } | null>(null)
-    const [isSearching, setIsSearching] = useState(false)
-    const [startTime, setStartTime] = useState<string>('')
-    const isTaskBasedProcess = proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección'
 
     const ordenesSeleccionadas = React.useMemo(
         () => ordenes?.length ? ordenes : [orden],
@@ -56,17 +48,6 @@ export default function TrazabilidadModal({
     const validateQuantity = React.useCallback((val: number) => {
         let error = null
         let avail = 0
-
-        // Field logic: Each field in the view (corte, enchape, etc.) 
-        // represents the WIP pieces READY for that specific module.
-        // Stage -> Field to use as limit
-        // ------------------------------
-        // Enchape    <- orden.corte
-        // Inspeccion <- orden.enchape
-        // Empaque    <- orden.inspeccion
-        // Digitado   <- orden.empaque
-        // Transito   <- orden.digitado
-        // CEDI       <- orden.transito
 
         switch (proceso) {
             case 'Corte':
@@ -104,92 +85,21 @@ export default function TrazabilidadModal({
 
     useEffect(() => {
         if (isOpen) {
-            setStartTime(new Date().toISOString())
-            if (proceso === 'Empaque') {
-                setStep('registro')
-                setIdentificacion('NO APLICA')
-                setEmpleado({ nombreCompleto: usuarioNombre, foto: '' })
-            } else {
-                setStep('identificacion')
-                setIdentificacion('')
-                setEmpleado(null)
-            }
             validateQuantity(1)
             setValidationError(null)
         }
-    }, [isOpen, validateQuantity, proceso, usuarioNombre])
+    }, [isOpen, validateQuantity])
 
-    // Set default quantity to available when available changes in Empaque
+    // Ajustar cantidad por defecto al disponible
     useEffect(() => {
-        if (isOpen && proceso === 'Empaque' && available > 0) {
+        if (isOpen && available > 0) {
             setCantidad(available)
         }
-    }, [isOpen, proceso, available])
+    }, [isOpen, available])
 
-    const iniciarInspeccionDirecta = async (emp: { nombreCompleto: string, foto: string }, cedula: string) => {
-        setLoading(true)
-        try {
-            const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
-                of: item.orden_fabricacion,
-                producto_descripcion: item.producto_descripcion,
-                available: ((item.enchape || 0) + (item.reponer_inspeccion || 0))
-            }))
-
-            const totalAvail = available || tareasOrdenes.reduce((sum, item) => sum + (item.available || 0), 0)
-
-            const nuevaTarea: TareaMuebleActiva = {
-                of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
-                proceso: proceso,
-                inicio: startTime || new Date().toISOString(),
-                operario_nombre: emp.nombreCompleto || 'Desconocido',
-                operario_cedula: cedula,
-                producto_descripcion: tareasOrdenes.length === 1 ? (tareasOrdenes[0].producto_descripcion || '') : `${proceso} de varias ordenes`,
-                available: totalAvail,
-                ordenes: tareasOrdenes,
-                taladro: taladro
-            }
-
-            await setTareaActiva(userEmail, nuevaTarea)
-            toast.success('¡Proceso de inspección iniciado!')
-            if (onStartTask) onStartTask(nuevaTarea)
-            if (onReportDefect) onReportDefect(orden, { cedula, nombre: emp.nombreCompleto })
-            onClose()
-        } catch (error) {
-            console.error('Error starting direct inspection task:', error)
-            toast.error('Error al iniciar inspección')
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleValidarOperario = async (empDataOverride?: { nombreCompleto: string, foto: string }) => {
-        if (identificacion.length < 4) return
-
-        setIsSearching(true)
-        try {
-            const data = empDataOverride || await getEmpleadoById(identificacion)
-            if (data) {
-                const emp = {
-                    nombreCompleto: data.nombreCompleto,
-                    foto: data.foto
-                }
-                setEmpleado(emp)
-
-                if (proceso === 'Inspeccion' || proceso === 'Inspección') {
-                    await iniciarInspeccionDirecta(emp, identificacion)
-                    return
-                }
-
-                setStep('registro')
-            } else {
-                toast.error('Por favor valida tu cédula')
-            }
-        } catch (error) {
-            console.error('Error validating operator:', error)
-            toast.error('Error al validar operario')
-        } finally {
-            setIsSearching(false)
-        }
+    const handleCopy = () => {
+        navigator.clipboard.writeText(orden.orden_fabricacion?.toString() || '')
+        toast.info('OF copiada al portapapeles')
     }
 
     const handleIncrement = () => {
@@ -214,109 +124,40 @@ export default function TrazabilidadModal({
         validateQuantity(val)
     }
 
-    // Real-time search effect
-    useEffect(() => {
-        const searchEmpleado = async () => {
-            if (identificacion.length >= 5) { // Search only when enough digits are typed
-                setIsSearching(true)
-                try {
-                    const data = await getEmpleadoById(identificacion)
-                    if (data) {
-                        setEmpleado({
-                            nombreCompleto: data.nombreCompleto,
-                            foto: data.foto
-                        })
-                    } else {
-                        setEmpleado(null)
-                    }
-                } catch (error) {
-                    console.error('Error searching operator:', error)
-                } finally {
-                    setIsSearching(false)
-                }
-            } else {
-                setEmpleado(null)
-            }
-        }
-
-        const debounceTimer = setTimeout(searchEmpleado, 500)
-        return () => clearTimeout(debounceTimer)
-    }, [identificacion])
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(orden.orden_fabricacion?.toString() || '')
-        toast.info('OF copiada al portapapeles')
-    }
-
     const handleSubmit = async () => {
         if (validationError) return
-        if (proceso !== 'Empaque' && !identificacion) return
 
-        // Si es un proceso basado en tareas (Corte, Enchape, Inspección), iniciamos la tarea con cronómetro
-        if (isTaskBasedProcess) {
-            setLoading(true)
-            try {
-                const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
-                    of: item.orden_fabricacion,
-                    producto_descripcion: item.producto_descripcion,
-                    available: proceso === 'Corte'
-                        ? (item.por_cortar || 0)
-                        : proceso === 'Enchape'
-                        ? ((item.corte || 0) + (item.reponer_enchape || 0))
-                        : ((item.enchape || 0) + (item.reponer_inspeccion || 0))
-                }))
-
-                const nuevaTarea = {
-                    of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
-                    proceso: proceso,
-                    inicio: startTime,
-                    operario_nombre: empleado?.nombreCompleto || 'Desconocido',
-                    operario_cedula: identificacion,
-                    producto_descripcion: tareasOrdenes.length === 1 ? tareasOrdenes[0].producto_descripcion : `${proceso} de varias ordenes`,
-                    available: available,
-                    ordenes: tareasOrdenes,
-                    taladro: taladro
-                }
-                
-                await setTareaActiva(userEmail, nuevaTarea)
-                toast.success(`¡Proceso de ${proceso.toLowerCase()} iniciado!`)
-                
-                if (onStartTask) onStartTask(nuevaTarea)
-                onClose()
-            } catch (error) {
-                console.error('Error starting task:', error)
-                toast.error('Error al iniciar el proceso')
-            } finally {
-                setLoading(false)
-            }
-            return
-        }
-
-        // Si es Empaque con múltiples órdenes seleccionadas (registro inmediato sin tarea ni tiempo)
-        if (proceso === 'Empaque' && ordenesSeleccionadas.length > 1) {
+        // Si son múltiples órdenes seleccionadas (ej. Empaque masivo o registro múltiple)
+        if (ordenesSeleccionadas.length > 1) {
             setLoading(true)
             try {
                 for (const item of ordenesSeleccionadas) {
-                    const cantItem = item.inspeccion || 0
+                    const cantItem = proceso === 'Corte'
+                        ? (item.por_cortar || 0)
+                        : proceso === 'Enchape'
+                        ? ((item.corte || 0) + (item.reponer_enchape || 0))
+                        : proceso === 'Empaque'
+                        ? (item.inspeccion || 0)
+                        : ((item.enchape || 0) + (item.reponer_inspeccion || 0))
                     if (cantItem > 0) {
                         await registrarTrazabilidadMueble({
                             orden_fabricacion: item.orden_fabricacion,
                             creado_por: usuarioNombre,
                             cantidad: cantItem,
-                            proceso: 'Empaque',
+                            proceso: proceso,
                             cedula_operario: 'NO APLICA',
                             nombre_operario: usuarioNombre,
-                            fecha_inicio: startTime,
-                            taladro: 'NO APLICA'
+                            fecha_inicio: new Date().toISOString(),
+                            taladro: taladro || 'NO APLICA'
                         })
                     }
                 }
-                toast.success('Empaque registrado exitosamente')
+                toast.success(`${proceso} registrado exitosamente`)
                 onSuccess()
                 onClose()
             } catch (error) {
-                console.error('Error al registrar empaque múltiple:', error)
-                toast.error('Error al registrar empaque')
+                console.error('Error al registrar múltiple:', error)
+                toast.error('Error al registrar')
             } finally {
                 setLoading(false)
             }
@@ -325,7 +166,6 @@ export default function TrazabilidadModal({
 
         if (cantidad <= 0) return
 
-        // Extra business logic from Flutter
         if (proceso === 'Inspeccion' && (orden.por_reponer || 0) > 0 && cantidad >= (orden.enchape || 0)) {
             toast.error('Tiene piezas por reponer en esta orden')
             return
@@ -335,12 +175,12 @@ export default function TrazabilidadModal({
         try {
             await registrarTrazabilidadMueble({
                 orden_fabricacion: orden.orden_fabricacion,
-                creado_por: proceso === 'Empaque' ? usuarioNombre : `${usuarioNombre} - ID: ${identificacion}`,
+                creado_por: usuarioNombre,
                 cantidad: cantidad,
                 proceso: proceso,
-                cedula_operario: proceso === 'Empaque' ? 'NO APLICA' : identificacion,
-                nombre_operario: proceso === 'Empaque' ? usuarioNombre : (empleado?.nombreCompleto || 'Desconocido'),
-                fecha_inicio: startTime,
+                cedula_operario: 'NO APLICA',
+                nombre_operario: usuarioNombre,
+                fecha_inicio: new Date().toISOString(),
                 taladro: taladro
             })
             toast.success(proceso === 'Empaque' ? 'Empaque registrado exitosamente' : 'Registro exitoso')
@@ -355,41 +195,8 @@ export default function TrazabilidadModal({
     }
 
     const handleStartTaskAndReportDefect = async () => {
-        if (!identificacion) {
-            toast.error('Debes ingresar tu cédula primero')
-            return
-        }
-
-        setLoading(true)
-        try {
-            const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
-                of: item.orden_fabricacion,
-                producto_descripcion: item.producto_descripcion,
-                available: ((item.enchape || 0) + (item.reponer_inspeccion || 0))
-            }))
-
-            const nuevaTarea: TareaMuebleActiva = {
-                of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
-                proceso: proceso,
-                inicio: startTime || new Date().toISOString(),
-                operario_nombre: empleado?.nombreCompleto || 'Desconocido',
-                operario_cedula: identificacion,
-                producto_descripcion: tareasOrdenes.length === 1 ? (tareasOrdenes[0].producto_descripcion || '') : `${proceso} de varias ordenes`,
-                available: available,
-                ordenes: tareasOrdenes,
-                taladro: taladro
-            }
-
-            await setTareaActiva(userEmail, nuevaTarea)
-            if (onStartTask) onStartTask(nuevaTarea)
-            if (onReportDefect) onReportDefect(orden)
-            onClose()
-        } catch (error) {
-            console.error('Error starting inspection task for defect:', error)
-            toast.error('Error al iniciar inspección')
-        } finally {
-            setLoading(false)
-        }
+        if (onReportDefect) onReportDefect(orden, { cedula: 'NO APLICA', nombre: usuarioNombre })
+        onClose()
     }
 
     if (!isOpen) return null
@@ -398,7 +205,7 @@ export default function TrazabilidadModal({
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
             
-            <div className={`relative w-full max-w-[360px] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 transition-all ${step === 'identificacion' ? 'min-h-[300px]' : ''}`}>
+            <div className="relative w-full max-w-[360px] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 transition-all">
                 {/* Header */}
                 <div className="p-5 flex items-start justify-between border-b border-gray-50 bg-gray-50/30">
                     <div className="flex flex-col">
@@ -417,231 +224,127 @@ export default function TrazabilidadModal({
 
                 {/* Body Content */}
                 <div className="p-6">
-                    {step === 'identificacion' ? (
-                        /* Step 1: Identification */
-                        <div className="space-y-6 flex flex-col items-center animate-in slide-in-from-right-4 duration-300">
-                            <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner overflow-hidden border-2 border-white">
-                                {empleado?.foto ? (
-                                    <img 
-                                        src={empleado.foto} 
-                                        alt={empleado.nombreCompleto}
-                                        className="w-full h-full object-cover animate-in fade-in zoom-in duration-500"
-                                    />
-                                ) : (
-                                    <User size={32} />
-                                )}
+                    <div className="space-y-6 flex flex-col items-center animate-in fade-in duration-300">
+                        {ordenesSeleccionadas.length > 1 ? (
+                            <div className="w-full max-h-36 overflow-y-auto rounded-2xl border border-gray-100 divide-y divide-gray-100">
+                                {ordenesSeleccionadas.map((item) => (
+                                    <div key={item.id} className="p-3 text-left">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="text-blue-600 font-black text-xs">OF #{item.orden_fabricacion}</span>
+                                            <span className="text-gray-400 font-bold text-[10px]">
+                                                {proceso === 'Corte'
+                                                    ? (item.por_cortar || 0)
+                                                    : proceso === 'Enchape'
+                                                    ? ((item.corte || 0) + (item.reponer_enchape || 0))
+                                                    : proceso === 'Empaque'
+                                                    ? (item.inspeccion || 0)
+                                                    : ((item.enchape || 0) + (item.reponer_inspeccion || 0))} disp.
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-500 font-bold text-[10px] uppercase leading-tight mt-1 line-clamp-2">
+                                            {item.producto_descripcion && item.producto_descripcion.trim() !== '' && item.producto_descripcion.toLowerCase() !== 'sin descripcion' && item.producto_descripcion.toLowerCase() !== 'sin descripción'
+                                                ? item.producto_descripcion 
+                                                : (item.producto_sku ? `PRODUCTO (${item.producto_sku})` : `OF #${item.orden_fabricacion}`)}
+                                        </p>
+                                    </div>
+                                ))}
                             </div>
-                            
-                            <div className="text-center space-y-1 h-14 flex flex-col justify-center">
-                                <h3 className="text-lg font-bold text-gray-900 leading-tight uppercase">
-                                    {empleado ? empleado.nombreCompleto : 'Validar Operario'}
-                                </h3>
-                                <p className="text-xs text-gray-500">
-                                    {isSearching ? 'Buscando operario...' : 'Ingrese su número de identificación'}
-                                </p>
-                            </div>
+                        ) : (
+                            <p className="text-center text-gray-500 font-bold text-xs leading-relaxed max-w-[280px] uppercase tracking-wider">
+                                {orden.producto_descripcion && orden.producto_descripcion.trim() !== '' && orden.producto_descripcion.toLowerCase() !== 'sin descripcion' && orden.producto_descripcion.toLowerCase() !== 'sin descripción'
+                                    ? orden.producto_descripcion 
+                                    : (orden.producto_sku ? `PRODUCTO (${orden.producto_sku})` : `OF #${orden.orden_fabricacion}`)}
+                            </p>
+                        )}
 
-                            <div className="w-full relative">
-                                <input 
-                                    type="text"
-                                    autoFocus
-                                    inputMode="numeric"
-                                    value={identificacion}
-                                    onChange={(e) => setIdentificacion(e.target.value.replace(/\D/g, ''))}
-                                    placeholder="Cédula o ID"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && identificacion.length >= 4) {
-                                            handleValidarOperario()
-                                        }
-                                    }}
-                                    className="w-full h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all placeholder:text-gray-200 placeholder:text-lg"
-                                />
+                        <div className="flex justify-center gap-8 w-full border-y border-gray-100 py-3">
+                            <div className="text-center">
+                                <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">
+                                    Usuario
+                                </span>
+                                <span className="text-gray-800 font-bold text-sm">
+                                    {usuarioNombre}
+                                </span>
                             </div>
-
-                            <button
-                                onClick={async () => {
-                                    if (empleado) {
-                                        if (proceso === 'Inspeccion' || proceso === 'Inspección') {
-                                            await iniciarInspeccionDirecta(empleado, identificacion)
-                                            return
-                                        }
-                                        setStep('registro')
-                                    } else {
-                                        await handleValidarOperario()
-                                    }
-                                }}
-                                disabled={identificacion.length < 4 || isSearching || loading}
-                                className={`w-full h-14 rounded-2xl flex items-center justify-center gap-2 font-bold text-white shadow-lg transition-all active:scale-[0.98] ${
-                                    identificacion.length < 4 || isSearching || loading
-                                        ? 'bg-gray-300 shadow-none cursor-not-allowed' 
-                                        : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 shadow-xl'
-                                }`}
-                            >
-                                {isSearching || loading ? (
-                                    <Loader2 className="animate-spin" size={20} />
-                                ) : (
-                                    <>
-                                        <span>CONTINUAR</span>
-                                        <ArrowRight size={20} />
-                                    </>
-                                )}
-                            </button>
+                            <div className="text-center">
+                                <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Disponible</span>
+                                <span className="text-gray-800 font-bold text-sm">{available}</span>
+                            </div>
                         </div>
-                    ) : (
-                        /* Step 2: Quantity & Submit */
-                        <div className="space-y-6 flex flex-col items-center animate-in slide-in-from-right-4 duration-300">
-                            {proceso !== 'Empaque' && (
+                        
+                        {(proceso !== 'Empaque' || ordenesSeleccionadas.length === 1) && (
+                            <div className="flex items-center gap-4">
                                 <button 
-                                    onClick={() => setStep('identificacion')}
-                                    className="self-start flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-blue-500 transition-colors uppercase"
+                                    onClick={handleDecrement} 
+                                    disabled={cantidad <= 1}
+                                    className={`transition-all ${cantidad <= 1 ? 'text-gray-200 cursor-not-allowed' : 'text-red-500 hover:scale-110 active:scale-95'}`}
                                 >
-                                    <ChevronLeft size={14} />
-                                    Volver
+                                    <MinusSquare size={48} fill="currentColor" stroke="white" />
+                                </button>
+                                
+                                <div className="relative flex flex-col items-center">
+                                    <input 
+                                        type="number"
+                                        value={cantidad}
+                                        onChange={handleInputChange}
+                                        className="w-24 h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 outline-none transition-all shadow-sm"
+                                    />
+                                    {available > 0 && (
+                                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">máx. {available}</span>
+                                    )}
+                                </div>
+
+                                <button 
+                                    onClick={handleIncrement} 
+                                    disabled={available > 0 && cantidad >= available}
+                                    className={`transition-all ${available > 0 && cantidad >= available ? 'text-gray-200 cursor-not-allowed' : 'text-emerald-500 hover:scale-110 active:scale-95'}`}
+                                >
+                                    <PlusSquare size={48} fill="currentColor" stroke="white" />
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="w-full">
+                            {validationError ? (
+                                <div className="bg-orange-500 rounded-2xl p-4 flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-300">
+                                    <AlertTriangle size={32} className="text-white" />
+                                    <p className="text-white text-center font-bold leading-tight text-sm uppercase">{validationError}</p>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={loading}
+                                    className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-bold text-white shadow-xl transition-all active:scale-[0.98] ${
+                                        loading 
+                                            ? 'bg-blue-400' 
+                                            : proceso === 'Empaque'
+                                            ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'
+                                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+                                    }`}
+                                >
+                                    {loading ? <Loader2 className="animate-spin" size={24} /> : (
+                                        proceso === 'Empaque' ? (
+                                            <><Send size={20} /><span>REGISTRAR EMPAQUE</span></>
+                                        ) : (
+                                            <><Send size={20} /><span>REGISTRAR {proceso.toUpperCase()}</span></>
+                                        )
+                                    )}
                                 </button>
                             )}
 
-                            {empleado && proceso !== 'Empaque' && (
-                                <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-300">
-                                    <div className="w-20 h-20 rounded-full border-4 border-blue-50 overflow-hidden shadow-md bg-gray-100 flex items-center justify-center">
-                                        {empleado.foto ? (
-                                            <img 
-                                                src={empleado.foto} 
-                                                alt={empleado.nombreCompleto}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <User size={40} className="text-gray-300" />
-                                        )}
-                                    </div>
-                                    <span className="text-sm font-bold text-gray-800 text-center px-4 leading-tight">
-                                        {empleado.nombreCompleto}
-                                    </span>
-                                </div>
+                            {(proceso === 'Inspeccion' || proceso === 'Inspección') && (
+                                <button
+                                    type="button"
+                                    onClick={handleStartTaskAndReportDefect}
+                                    disabled={loading}
+                                    className="w-full py-3.5 px-4 mt-3 rounded-2xl flex items-center justify-center gap-2 font-black text-amber-900 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 shadow-sm transition-all active:scale-[0.98] uppercase text-xs"
+                                >
+                                    <AlertTriangle size={18} className="text-amber-600" />
+                                    <span>REPORTAR DEFECTO / REPOSICIÓN</span>
+                                </button>
                             )}
-
-                            {ordenesSeleccionadas.length > 1 ? (
-                                <div className="w-full max-h-36 overflow-y-auto rounded-2xl border border-gray-100 divide-y divide-gray-100">
-                                    {ordenesSeleccionadas.map((item) => (
-                                        <div key={item.id} className="p-3 text-left">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-blue-600 font-black text-xs">OF #{item.orden_fabricacion}</span>
-                                                <span className="text-gray-400 font-bold text-[10px]">
-                                                    {proceso === 'Corte'
-                                                        ? (item.por_cortar || 0)
-                                                        : proceso === 'Enchape'
-                                                        ? ((item.corte || 0) + (item.reponer_enchape || 0))
-                                                        : proceso === 'Empaque'
-                                                        ? (item.inspeccion || 0)
-                                                        : ((item.enchape || 0) + (item.reponer_inspeccion || 0))} disp.
-                                                </span>
-                                            </div>
-                                            <p className="text-gray-500 font-bold text-[10px] uppercase leading-tight mt-1 line-clamp-2">
-                                                {item.producto_descripcion && item.producto_descripcion.trim() !== '' && item.producto_descripcion.toLowerCase() !== 'sin descripcion' && item.producto_descripcion.toLowerCase() !== 'sin descripción'
-                                                    ? item.producto_descripcion 
-                                                    : (item.producto_sku ? `PRODUCTO (${item.producto_sku})` : `OF #${item.orden_fabricacion}`)}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-center text-gray-400 font-bold text-[10px] leading-relaxed max-w-[280px] uppercase tracking-wider">
-                                    {orden.producto_descripcion && orden.producto_descripcion.trim() !== '' && orden.producto_descripcion.toLowerCase() !== 'sin descripcion' && orden.producto_descripcion.toLowerCase() !== 'sin descripción'
-                                        ? orden.producto_descripcion 
-                                        : (orden.producto_sku ? `PRODUCTO (${orden.producto_sku})` : `OF #${orden.orden_fabricacion}`)}
-                                </p>
-                            )}
-
-                            <div className="flex justify-center gap-8 w-full border-y border-gray-100 py-3">
-                                <div className="text-center">
-                                    <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">
-                                        {proceso === 'Empaque' ? 'Usuario' : 'Identificado'}
-                                    </span>
-                                    <span className="text-gray-800 font-bold text-sm">
-                                        {proceso === 'Empaque' ? usuarioNombre : identificacion}
-                                    </span>
-                                </div>
-                                <div className="text-center">
-                                    <span className="text-blue-500 text-[10px] font-bold uppercase block tracking-wider">Disponible</span>
-                                    <span className="text-gray-800 font-bold text-sm">{available}</span>
-                                </div>
-                            </div>
-                            
-                            {!isTaskBasedProcess && (proceso !== 'Empaque' || ordenesSeleccionadas.length === 1) && (
-                                <div className="flex items-center gap-4">
-                                    <button 
-                                        onClick={handleDecrement} 
-                                        disabled={cantidad <= 1}
-                                        className={`transition-all ${cantidad <= 1 ? 'text-gray-200 cursor-not-allowed' : 'text-red-500 hover:scale-110 active:scale-95'}`}
-                                    >
-                                        <MinusSquare size={48} fill="currentColor" stroke="white" />
-                                    </button>
-                                    
-                                    <div className="relative flex flex-col items-center">
-                                        <input 
-                                            type="number"
-                                            value={cantidad}
-                                            onChange={handleInputChange}
-                                            className="w-24 h-14 text-center text-2xl font-bold border-2 border-gray-100 rounded-2xl focus:border-blue-500 outline-none transition-all shadow-sm"
-                                        />
-                                        {available > 0 && (
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">máx. {available}</span>
-                                        )}
-                                    </div>
-
-                                    <button 
-                                        onClick={handleIncrement} 
-                                        disabled={available > 0 && cantidad >= available}
-                                        className={`transition-all ${available > 0 && cantidad >= available ? 'text-gray-200 cursor-not-allowed' : 'text-emerald-500 hover:scale-110 active:scale-95'}`}
-                                    >
-                                        <PlusSquare size={48} fill="currentColor" stroke="white" />
-                                    </button>
-                                </div>
-                            )}
-
-                            <div className="w-full">
-                                {validationError ? (
-                                    <div className="bg-orange-500 rounded-2xl p-4 flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-300">
-                                        <AlertTriangle size={32} className="text-white" />
-                                        <p className="text-white text-center font-bold leading-tight text-sm uppercase">{validationError}</p>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={handleSubmit}
-                                        disabled={loading}
-                                        className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-bold text-white shadow-xl transition-all active:scale-[0.98] ${
-                                            loading 
-                                                ? 'bg-blue-400' 
-                                                : proceso === 'Empaque'
-                                                ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'
-                                                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
-                                        }`}
-                                    >
-                                        {loading ? <Loader2 className="animate-spin" size={24} /> : (
-                                            isTaskBasedProcess ? (
-                                                <><Play size={20} /><span>INICIAR PROCESO</span></>
-                                            ) : proceso === 'Empaque' ? (
-                                                <><Send size={20} /><span>REGISTRAR EMPAQUE</span></>
-                                            ) : (
-                                                <><Send size={20} /><span>REGISTRAR</span></>
-                                            )
-                                        )}
-                                    </button>
-                                )}
-
-                                {(proceso === 'Inspeccion' || proceso === 'Inspección') && (
-                                    <button
-                                        type="button"
-                                        onClick={handleStartTaskAndReportDefect}
-                                        disabled={loading}
-                                        className="w-full py-3.5 px-4 mt-3 rounded-2xl flex items-center justify-center gap-2 font-black text-amber-900 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 shadow-sm transition-all active:scale-[0.98] uppercase text-xs"
-                                    >
-                                        <AlertTriangle size={18} className="text-amber-600" />
-                                        <span>REPORTAR DEFECTO / REPOSICIÓN</span>
-                                    </button>
-                                )}
-                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </div>

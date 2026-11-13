@@ -6,7 +6,7 @@ import { fetchEvaluaciones, updateEvaluacion, deleteEvaluacion, insertEvaluacion
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Eye, Search, X, TrendingUp, BarChart2, ShieldCheck, ShieldX, Clock, Trash2, PenLine, Edit2, User, Save, CheckCircle2, ArrowUp, ArrowDown, ArrowUpDown, CloudUpload, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Search, X, TrendingUp, BarChart2, ShieldCheck, ShieldX, Clock, Trash2, PenLine, Edit2, User, Save, CheckCircle2, ArrowUp, ArrowDown, ArrowUpDown, CloudUpload, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -18,36 +18,40 @@ import { createExternalClient } from "@/lib/supabase/external";
 import Header from "@/components/opt-sistemica/Header";
 import SubHeader from "@/components/hora-a-hora/SubHeader";
 
+// Semáforo Firplak de los indicadores (meta 90 %): verde ≥ 90 %, amarillo de 80 a 90 %, rojo por debajo de 80 %
+const colorSemaforo = (val: number) => val >= 90 ? 'text-[#3b8f50]' : val >= 80 ? 'text-[#b8962c]' : 'text-[#d14747]';
+
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraHora; onClose: () => void; resolveUserName: (v: string | undefined) => string }) {
     const getKPIStyle = (val: number) => {
-        if (val >= 90) return { color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", bar: "bg-emerald-500", label: "CUMPLE", labelBg: "bg-emerald-500" };
-        if (val >= 80) return { color: "text-amber-700", bg: "bg-amber-50 border-amber-200", bar: "bg-amber-400", label: "ATENCIÓN", labelBg: "bg-amber-400" };
-        return { color: "text-slate-700", bg: "bg-slate-50 border-slate-200", bar: "bg-slate-400", label: "EN PROCESO", labelBg: "bg-slate-500" };
+        // Mismo semáforo Firplak de la tabla: verde ≥ 90 %, amarillo 80–90 %, rojo < 80 %
+        if (val >= 90) return { color: "text-[#3b8f50]", bg: "bg-[#59a96a]/10 border-[#59a96a]/40", bar: "bg-[#59a96a]", label: "CUMPLE", labelBg: "bg-[#59a96a]" };
+        if (val >= 80) return { color: "text-[#b8962c]", bg: "bg-[#deb841]/10 border-[#deb841]/50", bar: "bg-[#deb841]", label: "ATENCIÓN", labelBg: "bg-[#deb841]" };
+        return { color: "text-[#d14747]", bg: "bg-[#d14747]/10 border-[#d14747]/40", bar: "bg-[#d14747]", label: "NO CUMPLE", labelBg: "bg-[#d14747]" };
     };
     const rSt = getKPIStyle(item.rendimiento);
     const qSt = getKPIStyle(item.calidad);
 
-    // Shrinks the font size as the displayed text gets longer, so long numbers never overflow their box
+    // Achica la letra cuando el texto es largo, para que los números no se salgan del recuadro (tamaños compactos)
     const fitFontSize = (text: string, base: "4xl" | "2xl" = "4xl") => {
         const len = text.length;
         if (base === "4xl") {
-            if (len <= 6) return "text-4xl";
-            if (len <= 7) return "text-3xl";
-            if (len <= 9) return "text-2xl";
-            return "text-xl";
+            if (len <= 7) return "text-2xl";
+            if (len <= 9) return "text-xl";
+            return "text-lg";
         }
-        if (len <= 6) return "text-2xl";
-        if (len <= 8) return "text-xl";
-        return "text-lg";
+        if (len <= 7) return "text-lg";
+        return "text-base";
     };
+    // Segundos → minutos (con coma decimal), p. ej. 2160 s = 36,0 min
+    const enMinutos = (seg: number) => `${(seg / 60).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} min`;
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-4 overflow-hidden animate-in zoom-in-95 fade-in duration-300">
 
                 {/* Header */}
-                <div className="bg-[#254153] text-white px-6 py-5 flex items-start justify-between">
+                <div className="bg-[#254153] text-white px-5 py-3 flex items-start justify-between">
                     <div>
                         <div className="flex items-center gap-3 mb-1">
                             <p className="text-xs font-bold uppercase tracking-widest opacity-70">Detalle Hora Hora</p>
@@ -57,9 +61,9 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                                 </span>
                             )}
                         </div>
-                        <h2 className="text-2xl font-black">{item.operario}</h2>
-                        <p className="text-sm opacity-80 mt-0.5">{item.puesto} · {item.linea} ({item.planta})</p>
-                        <p className="text-xs opacity-60 mt-1">
+                        <h2 className="text-lg font-black leading-tight">{item.operario}</h2>
+                        <p className="text-xs opacity-80 mt-0.5">{item.puesto} · {item.linea} ({item.planta})</p>
+                        <p className="text-[11px] opacity-60 mt-0.5">
                             {format(new Date(item.tiempoInicio), "dd/MM/yyyy HH:mm")}
                         </p>
                     </div>
@@ -68,11 +72,11 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-4 space-y-3">
 
                     {/* Realizado por */}
                     {item.creadoPor && (
-                        <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
                             <User size={16} className="text-[#254153] shrink-0" />
                             <div>
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hora Hora realizado por</p>
@@ -82,8 +86,8 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                     )}
 
                     {/* KPIs */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className={`rounded-2xl border-2 p-4 ${rSt.bg}`}>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className={`rounded-xl border-2 px-3 py-2 ${rSt.bg}`}>
                             <div className="flex items-center justify-between mb-1">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                                     <TrendingUp size={13} /> Rendimiento
@@ -91,11 +95,11 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                                 <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${rSt.labelBg}`}>{rSt.label}</span>
                             </div>
                             <p className={`${fitFontSize(`${item.rendimiento.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${rSt.color}`}>{item.rendimiento.toFixed(1)}%</p>
-                            <div className="w-full bg-slate-100 rounded-full h-2.5 mt-3 overflow-hidden">
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
                                 <div className={`h-full rounded-full ${rSt.bar}`} style={{ width: `${Math.min(item.rendimiento, 100)}%` }} />
                             </div>
                         </div>
-                        <div className={`rounded-2xl border-2 p-4 ${qSt.bg}`}>
+                        <div className={`rounded-xl border-2 px-3 py-2 ${qSt.bg}`}>
                             <div className="flex items-center justify-between mb-1">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                                     <BarChart2 size={13} /> Calidad
@@ -103,36 +107,38 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                                 <span className={`text-xs font-black px-2 py-0.5 rounded-full text-white ${qSt.labelBg}`}>{qSt.label}</span>
                             </div>
                             <p className={`${fitFontSize(`${item.calidad.toFixed(1)}%`)} font-black tabular-nums mt-1 truncate ${qSt.color}`}>{item.calidad.toFixed(1)}%</p>
-                            <div className="w-full bg-slate-100 rounded-full h-2.5 mt-3 overflow-hidden">
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
                                 <div className={`h-full rounded-full ${qSt.bar}`} style={{ width: `${Math.min(item.calidad, 100)}%` }} />
                             </div>
                         </div>
                     </div>
 
                     {/* Tiempos de ciclo */}
-                    <div className="bg-blue-50 border-2 border-blue-100 rounded-2xl p-4">
-                        <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3 flex items-center gap-1">
+                    <div className="bg-blue-50 border-2 border-blue-100 rounded-xl px-3 py-2">
+                        <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                             <Clock size={13} /> Tiempos de Ciclo
                         </p>
                         <div className="grid grid-cols-3 gap-3 text-center">
                             <div className="min-w-0">
-                                <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Teórico</p>
-                                <p className={`${fitFontSize(`${item.tiempoCicloTeorico}s`, "2xl")} font-black text-slate-700 truncate`}>{item.tiempoCicloTeorico}s</p>
+                                <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Teórico</p>
+                                <p className={`${fitFontSize(`${item.tiempoCicloTeorico}s`, "2xl")} font-black text-slate-700 truncate leading-tight`}>{item.tiempoCicloTeorico}s</p>
+                                <p className="text-xs font-bold text-slate-500">{enMinutos(item.tiempoCicloTeorico)}</p>
                             </div>
                             <div className="flex items-center justify-center text-slate-300 font-bold text-lg">VS</div>
                             <div className="min-w-0">
-                                <p className="text-xs text-blue-500 font-semibold uppercase tracking-wider mb-1">Prom. Real</p>
-                                <p className={`${fitFontSize(`${item.tiempoPromedio.toFixed(1)}s`, "2xl")} font-black text-blue-700 truncate`}>{item.tiempoPromedio.toFixed(1)}s</p>
+                                <p className="text-[11px] text-blue-500 font-semibold uppercase tracking-wider">Prom. Real</p>
+                                <p className={`${fitFontSize(`${item.tiempoPromedio.toFixed(1)}s`, "2xl")} font-black text-blue-700 truncate leading-tight`}>{item.tiempoPromedio.toFixed(1)}s</p>
+                                <p className="text-xs font-bold text-blue-500">{enMinutos(item.tiempoPromedio)}</p>
                             </div>
                         </div>
-                        <p className="text-center text-xs text-slate-500 font-semibold mt-3 uppercase tracking-wider">
+                        <p className="text-center text-[11px] text-slate-500 font-semibold mt-1 uppercase tracking-wider">
                             {item.ciclosTotales} ciclos válidos · {item.piezasReales} piezas reales
                         </p>
                     </div>
 
                     {/* Calidad detalle */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Detalle de Calidad</p>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Detalle de Calidad</p>
                         <div className="grid grid-cols-3 gap-3 text-center">
                             <div className="min-w-0">
                                 <p className="text-xs text-slate-400 font-semibold mb-1">Inspeccionadas</p>
@@ -150,7 +156,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                     </div>
 
                     {/* HDT */}
-                    <div className={`flex items-center justify-between p-4 rounded-xl border-2 ${item.hdtCumple ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
+                    <div className={`flex items-center justify-between px-3 py-2 rounded-xl border-2 ${item.hdtCumple ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
                         <div className="flex items-center gap-3">
                             {item.hdtCumple
                                 ? <ShieldCheck size={22} className="text-emerald-600 shrink-0" />
@@ -158,19 +164,19 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                             }
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Desglose de Trabajo (HDT)</p>
-                                <p className={`font-black text-base ${item.hdtCumple ? "text-emerald-700" : "text-slate-600"}`}>
+                                <p className={`font-black text-sm ${item.hdtCumple ? "text-emerald-700" : "text-slate-600"}`}>
                                     {item.hdtCumple ? "Cumple el estándar" : "En proceso de mejora"}
                                 </p>
                             </div>
                         </div>
-                        <span className={`text-2xl font-black ${item.hdtCumple ? "text-emerald-600" : "text-slate-400"}`}>
+                        <span className={`text-xl font-black ${item.hdtCumple ? "text-emerald-600" : "text-slate-400"}`}>
                             {item.hdtCumple ? "✓" : "○"}
                         </span>
                     </div>
 
                     {/* Desperdicios */}
                     {item.desperdicios?.length > 0 && (
-                        <div className="p-4 rounded-xl border-2 bg-purple-50 border-purple-200">
+                        <div className="px-3 py-2 rounded-xl border-2 bg-purple-50 border-purple-200">
                             <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
                                 <Trash2 size={13} /> Desperdicios identificados ({item.desperdicios.length})
                             </p>
@@ -184,34 +190,34 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
 
                     {/* Comentario */}
                     {item.comentarioGeneral && (
-                        <div className="p-4 rounded-xl border border-slate-200 bg-white">
-                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Comentarios y Observaciones</p>
+                        <div className="px-3 py-2 rounded-xl border border-slate-200 bg-white">
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Comentarios y Observaciones</p>
                             <p className="text-sm text-slate-700 italic">"{item.comentarioGeneral}"</p>
                         </div>
                     )}
 
                     {/* Compromiso / Retroalimentación */}
                     {item.compromiso && (
-                        <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40">
-                            <p className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-2">Compromiso / Retroalimentación</p>
+                        <div className="px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50/40">
+                            <p className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1">Compromiso / Retroalimentación</p>
                             <p className="text-sm text-indigo-900 italic">"{item.compromiso}"</p>
                         </div>
                     )}
 
                     {/* Firma */}
                     {(item as any).firmaOperario && (
-                        <div className="p-4 rounded-xl border border-slate-200 bg-white">
-                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1">
+                        <div className="px-3 py-2 rounded-xl border border-slate-200 bg-white">
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1">
                                 <PenLine size={13} /> Firma del Colaborador
                             </p>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={(item as any).firmaOperario} alt="Firma del colaborador" className="border border-slate-100 rounded-lg w-full max-h-32 object-contain bg-slate-50" />
+                            <img src={(item as any).firmaOperario} alt="Firma del colaborador" className="border border-slate-100 rounded-lg w-full max-h-24 object-contain bg-slate-50" />
                         </div>
                     )}
 
                 </div>
 
-                <div className="px-6 pb-6">
+                <div className="px-4 pb-4">
                     <Button onClick={onClose} className="w-full bg-[#254153] hover:bg-[#254153]/90 font-bold text-white">
                         Cerrar
                     </Button>
@@ -520,14 +526,21 @@ export default function Historico() {
         try { locales = JSON.parse(localStorage.getItem("historialHoraHora") || "[]"); } catch { locales = []; }
         fetchEvaluaciones().then(records => {
             const enBase = new Set(records.map(r => r.id));
-            const soloLocales = locales.filter(l => l?.id && !enBase.has(l.id));
+            const vistos = new Set<string>();
+            const unicos = <T extends { id: string }>(lista: T[]) => lista.filter(x => x?.id && !vistos.has(x.id) && (vistos.add(x.id), true));
+            const deBase = unicos(records);
+            const soloLocales = unicos(locales.filter(l => l?.id && !enBase.has(l.id)));
             setPendientes(new Set(soloLocales.map(l => l.id)));
-            setData([...records, ...soloLocales]);
+            setData([...deBase, ...soloLocales]);
+            // La copia del equipo solo guarda lo que NO está en la base (antes guardaba todo con firmas y llenaba el almacenamiento)
+            try { localStorage.setItem("historialHoraHora", JSON.stringify(soloLocales)); } catch { /* sin acceso */ }
         }).catch((err) => {
             console.error('Error fetching from Supabase:', err);
             setErrorCarga(`No se pudieron cargar los registros de la base de datos: ${err?.message || err}. Solo se muestran los guardados en este equipo.`);
-            setPendientes(new Set(locales.map(l => l.id)));
-            setData([...locales].reverse());
+            const vistos = new Set<string>();
+            const unicos = locales.filter(l => l?.id && !vistos.has(l.id) && (vistos.add(l.id), true));
+            setPendientes(new Set(unicos.map(l => l.id)));
+            setData([...unicos].reverse());
         });
 
         // Get logged-in user
@@ -611,9 +624,13 @@ export default function Historico() {
                 } else if (sortConfig.key === 'realizadoPor') {
                     valA = resolveUserName(a.creadoPor).toLowerCase();
                     valB = resolveUserName(b.creadoPor).toLowerCase();
-                } else if (sortConfig.key === 'rendimiento') {
-                    valA = a.rendimiento || 0;
-                    valB = b.rendimiento || 0;
+                } else if (sortConfig.key === 'rendimiento' || sortConfig.key === 'calidad') {
+                    valA = (a as any)[sortConfig.key] || 0;
+                    valB = (b as any)[sortConfig.key] || 0;
+                    return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+                } else if (sortConfig.key === 'hdt') {
+                    valA = a.hdtCumple ? 1 : 0;
+                    valB = b.hdtCumple ? 1 : 0;
                     return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
                 }
 
@@ -703,16 +720,16 @@ export default function Historico() {
             />
             <SubHeader />
 
-            <main className="flex-1 w-full max-w-[1500px] p-4 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <main className="flex-1 w-full max-w-[1400px] mx-auto px-3 py-3 sm:px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between mt-6">
-                    <h2 className="text-2xl font-bold text-[#254153]">Observaciones Guardadas</h2>
+                <div className="mb-4 flex flex-col md:flex-row gap-3 items-center justify-between">
+                    <h2 className="text-lg font-bold text-[#254153]">Observaciones Guardadas</h2>
 
                     <div className="flex-1 w-full max-w-lg relative mx-auto">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                         <Input
                             placeholder="Buscar por #, Línea, Operario, Realizado por..."
-                            className="pl-10 h-10 shadow-sm rounded-md border-slate-300 focus-visible:ring-primary"
+                            className="pl-9 h-8 text-xs shadow-sm rounded-md border-slate-300 focus-visible:ring-primary"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
@@ -736,62 +753,67 @@ export default function Historico() {
 
                 <div className="bg-white rounded-none shadow-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="table-fixed w-full min-w-[900px]">
                             <TableHeader className="bg-[#254153] hover:bg-[#254153]">
                                 <TableRow className="hover:bg-[#254153] border-none select-none">
                                     <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider w-16 cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[5%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('consecutivo')}
                                     >
                                         # <SortIcon columnKey="consecutivo" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[11%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('tiempoInicio')}
                                     >
                                         Fecha <SortIcon columnKey="tiempoInicio" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('plantaPuesto')}
                                     >
                                         Planta / Puesto <SortIcon columnKey="plantaPuesto" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('operario')}
                                     >
                                         Operario <SortIcon columnKey="operario" />
                                     </TableHead>
                                     <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
+                                        className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors w-[19%] whitespace-normal leading-tight"
                                         onClick={() => requestSort('realizadoPor')}
                                     >
                                         Realizado por <SortIcon columnKey="realizadoPor" />
                                     </TableHead>
-                                    <TableHead 
-                                        className="py-4 font-bold text-white uppercase text-xs tracking-wider cursor-pointer hover:bg-[#3b5998] transition-colors"
-                                        onClick={() => requestSort('rendimiento')}
-                                    >
-                                        KPIs <SortIcon columnKey="rendimiento" />
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[9%] whitespace-normal leading-tight" onClick={() => requestSort('rendimiento')}>
+                                        Rendimiento <SortIcon columnKey="rendimiento" />
                                     </TableHead>
-                                    <TableHead className="py-4 font-bold text-white uppercase text-xs tracking-wider text-right w-28">Acciones</TableHead>
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[8%] whitespace-normal leading-tight" onClick={() => requestSort('calidad')}>
+                                        Calidad <SortIcon columnKey="calidad" />
+                                    </TableHead>
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider bg-[#254153] cursor-pointer hover:bg-[#3b5998] transition-colors text-center w-[6%] whitespace-normal leading-tight" onClick={() => requestSort('hdt')}>
+                                        HDT <SortIcon columnKey="hdt" />
+                                    </TableHead>
+                                    <TableHead className="py-2 h-auto font-bold text-white uppercase text-[11px] tracking-wider text-right w-[4%] bg-[#254153]"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredAndSortedData.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="h-48 text-center text-slate-400 font-medium">
+                                        <TableCell colSpan={9} className="h-48 text-center text-slate-400 font-medium">
                                             No hay registros para mostrar.
                                           </TableCell>
                                     </TableRow>
                                 ) : filteredAndSortedData.map((item) => {
                                     const isOwner = currentUserEmail && (item.creadoPorEmail === currentUserEmail || item.creadoPor === currentUserEmail);
                                     return (
-                                        <TableRow key={item.id} className={`transition-colors ${pendientes.has(item.id) ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50'}`}>
-                                            <TableCell className="py-4">
+                                        // Clic en cualquier parte de la fila abre el detalle
+                                        <TableRow key={item.id} onClick={() => setSelected(item)} title="Clic para ver el detalle"
+                                            className={`transition-colors cursor-pointer text-xs ${pendientes.has(item.id) ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-100'}`}>
+                                            <TableCell className="py-1.5 whitespace-normal break-words align-middle">
                                                 {pendientes.has(item.id) ? (
-                                                    <button onClick={() => subirPendiente(item)} disabled={subiendo === item.id}
+                                                    <button onClick={e => { e.stopPropagation(); subirPendiente(item) }} disabled={subiendo === item.id}
                                                         title="Este registro solo está en este equipo: subirlo a la base de datos"
                                                         className="flex items-center gap-1 h-7 px-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold disabled:opacity-50">
                                                         <CloudUpload size={14} /> {subiendo === item.id ? 'Subiendo…' : 'Subir'}
@@ -800,45 +822,38 @@ export default function Historico() {
                                                     <span className="font-black text-[#254153] text-sm">{item.consecutivo || "—"}</span>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="font-medium text-slate-800">{format(new Date(item.tiempoInicio), "dd/MM/yyyy")}</div>
-                                                <div className="text-xs text-slate-500">{format(new Date(item.tiempoInicio), "HH:mm")}</div>
+                                            <TableCell className="py-1.5 whitespace-normal break-words align-middle">
+                                                <div className="font-medium text-slate-800">{format(new Date(item.tiempoInicio), "dd/MM/yyyy")} <span className="text-slate-500 font-normal">{format(new Date(item.tiempoInicio), "HH:mm")}</span></div>
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="font-bold text-slate-800">{item.planta}</div>
-                                                <div className="text-xs text-slate-500">{item.puesto}</div>
+                                            <TableCell className="py-1.5 whitespace-normal break-words align-middle">
+                                                <div className="text-slate-800"><b>{item.planta}</b> <span className="text-slate-500">· {item.puesto}</span></div>
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="text-sm font-medium text-slate-800">{item.operario}</div>
+                                            <TableCell className="py-1.5 whitespace-normal break-words align-middle">
+                                                <div className="font-medium text-slate-800">{item.operario}</div>
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="text-xs text-slate-600 font-medium truncate max-w-[160px]">{item.realizadoPor || resolveUserName(item.creadoPor)}</div>
+                                            <TableCell className="py-1.5 whitespace-normal break-words align-middle">
+                                                <div className="text-xs text-slate-600 font-medium leading-snug">{item.realizadoPor || resolveUserName(item.creadoPor)}</div>
                                             </TableCell>
-                                            <TableCell className="py-4 text-xs">
-                                                <div><span className="font-semibold w-16 inline-block">Rend:</span> <span className={`font-mono font-bold ${item.rendimiento >= 90 ? 'text-emerald-600' : item.rendimiento >= 80 ? 'text-amber-500' : 'text-slate-500'}`}>{item.rendimiento.toFixed(1)}%</span></div>
-                                                <div><span className="font-semibold w-16 inline-block">Calidad:</span> <span className={`font-mono font-bold ${item.calidad >= 90 ? 'text-emerald-600' : item.calidad >= 80 ? 'text-amber-500' : 'text-slate-500'}`}>{item.calidad.toFixed(1)}%</span></div>
-                                                <div><span className="font-semibold w-16 inline-block">HDT:</span> <span className={`font-bold ${item.hdtCumple ? 'text-emerald-600' : 'text-slate-500'}`}>{item.hdtCumple ? 'Sí' : 'No'}</span></div>
+                                            <TableCell className="py-1.5 text-center whitespace-normal">
+                                                <span className={`font-mono font-bold ${colorSemaforo(item.rendimiento)}`}>{item.rendimiento.toFixed(1)}%</span>
                                             </TableCell>
-                                            <TableCell className="py-4 text-right">
+                                            <TableCell className="py-1.5 text-center whitespace-normal">
+                                                <span className={`font-mono font-bold ${colorSemaforo(item.calidad)}`}>{item.calidad.toFixed(1)}%</span>
+                                            </TableCell>
+                                            <TableCell className="py-1.5 text-center whitespace-normal">
+                                                <span className={`font-bold ${item.hdtCumple ? 'text-[#3b8f50]' : 'text-[#d14747]'}`}>{item.hdtCumple ? 'Sí' : 'No'}</span>
+                                            </TableCell>
+                                            <TableCell className="py-1.5 text-right" onClick={e => e.stopPropagation()}>
                                                 <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700"
-                                                        title="Ver detalle"
-                                                        onClick={() => setSelected(item)}
-                                                    >
-                                                        <Eye size={16} />
-                                                    </Button>
                                                     {isOwner && (
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            className="h-8 w-8 text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700"
+                                                            className="h-7 w-7 text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700"
                                                             title="Editar registro"
                                                             onClick={() => setEditing(item)}
                                                         >
-                                                            <Edit2 size={16} />
+                                                            <Edit2 size={14} />
                                                         </Button>
                                                     )}
                                                 </div>

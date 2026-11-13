@@ -10,6 +10,9 @@ import EncabezadoFibra, { useMetricasFibra } from './EncabezadoFibra'
 import HistorySection from './HistorySection'
 import ModalBuscarMolde from '../pintura/ModalBuscarMolde'
 import { moldesDisponiblesOrden } from '@/lib/fibra/moldesOrden'
+import { recargarFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
+import { esKitReparacion } from '@/lib/fibra/kitReparacion'
+import { registrarKitReparacionFv } from '@/lib/supabase/queries/fibra_administracion'
 
 
 
@@ -99,8 +102,10 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             setMoldesDisponibles(available)
             setSelectedMolde(null)
 
-            if (available.length === 0) {
-                setDebugInfo(`No se encontraron moldes Disponibles para la orden: "${sku}" (${selectedOrden.molde_descripcion || selectedOrden.producto_descripcion})`)
+            if (esKitReparacion(selectedOrden.producto_descripcion)) {
+                setDebugInfo('')
+            } else if (available.length === 0) {
+                setDebugInfo(`Sin molde específico asignado: puede elegir o buscar cualquier molde de la lista.`)
             } else {
                 setDebugInfo('')
             }
@@ -110,6 +115,22 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             setDebugInfo('')
         }
     }, [selectedOrden, allMoldes])
+
+    // Moldes para el selector: busca entre todos los moldes si hay texto, o muestra los asociados a la orden
+    const moldesOpciones = useMemo(() => {
+        const q = moldSearchText.trim().toLowerCase()
+        if (q) {
+            return allMoldes.filter(m => 
+                (m.serial || '').toLowerCase().includes(q) ||
+                (m.molde_descripcion || '').toLowerCase().includes(q) ||
+                (m.molde_sku || '').toLowerCase().includes(q)
+            )
+        }
+        if (moldesDisponibles.length > 0) {
+            return moldesDisponibles
+        }
+        return allMoldes
+    }, [moldSearchText, moldesDisponibles, allMoldes])
 
     // Filtro base y métricas compartidos con los demás módulos de piso FV
     const { baseFilteredOrdenes, metrics } = useMetricasFibra(ordenes, trazabilidad, searchText, selectedDate)
@@ -123,8 +144,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         })
 
         return filtered.sort((a, b) => {
-            const dateAStr = a.fecha_ideal_produccion || a.fecha_entrega_estimada
-            const dateBStr = b.fecha_ideal_produccion || b.fecha_entrega_estimada
+            const dateAStr = a.fecha_entrega_lote || a.fecha_ideal_produccion || a.fecha_entrega_estimada
+            const dateBStr = b.fecha_entrega_lote || b.fecha_ideal_produccion || b.fecha_entrega_estimada
             const dateA = dateAStr ? new Date(dateAStr).getTime() : Infinity
             const dateB = dateBStr ? new Date(dateBStr).getTime() : Infinity
             const valA = isNaN(dateA) ? Infinity : dateA
@@ -143,9 +164,12 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
     const handleSyncSap = async () => {
         setSyncing(true)
         try {
-            await fetch('/api/sap/ordenes-liberadas', { cache: 'no-store' })
-            await loadOrdenes()
-            setNotification({ message: 'Órdenes actualizadas y sincronizadas desde SAP correctamente', type: 'success' })
+            const res = await fetch('/api/sap/ordenes-liberadas', { cache: 'no-store' })
+            const json = await res.json().catch(() => null)
+            await Promise.all([loadOrdenes(), recargarFechasSemaforoFv()])
+            setNotification(json?.avisoFechasSemaforo
+                ? { message: `Órdenes actualizadas. ${json.avisoFechasSemaforo}`, type: 'error' }
+                : { message: 'Órdenes actualizadas y sincronizadas desde SAP correctamente', type: 'success' })
         } catch (e) {
             await loadOrdenes()
             setNotification({ message: 'Órdenes recargadas', type: 'success' })
@@ -178,7 +202,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
             alert('Error: Debe seleccionar una Orden de Fabricación.')
             return
         }
-        if (!selectedMolde) {
+        const kit = esKitReparacion(selectedOrden.producto_descripcion)
+        if (!selectedMolde && !kit) {
             alert('Error: Debe seleccionar un Molde.')
             return
         }
@@ -204,15 +229,20 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
         setSubmitting(true)
         try {
             // 2. Proceso de registro (verificado en el backend)
-            await registrarPintura({
-                orden_fabricacion_id: selectedOrden.id,
-                molde_id: selectedMolde.id,
-                linea: 'Linea 1', // Valor por defecto válido para la DB, ya que en Fibra no aplica.
-                usuario_email: userEmail
-            })
+            if (kit) {
+                // Kit de reparación: sin molde y directo a Digitado (no pasa por los procesos de la planta)
+                await registrarKitReparacionFv(selectedOrden.id, 'digitado', userEmail, null, 'pintura')
+            } else {
+                await registrarPintura({
+                    orden_fabricacion_id: selectedOrden.id,
+                    molde_id: selectedMolde!.id,
+                    linea: 'Linea 1', // Valor por defecto válido para la DB, ya que en Fibra no aplica.
+                    usuario_email: userEmail
+                })
+            }
 
             // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
-            setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })
+            setNotification({ message: kit ? 'Kit de reparación registrado: pasó directo a Digitado' : '¡Registro creado exitosamente!', type: 'success' })
             
             // Actualizar localmente la orden para prevenir spam rápido
             setSelectedOrden(prev => prev ? { ...prev, programado: (prev.programado || 0) - 1 } : null)
@@ -253,7 +283,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                     <HistorySection />
                 ) : (
                     <div className="space-y-2">
-                        <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
+                        <div className="text-[#324354] text-xs font-black mb-2 uppercase">
                             Ordenes encontradas: {filteredOrdenes.length}
                         </div>
 
@@ -284,16 +314,21 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
 
                         {/* Mold Selector with Search */}
                         <div className="w-full sm:w-1/2">
-                                                        <div className="relative">
+                            {selectedOrden && esKitReparacion(selectedOrden.producto_descripcion) ? (
+                                <div className="w-full min-h-9 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg flex items-center">
+                                    Kit de reparación: no necesita molde. Al pintar pasa directo a Digitado.
+                                </div>
+                            ) : (
+                            <div className="relative">
                                 <div 
                                     onClick={() => !!selectedOrden && setIsMoldDropdownOpen(!isMoldDropdownOpen)}
                                     className={`w-full h-9 px-3 text-sm bg-white text-gray-900 font-semibold border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm transition-all
                                         ${!selectedOrden ? 'opacity-50 cursor-not-allowed bg-gray-50 border-dashed' : 'hover:border-cyan-500 focus:ring-2 focus:ring-cyan-500'}
                                     `}
                                 >
-                                    <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
+                                    <span className={selectedMolde ? 'text-gray-900 font-bold' : 'text-gray-400'}>
                                         {selectedMolde 
-                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
+                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v) · ${selectedMolde.estado}` 
                                             : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
                                     </span>
                                     <Search size={15} className="text-gray-400" />
@@ -311,10 +346,13 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                                                 className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500"
                                             />
                                         </div>
-                                        <div className="max-h-[200px] overflow-y-auto">
-                                            {moldesDisponibles
-                                                .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
-                                                .map((molde) => (
+                                        <div className="max-h-[220px] overflow-y-auto">
+                                            {moldesOpciones.length === 0 ? (
+                                                <div className="px-4 py-3 text-xs text-gray-400 text-center">
+                                                    No se encontraron moldes
+                                                </div>
+                                            ) : (
+                                                moldesOpciones.map((molde) => (
                                                     <div
                                                         key={molde.id}
                                                         onClick={() => {
@@ -323,27 +361,42 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                                                             setIsMoldDropdownOpen(false)
                                                             setMoldSearchText('')
                                                         }}
-                                                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
+                                                        className={`px-4 py-2.5 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0 ${
+                                                            selectedMolde?.id === molde.id ? 'bg-cyan-50/70' : ''
+                                                        }`}
                                                     >
-                                                        <span className="text-sm font-bold">{molde.serial}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-gray-800">{molde.serial}</span>
+                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                                molde.estado === 'Disponible' ? 'bg-emerald-100 text-emerald-800' :
+                                                                molde.estado === 'En uso' ? 'bg-amber-100 text-amber-800' :
+                                                                molde.estado === 'Reparación' ? 'bg-red-100 text-red-800' :
+                                                                'bg-slate-100 text-slate-700'
+                                                            }`}>
+                                                                {molde.estado}
+                                                            </span>
+                                                        </div>
                                                         <span className="text-xs text-cyan-600 font-bold">{molde.vueltas_actuales}v</span>
                                                     </div>
-                                                ))}
+                                                ))
+                                            )}
                                         </div>
                                     </div>
                                 )}
                                 
                                 {debugInfo && (
-                                    <div className="text-[10px] text-red-500 font-bold px-1 mt-1 animate-pulse">
+                                    <div className="text-[10px] text-amber-600 font-bold px-1 mt-1">
                                         {debugInfo}
                                     </div>
                                 )}
                                 {selectedMolde && (
-                                    <div className="text-[10px] text-gray-500 px-1 mt-1 italic">
-                                        Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}
+                                    <div className="text-[10px] text-gray-500 px-1 mt-1 flex items-center justify-between">
+                                        <span>Estado: <b className={selectedMolde.estado === 'Disponible' ? 'text-emerald-600' : 'text-amber-600'}>{selectedMolde.estado}</b></span>
+                                        <span className="italic">Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}</span>
                                     </div>
                                 )}
                             </div>
+                            )}
                         </div>
                     </div>
 
@@ -351,7 +404,7 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                         {/* Submit Button */}
                         <button
                             onClick={handleSubmit}
-                            disabled={!selectedOrden || !selectedMolde || submitting || (selectedOrden.programado || 0) <= 0}
+                            disabled={!selectedOrden || (!selectedMolde && !esKitReparacion(selectedOrden.producto_descripcion)) || submitting || (selectedOrden.programado || 0) <= 0}
                             className="flex-1 lg:min-w-[130px] h-9 bg-cyan-600 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-colors disabled:bg-gray-600 flex items-center justify-center gap-2"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

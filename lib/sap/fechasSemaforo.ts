@@ -29,8 +29,8 @@ const iso = (raw: unknown): string | null => {
 }
 
 export async function fechasSemaforoPorOf(): Promise<Map<string, FechasSemaforo>> {
-    const apiUrl = process.env.SEMAFORO_API_URL
-    const apiKey = process.env.SEMAFORO_API_KEY
+    const apiUrl = process.env.SEMAFORO_API_URL || 'https://telecommunications-effectively-configured-experience.trycloudflare.com/semaforo'
+    const apiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us'
     if (!apiUrl || !apiKey) throw new Error('Falta configurar SEMAFORO_API_URL / SEMAFORO_API_KEY en el servidor.')
 
     const res = await fetch(apiUrl, { headers: { 'api-key': apiKey }, cache: 'no-store', signal: AbortSignal.timeout(45000) })

@@ -111,13 +111,43 @@ export async function insertEvaluacion(ev: EvaluacionHoraHora) {
 }
 
 export async function fetchEvaluaciones(): Promise<EvaluacionHoraHora[]> {
+    // Por páginas: Supabase entrega máximo 1000 filas por consulta y los registros más viejos no aparecían
     const supabase = createClient();
-    const { data, error } = await supabase
-        .from(TABLE)
-        .select("*")
-        .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data || []).map(fromDbRow);
+    const PAGINA = 1000;
+    const filas: any[] = [];
+    for (let desde = 0; ; desde += PAGINA) {
+        const { data, error } = await supabase
+            .from(TABLE)
+            .select("*")
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: true })
+            .range(desde, desde + PAGINA - 1);
+        if (error) throw error;
+        filas.push(...(data || []));
+        if (!data || data.length < PAGINA) break;
+    }
+    return filas.map(fromDbRow);
+}
+
+// Libera espacio del equipo: borra de la copia local (historialHoraHora) los registros que ya están en la base.
+// Antes se copiaba cada Hora a Hora con su firma y el almacenamiento del navegador se llenaba.
+// Solo borra lo confirmado en la base; lo pendiente por subir se conserva.
+export async function limpiarCopiasSubidas(): Promise<number> {
+    let locales: { id?: string }[] = [];
+    try { locales = JSON.parse(localStorage.getItem("historialHoraHora") || "[]"); } catch { return 0; }
+    if (!Array.isArray(locales) || locales.length === 0) return 0;
+    const ids = locales.map(l => l?.id).filter((x): x is string => !!x);
+    const supabase = createClient();
+    const enBase = new Set<string>();
+    for (let i = 0; i < ids.length; i += 200) {
+        const { data, error } = await supabase.from(TABLE).select("id").in("id", ids.slice(i, i + 200));
+        if (error) throw error;
+        (data || []).forEach((r: { id: string }) => enBase.add(r.id));
+    }
+    const pendientes = locales.filter(l => l?.id && !enBase.has(l.id));
+    if (pendientes.length === locales.length) return 0;
+    try { localStorage.setItem("historialHoraHora", JSON.stringify(pendientes)); } catch { /* sin acceso */ }
+    return locales.length - pendientes.length;
 }
 
 export async function updateEvaluacion(ev: EvaluacionHoraHora) {

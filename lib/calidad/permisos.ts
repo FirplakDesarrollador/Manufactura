@@ -1,5 +1,6 @@
 // Personas/roles con permiso de edición en módulos de Calidad (misma regla de /calidad/criterios)
-const ADMIN_NAMES = ['jair alvarez', 'maria isabel escobar', 'carolina escobar', 'hector', 'calidad', 'admin'];
+// "Carolina Escobar" es Estiven Londoño (cambio de puesto sin cambio de correo)
+const ADMIN_NAMES = ['jair alvarez', 'maria isabel escobar', 'estiven londono', 'carolina escobar', 'hector', 'calidad', 'admin'];
 
 export interface UsuarioCalidad {
     nombre?: string | null;
