@@ -3,9 +3,27 @@ import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
 import { Box, Clipboard, Users, AlertTriangle, FileText } from 'lucide-react'
+import { toast } from 'sonner'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
 import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
+
+// Copia el número de la OF al portapapeles (con respaldo para navegadores sin permiso de portapapeles)
+const copiarOf = async (of: unknown) => {
+    const texto = String(of ?? '').trim()
+    if (!texto) return
+    try {
+        await navigator.clipboard.writeText(texto)
+    } catch {
+        const ta = document.createElement('textarea')
+        ta.value = texto
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        ta.remove()
+    }
+    toast.success(`Orden ${texto} copiada`)
+}
 
 // 'YYYY-MM-DD' → dd/mm/aaaa
 const fechaCorta = (iso: string | null) => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—'
@@ -101,10 +119,18 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                         // FV: 2 renglones en paralelo, a la izquierda OF y Pedido, a la derecha la descripción (resaltada) y el SKU
                         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 items-start">
                             <div className="min-w-0">
-                                <div className="flex items-center gap-1 text-[#324354]">
+                                {/* Un clic copia el número de la OF (como en Control de Piso MS); la tarjeta también se selecciona */}
+                                <span
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => copiarOf(orden.orden_fabricacion)}
+                                    onKeyDown={e => { if (e.key === 'Enter') copiarOf(orden.orden_fabricacion) }}
+                                    className="flex items-center gap-1 text-[#324354] cursor-copy rounded px-0.5 -mx-0.5 hover:bg-[#deb841]/25 transition-colors"
+                                    title="Clic para copiar el número de la orden"
+                                >
                                     <Clipboard size={16} className="shrink-0" />
                                     <span className="text-base font-black text-[#324354] whitespace-nowrap">OF: {orden.orden_fabricacion}</span>
-                                </div>
+                                </span>
                                 {/* Solo la orden de venta: sin la línea/lote (lo que va desde el primer guion) */}
                                 <div className="text-xs font-bold text-[#7B8E90] whitespace-nowrap mt-0.5">Pedido: {String(orden.pedido || (orden as any).numero_pedido || '').split('-')[0].trim() || 'Sin pedido'}</div>
                             </div>

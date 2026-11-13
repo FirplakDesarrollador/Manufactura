@@ -7,6 +7,7 @@ import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Filter, Pencil, Setti
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SaldosDefectsSettingsModal, DefectoSaldoDestruccion } from '@/components/calidad/SaldosDefectsSettingsModal'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import { esGaranteSP } from '@/lib/sistema-produccion/reglas'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import { v4 as uuidv4 } from 'uuid'
@@ -147,7 +148,12 @@ export default function SaldosYDestruccionesPage() {
                 localId: localUser?.id
             })
 
-            if (localUser?.permisos?.calidad) {
+            if (esGaranteSP(authData.user.email)) {
+                // Garantes: siempre pueden abrir la configuración de defectos
+                setHasEditPermission(!!localUser?.permisos?.calidad?.editar)
+                setHasDeletePermission(!!localUser?.permisos?.calidad?.eliminar)
+                setHasSettingsPermission(true)
+            } else if (localUser?.permisos?.calidad) {
                 setHasEditPermission(!!localUser.permisos.calidad.editar)
                 setHasDeletePermission(!!localUser.permisos.calidad.eliminar)
                 setHasSettingsPermission(!!localUser.permisos.calidad.configurar_defectos || localUser.permisos.calidad.configuracion === 'editar' || !!localUser.permisos.calidad.editar)
@@ -211,11 +217,38 @@ export default function SaldosYDestruccionesPage() {
         fetchData()
     }, [fetchData])
 
-    const handleSaveSettings = async (updatedDefects: DefectoSaldoDestruccion[]) => {
+    const handleSaveSettings = async (updatedDefectsIn: DefectoSaldoDestruccion[]) => {
+        let updatedDefects = updatedDefectsIn
+        // Garantes: defectos nuevos (id negativo) y cambios de nombre. Un error aquí se muestra y no se cierra la ventana.
+        const nuevos = updatedDefects.filter(d => d.id < 0)
+        const renombrados = updatedDefects.filter(d => {
+            const antes = defectOptions.find(o => o.id === d.id)
+            return d.id > 0 && antes && antes.defecto !== d.defecto
+        })
+        if ((nuevos.length || renombrados.length) && !esGaranteSP(user?.email)) {
+            alert('Solo Hector José Chinchilla Trigos, Maria Isabel Escobar Laurens y Ederson Estiven Londoño Alvarez pueden cambiar nombres o agregar defectos.')
+            return
+        }
+        const mensajeError = (m: string) => /row-level security|policy|permission/i.test(m)
+            ? 'La base no permite el cambio: ejecute ms_lista_saldos_destrucciones_garantes.sql en Supabase.'
+            : m
+        for (const d of renombrados) {
+            const { error } = await supabase.from('ms_lista_saldos_destrucciones').update({ defecto: d.defecto }).eq('id', d.id).select('id').single()
+            if (error) { alert(`No se pudo cambiar el nombre de "${d.defecto}": ${mensajeError(error.message)}`); return }
+        }
+        if (nuevos.length) {
+            const { data, error } = await supabase
+                .from('ms_lista_saldos_destrucciones')
+                .insert(nuevos.map(d => ({ defecto: d.defecto, saldo_o_destruccion: d.saldo_o_destruccion, Requiere_Foto: !!d.Requiere_Foto, Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde })))
+                .select('*')
+            if (error || !data) { alert(`No se pudieron agregar los defectos nuevos: ${mensajeError(error?.message || 'sin respuesta')}`); return }
+            const idReal = new Map(nuevos.map((d, i) => [d.id, data[i]?.id as number]))
+            updatedDefects = updatedDefects.map(d => (d.id < 0 ? { ...d, id: idReal.get(d.id) ?? d.id } : d))
+        }
         try {
             // Attempt to update Supabase table
             try {
-                const updatePromises = updatedDefects.map(d => 
+                const updatePromises = updatedDefects.filter(d => d.id > 0).map(d =>
                     supabase
                         .from('ms_lista_saldos_destrucciones')
                         .update({
@@ -907,6 +940,7 @@ export default function SaldosYDestruccionesPage() {
                 onClose={() => setIsSettingsOpen(false)}
                 defects={defectOptions}
                 onSave={handleSaveSettings}
+                puedeEditarDefectos={esGaranteSP(user?.email)}
             />
 
             {/* POPUP DE CONFIRMACIÓN DE ELIMINACIÓN */}

@@ -28,8 +28,8 @@ export default function CycleTimeStep() {
     const invalidos = ciclos.length - validos;
 
     const planta = evaluacionActual?.planta || "";
-    // Ciclos largos (FV, RTM y moldes): basta 1 ciclo; las demás plantas piden 10
-    const esCicloReducido = ["FV", "RTM", "RMOLD", "MOLD"].includes(planta);
+    // Ciclos largos (FV, RTM y moldes) y CALID (opcional, desde 1 sin tope): basta 1 ciclo; las demás plantas piden 10
+    const esCicloReducido = ["FV", "RTM", "RMOLD", "MOLD", "CALID"].includes(planta);
     const minCiclos = esCicloReducido ? 1 : 10;
 
     const minTime = validos > 0 ? Math.min(...ciclos.filter(c => c.valido).map(c => c.duracion)) : 0;
