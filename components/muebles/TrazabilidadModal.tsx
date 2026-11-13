@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { OrdenMueble, TareaMuebleActiva } from '@/types/muebles'
-import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2, Play } from 'lucide-react'
+import { X, Copy, MinusSquare, PlusSquare, AlertTriangle, Send, Loader2 } from 'lucide-react'
 import { registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
-import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
 import { toast } from 'sonner'
 
 interface TrazabilidadModalProps {
@@ -40,8 +39,6 @@ export default function TrazabilidadModal({
     const [loading, setLoading] = useState(false)
     const [validationError, setValidationError] = useState<string | null>(null)
     const [available, setAvailable] = useState<number>(0)
-    const [startTime, setStartTime] = useState<string>('')
-    const isTaskBasedProcess = proceso === 'Corte' || proceso === 'Enchape' || proceso === 'Inspeccion' || proceso === 'Inspección'
 
     const ordenesSeleccionadas = React.useMemo(
         () => ordenes?.length ? ordenes : [orden],
@@ -88,18 +85,17 @@ export default function TrazabilidadModal({
 
     useEffect(() => {
         if (isOpen) {
-            setStartTime(new Date().toISOString())
             validateQuantity(1)
             setValidationError(null)
         }
     }, [isOpen, validateQuantity])
 
-    // Ajustar cantidad por defecto al disponible en procesos que avanzan por lote o empaque
+    // Ajustar cantidad por defecto al disponible
     useEffect(() => {
-        if (isOpen && available > 0 && (proceso === 'Empaque' || !isTaskBasedProcess)) {
+        if (isOpen && available > 0) {
             setCantidad(available)
         }
-    }, [isOpen, proceso, available, isTaskBasedProcess])
+    }, [isOpen, available])
 
     const handleCopy = () => {
         navigator.clipboard.writeText(orden.orden_fabricacion?.toString() || '')
@@ -131,52 +127,18 @@ export default function TrazabilidadModal({
     const handleSubmit = async () => {
         if (validationError) return
 
-        // Procesos basados en tareas con cronómetro (Corte, Enchape, Inspección)
-        if (isTaskBasedProcess) {
-            setLoading(true)
-            try {
-                const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
-                    of: item.orden_fabricacion,
-                    producto_descripcion: item.producto_descripcion,
-                    available: proceso === 'Corte'
-                        ? (item.por_cortar || 0)
-                        : proceso === 'Enchape'
-                        ? ((item.corte || 0) + (item.reponer_enchape || 0))
-                        : ((item.enchape || 0) + (item.reponer_inspeccion || 0))
-                }))
-
-                const nuevaTarea: TareaMuebleActiva = {
-                    of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
-                    proceso: proceso,
-                    inicio: startTime || new Date().toISOString(),
-                    operario_nombre: usuarioNombre,
-                    operario_cedula: 'NO APLICA',
-                    producto_descripcion: tareasOrdenes.length === 1 ? (tareasOrdenes[0].producto_descripcion || '') : `${proceso} de varias ordenes`,
-                    available: available,
-                    ordenes: tareasOrdenes,
-                    taladro: taladro
-                }
-                
-                await setTareaActiva(userEmail, nuevaTarea)
-                toast.success(`¡Proceso de ${proceso.toLowerCase()} iniciado!`)
-                
-                if (onStartTask) onStartTask(nuevaTarea)
-                onClose()
-            } catch (error) {
-                console.error('Error starting task:', error)
-                toast.error('Error al iniciar el proceso')
-            } finally {
-                setLoading(false)
-            }
-            return
-        }
-
-        // Si son múltiples órdenes seleccionadas (ej. Empaque masivo)
+        // Si son múltiples órdenes seleccionadas (ej. Empaque masivo o registro múltiple)
         if (ordenesSeleccionadas.length > 1) {
             setLoading(true)
             try {
                 for (const item of ordenesSeleccionadas) {
-                    const cantItem = proceso === 'Empaque' ? (item.inspeccion || 0) : 1
+                    const cantItem = proceso === 'Corte'
+                        ? (item.por_cortar || 0)
+                        : proceso === 'Enchape'
+                        ? ((item.corte || 0) + (item.reponer_enchape || 0))
+                        : proceso === 'Empaque'
+                        ? (item.inspeccion || 0)
+                        : ((item.enchape || 0) + (item.reponer_inspeccion || 0))
                     if (cantItem > 0) {
                         await registrarTrazabilidadMueble({
                             orden_fabricacion: item.orden_fabricacion,
@@ -185,7 +147,7 @@ export default function TrazabilidadModal({
                             proceso: proceso,
                             cedula_operario: 'NO APLICA',
                             nombre_operario: usuarioNombre,
-                            fecha_inicio: startTime,
+                            fecha_inicio: new Date().toISOString(),
                             taladro: taladro || 'NO APLICA'
                         })
                     }
@@ -218,7 +180,7 @@ export default function TrazabilidadModal({
                 proceso: proceso,
                 cedula_operario: 'NO APLICA',
                 nombre_operario: usuarioNombre,
-                fecha_inicio: startTime,
+                fecha_inicio: new Date().toISOString(),
                 taladro: taladro
             })
             toast.success(proceso === 'Empaque' ? 'Empaque registrado exitosamente' : 'Registro exitoso')
@@ -233,36 +195,8 @@ export default function TrazabilidadModal({
     }
 
     const handleStartTaskAndReportDefect = async () => {
-        setLoading(true)
-        try {
-            const tareasOrdenes = ordenesSeleccionadas.map((item) => ({
-                of: item.orden_fabricacion,
-                producto_descripcion: item.producto_descripcion,
-                available: ((item.enchape || 0) + (item.reponer_inspeccion || 0))
-            }))
-
-            const nuevaTarea: TareaMuebleActiva = {
-                of: tareasOrdenes.length === 1 ? tareasOrdenes[0].of : `${tareasOrdenes.length} OF seleccionadas`,
-                proceso: proceso,
-                inicio: startTime || new Date().toISOString(),
-                operario_nombre: usuarioNombre,
-                operario_cedula: 'NO APLICA',
-                producto_descripcion: tareasOrdenes.length === 1 ? (tareasOrdenes[0].producto_descripcion || '') : `${proceso} de varias ordenes`,
-                available: available,
-                ordenes: tareasOrdenes,
-                taladro: taladro
-            }
-
-            await setTareaActiva(userEmail, nuevaTarea)
-            if (onStartTask) onStartTask(nuevaTarea)
-            if (onReportDefect) onReportDefect(orden, { cedula: 'NO APLICA', nombre: usuarioNombre })
-            onClose()
-        } catch (error) {
-            console.error('Error starting inspection task for defect:', error)
-            toast.error('Error al iniciar inspección')
-        } finally {
-            setLoading(false)
-        }
+        if (onReportDefect) onReportDefect(orden, { cedula: 'NO APLICA', nombre: usuarioNombre })
+        onClose()
     }
 
     if (!isOpen) return null
@@ -338,7 +272,7 @@ export default function TrazabilidadModal({
                             </div>
                         </div>
                         
-                        {!isTaskBasedProcess && (proceso !== 'Empaque' || ordenesSeleccionadas.length === 1) && (
+                        {(proceso !== 'Empaque' || ordenesSeleccionadas.length === 1) && (
                             <div className="flex items-center gap-4">
                                 <button 
                                     onClick={handleDecrement} 
@@ -389,12 +323,10 @@ export default function TrazabilidadModal({
                                     }`}
                                 >
                                     {loading ? <Loader2 className="animate-spin" size={24} /> : (
-                                        isTaskBasedProcess ? (
-                                            <><Play size={20} /><span>INICIAR PROCESO</span></>
-                                        ) : proceso === 'Empaque' ? (
+                                        proceso === 'Empaque' ? (
                                             <><Send size={20} /><span>REGISTRAR EMPAQUE</span></>
                                         ) : (
-                                            <><Send size={20} /><span>REGISTRAR</span></>
+                                            <><Send size={20} /><span>REGISTRAR {proceso.toUpperCase()}</span></>
                                         )
                                     )}
                                 </button>

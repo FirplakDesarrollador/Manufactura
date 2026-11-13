@@ -18,10 +18,9 @@ import SeguimientoModule from '@/components/muebles/SeguimientoModule'
 import ConfigurarTurnosModal from '@/components/muebles/ConfigurarTurnosModal'
 import ConfigurarSupervisoresModal from '@/components/muebles/ConfigurarSupervisoresModal'
 import CambiarPlantaModal from '@/components/muebles/CambiarPlantaModal'
-import ActiveTaskOverlay from '@/components/muebles/ActiveTaskOverlay'
 import ErrorBoundary from '@/components/common/ErrorBoundary'
 import { getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
-import { getTareaActiva } from '@/lib/supabase/queries/usuarios'
+import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
 
 export default function MueblesPage() {
     const router = useRouter()
@@ -33,7 +32,6 @@ export default function MueblesPage() {
     const [isTurnosModalOpen, setIsTurnosModalOpen] = useState(false)
     const [isSupervisoresModalOpen, setIsSupervisoresModalOpen] = useState(false)
     const [isPlantaModalOpen, setIsPlantaModalOpen] = useState(false)
-    const [activeTask, setActiveTask] = useState<any>(null)
 
     useEffect(() => {
         const getUser = async () => {
@@ -52,7 +50,10 @@ export default function MueblesPage() {
                 
                 if (profile) {
                     setProfile(profile)
-                    setActiveTask(profile.tarea_activa)
+                    // Si el usuario tenía alguna tarea_activa residual, limpiarla para que no se quede pegado
+                    if (profile.tarea_activa && user?.email) {
+                        setTareaActiva(user.email, null).catch(console.error)
+                    }
                     if (profile.modulo_predeterminado_muebles) {
                         setActiveModule(profile.modulo_predeterminado_muebles.toLowerCase())
                     }
@@ -62,28 +63,6 @@ export default function MueblesPage() {
         }
         getUser()
     }, [router])
-
-    useEffect(() => {
-        if (!user) return
-
-        const channel = supabase
-            .channel(`public:usuarios:uuid=eq.${user.id}`)
-            .on('postgres_changes', { 
-                event: 'UPDATE', 
-                schema: 'public', 
-                table: 'usuarios',
-                filter: `uuid=eq.${user.id}`
-            }, (payload) => {
-                if (payload.new && 'tarea_activa' in payload.new) {
-                    setActiveTask(payload.new.tarea_activa)
-                }
-            })
-            .subscribe()
-
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [user])
 
     useEffect(() => {
         if ((profile?.planta_muebles || '').toLowerCase() === 'cefi' && activeModule === 'empaque') {
@@ -322,7 +301,6 @@ export default function MueblesPage() {
                                     turno="1" 
                                     usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
                                     plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                    onStartTask={setActiveTask}
                                 />
                             ) : activeModule === 'enchape' ? (
                                 <EnchapeModule 
@@ -330,7 +308,6 @@ export default function MueblesPage() {
                                     turno="1" 
                                     usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
                                     plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                    onStartTask={setActiveTask}
                                 />
                             ) : activeModule === 'inspeccion' ? (
                                 <InspeccionModule 
@@ -338,7 +315,6 @@ export default function MueblesPage() {
                                     turno="1" 
                                     usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
                                     plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                    onStartTask={setActiveTask}
                                 />
                             ) : activeModule === 'empaque' ? (
                                 <EmpaqueModule 
@@ -346,7 +322,6 @@ export default function MueblesPage() {
                                     turno="1" 
                                     usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
                                     plantaMuebles={profile?.planta_muebles || 'Muebles'}
-                                    onStartTask={setActiveTask}
                                 />
                             ) : activeModule === 'digitado' ? (
                                 <DigitadoModule 
@@ -437,18 +412,6 @@ export default function MueblesPage() {
                     onPlantChanged={async () => {
                         await reloadProfile()
                         setIsPlantaModalOpen(false)
-                    }}
-                />
-            )}
-            {/* Active Task Overlay (Blocks the app) */}
-            {activeTask && (
-                <ActiveTaskOverlay 
-                    tarea={activeTask}
-                    userEmail={user.email || ''}
-                    usuarioNombre={profile?.nombre || user?.email || 'Usuario'}
-                    onFinished={async () => {
-                        setActiveTask(null)
-                        await reloadProfile()
                     }}
                 />
             )}
