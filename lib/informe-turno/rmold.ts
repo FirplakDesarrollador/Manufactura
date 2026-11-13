@@ -12,7 +12,22 @@ export const META_NS = 95; // %
 export const META_PRODUCTIVIDAD = 98; // % (fila META de la tabla de promedios del Excel)
 export const PERSONAS_META_BASE = 7; // la meta por persona del Excel es Meta ÷ 7
 export const MINUTOS_POR_MOLDE = 24;
-export const TIEMPO_OPERACION_MIN = 522; // 552 − 30 min
+export const TIEMPO_OPERACION_MIN = 522; // 552 − 30 min (histórico del Excel)
+// Turnos por defecto del cierre (se pueden cambiar en el formulario):
+//  - Lunes a viernes: 6:00 a 15:12 (552 min) − 20 de 5 min y cierre de turno − 20 alimentación 1 − 28 alimentación 2 = 484 min
+//  - Sábado: 6:00 a 13:20 (440 min) − 20 de 5 min y cierre de turno − 20 alimentación 1 = 400 min
+export const TURNO_RMOLD = { horaInicio: '06:00', horaFin: '15:12', inicioFinTurno: 20, alimentacion1: 20, alimentacion2: 28 };
+export const TURNO_RMOLD_SABADO = { horaInicio: '06:00', horaFin: '13:20', inicioFinTurno: 20, alimentacion1: 20, alimentacion2: 0 };
+export const turnoRmoldPara = (fecha: string) => (new Date(`${fecha}T12:00:00`).getDay() === 6 ? TURNO_RMOLD_SABADO : TURNO_RMOLD);
+export const PERSONAS_PROGRAMADAS_RMOLD = 6;
+export const META_RMOLD_DEFECTO = 24;
+// Minutos entre dos horas HH:MM (si la de fin es menor, cruza la medianoche)
+export function minutosEntre(inicio: string, fin: string): number | null {
+    const a = /^(\d{1,2}):(\d{2})/.exec(inicio || ''), b = /^(\d{1,2}):(\d{2})/.exec(fin || '');
+    if (!a || !b) return null;
+    const m = (+b[1] * 60 + +b[2]) - (+a[1] * 60 + +a[2]);
+    return m < 0 ? m + 1440 : m;
+}
 
 export const FAMILIAS_PARO = ['EXPLOTACIÓN (OPERARIO/PRODUCCIÓN)', 'INDUCIDO (NO DEPENDE DEL EQUIPO)', 'AVERÍA', 'SIN CLASIFICAR'] as const;
 export const NOMBRE_FAMILIA: Record<string, string> = {
@@ -42,6 +57,14 @@ export interface RegistroRmold {
     moldes_rtm: number;
     moldes_brillados: number;
     moldes_desmanchados: number;
+    contramoldes_reparados?: number | null; // C.M. reparados: no suman al total, solo estadística
+    // Tiempo laborado del turno (tiempo_operacion_min = disponible) y ausentismo (personas = presentes)
+    hora_inicio?: string | null;
+    hora_fin?: string | null;
+    min_inicio_fin_turno?: number | null;
+    min_alimentacion_1?: number | null;
+    min_alimentacion_2?: number | null;
+    ausentes?: number | null;
     moldes_esperados: number | null;
     moldes_entregados: number | null;
     nivel_servicio: number | null; // fracción, solo histórico digitado
@@ -117,6 +140,13 @@ const normalizarRegistro = (r: any): RegistroRmold => ({
     moldes_rtm: Number(r.moldes_rtm) || 0,
     moldes_brillados: Number(r.moldes_brillados) || 0,
     moldes_desmanchados: Number(r.moldes_desmanchados) || 0,
+    contramoldes_reparados: aNumero(r.contramoldes_reparados),
+    hora_inicio: r.hora_inicio ? String(r.hora_inicio).slice(0, 5) : null,
+    hora_fin: r.hora_fin ? String(r.hora_fin).slice(0, 5) : null,
+    min_inicio_fin_turno: aNumero(r.min_inicio_fin_turno),
+    min_alimentacion_1: aNumero(r.min_alimentacion_1),
+    min_alimentacion_2: aNumero(r.min_alimentacion_2),
+    ausentes: aNumero(r.ausentes),
     moldes_esperados: aNumero(r.moldes_esperados),
     moldes_entregados: aNumero(r.moldes_entregados),
     nivel_servicio: aNumero(r.nivel_servicio),
@@ -136,7 +166,9 @@ async function leerTodo(sb: SupabaseClient, tabla: string, orden: string) {
     }
 }
 
-const mensajeTablas = (e: any) => (/does not exist|schema cache|42P01|PGRST205/i.test(`${e?.message} ${e?.code}`)
+const mensajeTablas = (e: any) => (/contramoldes|hora_inicio|hora_fin|min_inicio_fin_turno|min_alimentacion|ausentes/i.test(`${e?.message}`)
+    ? 'Faltan columnas nuevas del cierre (contramoldes, tiempo del turno, ausentismo): ejecute rmold_cierre_campos.sql en Supabase.'
+    : /does not exist|schema cache|42P01|PGRST205/i.test(`${e?.message} ${e?.code}`)
     ? 'Faltan las tablas de RMOLD en la base: ejecute informe_turno_rmold.sql en Supabase.'
     : e?.message || 'No se pudieron leer los datos de RMOLD');
 
@@ -163,7 +195,9 @@ export async function cargarRmold(sb: SupabaseClient): Promise<{ registros: Regi
 // Guarda el cierre de un día (uno por fecha: si ya existe se actualiza) y reemplaza sus paros
 export async function guardarCierreRmold(sb: SupabaseClient, registro: RegistroRmold, paros: ParoRmold[], usuario: string) {
     const { id, updated_at, origen, creado_por, ...datos } = registro;
-    const fila = { ...datos, actualizado_por: usuario, updated_at: new Date().toISOString() };
+    const fila: Record<string, any> = { ...datos, actualizado_por: usuario, updated_at: new Date().toISOString() };
+    // Campos nuevos sin dato no se envían (así un cierre sin ellos se guarda aunque la base aún no tenga las columnas)
+    for (const k of ['contramoldes_reparados', 'hora_inicio', 'hora_fin', 'min_inicio_fin_turno', 'min_alimentacion_1', 'min_alimentacion_2', 'ausentes']) if (fila[k] == null) delete fila[k];
     const { error } = id
         ? await sb.from('rmold_registros').update(fila).eq('id', id)
         : await sb.from('rmold_registros').upsert({ ...fila, origen: 'formulario', creado_por: usuario }, { onConflict: 'fecha' });

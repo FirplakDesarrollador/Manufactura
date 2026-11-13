@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS public.rmold_registros (
     moldes_rtm            numeric(8, 2) NOT NULL DEFAULT 0,
     moldes_brillados      numeric(8, 2) NOT NULL DEFAULT 0,  -- cuentan como 1/2 molde
     moldes_desmanchados   numeric(8, 2) NOT NULL DEFAULT 0,  -- cuentan como 1/3 de molde
+    contramoldes_reparados numeric(8, 2),                    -- C.M. reparados: NO suman al total
+    -- hora_inicio, hora_fin, min_inicio_fin_turno, min_alimentacion_1, min_alimentacion_2, ausentes: ver rmold_cierre_campos.sql
     moldes_esperados      numeric(8, 2),
     moldes_entregados     numeric(8, 2),
     nivel_servicio        numeric(6, 4),  -- solo histórico digitado sin esperados/entregados (fracción 0-1)
