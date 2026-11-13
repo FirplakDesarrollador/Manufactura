@@ -58,6 +58,70 @@ function ConSugerencias({ value, onChange, opciones, placeholder, invalido = fal
     );
 }
 
+// Agregar un paro escribiendo: mientras se escribe se despliegan las sugerencias que coinciden; se puede
+// elegir una (clic o flechas + Enter) o seguir escribiendo y agregar el texto propio con Enter o el botón +.
+const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function AgregarParo({ opciones, onAgregar, bloqueado }: { opciones: string[]; onAgregar: (causa: string) => void; bloqueado: boolean }) {
+    const [texto, setTexto] = useState('');
+    const [abierto, setAbierto] = useState(false);
+    const [marcada, setMarcada] = useState(-1);
+    const filtro = sinTildes(texto.trim());
+    const visibles = opciones.filter(o => !filtro || sinTildes(o).includes(filtro));
+    const agregar = (causa: string) => {
+        if (!causa.trim()) return;
+        onAgregar(causa.trim());
+        setTexto('');
+        setAbierto(false);
+        setMarcada(-1);
+    };
+    return (
+        <div className="relative flex-1 min-w-[220px] max-w-xl flex gap-1.5">
+            <div className="relative flex-1">
+                <input
+                    value={texto}
+                    disabled={bloqueado}
+                    onChange={e => { setTexto(e.target.value); setAbierto(true); setMarcada(-1); }}
+                    onFocus={() => setAbierto(true)}
+                    onBlur={() => setTimeout(() => setAbierto(false), 120)}
+                    onKeyDown={e => {
+                        if (e.key === 'ArrowDown') { e.preventDefault(); setAbierto(true); setMarcada(i => Math.min(i + 1, visibles.length - 1)); }
+                        else if (e.key === 'ArrowUp') { e.preventDefault(); setMarcada(i => Math.max(i - 1, -1)); }
+                        else if (e.key === 'Enter') { e.preventDefault(); agregar(abierto && marcada >= 0 && visibles[marcada] ? visibles[marcada] : texto); }
+                        else if (e.key === 'Escape') setAbierto(false);
+                    }}
+                    placeholder={bloqueado ? 'Ya se reflejó todo el tiempo' : 'Escriba el paro o elija una sugerencia…'}
+                    className={`${campo} font-medium pr-7 disabled:opacity-40 disabled:cursor-not-allowed`}
+                />
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                {abierto && !bloqueado && (visibles.length > 0 || texto.trim()) && (
+                    <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-56 overflow-y-auto">
+                        {visibles.map((o, i) => (
+                            <li key={o}>
+                                <button type="button" onMouseDown={e => { e.preventDefault(); agregar(o); }}
+                                    className={`w-full text-left px-2.5 py-1 text-[13px] font-medium text-slate-700 leading-tight ${i === marcada ? 'bg-slate-100' : 'hover:bg-slate-100'}`}>
+                                    {o}
+                                </button>
+                            </li>
+                        ))}
+                        {texto.trim() && !visibles.some(o => sinTildes(o) === filtro) && (
+                            <li>
+                                <button type="button" onMouseDown={e => { e.preventDefault(); agregar(texto); }}
+                                    className="w-full text-left px-2.5 py-1 text-[13px] font-bold text-[#324354] hover:bg-slate-100 leading-tight flex items-center gap-1">
+                                    <Plus className="w-3.5 h-3.5" /> Agregar &quot;{texto.trim()}&quot;
+                                </button>
+                            </li>
+                        )}
+                    </ul>
+                )}
+            </div>
+            <button type="button" disabled={bloqueado || !texto.trim()} onClick={() => agregar(texto)} title="Agregar paro"
+                className="w-9 shrink-0 flex items-center justify-center rounded-lg bg-[#324354] text-white hover:bg-[#26333f] disabled:opacity-40 disabled:cursor-not-allowed">
+                <Plus className="w-4 h-4" />
+            </button>
+        </div>
+    );
+}
+
 function Dato({ t, v }: { t: string; v: React.ReactNode }) {
     return (
         <div className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
@@ -129,7 +193,6 @@ export default function FormularioMs() {
     useEffect(() => {
         setM(existente?.datos?.manual ? { ...manualVacio(), ...existente.datos.manual } : manualVacio());
         setMensaje(null);
-        setCalculado(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fecha, existente?.id]);
 
@@ -140,9 +203,8 @@ export default function FormularioMs() {
     const metaKilos = aNum(mFinal.metaKilos);
     const kilosReales = aNum(m.kilos);
     const minutosKilos = minutosParoKilos(metaKilos, kilosReales);
-    // Al calcular, los minutos por kilos son el tiempo que hay que repartir en los paros reflejados (con 5 min de tolerancia)
-    const [calculado, setCalculado] = useState(false);
-    const tiempoReflejar = calculado ? minutosKilos : null;
+    // Los minutos por kilos se calculan solos: son el tiempo que hay que repartir en los paros reflejados (con 5 min de tolerancia)
+    const tiempoReflejar = minutosKilos;
     const sumaReflejados = m.reflejados.reduce((s, p) => s + (aNum(p.minutos) ?? 0), 0);
     const limiteReflejados = tiempoReflejar == null ? null : tiempoReflejar + TOLERANCIA_REFLEJADOS_MIN;
     const excedido = limiteReflejados != null && sumaReflejados > limiteReflejados;
@@ -154,10 +216,10 @@ export default function FormularioMs() {
     const setAus = (i: number, k: keyof FilaAusentismo, v: string) => setM(p => ({ ...p, ausentismos: p.ausentismos.map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
     const setParo = (lista: ListaParos, i: number, k: keyof FilaParo, v: string) => setM(p => ({ ...p, [lista]: p[lista].map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
     const quitarParo = (lista: ListaParos, i: number) => setM(p => ({ ...p, [lista]: p[lista].filter((_, j) => j !== i) }));
-    const agregarParo = (lista: ListaParos, causa = '') => {
+    const agregarParo = (lista: ListaParos, causa = '', minutosDados = '') => {
         // Ausentismo en reflejados: los minutos se calculan con las personas ausentes (se pueden editar después)
         const ausentes = personasAusentes(m);
-        const minutos = lista === 'reflejados' && causa.startsWith('Ausentismo de') && ausentes > 0 ? String(minutosParoAusentismo(ausentes)) : '';
+        const minutos = minutosDados || (lista === 'reflejados' && causa.startsWith('Ausentismo de') && ausentes > 0 ? String(minutosParoAusentismo(ausentes)) : '');
         setM(p => ({ ...p, [lista]: [...p[lista], { minutos, causa }] }));
         // Con la causa ya puesta solo falta escribir los minutos
         setTimeout(() => {
@@ -178,6 +240,30 @@ export default function FormularioMs() {
         .some(l => m[l].some((p, i) => p.causa.trim() !== '' && usadas(l, i).has(claveParo(p.causa))));
     const avisoRepetidos = () => {
         setMensaje({ ok: false, texto: 'Hay paros repetidos con la misma descripción. Sume los minutos en una sola fila y quite la repetida.' });
+    };
+
+    // Paros reales (pintura y vaciado) que aún no están en reflejados: salen en la lista de sugerencias de reflejados.
+    // Alimentación y alistamiento no se reflejan. Al elegir uno, los minutos se proponen con los del paro real,
+    // sin pasarse del tiempo que falta por reflejar.
+    const noSeReflejan = (c: string) => /^(alimentacion|alistamiento)\b/.test(sinTildes(c.trim()));
+    const sugeridosReales = (() => {
+        const ya = usadas('reflejados');
+        const porCausa = new Map<string, { causa: string; minutos: number }>();
+        for (const p of [...m.parosPintura, ...m.parosVaciado]) {
+            const causa = p.causa.trim();
+            if (!causa || noSeReflejan(causa) || ya.has(claveParo(causa))) continue;
+            const k = claveParo(causa);
+            const previo = porCausa.get(k);
+            porCausa.set(k, { causa: previo?.causa || causa, minutos: (previo?.minutos || 0) + (aNum(p.minutos) ?? 0) });
+        }
+        return [...porCausa.values()];
+    })();
+    const minutosReflejarReal = (causa: string) => {
+        const s = sugeridosReales.find(x => claveParo(x.causa) === claveParo(causa));
+        if (!s) return '';
+        const resta = tiempoReflejar == null ? null : Math.max(0, tiempoReflejar - sumaReflejados);
+        const min = resta != null && resta > 0 ? Math.min(s.minutos || resta, resta) : s.minutos;
+        return min ? String(min) : '';
     };
 
     const avisoExcedido = () => {
@@ -222,19 +308,9 @@ export default function FormularioMs() {
                     <button type="button" onClick={() => quitarParo(lista, i)} className="w-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg" title="Quitar"><Trash2 className="w-4 h-4" /></button>
                 </div>
             ))}
-            {/* Paros más comunes: al elegir uno se agrega la fila con la causa puesta y el cursor en los minutos */}
+            {/* Agregar paro escribiendo: se despliegan las sugerencias o se agrega el texto escrito; luego el cursor va a los minutos */}
             <div className="flex flex-wrap items-center gap-2">
-                <div className="relative flex-1 min-w-[220px] max-w-md">
-                    <select value="" disabled={bloqueado} onChange={e => { if (e.target.value) agregarParo(lista, e.target.value); }}
-                        className={`${campo} font-medium text-slate-600 appearance-none pr-7 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}>
-                        <option value="">{bloqueado ? 'Ya se reflejó todo el tiempo' : 'Agregar paro…'}</option>
-                        {opciones.filter(c => !usadas(lista).has(claveParo(c))).map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-                <button type="button" disabled={bloqueado} onClick={() => agregarParo(lista)} className="px-2 py-0.5 rounded-full border-2 border-dashed border-slate-300 text-[11px] font-bold text-slate-500 hover:border-[#324354] hover:text-[#324354] flex items-center gap-0.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                    <Plus className="w-3 h-3" /> Otro paro
-                </button>
+                <AgregarParo opciones={opciones.filter(c => !usadas(lista).has(claveParo(c)))} onAgregar={c => agregarParo(lista, c, lista === 'reflejados' ? minutosReflejarReal(c) : '')} bloqueado={bloqueado} />
             </div>
         </div>
     );
@@ -443,16 +519,10 @@ export default function FormularioMs() {
                     <h3 className="text-sm font-black text-[#324354] mb-2">5. Paros reflejados</h3>
                     {/* Paro reflejado por kilos: (meta de la semana - kilos entregados al CEDI) / kg por minuto */}
                     <div className="rounded-xl border border-slate-200 bg-[#F6F3EE] p-3 mb-3">
-                        <div className="grid grid-cols-[minmax(0,160px)_1fr] gap-3 items-end">
-                            <div>
-                                <label className={etiqueta}>Meta kilos semana (kg)</label>
-                                <input type="number" inputMode="decimal" min={0} step="any" value={mFinal.metaKilos}
-                                    onChange={e => setM(p => ({ ...p, metaKilos: e.target.value }))} className={campo} />
-                            </div>
-                            <button type="button" onClick={() => setCalculado(true)} disabled={minutosKilos == null}
-                                className="h-[34px] px-3 rounded-lg bg-[#324354] text-white text-xs font-black uppercase tracking-wider hover:bg-[#26333f] disabled:opacity-40 disabled:cursor-not-allowed">
-                                Calcular paro por kilos
-                            </button>
+                        <div className="max-w-[180px]">
+                            <label className={etiqueta}>Meta kilos semana (kg)</label>
+                            <input type="number" inputMode="decimal" min={0} step="any" value={mFinal.metaKilos}
+                                onChange={e => setM(p => ({ ...p, metaKilos: e.target.value }))} className={campo} />
                         </div>
                         <p className="text-[11px] text-slate-600 mt-1.5">
                             {kilosReales == null
@@ -478,7 +548,7 @@ export default function FormularioMs() {
                             )
                         )}
                     </div>
-                    {listaParos('reflejados', 'Reflejados', true, causasReflejadoMs(m, a), sinTiempo)}
+                    {listaParos('reflejados', 'Reflejados', true, [...new Set([...sugeridosReales.map(s => s.causa), ...causasReflejadoMs(m, a)])], sinTiempo)}
                 </div>
 
                 {/* 6. Otros */}

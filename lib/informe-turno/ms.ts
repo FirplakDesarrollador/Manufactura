@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { conTamanoCorregido } from '@/lib/tamanoProducto';
 import { calcularResumen, fetchCatalogoDefectosMs, fetchMsReportes, normalizarPiezas } from '@/lib/calidad/msCalidad';
 import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
 
@@ -134,7 +135,6 @@ export function causasReflejadoMs(m: ManualMs, a: DatosAutoMs | null): string[] 
     const ausentes = personasAusentes(m);
     const top = (a?.topDefectos || []).filter(d => d.cantidad > 0);
     return [
-        'Avería',
         'Lavado de máquina Ultracaster',
         ausentes ? `Ausentismo de ${ausentes} ${ausentes === 1 ? 'persona' : 'personas'}` : 'Ausentismo de personas',
         'Operación en formación',
@@ -184,10 +184,13 @@ async function filasDelDia<T>(client: SupabaseClient, columnaFecha: string, colu
 export async function cargarDatosAutoMs(client: SupabaseClient, fecha: string): Promise<DatosAutoMs> {
     type FilaPintura = { pintura_linea: string | null; producto_color: string | null; estado: string | null };
     type FilaVaciado = { producto_tamano: string | null; producto_descripcion: string | null };
-    const [pintadas, vaciadas] = await Promise.all([
+    const [pintadas, vaciadasSap] = await Promise.all([
         filasDelDia<FilaPintura>(client, 'pintura_fecha', 'id, pintura_linea, producto_color, estado', fecha),
         filasDelDia<FilaVaciado>(client, 'vaciado_fecha', 'id, producto_tamano, producto_descripcion', fecha)
     ]);
+
+    // Tamaño corregido para productos que SAP envía como 'No aplica' (lib/tamanoProducto)
+    const vaciadas = vaciadasSap.map(conTamanoCorregido);
 
     const coloresMap = new Map<string, number>();
     pintadas.forEach(r => {

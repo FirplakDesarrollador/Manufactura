@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
 import Header from '@/components/opt-sistemica/Header';
 import { useRouter } from 'next/navigation';
+import { Cobertura, cargarCobertura, coberturaDe } from '@/lib/mantenimiento/coberturaPuestas';
 
 interface PuestaCompleta {
   id: string | number;
@@ -22,6 +23,9 @@ export default function PuestasAPuntoPage() {
   const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  // Puestas a punto y HDT vigentes por planta (conteo en cada tarjeta)
+  const [cobertura, setCobertura] = useState<Record<string, Cobertura> | null>(null);
+  useEffect(() => { cargarCobertura().then(setCobertura).catch(() => setCobertura({})); }, []);
 
   useEffect(() => {
     const initPage = async () => {
@@ -188,11 +192,42 @@ export default function PuestasAPuntoPage() {
                   style={{ animationDelay: `${index * 0.1}s`, padding: '2rem 1.5rem', gap: '1rem', textDecoration: 'none' }}
                 >
                   <div className="icon-container" style={{ width: '60px', height: '60px', borderRadius: '14px' }}>
+                     {/^m[aá]rmol/i.test(planta) ? (
+                       // Mármol sintético: lavamanos
+                       <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                         <path d="M12 3v3M9.5 4h5M12 6v2.5" />
+                         <path d="M3 10h18v1a7 7 0 0 1-7 7h-4a7 7 0 0 1-7-7v-1Z" />
+                         <path d="M10 18v3h4v-3" />
+                       </svg>
+                     ) : /^fibra/i.test(planta) ? (
+                       // Fibra de vidrio: bañera
+                       <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                         <path d="M5 12V5a2 2 0 0 1 3.5-1.3L9 4.5" />
+                         <path d="M7.5 6.5 10 4" />
+                         <path d="M2 12h20v1.5a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 13.5V12Z" />
+                         <path d="M6 19l-1 2M18 19l1 2" />
+                       </svg>
+                     ) : (
                      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 256 256">
                        <path d="M226.71,137.45h0l-31.54,9.66a72,72,0,0,1,0,17.78l31.54,9.66a8,8,0,0,1,5.32,9.86l-13.66,42a8,8,0,0,1-9.42,5.55l-32.55-6A72.16,72.16,0,0,1,161,236.44l-6,32.55a8,8,0,0,1-5.55,6.42l-42-13.66a8,8,0,0,1-5-9.86v0l9.66-31.54a72,72,0,0,1-17.78,0L84.69,251.89a8,8,0,0,1-9.86,5.32l-42-13.66A8,8,0,0,1,27.3,234.13l6-32.55A72.16,72.16,0,0,1,18,186.1l-32.55,6a8,8,0,0,1-6.42-5.55l-13.66-42a8,8,0,0,1,5-9.86v0l31.54-9.66a72,72,0,0,1,0-17.78l-31.54-9.66a8,8,0,0,1-5.32-9.86l13.66-42A8,8,0,0,1-6.72,40L25.83,46a72.16,72.16,0,0,1,15.42-15.42l-6-32.55A8,8,0,0,1,40.8-8.38l42,13.66a8,8,0,0,1,5,9.86v0l-9.66,31.54a72,72,0,0,1,17.78,0l9.66-31.54a8,8,0,0,1,9.86-5.32l42,13.66a8,8,0,0,1,6.42,9.42l-6,32.55A72.16,72.16,0,0,1,173.28,81.3l32.55-6a8,8,0,0,1,6.42,5.55l13.66,42A8,8,0,0,1,226.71,137.45ZM128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152Z"></path>
                      </svg>
+                     )}
                   </div>
                   <h3 className="card-title-centered" style={{ fontSize: '1.2rem', marginBottom: 0 }}>{planta}</h3>
+                  {cobertura && (() => {
+                    const c = coberturaDe(cobertura, planta);
+                    const faltan = c.procesos.reduce((s, p) => s + Math.max(0, p.hdts - p.puestas), 0);
+                    const pct = c.hdts ? Math.min(100, Math.round(((c.hdts - faltan) / c.hdts) * 100)) : 0;
+                    return (
+                      <div style={{ width: '100%', maxWidth: '240px', fontSize: '0.8rem', color: '#475569', textAlign: 'center' }}>
+                        <div><b style={{ color: '#324354' }}>{c.puestas}</b> puesta(s) a punto · <b style={{ color: '#324354' }}>{c.hdts}</b> HDT vigentes</div>
+                        <div style={{ height: '6px', borderRadius: '99px', background: '#F6F3EE', overflow: 'hidden', margin: '6px 0 4px' }}>
+                          <div style={{ height: '100%', width: pct + '%', borderRadius: '99px', background: faltan ? '#324354' : '#59a96a' }} />
+                        </div>
+                        <div style={{ fontWeight: 700, color: faltan ? '#d14747' : '#59a96a' }}>{c.hdts ? (faltan ? 'Faltan ' + faltan + ' según las HDT' : 'Completo según las HDT') : 'Sin HDT vigentes'}</div>
+                      </div>
+                    );
+                  })()}
                 </Link>
               ))
             )}
