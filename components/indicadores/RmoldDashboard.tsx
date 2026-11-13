@@ -46,13 +46,14 @@ interface Dia {
     fecha: string; ms: number; fv: number; rtm: number; brill: number; desm: number; total: number; meta: number; personas: number;
     productividad: number | null; pzsPersona: number | null; metaPzsPersona: number; productividadPersona: number | null;
     ns: number | null; esperados: number | null; entregados: number | null; reflejados: number;
+    cm: number | null; // contramoldes reparados (no suman al total)
 }
 // Columna de un periodo: promedios por día (como la tabla de promedios del Excel) y minutos de paro sumados
 interface Columna {
     key: string; label: string; dias: number;
     ms: number; fv: number; rtm: number; brill: number; desm: number; total: number; meta: number; personas: number;
     productividad: number | null; pzsPersona: number | null; metaPzsPersona: number | null; productividadPersona: number | null;
-    ns: number | null; esperados: number | null; entregados: number | null;
+    ns: number | null; esperados: number | null; entregados: number | null; cm: number | null;
     reflejados: number; parosTotal: number; [familia: string]: any;
 }
 
@@ -109,6 +110,7 @@ const TooltipRmold = ({ active, payload, gran, vista }: any) => {
                 <Fila texto={`Total${prom}`} valor={dec(c.total)} />
                 <Fila texto="Meta" valor={dec(c.meta)} />
                 <Fila texto="Productividad" valor={pct(c.productividad)} />
+                {c.cm != null && <Fila texto={`Contramoldes${prom} · no suman`} valor={dec(c.cm)} />}
             </>}
             {vista === 'persona' && <>
                 <Fila texto={`Piezas/persona${prom}`} valor={dec(c.pzsPersona)} />
@@ -168,7 +170,8 @@ export default function RmoldDashboard() {
             fecha: r.fecha, ms: r.moldes_ms, fv: r.moldes_fv, rtm: r.moldes_rtm, brill: r.moldes_brillados / 2, desm: r.moldes_desmanchados / 3,
             total: k.total, meta: r.meta, personas: r.personas, productividad: k.productividad, pzsPersona: k.pzsPersona,
             metaPzsPersona: k.metaPzsPersona, productividadPersona: k.productividadPersona, ns: k.ns,
-            esperados: r.moldes_esperados, entregados: r.moldes_entregados, reflejados: k.parosReflejados
+            esperados: r.moldes_esperados, entregados: r.moldes_entregados, reflejados: k.parosReflejados,
+            cm: r.contramoldes_reparados ?? null
         };
     }), [registros]);
 
@@ -214,7 +217,7 @@ export default function RmoldDashboard() {
                 ms: prom(x => x.ms) || 0, fv: prom(x => x.fv) || 0, rtm: prom(x => x.rtm) || 0, brill: prom(x => x.brill) || 0, desm: prom(x => x.desm) || 0,
                 total: prom(x => x.total) || 0, meta: prom(x => x.meta) || 0, personas: prom(x => x.personas) || 0,
                 productividad: prom(x => x.productividad), pzsPersona: prom(x => x.pzsPersona), metaPzsPersona: prom(x => x.metaPzsPersona),
-                productividadPersona: prom(x => x.productividadPersona), ns: prom(x => x.ns), esperados: prom(x => x.esperados), entregados: prom(x => x.entregados),
+                productividadPersona: prom(x => x.productividadPersona), ns: prom(x => x.ns), esperados: prom(x => x.esperados), entregados: prom(x => x.entregados), cm: prom(x => x.cm),
                 reflejados: d.reduce((a, x) => a + x.reflejados, 0),
                 parosTotal: p.reduce((a, x) => a + x.minutos, 0)
             };
@@ -346,6 +349,7 @@ export default function RmoldDashboard() {
     const kNs = promK(d => d.ns);
     const cargandoInicial = loading && !registros.length;
     const tarjeta = (titulo: string, valor: string, detalle?: string, color?: string, ayuda?: string) => ({ titulo, valor, detalle, color, ayuda });
+    const diasCm = diasKpi.filter(d => d.cm != null);
     const kpis = [
         tarjeta('Moldes reparados', dec(promK(d => d.total)), `prom./día · ${diasKpi.length} días`, undefined, 'Promedio diario de moldes reparados equivalentes (MS + FV + RTM + brillados ÷ 2 + desmanchados ÷ 3)'),
         tarjeta('Productividad', pct(kProd), `meta ${META_PRODUCTIVIDAD} %`, colorSemaforo(kProd, META_PRODUCTIVIDAD), 'Promedio de (moldes reparados ÷ meta) de cada día'),
@@ -353,6 +357,7 @@ export default function RmoldDashboard() {
         tarjeta('Product. / persona', pct(kPersona), 'meta 100 %', colorSemaforo(kPersona, 100)),
         tarjeta('Nivel de servicio', pct(kNs), `meta ${META_NS} %`, colorSemaforo(kNs, META_NS), 'Moldes entregados ÷ moldes esperados (promedio de los días)'),
         tarjeta('Personas', dec(promK(d => d.personas)), 'prom./día'),
+        tarjeta('Contramoldes', diasCm.length ? dec(diasCm.reduce((a, d) => a + (d.cm || 0), 0), 0) : '—', diasCm.length ? `prom. ${dec(promK(d => d.cm))}/día` : 'sin registro', undefined, 'Contramoldes reparados (C.M.) en el periodo. No suman al total de moldes reparados; promedio de los días con registro'),
         tarjeta('Paros registrados', `${dec(parosKpi.reduce((a, p) => a + p.minutos, 0), 0)} min`, `${parosKpi.length} paros`),
         tarjeta('Causa principal', pareto[0]?.name?.toLowerCase() || '—', pareto[0] ? `${pareto[0].pct} %` : undefined)
     ];
@@ -413,7 +418,7 @@ export default function RmoldDashboard() {
                 )}
 
                 {/* Tarjetas KPI */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
                     {kpis.map(k => (
                         <div key={k.titulo} className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white shadow-2xs flex flex-col justify-between min-w-0" title={k.ayuda}>
                             <span className="text-[8px] font-bold uppercase truncate text-slate-500">{k.titulo}</span>
