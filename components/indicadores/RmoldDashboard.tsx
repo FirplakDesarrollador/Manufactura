@@ -21,6 +21,7 @@ const COLOR_LINEA = '#324354';
 const COLOR_REFLEJADOS = '#7c3aed';
 const COLOR_ESPERADOS = '#cbd5e1';
 const COLOR_ENTREGADOS = '#0284c7';
+const COLOR_TOTAL = '#0284c7'; // columna de moldes reparados (total)
 // Tipos de molde reparado (equivalentes: brillado = ½, desmanchado = ⅓)
 const TIPOS = [
     { k: 'ms', nombre: 'MS', color: '#0284c7' },
@@ -327,10 +328,13 @@ export default function RmoldDashboard() {
         if (v == null) return <g key={p.index} />;
         return <circle key={p.index} cx={p.cx} cy={p.cy} r={3.5} fill={colorSemaforo(v, meta)} stroke="#fff" strokeWidth={1.5} opacity={tenue(p.payload.key) ? 0.35 : 1} />;
     };
-    // Total dentro de la parte alta de la pila (línea invisible que solo lleva la etiqueta)
-    const etiquetaDentro = (cols: Columna[], fmt: (v: number) => string) => (p: any) => {
-        if (!p.value || (cols.length > 16 && p.index % 2 === 1)) return null;
-        return <text x={p.x} y={p.y + 11} textAnchor="middle" fontSize={8.5} fontWeight={800} fill="#fff">{fmt(Number(p.value))}</text>;
+    // Total centrado (vertical y horizontal) dentro de la columna: la línea invisible lleva la mitad del valor
+    const etiquetaDentro = (cols: Columna[], valor: (c: Columna) => number | null | undefined, fmt: (v: number) => string) => (p: any) => {
+        const v = cols[p.index] ? valor(cols[p.index]) : null;
+        if (!v || p.y == null || (cols.length > 16 && p.index % 2 === 1)) return null;
+        const chico = cols.length > 12;
+        return <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fontSize={chico ? 10 : 13} fontWeight={800} fill="#fff"
+            stroke="rgba(0,0,0,0.25)" strokeWidth={chico ? 2 : 2.5} paintOrder="stroke" pointerEvents="none">{fmt(Number(v))}</text>;
     };
 
     // Tarjetas: días y paros filtrados (y el periodo elegido)
@@ -365,9 +369,9 @@ export default function RmoldDashboard() {
 
     const vacio = (texto: string) => <div className="h-full flex items-center justify-center text-sm font-bold text-slate-500 text-center px-4">{texto}</div>;
     const cargador = <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
-    const leyenda = (items: { color: string; texto: string; linea?: boolean }[]) => (
+    const leyenda = (items: { color: string; texto: string; linea?: boolean; punteada?: boolean }[]) => (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-bold text-slate-500">
-            {items.map(i => <span key={i.texto} className="flex items-center gap-1"><span className={i.linea ? 'w-3 h-0.5' : 'w-2 h-2 rounded-sm'} style={{ backgroundColor: i.color }} />{i.texto}</span>)}
+            {items.map(i => <span key={i.texto} className="flex items-center gap-1"><span className={i.punteada ? 'w-3.5 border-t-2 border-dashed' : i.linea ? 'w-3 h-0.5' : 'w-2 h-2 rounded-sm'} style={i.punteada ? { borderColor: i.color } : { backgroundColor: i.color }} />{i.texto}</span>)}
         </div>
     );
     const sinRegistros = !cargandoInicial && !registros.length;
@@ -430,8 +434,8 @@ export default function RmoldDashboard() {
                             <h3 className="min-w-0 truncate text-xs sm:text-sm font-black text-slate-800 first-letter:uppercase">{titulo(medida === 'pzs' ? 'Productividad moldes reparados' : 'Piezas por persona')}</h3>
                             <div className="shrink-0 flex items-center gap-2">
                                 {leyenda(medida === 'pzs'
-                                    ? [...TIPOS.map(t => ({ color: t.color, texto: t.nombre.split(' ')[0] })), { color: COLOR_LINEA, texto: '% cumpl.', linea: true }]
-                                    : [{ color: '#7B8E90', texto: 'Pzs/persona' }, { color: COLOR_LINEA, texto: '% cumpl.', linea: true }])}
+                                    ? [{ color: COLOR_TOTAL, texto: 'Moldes reparados' }, { color: COLOR_LINEA, texto: '% cumpl.', linea: true }, { color: COLOR_META, texto: `Meta ${META_PRODUCTIVIDAD}%`, punteada: true }]
+                                    : [{ color: '#7B8E90', texto: 'Pzs/persona' }, { color: COLOR_LINEA, texto: '% cumpl.', linea: true }, { color: COLOR_META, texto: 'Meta 100%', punteada: true }])}
                                 <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]" onClick={e => e.stopPropagation()}>
                                     {([['pzs', 'Piezas'], ['persona', 'Pzs/persona']] as const).map(([m, t]) => (
                                         <button key={m} onClick={() => setMedida(m)} className={`px-1.5 py-0.5 rounded-md font-bold transition-all ${medida === m ? 'bg-[#324354] text-white shadow-xs' : 'text-slate-600 hover:text-black'}`}>{t}</button>
@@ -448,21 +452,22 @@ export default function RmoldDashboard() {
                                         <YAxis yAxisId="izq" tick={{ fontSize: 9 }} width={30} />
                                         <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fill: COLOR_LINEA }} width={36} domain={[0, (max: number) => Math.max(140, Math.ceil(max / 20) * 20 + 20)]} tickFormatter={v => `${v}%`} />
                                         <Tooltip content={<TooltipRmold gran={gran} vista={medida} />} cursor={{ fill: '#f1f5f9' }} />
-                                        <ReferenceLine yAxisId="pct" y={medida === 'pzs' ? META_PRODUCTIVIDAD : 100} stroke={COLOR_META} strokeDasharray="4 4" strokeWidth={1.5}
-                                            label={{ value: `Meta ${medida === 'pzs' ? META_PRODUCTIVIDAD : 100}%`, position: 'insideTopRight', fill: COLOR_META, fontSize: 9, fontWeight: 800 }} />
+                                        <ReferenceLine yAxisId="pct" y={medida === 'pzs' ? META_PRODUCTIVIDAD : 100} stroke={COLOR_META} strokeDasharray="4 4" strokeWidth={1.5} />
                                         {medida === 'pzs'
-                                            ? TIPOS.map((t, i) => (
-                                                <Bar key={t.k} yAxisId="izq" dataKey={t.k} stackId="m" name={t.nombre} fill={t.color} radius={i === TIPOS.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={clicBarra(colsProd, clicProd)}>
+                                            ? (
+                                                // Solo el total: el detalle por tipo (MS, FV, RTM, brillados, desmanchados) va en el tooltip
+                                                <Bar yAxisId="izq" dataKey="total" name="Moldes reparados" fill={COLOR_TOTAL} radius={[4, 4, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={clicBarra(colsProd, clicProd)}>
                                                     {colsProd.map(c => <Cell key={c.key} fillOpacity={tenue(c.key) ? 0.3 : 1} />)}
                                                 </Bar>
-                                            ))
+                                            )
                                             : (
                                                 <Bar yAxisId="izq" dataKey="pzsPersona" name="Piezas/persona" fill="#7B8E90" radius={[4, 4, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={clicBarra(colsProd, clicProd)}>
                                                     {colsProd.map(c => <Cell key={c.key} fillOpacity={tenue(c.key) ? 0.3 : 1} />)}
                                                 </Bar>
                                             )}
-                                        <Line yAxisId="izq" dataKey={medida === 'pzs' ? 'total' : 'pzsPersona'} stroke="none" dot={false} activeDot={false} isAnimationActive={false} legendType="none">
-                                            <LabelList content={etiquetaDentro(colsProd, v => dec(v, medida === 'pzs' ? 0 : 1))} />
+                                        {/* Línea invisible a la mitad del valor: su punto cae en el centro de la columna y ahí va el total */}
+                                        <Line yAxisId="izq" dataKey={(c: Columna) => { const v = medida === 'pzs' ? c.total : c.pzsPersona; return v ? v / 2 : null; }} stroke="none" dot={false} activeDot={false} isAnimationActive={false} legendType="none" tooltipType="none">
+                                            <LabelList content={etiquetaDentro(colsProd, c => (medida === 'pzs' ? c.total : c.pzsPersona), v => dec(v, medida === 'pzs' ? 0 : 1))} />
                                         </Line>
                                         <Line yAxisId="pct" type="monotone" dataKey={medida === 'pzs' ? 'productividad' : 'productividadPersona'} stroke={COLOR_LINEA} strokeWidth={1.5} isAnimationActive={false} connectNulls
                                             dot={puntoSemaforo(medida === 'pzs' ? 'productividad' : 'productividadPersona', medida === 'pzs' ? META_PRODUCTIVIDAD : 100)}>
@@ -477,7 +482,7 @@ export default function RmoldDashboard() {
                     <div className="lg:col-span-5 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200" onClick={quitarAlClicFuera(clicNs)}>
                         <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 mb-1.5">
                             <h3 className="min-w-0 truncate text-xs sm:text-sm font-black text-slate-800 first-letter:uppercase">{titulo('Nivel de servicio')}</h3>
-                            <div className="shrink-0">{leyenda([{ color: COLOR_ESPERADOS, texto: 'Esperados' }, { color: COLOR_ENTREGADOS, texto: 'Entregados' }, { color: COLOR_LINEA, texto: 'NS', linea: true }])}</div>
+                            <div className="shrink-0">{leyenda([{ color: COLOR_ESPERADOS, texto: 'Esperados' }, { color: COLOR_ENTREGADOS, texto: 'Entregados' }, { color: COLOR_LINEA, texto: 'NS', linea: true }, { color: COLOR_META, texto: `Meta ${META_NS}%`, punteada: true }])}</div>
                         </div>
                         <div className="h-[var(--rm-h2)] w-full">
                             {cargandoInicial ? cargador : !colsNs.length ? vacio(sinRegistros ? 'Sin datos.' : 'Sin nivel de servicio para los filtros elegidos.') : (
@@ -488,8 +493,7 @@ export default function RmoldDashboard() {
                                         <YAxis yAxisId="izq" tick={{ fontSize: 9 }} width={26} />
                                         <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 9, fill: COLOR_LINEA }} width={36} domain={[(min: number) => Math.max(0, Math.floor(Math.min(min, META_NS) / 10) * 10 - 10), 100]} allowDataOverflow tickFormatter={v => `${v}%`} />
                                         <Tooltip content={<TooltipRmold gran={gran} vista="ns" />} cursor={{ fill: '#f1f5f9' }} />
-                                        <ReferenceLine yAxisId="pct" y={META_NS} stroke={COLOR_META} strokeDasharray="4 4" strokeWidth={1.5}
-                                            label={{ value: `Meta ${META_NS}%`, position: 'insideBottomRight', fill: COLOR_META, fontSize: 9, fontWeight: 800 }} />
+                                        <ReferenceLine yAxisId="pct" y={META_NS} stroke={COLOR_META} strokeDasharray="4 4" strokeWidth={1.5} />
                                         {(['esperados', 'entregados'] as const).map(k => (
                                             <Bar key={k} yAxisId="izq" dataKey={k} fill={k === 'esperados' ? COLOR_ESPERADOS : COLOR_ENTREGADOS} radius={[3, 3, 0, 0]} isAnimationActive={false} cursor="pointer" onClick={clicBarra(colsNs, clicNs)}>
                                                 {colsNs.map(c => <Cell key={c.key} fillOpacity={tenue(c.key) ? 0.3 : 1} />)}

@@ -4,7 +4,7 @@
 //  - Productividad = Total ÷ Meta (capacidad)
 //  - Piezas por persona = Total ÷ Personas; meta por persona = Meta ÷ 7; productividad por persona = real ÷ meta
 //  - Nivel de servicio = Entregados ÷ Esperados (histórico de mayo a octubre 2026: valor digitado)
-//  - Paros reflejados (min) = (Meta − Total) × 24
+//  - Paros reflejados (min) = (Meta − Total) × 24, nunca negativos (sobre la meta = 0)
 // Tablas: rmold_registros, rmold_paros y rmold_meta_personas (informe_turno_rmold.sql).
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -76,7 +76,7 @@ export interface CalculoDia {
     metaPzsPersona: number;
     productividadPersona: number | null; // %
     ns: number | null; // %
-    parosReflejados: number; // min (negativo = produjo por encima de la meta)
+    parosReflejados: number; // min; 0 si produjo la meta o más (no hay paros negativos)
 }
 
 export function calcularDia(r: Pick<RegistroRmold, 'moldes_ms' | 'moldes_fv' | 'moldes_rtm' | 'moldes_brillados' | 'moldes_desmanchados' | 'moldes_esperados' | 'moldes_entregados' | 'nivel_servicio' | 'personas' | 'meta'>): CalculoDia {
@@ -94,7 +94,8 @@ export function calcularDia(r: Pick<RegistroRmold, 'moldes_ms' | 'moldes_fv' | '
         metaPzsPersona,
         productividadPersona: pzsPersona != null && metaPzsPersona > 0 ? (pzsPersona / metaPzsPersona) * 100 : null,
         ns,
-        parosReflejados: (meta - total) * MINUTOS_POR_MOLDE
+        // Sobre la meta no hay paro: el Excel daba negativos, que restaban minutos a los otros días
+        parosReflejados: Math.max(0, (meta - total) * MINUTOS_POR_MOLDE)
     };
 }
 
