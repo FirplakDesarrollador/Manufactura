@@ -3,8 +3,10 @@ export const EXPLICIT_NAME_MAP: Record<string, string> = {
   'alejandro vegas': 'Pedro Alejandro Vegas Sanchez',
   'andres saldarriaga': 'Hector Andrés Saldarriaga Palacio',
   'andrés saldarriaga': 'Hector Andrés Saldarriaga Palacio',
-  'carolina escobar': 'Carolina Escobar Madrid',
-  'carolina escobar m.': 'Carolina Escobar Madrid',
+  // "Carolina Escobar" es Estiven Londoño (cambio de puesto sin cambio de correo)
+  'carolina escobar': 'Ederson Estiven Londoño Alvarez',
+  'carolina escobar m.': 'Ederson Estiven Londoño Alvarez',
+  'carolina escobar madrid': 'Ederson Estiven Londoño Alvarez',
   'dimer vergara': 'Dimer Gonzalo Vergara Delgado',
   'edison hernandez': 'Edisson Arley Hernández',
   'edisson hernandez': 'Edisson Arley Hernández',
@@ -52,7 +54,6 @@ export function resolveNombreCompleto(name: string | undefined | null, empleados
 
 export const RESPONSABLES_LIST = [
   'Brillitt Solanlli Baquero Diaz',
-  'Carolina Escobar Madrid',
   'Dimer Gonzalo Vergara Delgado',
   'Ederson Estiven Londoño Alvarez',
   'Edisson Arley Hernández',
