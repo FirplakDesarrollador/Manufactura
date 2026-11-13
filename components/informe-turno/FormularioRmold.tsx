@@ -191,14 +191,15 @@ export default function FormularioRmold() {
                 {/* 1. Moldes reparados */}
                 <div>
                     <h3 className="text-sm font-black text-[#324354] mb-2">1. Moldes reparados</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {/* Ya no hay moldes RTM: la casilla solo aparece al abrir un día viejo que tenga RTM */}
+                    <div className={`grid grid-cols-2 ${valor(c.rtm) > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-2.5`}>
                         {numero('ms', 'Mármol (MS)')}
                         {numero('fv', 'Fibra (FV)')}
-                        {numero('rtm', 'RTM')}
+                        {valor(c.rtm) > 0 && numero('rtm', 'RTM')}
                         {numero('brillados', 'Brillados', 'Cada molde brillado cuenta como ½ molde reparado')}
                         {numero('desmanchados', 'Desmanchados', 'Cada molde desmanchado cuenta como ⅓ de molde reparado')}
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">Total = MS + FV + RTM + Brillados ÷ 2 + Desmanchados ÷ 3</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Total = MS + FV + Brillados ÷ 2 + Desmanchados ÷ 3{valor(c.rtm) > 0 ? ' + RTM' : ''}</p>
                 </div>
 
                 {/* 2. Nivel de servicio */}
