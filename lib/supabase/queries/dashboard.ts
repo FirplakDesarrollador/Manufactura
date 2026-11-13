@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { conTamanoCorregido } from '@/lib/tamanoProducto'
 
 export interface TrazabilidadDia {
     proceso: string
@@ -171,7 +172,8 @@ export async function getMetricasDiaActual(): Promise<MetricasDia | null> {
         .or(`pintura_fecha.gte.${todayStr},vaciado_fecha.gte.${todayStr},cedi_fecha.gte.${todayStr},digitado_fecha.gte.${todayStr}`)
         .limit(4000)
 
-    const todayR = rData || []
+    // Tamaño corregido para productos que SAP envía como 'No aplica' (lib/tamanoProducto)
+    const todayR = (rData || []).map(conTamanoCorregido)
     const isTodayStr = (d: string | null) => d && d.startsWith(todayStr)
 
     // Stage filters
