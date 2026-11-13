@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, Molde } from '@/types/pintura'
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
@@ -41,7 +41,8 @@ type Proceso = {
 }
 
 // Plano de referencia (imagen "LAYOUT FV"): todo se ubica en % de este rectángulo
-const X0 = 0, Y0 = 70, ANCHO = 1650, ALTO = 650
+// ANCHO 1700: franja de la derecha para que Programado tenga 2 recuadros del tamaño de una mesa por fila
+const X0 = 0, Y0 = 70, ANCHO = 1700, ALTO = 650
 const pos = ([x1, y1, x2, y2]: Caja): React.CSSProperties => ({
     left: `${((x1 - X0) / ANCHO) * 100}%`,
     top: `${((y1 - Y0) / ALTO) * 100}%`,
@@ -60,7 +61,7 @@ const PROCESOS: Proceso[] = [
     // Debajo de Zona Curado: Desmolde (8 casillas) e Instalación Herrajes (5), tiempos de espera de las piezas vaciadas
     { id: 'desmoldez', label: 'Desmolde', tituloIzq: true, sinContador: true, tipo: 'espera', etapas: [], caja: [1072, 170, 1470, 308] },
     { id: 'herrajesz', label: 'Instalación\nHerrajes', tituloIzq: true, tipo: 'notificacion', etapas: ['herrajes'], crear: 'herrajes', caja: [974, 322, 1470, 394] },
-    { id: 'pintura', label: 'Pintura', tipo: 'notificacion', etapas: ['pintura'], crear: 'pintura', caja: [1484, 92, 1644, 164] },
+    { id: 'pintura', label: 'Pintura', tipo: 'notificacion', etapas: ['pintura'], crear: 'pintura', caja: [1484, 92, 1694, 164] },
     { id: 'huacales', label: 'Huacales', tipo: 'notificacion', etapas: ['empaque'], destino: 'huacales', caja: [6, 470, 208, 608] },
     { id: 'acabado2', label: 'Acabado 2', sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [216, 470, 418, 608] },
     { id: 'ensayo', label: 'Ensayo', tipo: 'notificacion', etapas: ['acabado'], destino: 'ensayo', caja: [426, 470, 530, 608] },
@@ -70,7 +71,7 @@ const PROCESOS: Proceso[] = [
     { id: 'reparacion', label: 'Reparación', tipo: 'notificacion', etapas: ['reparacion', 'reparacion_larga'], destino: 'reparacion', caja: [216, 644, 516, 716] },
     { id: 'soldadura', label: 'Soldadura', aislado: true, sinContador: true, tipo: 'sin-notificacion', etapas: [], caja: [1256, 644, 1362, 716] },
     // Pasos virtuales (no son procesos físicos): Programado → Pintura … Huacales → Digitado → Tránsito → CEDI
-    { id: 'programado', label: 'Programado', sub: 'Pendiente por pintar', tipo: 'virtual', etapas: ['programado'], caja: [1484, 212, 1644, 716] },
+    { id: 'programado', label: 'Programado', sub: 'Pendiente por pintar', tipo: 'virtual', etapas: ['programado'], caja: [1484, 212, 1694, 716] },
     { id: 'digitado', label: 'Digitado', tipo: 'virtual', etapas: ['digitado'], destino: 'digitado', caja: [6, 346, 600, 418] },
     { id: 'transito', label: 'Tránsito', tipo: 'virtual', etapas: ['transito'], destino: 'transito', caja: [6, 252, 600, 324] },
     { id: 'cedi', label: 'CEDI', tipo: 'virtual', etapas: ['cedi'], destino: 'cedi', caja: [6, 92, 600, 230] }
@@ -83,7 +84,7 @@ const DOS_RENGLONES = new Set(['huacales', 'acabado2', 'ensayo', 'pulido'])
 const FLECHAS: { x: number; y: number; dir: 'izq' | 'der' | 'arriba' | 'abajo' }[] = [
     { x: 1066, y: 128, dir: 'izq' },                                       // Zona Curado → Vaciado
     { x: 1477, y: 128, dir: 'izq' },                                       // Pintura → Zona Curado
-    { x: 1630, y: 170, dir: 'arriba' },                                    // Programado → Pintura
+    { x: 1680, y: 170, dir: 'arriba' },                                    // Programado → Pintura
     { x: 1066, y: 239, dir: 'der' },                                      // Vaciado → Desmolde (flecha en L)
     { x: 1271, y: 315, dir: 'abajo' },                                     // Desmolde → Instalación Herrajes
     { x: 1357, y: 424, dir: 'abajo' },                                     // Instalación Herrajes → Desmolde · Herrajes · Nivelación
@@ -113,7 +114,7 @@ const MESA_ANCHO = 92, MESA_ALTO = 60, GAP = 6
 type Zona = { id: string; proceso: string; label: string; n: number; cols: number; x: number; y: number; auto?: boolean; fueraDeCupo?: boolean; destino?: DestinoMovimientoFv; crear?: DestinoMovimientoFv; regreso?: DestinoMovimientoFv }
 const ZONAS: Zona[] = [
     // La mesa de Pintura recibe piezas pintadas pero no cuenta en el cupo de Vaciado (6 mesas)
-    { id: 'pintura', proceso: 'pintura', label: 'Pintura', n: 1, cols: 1, x: 1518, y: 98, fueraDeCupo: true, crear: 'pintura', regreso: 'pintura' },
+    { id: 'pintura', proceso: 'pintura', label: 'Pintura', n: 1, cols: 1, x: 1543, y: 98, fueraDeCupo: true, crear: 'pintura', regreso: 'pintura' },
     { id: 'curadop', proceso: 'curado', label: 'Zona Curado · pintadas, van para Vaciado', n: 4, cols: 4, x: 1078, y: 98, auto: true, crear: 'pintura', regreso: 'pintura' },
     { id: 'curadov', proceso: 'desmoldez', label: 'Desmolde · vaciadas, esperan desmolde', n: 8, cols: 4, x: 1078, y: 176, auto: true, crear: 'vaciado', regreso: 'vaciado' },
     { id: 'instherrajes', proceso: 'herrajesz', label: 'Instalación Herrajes', n: 5, cols: 5, x: 980, y: 328, auto: true, crear: 'vaciado', regreso: 'vaciado' },
@@ -224,6 +225,20 @@ export default function MapaProcesosFibraModule() {
     const [piezasMapa, setPiezasMapa] = useState<PiezaMapaFv[]>([])
     const [errorMesas, setErrorMesas] = useState<string | null>(null)
     const [listaAbierta, setListaAbierta] = useState<string | null>(null)
+    // Tamaño real del plano en pantalla: el plano se estira distinto a lo ancho y a lo alto, así que las OF de
+    // Programado toman el tamaño en px de una mesa (mismo recuadro que en los demás procesos)
+    const [plano, setPlano] = useState<{ w: number; h: number } | null>(null)
+    const observador = useRef<ResizeObserver | null>(null)
+    // ref de callback: el plano aparece después de cargar las órdenes
+    const planoRef = useCallback((el: HTMLDivElement | null) => {
+        observador.current?.disconnect()
+        observador.current = null
+        if (!el) return
+        const medir = () => setPlano(prev => (prev && prev.w === el.clientWidth && prev.h === el.clientHeight) ? prev : { w: el.clientWidth, h: el.clientHeight })
+        medir()
+        observador.current = new ResizeObserver(medir)
+        observador.current.observe(el)
+    }, [])
     // OF de Programado soltada en el mapa: falta escoger el molde para registrarla
     const [registroNuevo, setRegistroNuevo] = useState<{ pieza: PiezaMesa; destino: DestinoMovimientoFv; mesa: string | null; lugar: string } | null>(null)
     const [moldeElegido, setMoldeElegido] = useState<number | null>(null)
@@ -684,9 +699,16 @@ export default function MapaProcesosFibraModule() {
                 {p.id === 'programado' && (
                     <>
                         {p.sub && <span className="text-[9px] font-semibold italic opacity-80 leading-tight">{p.sub}</span>}
-                        {/* Todas las OF del mismo ancho: columnas iguales que se acomodan al ancho del recuadro */}
-                        <div className="mt-0.5 grid gap-0.5 content-start overflow-y-auto overflow-x-hidden min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))' }}>
+                        {/* OF como recuadros grandes, igual que las piezas en las mesas (2 por fila, misma altura y letra que una mesa): se pueden tomar
+                            con el dedo en tablet y celular. Se desplaza hacia abajo cuando hay muchas */}
+                        <div className="mt-0.5 grid content-start justify-center overflow-y-auto overflow-x-hidden min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                            style={plano ? {
+                                // Recuadro = pieza dentro de una mesa (mesa menos su borde punteado y relleno, 6 px)
+                                gridTemplateColumns: `repeat(2, ${Math.max(40, (MESA_ANCHO / ANCHO) * plano.w - 6)}px)`,
+                                gridAutoRows: `${Math.max(34, (MESA_ALTO / ALTO) * plano.h - 6)}px`,
+                                columnGap: `${(GAP / ANCHO) * plano.w + 6}px`,
+                                rowGap: `${(GAP / ALTO) * plano.h + 6}px`,
+                            } : { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4 }}>
                             {lista.map(x => (
                                 <button key={x.of} onClick={() => setDetalleOf(x.of)}
                                     draggable={!moviendo}
@@ -696,10 +718,11 @@ export default function MapaProcesosFibraModule() {
                                     }}
                                     onDragEnd={terminarArrastre}
                                     title={`OF ${x.of} · ${x.descripcion || 'sin descripción'} · ${x.piezas} pieza(s) pendientes · Entrega Lote (T) ${fechaT(x.of)?.split('-').reverse().join('/') || 'sin fecha'}${atrasadaT(x.of) ? ' (ATRASADA A CLIENTE)' : ''} · clic para ver el detalle · arrastrar a una mesa o proceso para registrar 1 pieza (se pide el molde)`}
-                                    className={`w-full min-w-0 flex items-baseline gap-0.5 text-[9px] font-bold px-1 rounded leading-[14px] whitespace-nowrap cursor-grab active:cursor-grabbing ${arrastre?.registrer === 'nueva:' + x.of ? 'opacity-40' : ''} ${coincide(x) ? 'bg-[#59a96a] text-white ring-2 ring-[#3b8f50]' : atrasadaT(x.of) ? ROJO_ATRASO : estilo.chip}`}>
-                                    {x.nombre && nombreCortado(x.nombre, 'min-w-0 flex-1')}
-                                    <span className="font-mono font-black shrink-0 ml-auto">{x.of.slice(-4)}</span>
-                                    {x.piezas > 1 && <sup className="shrink-0 text-[7px]">×{x.piezas}</sup>}
+                                    className={`relative w-full h-full min-w-0 flex flex-col items-center justify-center text-center px-0.5 overflow-hidden font-bold rounded cursor-grab active:cursor-grabbing ${arrastre?.registrer === 'nueva:' + x.of ? 'opacity-40' : ''} ${coincide(x) ? 'bg-[#59a96a] text-white ring-2 ring-[#3b8f50]' : atrasadaT(x.of) ? ROJO_ATRASO : estilo.chip}`}>
+                                    {x.nombre && nombreCortado(x.nombre, 'w-full justify-center text-[10px]')}
+                                    <span className="block font-mono text-lg font-black leading-none">{x.of.slice(-4)}</span>
+                                    {/* Piezas pendientes de la OF (si son varias): en la esquina inferior, sin tapar el nombre */}
+                                    {x.piezas > 1 && <span className="absolute bottom-0.5 right-0.5 text-[8px] font-black leading-none px-0.5 rounded bg-[#25323f] text-white">×{x.piezas}</span>}
                                 </button>
                             ))}
                         </div>
@@ -769,7 +792,7 @@ export default function MapaProcesosFibraModule() {
                     <div className="p-16 text-center text-slate-400 font-bold italic bg-white rounded-2xl border border-[#e2ded5]">Cargando órdenes...</div>
                 ) : (
                     <div className="w-full bg-white rounded-xl border border-[#e2ded5] shadow-sm p-2 min-w-[900px]">
-                        <div className="relative w-full h-[max(520px,calc(100vh-8rem))]">
+                        <div ref={planoRef} className="relative w-full h-[max(520px,calc(100vh-8rem))]">
                             {PROCESOS.map(caja)}
                             {PROCESOS.map(etiqueta)}
 

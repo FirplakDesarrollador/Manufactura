@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Info, Loader2, Plus, Settings2, Trash2, X } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, BarChart3, CheckCircle2, Info, Loader2, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
     CAUSAS_PARO_BASE, FAMILIAS_PARO, META_NS, META_PRODUCTIVIDAD, MINUTOS_POR_MOLDE, MetaPersonas, NOMBRE_FAMILIA, ParoRmold, RegistroRmold,
@@ -160,7 +161,13 @@ export default function FormularioRmold() {
             <section className={`lg:col-span-8 bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border ${existente ? 'border-amber-400 ring-4 ring-amber-100' : 'border-[#e2ded5]'} space-y-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
                     <div>
-                        <span className="text-xs font-black uppercase bg-[#324354]/10 text-[#324354] px-2.5 py-1 rounded-md">RMOLD · Reparación de Moldes</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-black uppercase bg-[#324354]/10 text-[#324354] px-2.5 py-1 rounded-md">RMOLD · Reparación de Moldes</span>
+                            <Link href="/indicadores-productividad?vista=rmold" title="Ver las gráficas de Reparación de Moldes en el Tablero de Control"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#324354] hover:bg-[#254153] text-white text-xs font-bold shadow-sm">
+                                <BarChart3 size={14} /> Ver gráficas
+                            </Link>
+                        </div>
                         <h2 className="text-lg font-black text-[#324354] mt-1.5">Cierre del día</h2>
                         <p className="text-xs text-slate-500 capitalize">{fechaLarga(fecha)}</p>
                     </div>
@@ -184,14 +191,15 @@ export default function FormularioRmold() {
                 {/* 1. Moldes reparados */}
                 <div>
                     <h3 className="text-sm font-black text-[#324354] mb-2">1. Moldes reparados</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {/* Ya no hay moldes RTM: la casilla solo aparece al abrir un día viejo que tenga RTM */}
+                    <div className={`grid grid-cols-2 ${valor(c.rtm) > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-2.5`}>
                         {numero('ms', 'Mármol (MS)')}
                         {numero('fv', 'Fibra (FV)')}
-                        {numero('rtm', 'RTM')}
+                        {valor(c.rtm) > 0 && numero('rtm', 'RTM')}
                         {numero('brillados', 'Brillados', 'Cada molde brillado cuenta como ½ molde reparado')}
                         {numero('desmanchados', 'Desmanchados', 'Cada molde desmanchado cuenta como ⅓ de molde reparado')}
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">Total = MS + FV + RTM + Brillados ÷ 2 + Desmanchados ÷ 3</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Total = MS + FV + Brillados ÷ 2 + Desmanchados ÷ 3{valor(c.rtm) > 0 ? ' + RTM' : ''}</p>
                 </div>
 
                 {/* 2. Nivel de servicio */}
@@ -307,7 +315,7 @@ export default function FormularioRmold() {
                             { t: 'Piezas / persona', v: calculo.pzsPersona == null ? '—' : dec(calculo.pzsPersona), d: `meta ${dec(calculo.metaPzsPersona)}` },
                             { t: 'Productividad / persona', v: calculo.productividadPersona == null ? '—' : `${dec(calculo.productividadPersona)} %`, d: 'meta 100 %', cls: semaforo(calculo.productividadPersona, 100) },
                             { t: 'Nivel de servicio', v: calculo.ns == null ? '—' : `${dec(calculo.ns)} %`, d: `meta ${META_NS} %`, cls: semaforo(calculo.ns, META_NS) },
-                            { t: 'Paros reflejados', v: `${dec(calculo.parosReflejados, 0)} min`, d: calculo.parosReflejados < 0 ? 'sobre la meta' : `${MINUTOS_POR_MOLDE} min por molde` }
+                            { t: 'Paros reflejados', v: `${dec(calculo.parosReflejados, 0)} min`, d: calculo.total >= valor(c.meta) && valor(c.meta) > 0 ? 'meta cumplida' : `${MINUTOS_POR_MOLDE} min por molde` }
                         ].map(k => (
                             <div key={k.t} className="bg-white rounded-xl px-2.5 py-1.5">
                                 <span className="text-[9px] font-black uppercase text-slate-500 block truncate">{k.t}</span>
