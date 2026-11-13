@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 
 export type CicloMedido = {
     id: string;
@@ -46,8 +47,68 @@ export type EvaluacionHoraHora = {
     ciclos: CicloMedido[];
 };
 
+// Cronómetro del paso Tiempos: se guarda con el borrador para que una recarga no lo pierda
+export type Cronometro = { isRunning: boolean; startTime: number | null; elapsed: number };
+const CRONOMETRO_INICIAL: Cronometro = { isRunning: false, startTime: null, elapsed: 0 };
+
+export type ResultadoGuardado =
+    | { ok: true; consecutivo: number | null }
+    | { ok: false; error: string; copiaLocal: boolean };
+
+// Copia de respaldo en el equipo de los registros que NO llegaron a la base (Historial → Subir)
+export function guardarPendienteLocal(ev: EvaluacionHoraHora): boolean {
+    try {
+        const historial: EvaluacionHoraHora[] = JSON.parse(localStorage.getItem('historialHoraHora') || '[]');
+        const resto = historial.filter(h => h?.id !== ev.id);
+        localStorage.setItem('historialHoraHora', JSON.stringify([...resto, ev]));
+        return true;
+    } catch (e) {
+        console.error('No se pudo guardar la copia local del Hora a Hora:', e);
+        return false;
+    }
+}
+
+const conLimite = <T,>(p: Promise<T>, ms: number) => new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('La base de datos no respondió a tiempo (revise la conexión a internet)')), ms);
+    p.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+});
+
+// Si el navegador está lleno aun después de limpiar, el formulario lo avisa (borradorSinEspacio)
+export let borradorSinEspacio = false;
+let limpiando = false;
+let ultimoPendiente: [string, string] | null = null;
+
+// localStorage que no rompe la app si está lleno o bloqueado
+const almacenamientoSeguro: StateStorage = {
+    getItem: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+    setItem: (k, v) => {
+        try { localStorage.setItem(k, v); borradorSinEspacio = false; return; } catch { /* lleno: se intenta liberar */ }
+        ultimoPendiente = [k, v];
+        if (limpiando) return;
+        limpiando = true;
+        // Libera las copias viejas que ya están en la base y reintenta con el valor más reciente
+        import('@/lib/db/horaHora').then(m => m.limpiarCopiasSubidas()).catch(() => 0).then(() => {
+            limpiando = false;
+            if (!ultimoPendiente) return;
+            const [kk, vv] = ultimoPendiente;
+            ultimoPendiente = null;
+            try { localStorage.setItem(kk, vv); borradorSinEspacio = false; }
+            catch {
+                if (!borradorSinEspacio) console.warn('Hora a Hora: el almacenamiento del navegador está lleno; el borrador no se puede guardar en este equipo.');
+                borradorSinEspacio = true;
+            }
+        });
+    },
+    removeItem: (k) => { try { localStorage.removeItem(k); } catch { /* sin acceso */ } },
+};
+
 type AppState = {
     evaluacionActual: EvaluacionHoraHora | null;
+    paso: number;
+    setPaso: (paso: number) => void;
+    cronometro: Cronometro;
+    setCronometro: (c: Partial<Cronometro>) => void;
+    guardarEvaluacion: () => Promise<ResultadoGuardado>;
     iniciarEvaluacion: (datosBasicos: Partial<EvaluacionHoraHora>) => void;
     actualizarEvaluacion: (datos: Partial<EvaluacionHoraHora>) => void;
     agregarCiclo: (ciclo: CicloMedido) => void;
@@ -83,8 +144,12 @@ const initialState: Partial<EvaluacionHoraHora> = {
     ciclos: [],
 };
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>()(persist((set, get) => ({
     evaluacionActual: null,
+    paso: 0,
+    setPaso: (paso) => set({ paso }),
+    cronometro: CRONOMETRO_INICIAL,
+    setCronometro: (c) => set((state) => ({ cronometro: { ...state.cronometro, ...c } })),
     iniciarEvaluacion: (datosBasicos) => set((state) => {
         return {
             evaluacionActual: {
@@ -168,6 +233,29 @@ export const useStore = create<AppState>((set) => ({
             }
         };
     }),
+    // Guarda en la base y ESPERA la respuesta. Si falla, la evaluación sigue en pantalla para reintentar
+    // y queda una copia en el equipo (Historial → Subir). El id es fijo: un reintento no duplica el registro.
+    guardarEvaluacion: async () => {
+        const actual = get().evaluacionActual;
+        if (!actual) return { ok: false, error: 'No hay evaluación en curso', copiaLocal: false };
+        const { rendimiento, calidad, hdtCumple } = actual;
+        let estadoGlobal: 'Verde' | 'Amarillo' | 'Rojo' = 'Verde';
+        if (rendimiento < 80 || calidad < 80 || !hdtCumple) estadoGlobal = 'Rojo';
+        else if (rendimiento < 90 || calidad < 90) estadoGlobal = 'Amarillo';
+        const final: EvaluacionHoraHora = { ...actual, tiempoFin: Date.now(), estadoGlobal };
+        set({ evaluacionActual: final });
+        try {
+            const { insertEvaluacion } = await import('@/lib/db/horaHora');
+            const consecutivo = await conLimite(insertEvaluacion(final), 25000);
+            return { ok: true, consecutivo: consecutivo ?? null };
+        } catch (err: any) {
+            // Ya estaba guardado (un intento anterior sí llegó aunque no respondió a tiempo)
+            if (err?.code === '23505') return { ok: true, consecutivo: null };
+            const error = err?.message || err?.details || String(err);
+            console.error('Error guardando Hora a Hora:', error);
+            return { ok: false, error, copiaLocal: guardarPendienteLocal(final) };
+        }
+    },
     cerrarEvaluacion: () => set((state) => {
         if (!state.evaluacionActual) return state;
 
@@ -209,5 +297,11 @@ export const useStore = create<AppState>((set) => ({
 
         return { evaluacionActual: finalEvaluacion };
     }),
-    reset: () => set({ evaluacionActual: null }),
+    reset: () => set({ evaluacionActual: null, paso: 0, cronometro: CRONOMETRO_INICIAL }),
+}), {
+    // Borrador en el equipo: si se recarga la página, se cierra el navegador o se va a otra pantalla, no se pierde lo registrado
+    name: 'horaHoraBorrador',
+    storage: createJSONStorage(() => almacenamientoSeguro),
+    partialize: (s) => ({ evaluacionActual: s.evaluacionActual, paso: s.paso, cronometro: s.cronometro }),
+    skipHydration: true,
 }));

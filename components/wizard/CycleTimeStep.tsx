@@ -12,12 +12,17 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
 export default function CycleTimeStep() {
-    const { evaluacionActual, agregarCiclo, marcarCicloInvalido } = useStore();
+    const { evaluacionActual, agregarCiclo, marcarCicloInvalido, cronometro, setCronometro } = useStore();
 
-    // Stopwatch State
-    const [isRunning, setIsRunning] = useState(false);
-    const [startTime, setStartTime] = useState<number | null>(null);
-    const [elapsedTime, setElapsedTime] = useState(0); // in ms
+    // Cronómetro guardado en el borrador: sigue corriendo si recargan la página o cambian de paso
+    // (los ciclos de FV/RTM/moldes duran 17–42 min y antes se perdían)
+    const { isRunning, startTime } = cronometro;
+    const [elapsedTime, setElapsedLocal] = useState(() =>
+        cronometro.isRunning && cronometro.startTime ? Date.now() - cronometro.startTime : cronometro.elapsed
+    ); // in ms
+    const setIsRunning = (v: boolean) => setCronometro({ isRunning: v });
+    const setStartTime = (v: number | null) => setCronometro({ startTime: v });
+    const setElapsedTime = (v: number) => { setElapsedLocal(v); setCronometro({ elapsed: v }); };
 
     // Manual State
     const [manualTime, setManualTime] = useState("");
@@ -39,7 +44,7 @@ export default function CycleTimeStep() {
         let interval: NodeJS.Timeout;
         if (isRunning && startTime) {
             interval = setInterval(() => {
-                setElapsedTime(Date.now() - startTime);
+                setElapsedLocal(Date.now() - startTime);
             }, 100);
         }
         return () => clearInterval(interval);
@@ -54,12 +59,13 @@ export default function CycleTimeStep() {
     };
 
     const startStopwatch = () => {
-        setIsRunning(true);
-        setStartTime(Date.now() - elapsedTime);
+        setCronometro({ isRunning: true, startTime: Date.now() - elapsedTime });
     };
 
     const pauseStopwatch = () => {
-        setIsRunning(false);
+        const transcurrido = startTime ? Date.now() - startTime : elapsedTime;
+        setElapsedLocal(transcurrido);
+        setCronometro({ isRunning: false, elapsed: transcurrido });
     };
 
     const stopStopwatch = () => {
@@ -274,6 +280,7 @@ export default function CycleTimeStep() {
                                     <div className="flex gap-4">
                                         <Input
                                             type="number"
+                                            onWheel={(e) => e.currentTarget.blur()}
                                             value={manualTime}
                                             onChange={(e) => setManualTime(e.target.value)}
                                             placeholder="Ej. 120"
