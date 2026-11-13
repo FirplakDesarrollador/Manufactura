@@ -532,6 +532,8 @@ export default function Historico() {
             const soloLocales = unicos(locales.filter(l => l?.id && !enBase.has(l.id)));
             setPendientes(new Set(soloLocales.map(l => l.id)));
             setData([...deBase, ...soloLocales]);
+            // La copia del equipo solo guarda lo que NO está en la base (antes guardaba todo con firmas y llenaba el almacenamiento)
+            try { localStorage.setItem("historialHoraHora", JSON.stringify(soloLocales)); } catch { /* sin acceso */ }
         }).catch((err) => {
             console.error('Error fetching from Supabase:', err);
             setErrorCarga(`No se pudieron cargar los registros de la base de datos: ${err?.message || err}. Solo se muestran los guardados en este equipo.`);

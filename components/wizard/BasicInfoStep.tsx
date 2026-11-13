@@ -25,6 +25,18 @@ const PROCESOS_POR_PLANTA: Record<string, string[]> = {
     "CALID": ["INSPECCION", "AUDITORIA", "LIBERACION"],
 };
 
+// Tiempo de ciclo teórico recomendado por planta, en segundos (dato de Manufactura; se puede corregir en el formulario)
+// MOLD y CALID no tienen tiempo recomendado
+const TIEMPO_RECOMENDADO_SEG: Record<string, number> = {
+    MS: 60,        // 1 min
+    FV: 1020,      // 17 min
+    RTM: 2520,     // 42 min
+    MBL: 25.26,    // 0,421 min
+    CEFI: 25.26,   // 0,421 min
+    RMOLD: 1320,   // 22 min
+}
+const fmtMin = (seg: number) => (seg / 60).toLocaleString("es-CO", { maximumFractionDigits: 3 })
+
 // Planta del formulario → nombre(s) de la planta en Talento Humano (para listar sus operarios)
 const PLANTA_TALENTO_HUMANO: Record<string, string[]> = {
     MS: ["marmol sintetico", "marmol (calidad)"],
@@ -139,8 +151,17 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
     };
 
     const handleSelect = (name: string, value: string) => {
+        if (name === "planta") {
+            const actual = formData.tiempoCicloTeorico.trim();
+            const eraRecomendado = !actual || Object.values(TIEMPO_RECOMENDADO_SEG).some(t => Number(actual) === t);
+            const rec = TIEMPO_RECOMENDADO_SEG[value];
+            setFormData({ ...formData, planta: value, tiempoCicloTeorico: eraRecomendado ? (rec ? String(rec) : "") : formData.tiempoCicloTeorico });
+            return;
+        }
         setFormData({ ...formData, [name]: value });
     };
+
+    const tiempoRecomendado = TIEMPO_RECOMENDADO_SEG[formData.planta];
 
     const isFormValid = Object.values(formData).every(val => val.trim() !== "") && Number(formData.tiempoCicloTeorico) > 0;
 
@@ -254,15 +275,17 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                                         <ul className="list-disc pl-4 space-y-1 text-slate-500 font-medium">
                                             <li><span className="text-slate-700 font-bold">MS:</span> 60 segundos</li>
                                             <li><span className="text-slate-700 font-bold">FV:</span> 17 minutos (1020 segs)</li>
-                                            <li><span className="text-slate-700 font-bold">RTM:</span> 40 minutos (2400 segs)</li>
-                                            <li><span className="text-slate-700 font-bold">MBL:</span> 0.42 min/pieza (25.2 segs)</li>
-                                            <li><span className="text-slate-700 font-bold">CEFI:</span> 0.42 min/pieza (25.2 segs)</li>
+                                            <li><span className="text-slate-700 font-bold">RTM:</span> 42 minutos (2520 segs)</li>
+                                            <li><span className="text-slate-700 font-bold">MBL:</span> 0,421 min/pieza (25,26 segs)</li>
+                                            <li><span className="text-slate-700 font-bold">CEFI:</span> 0,421 min/pieza (25,26 segs)</li>
+                                            <li><span className="text-slate-700 font-bold">RMOLD:</span> 22 minutos (1320 segs)</li>
+                                            <li><span className="text-slate-700 font-bold">MOLD:</span> sin tiempo recomendado</li>
                                         </ul>
                                     </div>
                                 )}
                             </div>
                             <div className="relative">
-                                <Input id="tiempo" name="tiempoCicloTeorico" type="number" min="1" step="0.1" placeholder="Ej. 60" value={formData.tiempoCicloTeorico} onChange={handleChange} className="pl-16 font-bold text-lg border-primary/20 focus:border-primary" required />
+                                <Input id="tiempo" name="tiempoCicloTeorico" type="number" onWheel={(e) => e.currentTarget.blur()} min="1" step="any" placeholder="Ej. 60" value={formData.tiempoCicloTeorico} onChange={handleChange} className="pl-16 font-bold text-lg border-primary/20 focus:border-primary" required />
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-medium">
                                     segs
                                 </div>
@@ -272,6 +295,18 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                                     Equivale a: <span className="font-bold text-primary">{(Number(formData.tiempoCicloTeorico) / 60).toFixed(2)} minutos</span>
                                 </p>
                             )}
+                            {formData.planta && (tiempoRecomendado ? (
+                                <p className="text-sm font-semibold text-[#d14747] mt-1">
+                                    Este es el tiempo recomendado de la planta {formData.planta} ({fmtMin(tiempoRecomendado)} min = {tiempoRecomendado.toLocaleString("es-CO")} segs), verifícalo y corrígelo.
+                                    {Number(formData.tiempoCicloTeorico) !== tiempoRecomendado && (
+                                        <button type="button" onClick={() => setFormData({ ...formData, tiempoCicloTeorico: String(tiempoRecomendado) })} className="ml-1 underline font-bold hover:text-[#a83636]">Usar el recomendado</button>
+                                    )}
+                                </p>
+                            ) : (
+                                <p className="text-sm font-semibold text-[#d14747] mt-1">
+                                    La planta {formData.planta} no tiene tiempo recomendado: ingresa el tiempo de ciclo teórico.
+                                </p>
+                            ))}
                         </div>
 
                     </div>
