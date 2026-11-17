@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowRightLeft, ChevronDown, ChevronUp, FileText, Loader2, Plus, RefreshCw, Search, Settings2, Trash2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
+import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
 
 // Módulo Traslados (FV): cada OF liberada pendiente con su traslado comparado contra la lista de materiales.
 // Se exigen solo los Accesorios y Equipos que no son consumibles de uso común. La revisión la hace
@@ -77,14 +78,22 @@ export default function TrasladosFibraModule() {
 
     const ultima = useMemo(() => (datos || []).reduce((m, d) => d.calculado_at > m ? d.calculado_at : m, ''), [datos])
     const cuenta = (e: EstadoOf) => (datos || []).filter(d => d.estado === e).length
+    const semaforo = useFechasSemaforoFv()
+    const fechaLib = (of: string) => semaforo?.mapa.get(String(of).trim())?.realLib?.slice(0, 10) || null
     const visibles = useMemo(() => {
         const q = busqueda.trim().toLowerCase()
         return (datos || [])
             .filter(d => !filtro || d.estado === filtro)
             .filter(d => !q || d.orden_fabricacion.includes(q) || (d.producto_descripcion || '').toLowerCase().includes(q) || (d.producto_sku || '').toLowerCase().includes(q)
                 || d.detalle.some(f => f.estado === 'faltante' && (f.item.toLowerCase().includes(q) || f.descripcion.toLowerCase().includes(q))))
-            .sort((a, b) => ESTADOS[a.estado].orden - ESTADOS[b.estado].orden || b.faltantes - a.faltantes || a.orden_fabricacion.localeCompare(b.orden_fabricacion))
-    }, [datos, busqueda, filtro])
+            // Agrupadas por fecha de liberación (Real Liberación del Semáforo), la más reciente primero; sin fecha al final.
+            // Dentro de cada fecha: lo más grave primero
+            .sort((a, b) => {
+                const fa = fechaLib(a.orden_fabricacion), fb = fechaLib(b.orden_fabricacion)
+                return (fa ? 0 : 1) - (fb ? 0 : 1) || (fb || '').localeCompare(fa || '')
+                    || ESTADOS[a.estado].orden - ESTADOS[b.estado].orden || b.faltantes - a.faltantes || a.orden_fabricacion.localeCompare(b.orden_fabricacion)
+            })
+    }, [datos, busqueda, filtro, semaforo])
     const alternar = (of: string) => setAbiertas(p => { const n = new Set(p); if (n.has(of)) n.delete(of); else n.add(of); return n })
 
     return (
@@ -154,14 +163,28 @@ export default function TrasladosFibraModule() {
                         </div>
                     ) : visibles.length === 0 ? (
                         <div className="p-10 text-center text-slate-400 font-bold italic bg-white rounded-xl border border-[#e2ded5]">Ninguna OF coincide con el filtro</div>
-                    ) : visibles.map(d => {
+                    ) : visibles.map((d, i) => {
+                        // Encabezado del grupo cuando cambia la fecha de liberación
+                        const fl = fechaLib(d.orden_fabricacion)
+                        const nuevoGrupo = i === 0 || fechaLib(visibles[i - 1].orden_fabricacion) !== fl
+                        const enGrupo = nuevoGrupo ? visibles.filter(x => fechaLib(x.orden_fabricacion) === fl).length : 0
                         const est = ESTADOS[d.estado]
                         const abierta = abiertas.has(d.orden_fabricacion)
                         const exigidas = d.detalle.filter(f => f.estado !== 'no_exigido').sort((a, b) => ORDEN_FILA[a.estado] - ORDEN_FILA[b.estado] || a.descripcion.localeCompare(b.descripcion))
                         const noExigidas = d.detalle.filter(f => f.estado === 'no_exigido')
                         const extras = d.extras.filter(x => !x.asignado)
                         return (
-                            <section key={d.orden_fabricacion} className="bg-white rounded-xl border border-[#e2ded5] shadow-sm">
+                            <React.Fragment key={d.orden_fabricacion}>
+                            {nuevoGrupo && (
+                                <div className={`flex items-center gap-2 ${i === 0 ? '' : 'pt-2'}`}>
+                                    <span className="text-[11px] font-black uppercase tracking-wide text-[#324354]">
+                                        {fl ? `Liberación ${fl.split('-').reverse().join('/')}` : 'Sin fecha de liberación en el Semáforo'}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-[#7B8E90]">{enGrupo} OF</span>
+                                    <span className="flex-1 h-px bg-[#e2ded5]" />
+                                </div>
+                            )}
+                            <section className="bg-white rounded-xl border border-[#e2ded5] shadow-sm">
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
                                     <span className={`w-3 h-3 rounded-full shrink-0 ${est.punto}`} />
                                     <button onClick={() => setDetalleOf(d.orden_fabricacion)} className="text-sm font-black text-[#324354] hover:underline flex items-center gap-1" title="Detalle de la orden en SAP">
@@ -263,6 +286,7 @@ export default function TrasladosFibraModule() {
                                     </div>
                                 )}
                             </section>
+                            </React.Fragment>
                         )
                     })}
                 </div>

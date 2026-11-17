@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getAllMoldes, getOrdenesFabricacion } from '@/lib/supabase/queries/fibra'
+import { plantaDeMolde } from '@/lib/supabase/queries/fibra_moldes'
+import { moldesDeOrden } from '@/lib/fibra/moldesOrden'
 import { 
     Search, 
     X, 
@@ -49,35 +51,38 @@ export default function CargaMoldesTable() {
         setLoading(true)
         setErrorMsg(null)
         try {
-            const { data: result, error } = await supabase
-                .from('query_carga_moldes')
-                .select('*')
-                
-            if (error) {
-                console.error("Error fetching carga moldes:", error)
-                setErrorMsg("No se pudieron cargar los datos de carga de moldes.")
+            // Carga de moldes de FIBRA (antes leía la vista de Mármol query_carga_moldes): moldes de Fibra agrupados por
+            // tipo, con su estado, y lo programado de las OF pendientes de Fibra que usan ese tipo de molde
+            // (misma regla de Pintura: lib/fibra/moldesOrden.ts).
+            const [moldes, ordenes] = await Promise.all([getAllMoldes(), getOrdenesFabricacion()])
+            const fv = moldes.filter(m => plantaDeMolde(m.molde_descripcion || '') === 'FV')
+            const grupos = new Map<string, { sku: string; desc: string; moldes: typeof fv; ofs: Set<string>; programado: number }>()
+            const clave = (m: (typeof fv)[number]) => (m.molde_sku || m.molde_descripcion || '').trim().toUpperCase()
+            for (const m of fv) {
+                const k = clave(m); if (!k) continue
+                const g = grupos.get(k) || { sku: m.molde_sku || '—', desc: m.molde_descripcion || '', moldes: [], ofs: new Set<string>(), programado: 0 }
+                g.moldes.push(m); grupos.set(k, g)
             }
-            
-            if (result && result.length > 0) {
-                const normalized: CargaMoldesRow[] = result.map((row: any) => ({
-                    moldeSku: row.molde_sku || row.moldeSku || row.sku || '',
-                    moldeDescripcion: row.molde_descripcion || row.moldeDescripcion || row.descripcion || '',
-                    moldesTotales: Number(row.moldes_totales ?? row.moldesTotales ?? row.totales ?? 0),
-                    moldesHabilitados: Number(row.moldes_habilitados ?? row.moldesHabilitados ?? 0),
-                    moldesDisponibles: Number(row.moldes_disponibles ?? row.moldesDisponibles ?? row.disponibles ?? 0),
-                    moldesEnUso: Number(row.moldes_en_uso ?? row.moldesEnUso ?? row.en_uso ?? 0),
-                    moldesEnReparacion: Number(row.moldes_en_reparacion ?? row.moldesEnReparacion ?? row.reparacion ?? 0),
-                    moldesEnFabricacion: Number(row.moldes_en_fabricacion ?? row.moldesEnFabricacion ?? row.fabricacion ?? 0),
-                    totalOrdenes: Number(row.total_ordenes ?? row.totalOrdenes ?? row.ordenes ?? 0),
-                    piezasProgramadas: Number(row.piezas_programadas ?? row.piezasProgramadas ?? row.programado ?? 0),
-                    promedioVueltas: row.promedio_vueltas != null 
-                        ? Number(row.promedio_vueltas) 
-                        : (row.vueltas != null ? Number(row.vueltas) : null)
-                }))
-                setData(normalized)
-            } else {
-                setData([])
+            for (const o of ordenes) {
+                const prog = Math.max(0, Number(o.programado) || 0); if (!prog) continue
+                const propios = moldesDeOrden(o, fv); if (!propios.length) continue
+                const g = grupos.get(clave(propios[0])); if (!g) continue
+                g.ofs.add(String(o.orden_fabricacion)); g.programado += prog
             }
+            const esEstado = (m: (typeof fv)[number], re: RegExp) => re.test(String(m.estado || ''))
+            setData([...grupos.values()].map(g => {
+                const total = g.moldes.length
+                const fabricacion = g.moldes.filter(m => esEstado(m, /fabric/i)).length
+                const vueltas = g.moldes.map(m => Number(m.vueltas_actuales)).filter(v => Number.isFinite(v))
+                return {
+                    moldeSku: g.sku, moldeDescripcion: g.desc, moldesTotales: total, moldesHabilitados: total - fabricacion,
+                    moldesDisponibles: g.moldes.filter(m => esEstado(m, /^disponible$/i)).length,
+                    moldesEnUso: g.moldes.filter(m => esEstado(m, /en uso/i)).length,
+                    moldesEnReparacion: g.moldes.filter(m => esEstado(m, /repar/i)).length,
+                    moldesEnFabricacion: fabricacion, totalOrdenes: g.ofs.size, piezasProgramadas: g.programado,
+                    promedioVueltas: vueltas.length ? Math.round(100 * vueltas.reduce((x, y) => x + y, 0) / vueltas.length) / 100 : null,
+                }
+            }))
         } catch (error: any) {
             console.error("Error en CargaMoldesTable:", error)
             setErrorMsg(error?.message || "Ocurrió un error inesperado.")
