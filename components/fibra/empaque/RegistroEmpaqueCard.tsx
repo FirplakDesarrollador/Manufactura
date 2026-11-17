@@ -5,6 +5,7 @@ import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarEmpaque } from '@/lib/supabase/queries/fibra_empaque'
 import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
+import EstadoEntregaOf from '../EstadoEntregaOf'
 import AccionesPiezaFibra from '../AccionesPiezaFibra'
 import { PackageCheck } from 'lucide-react'
 
@@ -30,5 +31,6 @@ export default function RegistroEmpaqueCard({ registro, orden, moldes, usuarioEm
         />
     )
 
-    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-emerald-50/40" />
+    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-emerald-50/40"
+        extra={<EstadoEntregaOf of={registro.orden_fabricacion} />} />
 }

@@ -176,12 +176,12 @@ export default function TrasladosFibraModule() {
                         return (
                             <React.Fragment key={d.orden_fabricacion}>
                             {nuevoGrupo && (
-                                <div className={`flex items-center gap-2 ${i === 0 ? '' : 'pt-2'}`}>
-                                    <span className="text-[11px] font-black uppercase tracking-wide text-[#324354]">
+                                // Separador de fecha marcado: franja navy con la fecha, más espacio arriba entre grupos
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#324354] text-white shadow-sm ${i === 0 ? '' : 'mt-5'}`}>
+                                    <span className="text-xs font-black uppercase tracking-wide">
                                         {fl ? `Liberación ${fl.split('-').reverse().join('/')}` : 'Sin fecha de liberación en el Semáforo'}
                                     </span>
-                                    <span className="text-[10px] font-bold text-[#7B8E90]">{enGrupo} OF</span>
-                                    <span className="flex-1 h-px bg-[#e2ded5]" />
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/15">{enGrupo} OF</span>
                                 </div>
                             )}
                             <section className="bg-white rounded-xl border border-[#e2ded5] shadow-sm">

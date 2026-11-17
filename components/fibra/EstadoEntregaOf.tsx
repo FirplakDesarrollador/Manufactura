@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertTriangle, CheckCircle2, ChevronRight, HelpCircle, Loader2, PackageSearch, RefreshCw, X } from 'lucide-react'
-import { revisarEntrega, useRevisionEntrega, type ComponenteEntrega, type ResultadoEntrega } from '@/lib/fibra/revisionEntrega'
+import { proximaActualizacion, revisarEntrega, useRevisionEntrega, type ComponenteEntrega, type ResultadoEntrega } from '@/lib/fibra/revisionEntrega'
 
 // Aviso de la tarjeta (Digitado y Tránsito): "Analizando componentes para la entrega…" mientras se revisa en SAP, en
 // segundo plano, que la bodega (MP-03) tenga lo que falta por descontar de cada componente de la OF (todo menos mano
@@ -40,23 +40,35 @@ export default function EstadoEntregaOf({ of }: { of: string | number | null | u
     const r = estado.resultado
     const vista = VISTA[r.estado]
     const { Icono } = vista
+    const revisado = new Date(r.calculado_at).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     return (
-        <>
+        <div className="flex items-center gap-2 min-w-0">
             <button type="button" onClick={e => { e.stopPropagation(); setAbierto(true) }} title="Ver el análisis de componentes"
-                className={`${caja} text-left rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-white hover:shadow-sm transition-colors`}>
+                className={`${caja} text-left rounded-lg px-2 py-1 -ml-2 -my-1 hover:bg-white hover:shadow-sm transition-colors`}>
                 <Icono size={16} className={`${vista.color} shrink-0`} />
-                <div>
+                <div className="min-w-0">
                     {titulo}
                     <p className={`text-xs font-black leading-tight mt-0.5 flex items-center gap-1.5 ${vista.color}`}>
                         {vista.texto(r)}
                         <span className="text-[10px] font-semibold text-slate-500">{r.cubiertos}/{r.exigidos}</span>
-                        {otraVez('text-slate-400 hover:text-[#324354] cursor-pointer')}
+                    </p>
+                    <p className="text-[10px] font-semibold text-slate-500 leading-tight mt-0.5 whitespace-nowrap flex items-center gap-1"
+                        title={estado.errorActualizar
+                            ? `No se pudo actualizar (${estado.errorActualizar}); se muestra la revisión anterior`
+                            : `Fecha y hora de la última consulta a SAP. Se actualiza sola cada hora en punto (próxima: ${proximaActualizacion()})`}>
+                        Revisado {revisado}
+                        {estado.actualizando && <span className="flex items-center gap-0.5 text-sky-700"><Loader2 size={10} className="animate-spin" /> actualizando…</span>}
+                        {estado.errorActualizar && <AlertTriangle size={10} className="text-amber-600" />}
                     </p>
                 </div>
                 <ChevronRight size={14} className="text-slate-400 shrink-0" />
             </button>
+            <button type="button" onClick={e => { e.stopPropagation(); revisarEntrega(of) }} disabled={estado.actualizando} title="Consultar SAP de nuevo"
+                className="h-7 px-2 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-[10px] font-bold flex items-center gap-1 shrink-0 disabled:opacity-50">
+                <RefreshCw size={12} className={estado.actualizando ? 'animate-spin' : ''} /> Actualizar
+            </button>
             {abierto && createPortal(<AnalisisEntrega of={String(of)} r={r} onClose={() => setAbierto(false)} />, document.body)}
-        </>
+        </div>
     )
 }
 

@@ -4,6 +4,7 @@ import React from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarAccionReparacion } from '@/lib/supabase/queries/fibra_reparacion'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
+import EstadoEntregaOf from '../EstadoEntregaOf'
 import AccionesPiezaFibra, { AccionPieza } from '../AccionesPiezaFibra'
 import { Wrench, Trash2, CircleDollarSign, PackageCheck, RotateCcw, Undo2 } from 'lucide-react'
 
@@ -50,5 +51,6 @@ export default function RegistroReparacionCard({ registro, orden, moldes, usuari
 
     const acciones = <AccionesPiezaFibra principal={principal} otras={otras} onHecho={onRefresh} />
 
-    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja={franja} />
+    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja={franja}
+        extra={<EstadoEntregaOf of={registro.orden_fabricacion} />} />
 }

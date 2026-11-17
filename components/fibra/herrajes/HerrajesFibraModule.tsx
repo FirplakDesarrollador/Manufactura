@@ -6,6 +6,7 @@ import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { getRegistrosParaHerrajes, registrarHerrajes } from '@/lib/supabase/queries/fibra_herrajes'
 import ModuloPiezasFibra from '../ModuloPiezasFibra'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
+import EstadoEntregaOf from '../EstadoEntregaOf'
 
 // Instalación Herrajes: punto de notificación entre Vaciado y Pulido (un solo botón: Registrar Herrajes)
 function RegistroHerrajesCard({ registro, orden, moldes, usuarioEmail, onRefresh }: {
@@ -35,7 +36,8 @@ function RegistroHerrajesCard({ registro, orden, moldes, usuarioEmail, onRefresh
         </button>
     )
 
-    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-amber-50/40" />
+    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-amber-50/40"
+        extra={<EstadoEntregaOf of={registro.orden_fabricacion} />} />
 }
 
 export default function HerrajesFibraModule({ userEmail }: { userEmail: string }) {
