@@ -38,7 +38,8 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     indicadores_productividad: true,
     asistencia: true,
     mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador'],
-    esquema_personal: ['editar']
+    esquema_personal: ['editar'],
+    inventarios_ciclicos: true
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -61,7 +62,8 @@ const PERMISSION_LABELS: Record<string, string> = {
     indicadores_productividad: 'Tablero de Control',
     asistencia: 'Asistencia',
     mantenimiento: 'Mantenimiento (LILAC)',
-    esquema_personal: 'Esquema de Personal (además de jefes y coordinadores)'
+    esquema_personal: 'Esquema de Personal (además de jefes y coordinadores)',
+    inventarios_ciclicos: 'Inventarios Cíclicos'
 };
 
 const SUBMODULO_LABELS: Record<string, string> = {
