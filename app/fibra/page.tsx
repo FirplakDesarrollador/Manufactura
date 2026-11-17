@@ -57,6 +57,18 @@ export default function FibraPage() {
     const [loading, setLoading] = useState(true)
     const [sidebarOpen, setSidebarOpen] = useState(true)
     const [activeModule, setActiveModule] = useState<string>('')
+    // Aviso de Traslados: OF con novedades (sin traslado, con faltantes o solicitado sin trasladar) en la última revisión
+    const [novedadesTraslados, setNovedadesTraslados] = useState(0)
+    useEffect(() => {
+        const contar = async () => {
+            const { count, error } = await supabase.from('traslados_of_fv').select('orden_fabricacion', { count: 'exact', head: true })
+                .in('estado', ['sin_traslado', 'faltante', 'solicitado'])
+            if (!error) setNovedadesTraslados(count || 0)
+        }
+        contar()
+        const t = setInterval(contar, 5 * 60000)
+        return () => clearInterval(t)
+    }, [])
 
     const getUserData = useCallback(async () => {
         setLoading(true)
@@ -423,8 +435,8 @@ export default function FibraPage() {
                         {/* Traslados: OF liberadas vs. sus traslados en SAP (solo consulta, sin permiso propio) */}
                         <button
                             onClick={() => setActiveModule('traslados')}
-                            title={sidebarOpen ? undefined : 'Traslados'}
-                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'traslados'
+                            title={sidebarOpen ? undefined : `Traslados${novedadesTraslados ? ` · ${novedadesTraslados} OF con novedades` : ''}`}
+                            className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'traslados'
                                 ? 'bg-[#254153] text-white'
                                 : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                 }`}
@@ -434,6 +446,13 @@ export default function FibraPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h12m0 0l-4-4m4 4l-4 4M17 17H5m0 0l4 4m-4-4l4-4" />
                             </svg>
                             <span>Traslados</span>
+                            {/* Número rojo tipo notificación: OF con faltantes o sin traslado (se ve también con el menú recogido) */}
+                            {novedadesTraslados > 0 && (
+                                <b title={`${novedadesTraslados} OF con faltantes o sin traslado`}
+                                    className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${sidebarOpen ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+                                    {novedadesTraslados > 99 ? '99+' : novedadesTraslados}
+                                </b>
+                            )}
                         </button>
 
                         {/* Mapa de procesos: solo consulta, sin permiso propio */}
