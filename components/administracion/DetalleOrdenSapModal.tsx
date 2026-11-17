@@ -433,12 +433,12 @@ export default function DetalleOrdenSapModal({ ordenFabricacion, onClose, piso }
                                     </div>
                                 ))}
                                 {([
-                                    { label: 'Cantidad Resina', total: masaCalc, piezas: (orden.vaciado || []).map(p => ({ pieza: p.pieza, kg: p.resinaKg, extra: p.resinaTipo })) },
+                                    { label: 'Resina', total: masaCalc, piezas: (orden.vaciado || []).map(p => ({ pieza: p.pieza, kg: p.resinaKg, extra: p.resinaTipo })) },
                                     { label: 'Gelcoat teórico', total: gelcoatCalc, piezas: (orden.vaciado || []).filter(p => p.gelcoatKg != null).map(p => ({ pieza: p.pieza, kg: p.gelcoatKg as number, extra: '' })) }
                                 ]).map(({ label, total, piezas }) => {
                                     const varias = piezas.length > 1
                                     return (
-                                        <div key={label} title={label === 'Cantidad Resina' && detalleVaciado ? detalleVaciado : undefined}
+                                        <div key={label} title={label === 'Resina' && detalleVaciado ? detalleVaciado : undefined}
                                             className={`bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 min-w-0 ${varias ? '-mt-[18px]' : ''}`}>
                                             <div className="flex items-baseline justify-between gap-1">
                                                 <span className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap truncate">{label}</span>

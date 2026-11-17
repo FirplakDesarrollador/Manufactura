@@ -95,7 +95,8 @@ export default function Header({
   return (
     <>
       <header className={`z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full ${compact ? 'sticky top-0' : 'fixed top-0 left-0 right-0'}`}>
-      <div className={`w-full px-3 sm:px-4 flex items-center justify-between relative ${estilo ? 'h-12' : 'h-20'}`}>
+      {/* pl-2: el centro del ≡ queda a 24 px, alineado con la columna de íconos del menú lateral recogido (w-12) */}
+      <div className={`w-full pl-2 pr-3 sm:pr-4 flex items-center justify-between relative ${estilo ? 'h-12' : 'h-20'}`}>
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
         <div className={`flex items-center ${estilo ? 'gap-3 sm:gap-4' : 'gap-6'}`}>

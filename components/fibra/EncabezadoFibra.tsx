@@ -3,6 +3,8 @@
 import React, { useMemo } from 'react'
 import { OrdenFabricacion, RegistroTrazabilidad } from '@/types/pintura'
 import { Search, X, Calendar, RefreshCw } from 'lucide-react'
+import { useKgPorSku } from '@/lib/fibra/kgProductoFv'
+import { parseDBTimestamp } from '@/lib/utils/date'
 
 // Encabezado común de los módulos de piso FV (Pintura, Vaciado…): indicadores del día y barra de búsqueda,
 // fecha, limpiar y Actualizar SAP. Las métricas y el filtro base son los mismos de Administración.
@@ -34,6 +36,9 @@ export function useMetricasFibra(ordenes: OrdenFabricacion[], trazabilidad: Regi
         })
     }, [ordenes, searchText, selectedDate])
 
+    // Kilos por producto (resina + gelcoat con la reducción de Parámetros FV)
+    const kgPorSku = useKgPorSku()
+
     // Calculate metrics to match reference app (FlutterFlow)
     const metrics = useMemo(() => {
         const today = new Date().toISOString().split('T')[0]
@@ -60,12 +65,19 @@ export function useMetricasFibra(ordenes: OrdenFabricacion[], trazabilidad: Regi
             const aDate = (t.acabado_fecha || '').split('T')[0]
             return aDate === today
         })
-        // Kilograms: Current Transito + Cedi Today (Matches FF logic for 3407.8kg)
-        const transitoTotal = trazabilidad.filter(t => t.estado === 'Transito')
         const cediToday = trazabilidad.filter(t => (t.cedi_fecha || '').split('T')[0] === today)
 
-        const totalKilos = [...transitoTotal, ...cediToday]
-            .reduce((acc, t) => acc + (Number(t.kilos_vaciados) || 0), 0)
+        // Kg Hoy: resina + gelcoat (con la reducción de Parámetros FV) de las piezas vaciadas hoy (día local).
+        // Pieza cuyo producto no tiene kilos en Parámetros → no suma y se cuenta como "sin dato".
+        const hoyLocal = new Date().toLocaleDateString('en-CA')
+        let totalKilos = 0, kgSinDato = 0
+        for (const t of trazabilidad) {
+            const f = t.vaciado_fecha || t.fecha_vaciado
+            if (!f || parseDBTimestamp(f).toLocaleDateString('en-CA') !== hoyLocal) continue
+            const kg = kgPorSku?.get(String((t as any).producto_sku || '').trim())
+            if (kg === undefined) kgSinDato++
+            else totalKilos += kg
+        }
 
         // Derive transito from filtered orders so it respects the search filter exactly
         const transitoFiltered = baseFilteredOrdenes.reduce((sum, o) => sum + Math.max(0, o.transito || 0), 0)
@@ -83,9 +95,11 @@ export function useMetricasFibra(ordenes: OrdenFabricacion[], trazabilidad: Regi
             digitado: trazabilidad.filter(t => t.estado === 'Digitado').length,
             transito: transitoFiltered,
             cedi: cediToday.length,
-            kilogramos: parseFloat(totalKilos.toFixed(1))
+            kilogramos: parseFloat(totalKilos.toFixed(1)),
+            kgSinDato: kgPorSku ? kgSinDato : 0,
+            kgCargando: !kgPorSku
         }
-    }, [baseFilteredOrdenes, trazabilidad])
+    }, [baseFilteredOrdenes, trazabilidad, kgPorSku])
 
     return { baseFilteredOrdenes, metrics }
 }
@@ -123,43 +137,44 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
                     <StatCard label="Digitado" value={metrics.digitado} color="bg-[#59a96a]/15 text-[#2f7a40]" />
                     <StatCard label="Transito" value={metrics.transito} color="bg-[#59a96a]/15 text-[#2f7a40]" />
                     <StatCard label="Cedi Hoy" value={metrics.cedi} color="bg-[#59a96a]/15 text-[#2f7a40]" />
-                    <StatCard label="Kg Hoy" value={metrics.kilogramos.toFixed(1)} color="bg-[#324354] text-white" />
+                    <StatCard label="Kg Hoy" value={metrics.kgCargando ? '…' : `${metrics.kilogramos.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${metrics.kgSinDato ? '*' : ''}`} color="bg-[#324354] text-white"
+                        title={`Resina + gelcoat de las piezas vaciadas hoy (con la reducción de Parámetros).${metrics.kgSinDato ? ` * ${metrics.kgSinDato} pieza(s) sin kilos en Parámetros: no suman.` : ''}`} />
                 </div>
             </div>
 
-            {/* Controls */}
+            {/* Controles: en celular búsqueda, fecha, limpiar y SAP en un solo renglón (sin títulos) */}
             <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-2 sm:gap-3">
-                    <div className="basis-full md:basis-0 flex-1 min-w-0 md:min-w-[300px]">
-                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Búsqueda Global</label>
+                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-1.5 sm:gap-3">
+                    <div className="basis-0 flex-1 min-w-[96px] md:min-w-[300px]">
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 hidden sm:block">Búsqueda Global</label>
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                            <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                             <input
                                 type="text"
                                 placeholder={placeholder}
                                 value={searchText}
                                 onChange={(e) => onSearchChange(e.target.value)}
-                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
+                                className="w-full h-8 pl-7 sm:pl-9 pr-2 sm:pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
                             />
                         </div>
                     </div>
 
-                    <div className="w-40 sm:w-48">
-                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Filtrar Fecha</label>
+                    <div className="w-[112px] sm:w-48 shrink-0">
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 hidden sm:block">Filtrar Fecha</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hidden sm:block" size={15} />
                             <input
                                 type="date"
                                 value={selectedDate || ''}
                                 onChange={(e) => onDateChange(e.target.value)}
-                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
+                                className="w-full h-8 pl-1.5 sm:pl-9 pr-1 sm:pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-[11px] sm:text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
                             />
                         </div>
                     </div>
 
                     <button
                         onClick={onClear}
-                        className="h-8 w-8 flex items-center justify-center bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
+                        className="h-8 w-8 shrink-0 flex items-center justify-center bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
                         title="Limpiar filtros"
                     >
                         <X size={16} />
@@ -169,7 +184,7 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
                     <button
                         onClick={onSyncSap}
                         disabled={syncing || loading}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-[#324354] text-white rounded-lg hover:bg-[#254153] transition-colors shadow-sm disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider h-8 self-end"
+                        className="shrink-0 flex items-center gap-1.5 px-2 sm:px-3 py-2 bg-[#324354] text-white rounded-lg hover:bg-[#254153] transition-colors shadow-sm disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider h-8 self-end"
                         title="Sincronizar y recargar órdenes desde SAP"
                     >
                         <RefreshCw size={15} className={syncing || loading ? 'animate-spin' : ''} />
@@ -177,16 +192,16 @@ export default function EncabezadoFibra({ metrics, searchText, onSearchChange, s
                     </button>
                     )}
 
-                    {extra}
+                    {extra && <div className="basis-full sm:basis-auto">{extra}</div>}
                 </div>
             </div>
         </>
     )
 }
 
-function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
+function StatCard({ label, value, color, title }: { label: string, value: string | number, color: string, title?: string }) {
     return (
-        <div className={`flex-1 min-w-[64px] sm:min-w-[76px] px-1 sm:px-1.5 py-1.5 rounded-lg border border-[#e2ded5] shadow-sm flex flex-col items-center justify-center ${color}`}>
+        <div title={title} className={`flex-1 min-w-[64px] sm:min-w-[76px] px-1 sm:px-1.5 py-1.5 rounded-lg border border-[#e2ded5] shadow-sm flex flex-col items-center justify-center ${color}`}>
             <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
             <span className="text-sm font-black tracking-tight">{value}</span>
         </div>

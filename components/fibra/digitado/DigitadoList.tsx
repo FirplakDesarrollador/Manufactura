@@ -6,6 +6,7 @@ import RegistroDigitadoCard from './RegistroDigitadoCard'
 import { Truck, Info, Package, ArrowLeft } from 'lucide-react'
 import { getRegistrosTrazabilidadPorOrden } from '@/lib/supabase/queries/fibra'
 import { registrarDigitadoMasivo } from '@/lib/supabase/queries/fibra_digitado'
+import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
 import OrdenCard from '@/components/pintura/OrdenCard'
 import { toast } from 'sonner'
 
@@ -61,6 +62,7 @@ export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, o
         setBulkLoading(true)
         try {
             await registrarDigitadoMasivo(idsToUpdate, userEmail)
+            revisarEntrega(order.orden_fabricacion)   // en segundo plano: componentes para la entrega
             toast.success(`${selectCount} piezas movidas a Tránsito`)
             await loadRegistros()
             onRefresh()

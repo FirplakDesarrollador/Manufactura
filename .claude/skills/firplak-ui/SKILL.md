@@ -62,7 +62,7 @@ Componente único: `components/opt-sistemica/Header.tsx`. **No crear encabezados
 ```
 - Fondo `bg-[#324354]`, alto `h-12` (48 px), capa `z-[100]`.
 - Contenido a **todo el ancho** (`w-full px-3 sm:px-4`), sin `max-w-[1800px] mx-auto`: el menú y el título quedan pegados al borde izquierdo y el nombre al derecho, en cualquier pantalla (aprobado 2026-11-08).
-- Izquierda: menú hamburguesa (`w-6 h-6`) + título en mayúsculas `text-base sm:text-lg font-light tracking-widest`. **Sin subtítulo** (el prop existe por compatibilidad, no se muestra).
+- Izquierda: menú hamburguesa (`w-6 h-6`, botón `w-8`; el banner lleva `pl-2 pr-3 sm:pr-4` para que el centro del ≡ quede a 24 px, alineado con los íconos del menú lateral recogido `w-12`) + título en mayúsculas `text-base sm:text-lg font-light tracking-widest`. **Sin subtítulo** (el prop existe por compatibilidad, no se muestra).
 - Centro: logo FIRPLAK `h-9` (blanco, `/logo-firplak-clean.png`).
 - Derecha: solo el primer nombre del usuario `text-sm sm:text-base font-semibold` (sin el texto "Usuario"). **Sin ícono de cerrar sesión en el banner**: se cierra sesión solo desde el menú lateral.
 - El estilo es siempre el compacto; `compact` solo decide la posición: `true` → `sticky top-0`; `false` → `fixed` con espaciador `h-12`.
@@ -323,3 +323,4 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - 2026-11-02 · Menús de módulos más pequeños (§6.1) para que los 15 módulos del inicio se vean completos a zoom 100 %: tarjetas de 165 px (220 px en 2xl), ícono, letra y espacios reducidos en Inicio, Control de piso, Calidad, Sistema de Producción, Mantenimiento y Nueva OPT.
 - 2026-11-02 · Control de Piso FV pasa al `Header` estándar; menú de módulos de planta recogible a barra de íconos (§2.0).
 - 2026-11-10 · Tarjeta de orden FV (§6.2): encabezado OF | descripción en 2 renglones, 3 fechas del Semáforo con nombres cortos, Moldes compacto y todo en colores Firplak; detalle SAP junto a la descripción.
+- 2026-11-16 · Banner: margen izquierdo `pl-2` en toda la app para alinear el ≡ con la columna de íconos del menú de módulos recogido (Control de Piso FV y MS). Control de Piso MS pasa al `Header` estándar y al mismo menú lateral de FV (íconos iguales en procesos comunes).

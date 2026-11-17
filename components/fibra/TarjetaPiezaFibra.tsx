@@ -3,26 +3,28 @@
 import React from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import OrdenCard from '@/components/pintura/OrdenCard'
-import { Layers, Scale, AlertTriangle } from 'lucide-react'
+import { Layers, AlertTriangle } from 'lucide-react'
 import TrazabilidadPiezaFibra from './TrazabilidadPiezaFibra'
 
 // Tarjeta de una pieza en los módulos de piso FV (Vaciado, Pulido, Ensayo…): la tarjeta de la orden de Pintura
-// y debajo la franja de la pieza (serial, último proceso con su trazabilidad, masa teórica) con las acciones del módulo a la derecha
+// y debajo la franja de la pieza (serial, último proceso con su trazabilidad, con las acciones del módulo a la derecha
 interface TarjetaPiezaFibraProps {
     registro: RegistroTrazabilidad
     orden?: OrdenFabricacion
     moldes: Molde[]
     acciones: React.ReactNode
+    pesos?: 'gelcoat' | 'resina'   // kilos por pieza en la tarjeta de la orden (Resina en Vaciado)
+    extra?: React.ReactNode   // dato adicional en la franja (p. ej. componentes para la entrega en Digitado)
     franja?: string   // ya no cambia el color: la franja es gris Firplak en todos los módulos (se deja por compatibilidad)
 }
 
-export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones }: TarjetaPiezaFibraProps) {
+export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones, extra, pesos }: TarjetaPiezaFibraProps) {
     return (
         <div className="bg-white border-2 border-[#e2ded5] rounded-lg">
             {orden ? (
                 // La tarjeta de la orden solo informa: sin borde propio ni selección
                 <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none [&>button]:cursor-default [&>button:hover]:bg-white">
-                    <OrdenCard planta="fv" orden={orden} isActive={false} onClick={() => { }} moldes={moldes} />
+                    <OrdenCard planta="fv" pesos={pesos} orden={orden} isActive={false} onClick={() => { }} moldes={moldes} />
                 </div>
             ) : (
                 <div className="p-3 text-xs">
@@ -35,28 +37,24 @@ export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones }:
             )}
 
             {/* Franja de la pieza: gris cálido Firplak (crema con borde #e2ded5) en todos los módulos */}
-            <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-2 flex flex-col lg:flex-row lg:items-center gap-3">
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 flex-1 min-w-0">
+            <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1 flex flex-col lg:flex-row lg:items-center gap-1.5 lg:gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-6 gap-y-1 flex-1 min-w-0">
+                    {/* En celular molde (serial) y último proceso en un solo renglón (sin íconos, letra menor) */}
+                    <div className="flex flex-nowrap items-center gap-x-3 sm:gap-x-6 min-w-0">
                     <div className="flex items-center gap-2">
-                        <Layers size={18} className="text-[#7B8E90] shrink-0" />
+                        <Layers size={16} className="text-[#7B8E90] shrink-0 hidden sm:block" />
                         <div>
-                            <p className="text-[10px] text-[#7B8E90] uppercase font-black leading-none">Serial</p>
-                            <p className="text-lg font-black text-[#324354] leading-tight">{registro.molde_serial}</p>
+                            <p className="text-[10px] text-[#7B8E90] uppercase font-black leading-none">Molde</p>
+                            <p className="text-sm sm:text-base font-black text-[#324354] leading-tight whitespace-nowrap">{registro.molde_serial}</p>
                         </div>
                     </div>
                     <TrazabilidadPiezaFibra registro={registro} />
-                    <div className="flex items-center gap-2">
-                        <Scale size={16} className="text-[#7B8E90] shrink-0" />
-                        <div>
-                            <p className="text-[10px] text-[#7B8E90] uppercase font-black leading-none">Masa teórica</p>
-                            <p className="text-xs font-bold text-[#324354] leading-tight mt-0.5">
-                                {registro.molde_masa_teorica ? `${Number(registro.molde_masa_teorica).toFixed(2)} Kg` : 'N/A'}
-                            </p>
-                        </div>
                     </div>
+                    {extra}
                 </div>
 
-                <div className="flex flex-wrap gap-2 shrink-0">{acciones}</div>
+                {/* En celular los botones en un solo renglón, repartidos a lo ancho y con letra más pequeña */}
+                <div className="flex flex-nowrap sm:flex-wrap gap-2 shrink-0 [&>*]:flex-1 [&>*]:min-w-0 sm:[&>*]:flex-none [&_button]:px-2 sm:[&_button]:px-4 [&_button]:text-xs sm:[&_button]:text-sm [&_button]:whitespace-nowrap [&_button]:h-9">{acciones}</div>
             </div>
         </div>
     )

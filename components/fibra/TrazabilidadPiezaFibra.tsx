@@ -1,12 +1,14 @@
 'use client'
 import { parseDBTimestamp } from '@/lib/utils/date';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { RegistroTrazabilidad } from '@/types/pintura'
-import { Clock, ChevronDown } from 'lucide-react'
+import { Clock, ChevronDown, X } from 'lucide-react'
 
 // Fecha y hora de cada proceso ya registrado de una pieza FV. En la franja se ve el último;
-// si hay más de uno, "Trazabilidad ▾" despliega todos en orden con el usuario que lo registró.
+// si hay más de uno, "Traz. ▾" abre todos en orden con el usuario que lo registró, en una ventana centrada en la pantalla
+// (como desplegable se cortaba en el celular).
 const PASOS: { label: string; fecha: (r: RegistroTrazabilidad) => string | undefined; usuario?: (r: RegistroTrazabilidad) => string | undefined }[] = [
     { label: 'Pintura', fecha: r => r.pintura_fecha, usuario: r => r.pintura_user_name },
     { label: 'Contramolde', fecha: r => r.contramolde_fecha, usuario: r => r.contramolde_user_name },
@@ -29,13 +31,12 @@ const formato = (d: Date) => d.toLocaleString('es-CO', { day: '2-digit', month: 
 
 export default function TrazabilidadPiezaFibra({ registro }: { registro: RegistroTrazabilidad }) {
     const [abierta, setAbierta] = useState(false)
-    const ref = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         if (!abierta) return
-        const cerrar = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAbierta(false) }
-        document.addEventListener('mousedown', cerrar)
-        return () => document.removeEventListener('mousedown', cerrar)
+        const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierta(false) }
+        window.addEventListener('keydown', tecla)
+        return () => window.removeEventListener('keydown', tecla)
     }, [abierta])
 
     const pasos = useMemo(() => PASOS
@@ -50,24 +51,33 @@ export default function TrazabilidadPiezaFibra({ registro }: { registro: Registr
     const ultimo = pasos[pasos.length - 1]
 
     return (
-        <div ref={ref} className="relative flex items-center gap-2">
-            <Clock size={16} className="text-[#7B8E90] shrink-0" />
+        <div className="flex items-center gap-2 min-w-0">
+            <Clock size={16} className="text-[#7B8E90] shrink-0 hidden sm:block" />
             <div>
-                <p className="text-[10px] text-[#7B8E90] uppercase font-black leading-none">{ultimo ? `Último proceso: ${ultimo.label}` : 'Trazabilidad'}</p>
-                <p className="text-xs font-bold text-[#324354] leading-tight mt-0.5">{ultimo ? formato(ultimo.fecha) : 'Sin registros'}</p>
+                <p className="text-[9px] sm:text-[10px] text-[#7B8E90] uppercase font-black leading-none whitespace-nowrap">{ultimo ? `Último proceso: ${ultimo.label}` : 'Trazabilidad'}</p>
+                <p className="text-[11px] sm:text-xs font-bold text-[#324354] leading-tight mt-0.5 whitespace-nowrap">{ultimo ? formato(ultimo.fecha) : 'Sin registros'}</p>
             </div>
             {pasos.length > 1 && (
                 <button
-                    onClick={() => setAbierta(v => !v)}
-                    className="h-7 px-2 ml-1 rounded-lg border border-[#e2ded5] bg-white hover:bg-[#F6F3EE] text-[11px] font-bold text-[#324354] flex items-center gap-1"
+                    onClick={e => { e.stopPropagation(); setAbierta(true) }}
+                    className="h-7 px-2 ml-1 shrink-0 whitespace-nowrap rounded-lg border border-[#e2ded5] bg-white hover:bg-[#F6F3EE] text-[11px] font-bold text-[#324354] flex items-center gap-1"
                     title="Ver la fecha y hora de cada proceso de la pieza"
                 >
-                    Trazabilidad ({pasos.length})
-                    <ChevronDown size={14} className={`transition-transform ${abierta ? 'rotate-180' : ''}`} />
+                    Traz. ({pasos.length})
+                    <ChevronDown size={14} />
                 </button>
             )}
-            {abierta && (
-                <div className="absolute left-0 top-full mt-1 z-20 w-80 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+            {abierta && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[150] bg-black/40 flex items-center justify-center p-3"
+                    onMouseDown={e => { if (e.target === e.currentTarget) setAbierta(false) }} onClick={e => e.stopPropagation()}>
+                <div className="w-full max-w-sm bg-white border-2 border-[#324354] rounded-xl shadow-2xl overflow-hidden">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[#e2ded5]">
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase text-[#7B8E90] leading-none">Trazabilidad</p>
+                            <p className="text-sm font-black text-[#324354] truncate">OF {registro.orden_fabricacion} · Serial {registro.molde_serial}</p>
+                        </div>
+                        <button onClick={() => setAbierta(false)} className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 shrink-0" title="Cerrar"><X size={16} /></button>
+                    </div>
                     <table className="w-full text-[11px]">
                         <thead className="bg-[#324354] text-white">
                             <tr>
@@ -87,6 +97,8 @@ export default function TrazabilidadPiezaFibra({ registro }: { registro: Registr
                         </tbody>
                     </table>
                 </div>
+                </div>,
+                document.body
             )}
         </div>
     )
