@@ -6,116 +6,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   Send, Bot, User, HelpCircle, BookOpen, Clock,
-  Activity, CheckCircle2, FileText, Eye, Sparkles, Wrench, BarChart2, Briefcase, Info
+  Activity, CheckCircle2, FileText, Eye, Sparkles, Wrench, BarChart2, Briefcase, Info, Network, Search, ChevronRight, ArrowRight, ExternalLink, Construction
 } from "lucide-react";
 import Header from "@/components/opt-sistemica/Header";
+import { MODULOS, GRUPOS, FLUJO, responder, type Modulo, type Pestana } from "@/lib/asistencia/conocimiento";
 
-// Comprehensive Application summaries data matching all modules and submodules
-const APP_SUMMARIES = [
-  {
-    id: "control-piso",
-    title: "Control de Piso",
-    icon: Activity,
-    color: "border-l-[#324354] text-[#324354]",
-    description: "Módulo principal para reportar la producción diaria por estación en las plantas de manufactura. Permite registrar las piezas vaciadas, pulidas, pintadas y empacadas.",
-    submodules: [
-      { name: "Control de Piso Mármol", desc: "Reporte operativo para la planta de Mármol Sintético por estación de trabajo." },
-      { name: "Control de Piso Muebles", desc: "Monitoreo y registro de piezas en la planta de ensamble de madera." },
-      { name: "Control de Piso Fibra", desc: "Seguimiento de la producción en la planta de Fibra de Vidrio (bañeras y jacuzzis)." }
-    ],
-    tips: ["Verifica tu línea de producción antes de iniciar el registro diario.", "Registra las piezas al finalizar cada tanda de trabajo para no perder trazabilidad."]
-  },
-  {
-    id: "calidad",
-    title: "Calidad",
-    icon: CheckCircle2,
-    color: "border-l-[#7B8E90] text-[#7B8E90]",
-    description: "Auditoría, control e inspección de producto terminado. Permite registrar defectos, clasificar piezas no conformes y asegurar que los productos cumplan con los estándares antes del despacho.",
-    submodules: [
-      { name: "Indicadores Calidad", desc: "Módulo de estadísticas de rendimiento y defectos promedio de calidad." },
-      { name: "Calidad MS", desc: "Registro específico de inspección para piezas de Mármol Sintético." },
-      { name: "Ficha RRC (Respuesta Rápida Calidad)", desc: "Tarjeta de control y corrección ante incidentes graves de calidad o materia prima." },
-      { name: "Criterios de Aceptación y Rechazo", desc: "Catálogo visual de defectos admisibles y no admisibles por planta." },
-      { name: "Plan de Vigilancia", desc: "Pautas de chequeo sistemático del proceso en puntos críticos de control." },
-      { name: "QRQC", desc: "Flujo de Respuesta Rápida de Control de Calidad ante quejas o fallas graves." }
-    ],
-    tips: ["Registra siempre la causa raíz del defecto en la Ficha RRC.", "Revisa los Criterios de Aceptación y Rechazo si tienes dudas sobre la gravedad de un defecto."]
-  },
-  {
-    id: "sistema-produccion",
-    title: "Sistema de Producción",
-    icon: FileText,
-    color: "border-l-[#324354] text-[#324354]",
-    description: "Gestión de la eficiencia y estandarización del proceso productivo. Integra el monitoreo de rendimiento, comportamiento seguro (OPT) e ideas de mejora.",
-    submodules: [
-      { name: "Estadísticas del Sistema", desc: "Panel consolidado con los históricos de OPT, Hora a Hora y estándares por planta." },
-      { name: "Bitácora de Turno", desc: "Reporte diario de novedades, incidencias y cumplimiento de actividades programadas." },
-      { name: "HDT Hoja División de Trabajo", desc: "Estandarización del trabajo y desglose de operaciones clave por autor y sección." },
-      { name: "Hora a Hora", desc: "Monitoreo en tiempo real de piezas conformes, defectuosas y desperdicios por hora." },
-      { name: "OPT Operativa", desc: "Auditoría de comportamientos seguros de los colaboradores (EPP, ergonomía, 5S)." },
-      { name: "OPT Sistémica", desc: "Programación semanal de observaciones y seguimiento al calendario de auditorías." },
-      { name: "5'S", desc: "Estándar y auditoría de orden, aseo e inspección de puestos de trabajo." },
-      { name: "Tarjetas Excelencia", desc: "Sugerencias de mejora aportadas por el personal de planta para optimizar procesos." }
-    ],
-    tips: ["Registra el Hora a Hora puntualmente al finalizar cada hora.", "Utiliza las Tarjetas de Excelencia para proponer cambios que reduzcan los desperdicios."]
-  },
-  {
-    id: "mantenimiento",
-    title: "Mantenimiento",
-    icon: Wrench,
-    color: "border-l-[#7B8E90] text-[#7B8E90]",
-    description: "Control de mantenimiento autónomo y preventivo de maquinaria de planta. Registra anomalías y lecciones LUP para evitar paradas no programadas.",
-    submodules: [
-      { name: "Indicadores Mantenimiento", desc: "KPIs de paros, disponibilidad de equipos y tiempos promedio de reparación." },
-      { name: "Tarjetas de Anomalías", desc: "Reporte de condiciones anormales o fallas detectadas en máquinas para intervención." },
-      { name: "Gestor de Mantenimiento", desc: "Ordenación de tareas, preventivos programados e historial de fallas." },
-      { name: "Almacén", desc: "Control de inventario de repuestos y materiales de mantenimiento." },
-      { name: "Máquinas", desc: "Ficha técnica, planos y manuales de los activos críticos de la empresa." },
-      { name: "Mantenimiento Autónomo LILAC", desc: "Checklist de inspección diaria de limpieza, lubricación y ajuste realizado por el operario." },
-      { name: "Puestas a Punto", desc: "Parámetros estándar de operación inicial para asegurar la calidad de la primera pieza." },
-      { name: "Controles Visuales", desc: "Señalizaciones y ayudas visuales para evitar errores operativos en máquinas." },
-      { name: "Lecciones LUP", desc: "Lecciones de Un Punto para el entrenamiento rápido sobre componentes de máquinas." },
-      { name: "Principio de Máquina", desc: "Descripción técnica del funcionamiento básico y riesgos de cada equipo." }
-    ],
-    tips: ["Registra las anomalías tan pronto las identifiques para evitar que escalen a daños graves.", "Realiza el Mantenimiento Autónomo LILAC antes de encender cualquier máquina al inicio de turno."]
-  },
-  {
-    id: "tablero-control",
-    title: "Tablero de Control",
-    icon: BarChart2,
-    color: "border-l-[#324354] text-[#324354]",
-    description: "Consolidación de indicadores clave de productividad en la planta de Firplak. Integra reportes automáticos y paneles manuales editables en tiempo real.",
-    submodules: [
-      { name: "Tablero BI", desc: "Visor interactivo que embebe el reporte de Power BI de producción mediante un iframe." },
-      { name: "Tablero Manual", desc: "Control de 7 KPIs manuales (Nivel Servicio, Productividad %, Productividad PZ, Productividad KG, Calidad, Presentismo, Accidentes) con semáforo dinámico." }
-    ],
-    tips: ["Haz clic sobre cualquier indicador en el Tablero Manual para editar su valor y guardar la meta diaria.", "El color de fondo cambiará automáticamente (Verde, Amarillo, Rojo) según alcances o no la meta configurada."]
-  },
-  {
-    id: "inventarios",
-    title: "Inventarios",
-    icon: Briefcase,
-    color: "border-l-[#7B8E90] text-[#7B8E90]",
-    description: "Consulta rápida de existencias de materias primas, materiales en tránsito y stock de producto terminado en almacenes de la planta.",
-    tips: ["Usa los filtros de almacén para aislar existencias específicas.", "Reporta cualquier descuadre de inventario inmediatamente."]
-  },
-  {
-    id: "consulta-sap",
-    title: "Consulta SAP",
-    icon: Info,
-    color: "border-l-[#324354] text-[#324354]",
-    description: "Consulta integrada de órdenes de fabricación, estado de entrega de lotes y especificaciones técnicas de materiales en SAP sin salir de la plataforma.",
-    tips: ["Asegúrate de copiar correctamente el número de orden de fabricación de SAP antes de consultar."]
-  },
-  {
-    id: "talento-humano",
-    title: "Talento Humano",
-    icon: User,
-    color: "border-l-[#7B8E90] text-[#7B8E90]",
-    description: "Portal externo de autogestión de nómina, certificados laborales, capacitaciones, vacaciones y beneficios para todos los colaboradores de Firplak.",
-    tips: ["Se abre en una pestaña externa y asocia tu correo de sesión automáticamente."]
-  }
-];
+const quitarTildes = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const textoModulo = (m: Modulo) => quitarTildes([m.nombre, m.que, ...(m.submodulos || []).flatMap(s => [s.nombre, s.que, ...(s.pestanas || []).flatMap(p => [p.nombre, p.que])]), ...(m.pestanas || []).flatMap(p => [p.nombre, p.que])].join(" "));
+
+function Chip({ estado }: { estado?: 'construccion' | 'externo' }) {
+  if (!estado) return null;
+  return estado === 'construccion'
+    ? <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 inline-flex items-center gap-1"><Construction size={10} /> En construcción</span>
+    : <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200 inline-flex items-center gap-1"><ExternalLink size={10} /> Externo</span>;
+}
+
+function ListaPestanas({ pestanas }: { pestanas: Pestana[] }) {
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {pestanas.map(p => (
+        <li key={p.nombre} className="text-[11px] leading-snug pl-3 border-l-2 border-[#e2ded5]">
+          <span className="font-bold text-[#324354]">{p.nombre}:</span> <span className="text-slate-600">{p.que}</span>
+          {p.como && <div className="text-[10px] text-[#7B8E90] mt-0.5"><b>Cómo se usa:</b> {p.como}</div>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// El glosario y la jerarquía vienen de lib/asistencia/conocimiento.ts (módulo → submódulo → pestaña)
 
 // Expanded Chatbot Knowledge Base
 const KNOWLEDGE_BASE: Record<string, string> = {
@@ -151,7 +70,8 @@ interface Message {
 }
 
 export default function AsistenciaPage() {
-  const [activeTab, setActiveTab] = useState<'assistant' | 'glossary'>('assistant');
+  const [activeTab, setActiveTab] = useState<'assistant' | 'glossary' | 'jerarquia'>('assistant');
+  const [filtroGlosario, setFiltroGlosario] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "bot",
@@ -191,11 +111,14 @@ export default function AsistenciaPage() {
 
     // Process response with simulated delay
     setTimeout(() => {
-      let response = "Disculpa, no logré entender la consulta sobre manufactura. Intenta preguntar sobre: **Control de Piso**, **Calidad**, **Mantenimiento**, **Sistema de Producción**, **Tablero de Control**, **Cultura** o **5S**.";
+      let response = "Disculpa, no logré entender la consulta sobre manufactura. Pregunta por cualquier módulo, submódulo o pestaña, por ejemplo: **Control de Piso Fibra**, **Traslados**, **Digitado**, **Parámetros**, **Calidad MS**, **Gestor de Mantenimiento**, **Informe de Turno** o **Tablero de Control**. También puedes revisar la pestaña **Jerarquía**.";
       
       const cleanText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       
-      for (const key of Object.keys(KNOWLEDGE_BASE)) {
+      // Primero la base de conocimiento completa (módulo → submódulo → pestaña); el saludo sigue en la base corta
+      const encontrada = /^\s*(hola|buen[oa]s)/.test(cleanText) ? null : responder(text);
+      if (encontrada) response = encontrada;
+      else for (const key of Object.keys(KNOWLEDGE_BASE)) {
         if (cleanText.includes(key)) {
           response = KNOWLEDGE_BASE[key];
           break;
@@ -220,9 +143,10 @@ export default function AsistenciaPage() {
   // FAQ suggestion chips
   const suggestions = [
     "¿Qué es Control de Piso?",
+    "¿Qué hace Traslados?",
+    "¿Cómo funciona Digitado en Fibra?",
     "¿Qué submódulos tiene Calidad?",
-    "¿Qué es Sistema de Producción?",
-    "¿Qué es Mantenimiento?",
+    "¿Qué tiene el Gestor de Mantenimiento?",
     "¿Cómo usar el Tablero de Control?"
   ];
 
@@ -307,11 +231,22 @@ export default function AsistenciaPage() {
             <BookOpen size={16} />
             <span>Glosario de Módulos</span>
           </button>
+          <button
+            onClick={() => setActiveTab('jerarquia')}
+            className={`inline-flex items-center gap-2 h-7 px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer border ${
+              activeTab === 'jerarquia'
+                ? 'bg-[#324354] text-white border-[#324354] shadow-sm'
+                : 'bg-white text-slate-600 border-[#e2ded5] hover:bg-slate-50'
+            }`}
+          >
+            <Network size={16} />
+            <span>Jerarquía</span>
+          </button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <main className="relative z-10 flex-1 flex flex-col justify-start p-6 md:p-12 pt-6 max-w-4xl mx-auto w-full">
+      <main className="relative z-10 flex-1 flex flex-col justify-start p-3 sm:p-6 md:px-10 pt-6 max-w-6xl mx-auto w-full">
         
         {/* Tab 1: Virtual Assistant */}
         {activeTab === 'assistant' && (
@@ -412,63 +347,179 @@ export default function AsistenciaPage() {
           </div>
         )}
 
-        {/* Tab 2: Application Glossary */}
+        {/* Tab 2: Glosario de Módulos — todos los módulos con submódulos, pestañas, cómo se usan y consejos */}
         {activeTab === 'glossary' && (
-          <div className="flex flex-col space-y-6 w-full animate-fade-in pb-12">
-            <header className="mb-4 flex items-center gap-3 text-[#324354]">
-              <BookOpen size={24} />
-              <h2 className="text-2xl font-bold uppercase tracking-wider font-display">Glosario de Aplicaciones</h2>
+          <div className="flex flex-col space-y-5 w-full animate-fade-in pb-12">
+            <header className="flex flex-wrap items-center justify-between gap-3 text-[#324354]">
+              <div className="flex items-center gap-3">
+                <BookOpen size={24} />
+                <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-wider font-display">Glosario de Módulos</h2>
+              </div>
+              <div className="relative w-full sm:w-72">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={filtroGlosario} onChange={e => setFiltroGlosario(e.target.value)} placeholder="Buscar módulo, pestaña o función…"
+                  className="w-full h-9 pl-9 pr-3 bg-white border border-[#e2ded5] rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-[#7B8E90]" />
+              </div>
+            </header>
+            <p className="text-xs text-slate-500 font-medium -mt-2">
+              {MODULOS.length} módulos de la app Manufactura. Cada uno con lo que hace, sus submódulos y pestañas, cómo se usa cada una y con qué otros módulos se conecta.
+            </p>
+
+            {GRUPOS.map(grupo => {
+              const q = quitarTildes(filtroGlosario.trim());
+              const mods = MODULOS.filter(m => m.grupo === grupo && (!q || textoModulo(m).includes(q)));
+              if (!mods.length) return null;
+              return (
+                <section key={grupo} className="space-y-4">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-[#7B8E90]">{grupo}</h3>
+                  {mods.map(m => (
+                    <Card key={m.id} id={`mod-${m.id}`} className="shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] bg-white rounded-3xl overflow-hidden">
+                      <CardHeader className="py-3 px-5 bg-[#324354]/5 border-b border-[#e2ded5] flex flex-row flex-wrap items-center gap-2">
+                        <span className="text-lg font-bold text-[#324354]">{m.nombre}</span>
+                        <Chip estado={m.estado} />
+                        <span className="ml-auto text-[10px] font-mono text-slate-400">{m.ruta}</span>
+                      </CardHeader>
+                      <CardContent className="p-5 space-y-4">
+                        <p className="text-sm text-slate-700 leading-relaxed font-medium">{m.que}</p>
+                        {m.quien && <p className="text-[11px] text-slate-500"><b className="text-[#324354]">Lo usan:</b> {m.quien}</p>}
+
+                        {m.submodulos && (
+                          <div className="space-y-2 pt-1 border-t border-slate-100">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block pt-2">Submódulos ({m.submodulos.length})</span>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                              {m.submodulos.map(s => (
+                                <div key={s.nombre} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-xs font-bold text-[#324354]">{s.nombre}</span>
+                                    <Chip estado={s.estado} />
+                                  </div>
+                                  <span className="text-[11px] text-slate-600 mt-1 block leading-snug">{s.que}</span>
+                                  {s.pestanas && <ListaPestanas pestanas={s.pestanas} />}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {m.pestanas && (
+                          <div className="pt-1 border-t border-slate-100">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block pt-2">Pestañas ({m.pestanas.length})</span>
+                            <ListaPestanas pestanas={m.pestanas} />
+                          </div>
+                        )}
+
+                        {(m.consejos.length > 0 || m.conecta) && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {m.consejos.length > 0 && (
+                              <div className="bg-[#F6F3EE] p-3 rounded-2xl border border-[#e2ded5]">
+                                <span className="text-[10px] text-[#7B8E90] font-bold uppercase tracking-wider block mb-1.5">Recomendaciones clave</span>
+                                <ul className="space-y-1.5">
+                                  {m.consejos.map((c, i) => <li key={i} className="text-xs text-slate-600 flex items-start gap-2"><span className="text-[#324354] font-bold">&bull;</span><span>{c}</span></li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {m.conecta && (
+                              <div className="bg-white p-3 rounded-2xl border border-[#e2ded5]">
+                                <span className="text-[10px] text-[#7B8E90] font-bold uppercase tracking-wider block mb-1.5">Se conecta con</span>
+                                <ul className="space-y-1.5">
+                                  {m.conecta.map((c, i) => <li key={i} className="text-xs text-slate-600 flex items-start gap-2"><ArrowRight size={12} className="text-[#324354] mt-0.5 shrink-0" /><span>{c}</span></li>)}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </section>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Tab 3: Jerarquía — árbol completo de la app (módulo → submódulo → pestaña) y flujo de la información */}
+        {activeTab === 'jerarquia' && (
+          <div className="flex flex-col space-y-5 w-full animate-fade-in pb-12">
+            <header className="flex items-center gap-3 text-[#324354]">
+              <Network size={24} />
+              <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-wider font-display">Jerarquía de la aplicación</h2>
             </header>
 
-            <div className="space-y-6">
-              {APP_SUMMARIES.map(app => {
-                const IconComponent = app.icon;
-                return (
-                  <Card key={app.id} className={`shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] transition duration-200 bg-white rounded-3xl overflow-hidden`}>
-                    <CardHeader className="py-4 px-6 bg-[#324354]/5 border-b border-[#e2ded5] flex flex-row items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#324354]/10 flex items-center justify-center text-[#324354]">
-                        <IconComponent size={20} />
-                      </div>
-                      <span className="text-lg font-bold text-[#324354]">{app.title}</span>
-                    </CardHeader>
-                    
-                    <CardContent className="p-6 space-y-4">
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                        {app.description}
-                      </p>
-                      
-                      {/* Submodules list if present */}
-                      {app.submodules && (
-                        <div className="space-y-3 pt-1 border-t border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Submódulos y Herramientas:</span>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {app.submodules.map((sub, sIdx) => (
-                              <div key={sIdx} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl">
-                                <span className="text-xs font-bold text-[#324354] block">{sub.name}</span>
-                                <span className="text-[11px] text-slate-500 mt-1 block">{sub.desc}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+            {/* Flujo de la información */}
+            <section className="bg-white rounded-3xl border border-[#e2ded5] p-4 sm:p-5 shadow-[0_4px_25px_rgba(50,67,84,0.05)]">
+              <h3 className="text-sm font-black text-[#324354] mb-3">Cómo fluye la información</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {FLUJO.map((f, i) => (
+                  <div key={f.paso} className="relative rounded-2xl bg-[#F6F3EE] border border-[#e2ded5] p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-[#324354] text-white text-[11px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
+                      <span className="text-xs font-black text-[#324354]">{f.paso}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">{f.detalle}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-                      {/* Tips alert box */}
-                      <div className="bg-[#F6F3EE] p-4 rounded-2xl border border-[#e2ded5] space-y-1">
-                        <span className="text-[10px] text-[#7B8E90] font-bold uppercase tracking-wider block mb-2">Recomendaciones Clave:</span>
-                        <ul className="space-y-2">
-                          {app.tips.map((tip, idx) => (
-                            <li key={idx} className="text-xs text-slate-600 flex items-start gap-2 font-medium">
-                              <span className="text-[#324354] font-bold mt-0.5">&bull;</span>
-                              <span>{tip}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+            {/* Árbol */}
+            <section className="bg-white rounded-3xl border border-[#e2ded5] p-4 sm:p-5 shadow-[0_4px_25px_rgba(50,67,84,0.05)]">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                <h3 className="text-sm font-black text-[#324354]">Mapa completo: Módulo › Submódulo › Pestaña</h3>
+                <span className="text-[10px] text-slate-400 font-semibold">Toque un módulo para abrirlo · se recorre igual que el menú ≡ del banner</span>
+              </div>
+              <div className="space-y-3">
+                {GRUPOS.map(grupo => (
+                  <div key={grupo}>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-[#7B8E90] mb-1.5">{grupo}</div>
+                    <div className="space-y-1.5">
+                      {MODULOS.filter(m => m.grupo === grupo).map(m => {
+                        const nSub = m.submodulos?.length || 0;
+                        const nTab = (m.pestanas?.length || 0) + (m.submodulos || []).reduce((a, s) => a + (s.pestanas?.length || 0), 0);
+                        return (
+                          <details key={m.id} className="group rounded-xl border border-[#e2ded5] bg-white open:bg-[#F6F3EE]/50">
+                            <summary className="cursor-pointer list-none px-3 py-2 flex items-center gap-2">
+                              <ChevronRight size={15} className="text-[#324354] transition-transform group-open:rotate-90 shrink-0" />
+                              <span className="text-sm font-bold text-[#324354]">{m.nombre}</span>
+                              <Chip estado={m.estado} />
+                              <span className="ml-auto text-[10px] text-slate-400 font-semibold whitespace-nowrap">
+                                {nSub ? `${nSub} submódulo${nSub > 1 ? 's' : ''}` : ''}{nSub && nTab ? ' · ' : ''}{nTab ? `${nTab} pestaña${nTab > 1 ? 's' : ''}` : ''}
+                              </span>
+                            </summary>
+                            <div className="px-3 pb-3 pl-8 space-y-2">
+                              <p className="text-[11px] text-slate-600">{m.que}</p>
+                              {(m.submodulos || []).map(s => (
+                                <div key={s.nombre} className="border-l-2 border-[#324354]/30 pl-3">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-xs font-bold text-[#324354]">{s.nombre}</span>
+                                    <Chip estado={s.estado} />
+                                    {s.ruta && <span className="text-[9px] font-mono text-slate-400">{s.ruta}</span>}
+                                  </div>
+                                  <p className="text-[11px] text-slate-500">{s.que}</p>
+                                  {s.pestanas && (
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                      {s.pestanas.map(p => <span key={p.nombre} title={p.que} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#e2ded5] text-slate-600">{p.nombre}</span>)}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              {m.pestanas && (
+                                <div className="flex flex-wrap gap-1">
+                                  {m.pestanas.map(p => <span key={p.nombre} title={p.que} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#e2ded5] text-slate-600">{p.nombre}</span>)}
+                                </div>
+                              )}
+                              <button onClick={() => { setFiltroGlosario(''); setActiveTab('glossary'); setTimeout(() => document.getElementById(`mod-${m.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+                                className="text-[11px] font-bold text-[#324354] underline underline-offset-2 hover:text-sky-700">
+                                Ver el detalle completo en el Glosario
+                              </button>
+                            </div>
+                          </details>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         )}
 

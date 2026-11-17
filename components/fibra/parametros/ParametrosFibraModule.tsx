@@ -1,240 +1,228 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
-import { ProductoMS } from '@/types/pintura'
-import { getProductosMS, updateProductosBulk } from '@/lib/supabase/queries/fibra_productos'
-import {
-    Search,
-    Eraser,
-    Loader2,
-    Save,
-    CheckSquare,
-    Square,
-    Percent,
-    Weight,
-    Info,
-    AlertCircle
-} from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, CheckSquare, Info, Loader2, Percent, RefreshCw, Save, Search, Square, X } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+
+// Parámetros FV: resina y gelcoat por pieza (Bañera / Faldón) de cada producto de Fibra, calculados desde la lista de
+// materiales de SAP (/api/sap/productos-fv → tabla productos_fv_pesos), y la reducción en % que define la planta para cada
+// material, como en Mármol: Kg app = Kg SAP × (1 − % / 100). Antes esta pantalla mostraba los productos de MS.
+
+type Fila = {
+    producto_sku: string; producto_descripcion: string | null
+    resina_banera_kg: number | null; resina_banera_tipo: string | null; gelcoat_banera_kg: number | null
+    resina_faldon_kg: number | null; resina_faldon_tipo: string | null; gelcoat_faldon_kg: number | null
+    error: string | null; calculado_at: string | null
+    porcentaje_reduccion_resina: number; porcentaje_reduccion_gelcoat: number
+    modified_at: string | null; modified_by: string | null
+}
+type Material = 'resina' | 'gelcoat'
+
+const kg = (v: number | null) => v === null || v === undefined ? null : Math.round(v * 100) / 100
+const fmt = (v: number | null) => v === null ? '—' : v.toLocaleString('es-CO', { maximumFractionDigits: 2 })
+const aplicar = (v: number | null, pct: number) => v === null ? null : kg(v * (1 - (Number(pct) || 0) / 100))
+const fecha = (s: string | null) => s ? new Date(s).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 
 export default function ParametrosFibraModule({ userEmail }: { userEmail: string }) {
-    const [productos, setProductos] = useState<ProductoMS[]>([])
-    const [loading, setLoading] = useState(true)
-    const [searchText, setSearchText] = useState('')
-    const [reductionType, setReductionType] = useState<'percent' | 'kg'>('percent')
-    const [reductionValue, setReductionValue] = useState('0.0')
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-    const [saving, setSaving] = useState(false)
+    const [filas, setFilas] = useState<Fila[]>([])
+    const [cargando, setCargando] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [busqueda, setBusqueda] = useState('')
+    const [material, setMaterial] = useState<Material>('resina')
+    const [pct, setPct] = useState('0')
+    const [sel, setSel] = useState<Set<string>>(new Set())
+    const [guardando, setGuardando] = useState(false)
+    const [sync, setSync] = useState<{ hechos: number; total: number; errores: number } | null>(null)
+    const cancelar = useRef(false)
 
-    useEffect(() => {
-        loadData()
+    const cargar = useCallback(async () => {
+        setCargando(true)
+        const todas: Fila[] = []
+        for (let i = 0; ; i += 1000) {
+            const { data, error: e } = await supabase.from('productos_fv_pesos').select('*').order('producto_descripcion').range(i, i + 999)
+            if (e) { setError(/productos_fv_pesos|relation|schema cache/i.test(e.message) ? 'Falta crear la tabla: ejecute productos_fv_pesos.sql en Supabase.' : e.message); break }
+            todas.push(...((data || []) as Fila[]))
+            if (!data || data.length < 1000) { setError(null); break }
+        }
+        setFilas(todas); setCargando(false)
     }, [])
+    useEffect(() => { cargar() }, [cargar])
 
-    const loadData = async () => {
-        setLoading(true)
+    const visibles = useMemo(() => {
+        const q = busqueda.trim().toLowerCase()
+        // Los productos sin datos de SAP (error o sin kilos) van al final; el resto en orden alfabético
+        const sinDatos = (f: Fila) => !!f.error || [f.resina_banera_kg, f.resina_faldon_kg, f.gelcoat_banera_kg, f.gelcoat_faldon_kg].every(v => v === null)
+        return filas
+            .filter(f => !q || f.producto_sku.toLowerCase().includes(q) || (f.producto_descripcion || '').toLowerCase().includes(q))
+            .sort((a, b) => Number(sinDatos(a)) - Number(sinDatos(b)) || (a.producto_descripcion || '').localeCompare(b.producto_descripcion || ''))
+    }, [filas, busqueda])
+    const todosSel = visibles.length > 0 && visibles.every(f => sel.has(f.producto_sku))
+    const alternarTodos = () => setSel(p => { const n = new Set(p); visibles.forEach(f => todosSel ? n.delete(f.producto_sku) : n.add(f.producto_sku)); return n })
+    const alternar = (sku: string) => setSel(p => { const n = new Set(p); if (n.has(sku)) n.delete(sku); else n.add(sku); return n })
+    const sinDato = filas.filter(f => f.error).length
+
+    // Actualiza desde SAP por lotes (uno a la vez); primero los productos de las OF pendientes de Fibra
+    const actualizarSap = async () => {
+        cancelar.current = false
+        setSync({ hechos: 0, total: 0, errores: 0 }); setError(null)
         try {
-            const data = await getProductosMS()
-            setProductos(data)
-        } catch (error) {
-            console.error('Error loading products:', error)
+            const r = await fetch('/api/sap/productos-fv?accion=lista', { cache: 'no-store' })
+            const d = await r.json()
+            if (!r.ok) throw new Error(d.error || `Error ${r.status}`)
+            const { data: ofs } = await supabase.from('ordenes_fabricacion_fv').select('producto_sku')
+            const prioridad = new Set((ofs || []).map((o: any) => String(o.producto_sku || '').trim()))
+            const skus: string[] = (d.productos as { sku: string }[]).map(p => p.sku).sort((a, b) => Number(prioridad.has(b)) - Number(prioridad.has(a)))
+            let errores = 0
+            setSync({ hechos: 0, total: skus.length, errores })
+            for (let i = 0; i < skus.length; i += 10) {
+                if (cancelar.current) break
+                const lote = skus.slice(i, i + 10)
+                const rr = await fetch(`/api/sap/productos-fv?accion=calcular&skus=${encodeURIComponent(lote.join(','))}`, { cache: 'no-store' })
+                const dd = await rr.json().catch(() => ({}))
+                if (!rr.ok) throw new Error(dd.error || `Error ${rr.status}`)
+                errores += dd.conError || 0
+                setSync({ hechos: Math.min(i + 10, skus.length), total: skus.length, errores })
+                if ((i / 10) % 10 === 9) cargar()   // va mostrando lo calculado
+            }
+        } catch (e) {
+            setError(`No se pudo actualizar desde SAP: ${e instanceof Error ? e.message : 'error'}`)
         } finally {
-            setLoading(false)
+            await cargar(); setSync(null)
         }
     }
 
-    const filteredProductos = useMemo(() => {
-        const search = searchText.toLowerCase()
-        return productos.filter(p =>
-            (p.producto_sku?.toLowerCase() || '').includes(search) ||
-            (p.producto_descripcion?.toLowerCase() || '').includes(search) ||
-            (p.color?.toLowerCase() || '').includes(search) ||
-            (p.masa?.toString() || '').includes(search)
+    const guardar = async () => {
+        const v = Number(String(pct).replace(',', '.'))
+        if (!sel.size) return alert('Seleccione al menos un producto')
+        if (!(v >= 0 && v < 100)) return alert('El % de reducción debe estar entre 0 y 99')
+        if (!confirm(`¿Reducir ${material === 'resina' ? 'la resina' : 'el gelcoat'} en ${v} % a ${sel.size} producto(s)?`)) return
+        setGuardando(true)
+        const { error: e } = await supabase.from('productos_fv_pesos')
+            .update({ [material === 'resina' ? 'porcentaje_reduccion_resina' : 'porcentaje_reduccion_gelcoat']: v, modified_at: new Date().toISOString(), modified_by: userEmail })
+            .in('producto_sku', [...sel])
+        setGuardando(false)
+        if (e) return alert(`No se pudo guardar: ${e.message}`)
+        setSel(new Set()); setPct('0'); cargar()
+    }
+
+    const celda = (sap: number | null, red: number, tipo?: string | null) => sap === null
+        ? <span className="text-slate-300">—</span>
+        : (
+            <div className="leading-tight" title={`SAP ${fmt(sap)} Kg${red ? ` − ${red} %` : ''}${tipo ? ` · resina ${tipo.toLowerCase()}` : ''}`}>
+                <div className="font-black text-[#324354]">{fmt(aplicar(sap, red))}</div>
+                <div className="text-[9px] text-slate-400 font-semibold">{red ? `SAP ${fmt(sap)}` : tipo || 'SAP'}</div>
+            </div>
         )
-    }, [productos, searchText])
-
-    const handleSelectAll = () => {
-        if (selectedIds.size === filteredProductos.length) {
-            setSelectedIds(new Set())
-        } else {
-            setSelectedIds(new Set(filteredProductos.map(p => p.id)))
-        }
-    }
-
-    const toggleSelect = (id: number) => {
-        const newSelected = new Set(selectedIds)
-        if (newSelected.has(id)) {
-            newSelected.delete(id)
-        } else {
-            newSelected.add(id)
-        }
-        setSelectedIds(newSelected)
-    }
-
-    const handleSave = async () => {
-        if (selectedIds.size === 0) {
-            alert('Debe seleccionar al menos 1 producto')
-            return
-        }
-
-        const modeText = reductionType === 'percent' ? `${reductionValue}%` : `${reductionValue}kg`
-        if (!confirm(`¿Seguro que desea reducir en ${modeText} los kilos de los ${selectedIds.size} productos seleccionados?`)) return
-
-        setSaving(true)
-        try {
-            const val = parseFloat(reductionValue)
-            await updateProductosBulk(Array.from(selectedIds), {
-                [reductionType === 'percent' ? 'porcentaje_reduccion' : 'kilos_reduccion']: val,
-                modified_by: userEmail
-            })
-            alert(`Se aplicó la reducción a ${selectedIds.size} productos correctamente.`)
-            setReductionValue('0.0')
-            setSelectedIds(new Set())
-            loadData()
-        } catch (error) {
-            console.error('Error saving changes:', error)
-            alert('Hubo un error al guardar los cambios.')
-        } finally {
-            setSaving(false)
-        }
-    }
 
     return (
-        <div className="h-full flex flex-col bg-slate-50/30">
-            {/* Header / Tools */}
-            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-6">
-                    {/* Search */}
-                    <div className="flex-1 min-w-[300px]">
-                        <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Búsqueda</label>
+        <div className="h-full flex flex-col bg-[#F6F3EE]/40">
+            {/* Barra de herramientas */}
+            <div className="bg-white border-b border-[#e2ded5] px-3 sm:px-4 py-2 shrink-0 space-y-2">
+                <div className="flex flex-wrap items-end gap-2">
+                    <div className="flex-1 min-w-[200px]">
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Búsqueda</label>
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="sku / producto / kilos / color"
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="SKU / producto"
+                                className="w-full h-8 pl-8 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]" />
                         </div>
                     </div>
-
-                    {/* Reduction Selector */}
-                    <div className="flex gap-4 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                        <button
-                            onClick={() => setReductionType('percent')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${reductionType === 'percent' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
-                        >
-                            <Percent size={14} /> REDUCIR EN %
-                        </button>
-                        <button
-                            onClick={() => setReductionType('kg')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${reductionType === 'kg' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
-                        >
-                            <Weight size={14} /> REDUCIR EN KILOS
-                        </button>
-                    </div>
-
-                    {/* Value & Save */}
-                    <div className="flex items-end gap-3">
-                        <div className="w-32">
-                            <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">
-                                {reductionType === 'percent' ? '% de reducción' : 'Kg de reducción'}
-                            </label>
-                            <input
-                                type="number"
-                                step="0.1"
-                                value={reductionValue}
-                                onChange={(e) => setReductionValue(e.target.value)}
-                                className="w-full px-4 py-2 bg-white border-2 border-slate-200 rounded-lg font-black text-center text-blue-600 focus:border-blue-500 outline-none"
-                            />
+                    <div>
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Reducir</label>
+                        <div className="flex h-8 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            {(['resina', 'gelcoat'] as const).map(m => (
+                                <button key={m} onClick={() => setMaterial(m)} className={`px-3 rounded-md text-[11px] font-bold uppercase ${material === m ? 'bg-[#324354] text-white' : 'text-slate-500 hover:text-[#324354]'}`}>{m === 'resina' ? 'Resina' : 'Gelcoat'}</button>
+                            ))}
                         </div>
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || selectedIds.size === 0}
-                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-6 py-2.5 rounded-lg flex items-center gap-2 font-black text-sm shadow-lg shadow-blue-200 transition-all active:scale-95"
-                        >
-                            {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                            MODIFICAR
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">% de reducción</label>
+                        <div className="relative w-24">
+                            <input value={pct} onChange={e => setPct(e.target.value)} inputMode="decimal"
+                                className="w-full h-8 pl-3 pr-7 bg-white border border-[#e2ded5] rounded-lg font-black text-sm text-[#324354] text-right outline-none focus:ring-2 focus:ring-[#7B8E90]" />
+                            <Percent size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        </div>
+                    </div>
+                    <button onClick={guardar} disabled={guardando || !sel.size}
+                        className="h-8 px-3 rounded-lg bg-[#324354] text-white text-[11px] font-bold uppercase flex items-center gap-1.5 hover:bg-[#254153] disabled:opacity-40">
+                        {guardando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Aplicar ({sel.size})
+                    </button>
+                    {sync ? (
+                        <button onClick={() => { cancelar.current = true }} className="h-8 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] text-[11px] font-bold flex items-center gap-1.5" title="Detener la actualización">
+                            <Loader2 size={14} className="animate-spin" /> {sync.total ? `${sync.hechos}/${sync.total}` : 'Leyendo SAP…'} <X size={13} />
                         </button>
-                    </div>
-
-                    {/* Note */}
-                    <div className="max-w-[280px] bg-blue-50 p-3 rounded-xl border border-blue-100 flex gap-2">
-                        <Info className="text-blue-500 shrink-0" size={16} />
-                        <p className="text-[10px] font-bold text-blue-700 leading-tight">
-                            Nota: Puedes reducir en porcentaje o kilogramos los productos que selecciones
-                        </p>
-                    </div>
+                    ) : (
+                        <button onClick={actualizarSap} className="h-8 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-[11px] font-bold flex items-center gap-1.5"
+                            title="Recalcular resina y gelcoat de todos los productos FV desde la lista de materiales de SAP (primero los de las OF pendientes)">
+                            <RefreshCw size={14} /> Actualizar desde SAP
+                        </button>
+                    )}
                 </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-bold">
+                    <span className="text-slate-500">PRODUCTOS: <b className="text-[#324354]">{visibles.length}</b></span>
+                    <span className="text-[#2f7a40]">SELECCIONADOS: {sel.size}</span>
+                    {sinDato > 0 && <span className="text-[#d14747]">SIN DATO EN SAP: {sinDato}</span>}
+                    <span className="text-slate-400 font-semibold flex items-center gap-1"><Info size={12} /> Kilos por pieza para 1 unidad. Kg app = Kg SAP menos el % de reducción de cada material.</span>
+                </div>
+                {sync && sync.total > 0 && (
+                    <div className="h-1.5 bg-slate-100 rounded"><div className="h-full bg-[#59a96a] rounded transition-all" style={{ width: `${(100 * sync.hechos) / sync.total}%` }} /></div>
+                )}
+                {error && <div className="px-3 py-1.5 rounded-lg bg-[#d14747]/10 border border-[#d14747]/40 text-[#d14747] text-xs font-bold flex items-center gap-2"><AlertTriangle size={14} /> {error}</div>}
             </div>
 
-            {/* Selection Info */}
-            <div className="px-6 py-2 bg-slate-50 flex justify-between border-b border-slate-200">
-                <div className="flex gap-4 text-[10px] font-black uppercase tracking-wider">
-                    <span className="text-slate-400">Encontrados: <b className="text-slate-700">{filteredProductos.length}</b></span>
-                    <span className="text-green-600 border-l border-slate-200 pl-4">Seleccionados: <b>{selectedIds.size}</b></span>
-                </div>
-            </div>
-
-            {/* Table */}
-            <div className="flex-1 overflow-auto p-4">
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden box-border">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-blue-600 text-white font-black text-[10px] uppercase tracking-wider">
-                                <th className="p-3 w-10">
-                                    <button onClick={handleSelectAll} className="hover:scale-110 transition-transform">
-                                        {selectedIds.size === filteredProductos.length && filteredProductos.length > 0
-                                            ? <CheckSquare size={20} className="text-white" />
-                                            : <Square size={20} className="text-white" />
-                                        }
-                                    </button>
-                                </th>
-                                <th className="p-3">Sku</th>
-                                <th className="p-3">Producto</th>
-                                <th className="p-3 text-center">Kg SAP</th>
-                                <th className="p-3 text-center">% Reduc.</th>
-                                <th className="p-3 text-center">Kg Reduc.</th>
-                                <th className="p-3 text-center bg-blue-700">Kg App</th>
-                                <th className="p-3 whitespace-nowrap">Ult. Modif</th>
-                                <th className="p-3">Modificado Por</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={9} className="p-20 text-center"><Loader2 className="animate-spin text-blue-500 mx-auto" size={40} /></td>
+            {/* Tabla */}
+            <div className="flex-1 min-h-0 overflow-auto p-2 sm:p-4">
+                {cargando && !filas.length ? (
+                    <div className="py-16 flex items-center justify-center gap-2 text-slate-500 text-sm font-semibold"><Loader2 className="animate-spin" size={18} /> Cargando productos…</div>
+                ) : !filas.length ? (
+                    <div className="py-16 text-center text-slate-500 text-sm font-semibold">Aún no hay productos calculados. Oprima <b>"Actualizar desde SAP"</b>.</div>
+                ) : (
+                    <div className="bg-white rounded-xl border border-[#e2ded5] shadow-sm overflow-hidden">
+                        <table className="w-full text-xs">
+                            <thead className="bg-[#324354] text-white sticky top-0 z-10">
+                                <tr className="text-[10px] uppercase">
+                                    <th rowSpan={2} className="px-2 py-2 w-8"><button onClick={alternarTodos} title="Seleccionar todos los visibles">{todosSel ? <CheckSquare size={16} /> : <Square size={16} />}</button></th>
+                                    <th rowSpan={2} className="px-2 py-2 text-left">SKU</th>
+                                    <th rowSpan={2} className="px-2 py-2 text-left">Producto</th>
+                                    <th colSpan={3} className="px-2 pt-2 pb-0.5 text-center border-l border-white/20">Resina (Kg)</th>
+                                    <th colSpan={3} className="px-2 pt-2 pb-0.5 text-center border-l border-white/20">Gelcoat (Kg)</th>
+                                    <th rowSpan={2} className="px-2 py-2 text-left border-l border-white/20">Últ. modif.</th>
                                 </tr>
-                            ) : filteredProductos.length === 0 ? (
-                                <tr>
-                                    <td colSpan={9} className="p-20 text-center text-slate-400 font-bold italic">No se encontraron productos</td>
+                                <tr className="text-[10px] uppercase">
+                                    <th className="px-2 pb-2 text-right border-l border-white/20">Bañera</th>
+                                    <th className="px-2 pb-2 text-right">Faldón</th>
+                                    <th className="px-2 pb-2 text-right">% red.</th>
+                                    <th className="px-2 pb-2 text-right border-l border-white/20">Bañera</th>
+                                    <th className="px-2 pb-2 text-right">Faldón</th>
+                                    <th className="px-2 pb-2 text-right">% red.</th>
                                 </tr>
-                            ) : (
-                                filteredProductos.map((p, idx) => (
-                                    <tr key={p.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-blue-50/30 transition-colors text-[11px] font-bold text-slate-600`}>
-                                        <td className="p-3">
-                                            <button onClick={() => toggleSelect(p.id)} className="hover:scale-110 transition-transform">
-                                                {selectedIds.has(p.id)
-                                                    ? <CheckSquare size={18} className="text-green-500" />
-                                                    : <Square size={18} className="text-slate-300" />
-                                                }
-                                            </button>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {visibles.map(f => (
+                                    <tr key={f.producto_sku} onClick={() => alternar(f.producto_sku)} className={`cursor-pointer ${sel.has(f.producto_sku) ? 'bg-[#59a96a]/10' : 'hover:bg-slate-50'}`}>
+                                        <td className="px-2 py-1.5 text-[#324354]">{sel.has(f.producto_sku) ? <CheckSquare size={16} /> : <Square size={16} className="text-slate-300" />}</td>
+                                        <td className="px-2 py-1.5 font-bold text-[#324354] whitespace-nowrap">{f.producto_sku}</td>
+                                        <td className="px-2 py-1.5 font-semibold text-slate-700 min-w-[220px]">
+                                            {/* Descripción completa: si es larga baja a otro renglón */}
+                                            <div className="break-words leading-snug">{f.producto_descripcion || '—'}</div>
+                                            {f.error && <div className="text-[10px] font-bold text-[#d14747] break-words">{f.error}</div>}
                                         </td>
-                                        <td className="p-3 text-blue-600 font-black">{p.producto_sku}</td>
-                                        <td className="p-3 max-w-xs truncate">{p.producto_descripcion}</td>
-                                        <td className="p-3 text-center font-black">{p.masa}</td>
-                                        <td className="p-3 text-center text-orange-600">{p.porcentaje_reduccion}%</td>
-                                        <td className="p-3 text-center text-orange-600">{p.kilos_reduccion}</td>
-                                        <td className="p-3 text-center bg-blue-50 font-black text-blue-700 text-sm">{p.kilos}</td>
-                                        <td className="p-3 whitespace-nowrap text-slate-400">
-                                            {p.modified_at ? new Date(p.modified_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                        <td className="px-2 py-1.5 text-right border-l border-slate-100">{celda(f.resina_banera_kg, f.porcentaje_reduccion_resina, f.resina_banera_tipo)}</td>
+                                        <td className="px-2 py-1.5 text-right">{celda(f.resina_faldon_kg, f.porcentaje_reduccion_resina, f.resina_faldon_tipo)}</td>
+                                        <td className={`px-2 py-1.5 text-right font-black ${f.porcentaje_reduccion_resina ? 'text-[#d14747]' : 'text-slate-300'}`}>{fmt(f.porcentaje_reduccion_resina)} %</td>
+                                        <td className="px-2 py-1.5 text-right border-l border-slate-100">{celda(f.gelcoat_banera_kg, f.porcentaje_reduccion_gelcoat)}</td>
+                                        <td className="px-2 py-1.5 text-right">{celda(f.gelcoat_faldon_kg, f.porcentaje_reduccion_gelcoat)}</td>
+                                        <td className={`px-2 py-1.5 text-right font-black ${f.porcentaje_reduccion_gelcoat ? 'text-[#d14747]' : 'text-slate-300'}`}>{fmt(f.porcentaje_reduccion_gelcoat)} %</td>
+                                        <td className="px-2 py-1.5 border-l border-slate-100 text-[10px] text-slate-500 whitespace-nowrap">
+                                            <div>{fecha(f.modified_at)}</div>
+                                            <div className="truncate max-w-[140px]" title={f.modified_by || ''}>{f.modified_by || ''}</div>
                                         </td>
-                                        <td className="p-3 text-slate-400 truncate max-w-[120px]">{p.modified_by || '-'}</td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     )
