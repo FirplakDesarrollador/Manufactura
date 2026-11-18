@@ -459,6 +459,8 @@ export async function GET() {
                     molde_descripcion: r.molde_descripcion,
                     kilos_gelcoat: r.kilos_gelcoat,
                     componentes: r.componentes || null,
+                    // Unidades ya completadas (recibidas) en SAP: cuentan como CEDI aunque no se registraran en planta
+                    cantidad_completada_sap: Number(r.cantCompletada) || 0,
                     modificado_por: 'Sistema SAP',
                     ...(fechas ? {
                         ...(fechas.get(String(r.orden_fabricacion).trim()) ?? sinFecha),
@@ -467,11 +469,19 @@ export async function GET() {
                 }));
 
             const BATCH_SIZE = 50;
+            let sinColumnaCompletada = false;
             for (let i = 0; i < cleanFibraBatch.length; i += BATCH_SIZE) {
-                const batch = cleanFibraBatch.slice(i, i + BATCH_SIZE);
-                const { error: errFibra } = await supabase
+                let batch: Record<string, unknown>[] = cleanFibraBatch.slice(i, i + BATCH_SIZE);
+                if (sinColumnaCompletada) batch = batch.map(({ cantidad_completada_sap, ...resto }) => resto);
+                let { error: errFibra } = await supabase
                     .from('ordenes_fabricacion_fibra')
                     .upsert(batch, { onConflict: 'orden_fabricacion' });
+                // Sin la columna cantidad_completada_sap (falta fibra_completada_sap.sql): se guardan las órdenes sin ella
+                if (errFibra && /cantidad_completada_sap/i.test(errFibra.message)) {
+                    sinColumnaCompletada = true;
+                    batch = batch.map(({ cantidad_completada_sap, ...resto }) => resto);
+                    ({ error: errFibra } = await supabase.from('ordenes_fabricacion_fibra').upsert(batch, { onConflict: 'orden_fabricacion' }));
+                }
                 if (errFibra) {
                     console.error('Error upserting ordenes_fabricacion_fibra:', errFibra);
                     if (fechas && !avisoFechasSemaforo) {

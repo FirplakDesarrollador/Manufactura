@@ -38,7 +38,7 @@ export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones, e
 
             {/* Franja de la pieza: gris cálido Firplak (crema con borde #e2ded5) en todos los módulos */}
             <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1 flex flex-col lg:flex-row lg:items-center gap-1.5 lg:gap-3">
-                <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-6 gap-y-1 flex-1 min-w-0">
+                <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-3 sm:gap-x-5 lg:gap-x-4 2xl:gap-x-6 gap-y-1 flex-1 min-w-0">
                     {/* En celular molde (serial) y último proceso en un solo renglón (sin íconos, letra menor) */}
                     <div className="flex flex-nowrap items-center gap-x-3 sm:gap-x-6 min-w-0">
                     <div className="flex items-center gap-2">
@@ -54,7 +54,8 @@ export default function TarjetaPiezaFibra({ registro, orden, moldes, acciones, e
                 </div>
 
                 {/* En celular los botones en un solo renglón, repartidos a lo ancho y con letra más pequeña */}
-                <div className="flex flex-nowrap sm:flex-wrap gap-2 shrink-0 [&>*]:flex-1 [&>*]:min-w-0 sm:[&>*]:flex-none [&_button]:px-2 sm:[&_button]:px-4 [&_button]:text-xs sm:[&_button]:text-sm [&_button]:whitespace-nowrap [&_button]:h-9">{acciones}</div>
+                {/* En pantallas de planta (≈1266 px a zoom 100 %) botones más compactos para que la franja quepa en un renglón */}
+                <div className="flex flex-nowrap sm:flex-wrap lg:flex-nowrap gap-2 shrink-0 [&>*]:flex-1 [&>*]:min-w-0 sm:[&>*]:flex-none [&_button]:px-2 sm:[&_button]:px-4 lg:[&_button]:px-3 2xl:[&_button]:px-4 [&_button]:text-xs sm:[&_button]:text-sm lg:[&_button]:text-xs 2xl:[&_button]:text-sm [&_button]:whitespace-nowrap [&_button]:h-9">{acciones}</div>
             </div>
         </div>
     )

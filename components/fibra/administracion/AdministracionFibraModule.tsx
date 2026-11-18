@@ -11,6 +11,8 @@ import {
 } from '@/lib/supabase/queries/fibra_administracion'
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
+import EstadoEntregaOf from '../EstadoEntregaOf'
+import { conCompletadaSap } from '@/lib/fibra/completadaSap'
 import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import {
     RefreshCw,
@@ -88,7 +90,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     .limit(10000),
                 getAllMoldes()
             ])
-            setOrdenes(ofRes.data || [])
+            setOrdenes(await conCompletadaSap(ofRes.data || []))
             setRegistros(trazRes.data || [])
             setAllMoldes(moldesData)
         } catch (error) {
@@ -486,19 +488,21 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             moldes={allMoldes}
                                         />
                                     </div>
-                                    <div className="rounded-b-md border-t-2 border-gray-200 bg-slate-50 px-3 py-1.5 flex flex-wrap items-center gap-2">
+                                    {/* Franja igual a la de los módulos de piso (crema, botones h-9) con los componentes para la entrega de la OF */}
+                                    <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1 flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1.5">
                                         <button
                                             onClick={() => toggleOrden(item.id)}
-                                            className={`h-8 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors ${expandedOrdenes.has(item.id) ? 'bg-[#324354] text-white border-[#324354]' : 'bg-white text-[#324354] border-[#e2ded5] hover:bg-[#F6F3EE]'}`}
+                                            className={`h-9 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-colors ${expandedOrdenes.has(item.id) ? 'bg-[#324354] text-white border-[#324354]' : 'bg-white text-[#324354] border-[#e2ded5] hover:bg-[#F6F3EE]'}`}
                                             title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
                                         >
                                             <ChevronsUpDown size={15} />
                                             {expandedOrdenes.has(item.id) ? 'Ocultar piezas' : 'Ver piezas'}
                                         </button>
-                                        <div className="ml-auto flex gap-2">
+                                        <EstadoEntregaOf of={item.orden_fabricacion} />
+                                        <div className="ml-auto flex gap-2 shrink-0">
                                             <button
                                                 onClick={() => setEditModal({ type: 'of', item })}
-                                                className="h-8 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-xs font-bold flex items-center gap-1.5 transition-colors"
                                                 title="Editar Orden"
                                             >
                                                 <Edit2 size={15} />
@@ -506,7 +510,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             </button>
                                             <button
                                                 onClick={() => handleDelete('of', item.id)}
-                                                className="h-8 px-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                className="h-9 px-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
                                                 title="Eliminar Orden"
                                             >
                                                 <Trash2 size={15} />

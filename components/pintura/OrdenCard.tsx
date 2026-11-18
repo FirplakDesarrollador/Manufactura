@@ -8,6 +8,7 @@ import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapMod
 import { OrderProcessesPanel } from '@/components/fibra/administracion/AdministracionFibraModule'
 import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
 import { usePesosVaciado } from '@/lib/fibra/usePesosVaciado'
+import { cediSoloSap } from '@/lib/fibra/completadaSap'
 
 // Copia el número de la OF al portapapeles (con respaldo para navegadores sin permiso de portapapeles)
 const copiarOf = async (of: unknown) => {
@@ -67,11 +68,12 @@ function PesosPieza({ of, tipo }: { of: unknown; tipo: 'gelcoat' | 'resina' }) {
 // Helper to render a small metric box within the card
 // FV: el proceso con piezas se resalta en amarillo Firplak; en cero queda suave
 // FV en celular: los procesos en cero se ocultan (siempre=true para Cantidad y Programado) para que la tarjeta quepa completa
-const MiniMetric = ({ label, value, color, fv, siempre }: { label: string, value: number, color?: string, fv?: boolean, siempre?: boolean }) => (
-    <div className={`${fv && !siempre && value <= 0 ? 'hidden sm:flex' : 'flex'} flex-col items-center justify-center p-1 border rounded min-w-0 overflow-hidden ${color || (fv ? (value > 0 ? 'bg-[#deb841]/20 border-[#deb841]' : 'bg-white border-[#e2ded5]') : 'border-gray-200')}`}>
+const MiniMetric = ({ label, value, color, fv, siempre, nota, titulo }: { label: string, value: number, color?: string, fv?: boolean, siempre?: boolean, nota?: string, titulo?: string }) => (
+    <div title={titulo} className={`${fv && !siempre && value <= 0 ? 'hidden sm:flex' : 'flex'} flex-col items-center justify-center p-1 border rounded min-w-0 overflow-hidden ${color || (fv ? (value > 0 ? 'bg-[#deb841]/20 border-[#deb841]' : 'bg-white border-[#e2ded5]') : 'border-gray-200')}`}>
         {/* Nombres largos (Programado, Destrucción, Reparación…) un punto más pequeños para que quepan en el recuadro */}
         <span className={`font-bold uppercase text-center leading-tight max-w-full ${fv ? 'text-[#7B8E90]' : 'text-gray-900'} ${fv ? (label.length > 8 ? 'text-[8px] tracking-tight' : 'text-[9px]') : label.length > 9 ? 'text-[9px] tracking-tighter' : 'text-[10px]'}`}>{label}</span>
         <span className={`text-sm ${fv ? (value > 0 || color ? 'text-[#324354] font-black' : 'text-[#7B8E90]/60 font-bold') : 'text-gray-900 font-bold'}`}>{value}</span>
+        {nota && <span className="text-[8px] font-black uppercase leading-none text-[#d14747] text-center max-w-full truncate">{nota}</span>}
     </div>
 )
 
@@ -105,9 +107,13 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
     const enReparacion = relevantMoldes.filter(m => !['Disponible', 'En uso'].includes(m.estado)).length
 
     const cantidadTotal = Math.max(0, orden.cantidad || orden.cantidad_programada || 0)
+    // FV: unidades ya completadas en SAP sin registro en planta → cuentan como CEDI (y no como Programado)
+    const cediSap = planta === 'fv' ? cediSoloSap(orden) : 0
 
-    // Sum of all stage counts
+    // Sum of all stage counts (Herrajes es una etapa propia de FV entre Vaciado y Pulido: sin sumarla, la pieza
+    // en Herrajes seguía contando como Programado y el total pasaba de la cantidad)
     const sumEtapas = (orden.pintura || 0) +
+        (orden.herrajes || 0) +
         (orden.pulido || 0) +
         (orden.reparacion || 0) +
         (orden.saldo || 0) +
@@ -118,7 +124,8 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
         (orden.acabado || 0) +
         (orden.reparacion_larga || 0) +
         (orden.digitado || 0) +
-        (orden.cedi || 0)
+        (orden.cedi || 0) +
+        cediSap
 
     const isExcedido = cantidadTotal > 0 && sumEtapas > cantidadTotal
     const programadoCalculado = Math.max(0, cantidadTotal - sumEtapas)
@@ -322,7 +329,10 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                     <MiniMetric label="Destrucción" value={Math.max(0, orden.destruccion || 0)} fv />
                     <MiniMetric label="Digitado" value={Math.max(0, orden.digitado || 0)} fv />
                     <MiniMetric label="Tránsito" value={Math.max(0, orden.transito || 0)} fv />
-                    <MiniMetric label="CEDI" value={Math.max(0, orden.cedi || 0)} color="bg-[#59a96a]/20 border-[#59a96a]/70" fv />
+                    <MiniMetric label="CEDI" value={Math.max(0, orden.cedi || 0) + cediSap}
+                        color={cediSap ? 'bg-[#59a96a]/20 border-[#d14747] ring-1 ring-[#d14747]/40' : 'bg-[#59a96a]/20 border-[#59a96a]/70'} fv
+                        nota={cediSap ? `${cediSap} solo SAP` : undefined}
+                        titulo={cediSap ? `${cediSap} unidad(es) entregada(s) en SAP sin registro en piso (SAP: ${orden.cantidad_completada_sap} completada(s); registradas en planta: ${Math.max(0, orden.cedi || 0)})` : undefined} />
                 </div>
             ) : (
             <div className="sm:col-span-2 flex-1 lg:pl-3 grid grid-cols-4 sm:grid-cols-8 gap-1">

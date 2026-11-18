@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
+import { conCompletadaSap } from '@/lib/fibra/completadaSap'
 
 export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
     const [fvRes, fibRes] = await Promise.all([
@@ -30,7 +31,7 @@ export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
     })
 
     // Siempre ordenar de lo más atrasado a lo más reciente por Fecha Entrega Lote (columna T del Semáforo)
-    return combinadas.sort((a, b) => {
+    return (await conCompletadaSap(combinadas)).sort((a, b) => {
         const rawA = a.fecha_entrega_lote || a.fecha_ideal_produccion || a.fecha_entrega_estimada
         const rawB = b.fecha_entrega_lote || b.fecha_ideal_produccion || b.fecha_entrega_estimada
         const timeA = rawA ? new Date(rawA).getTime() : Infinity

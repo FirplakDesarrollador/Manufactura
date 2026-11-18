@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarPulido } from '@/lib/supabase/queries/fibra_pulido'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
+import EstadoEntregaOf from '../EstadoEntregaOf'
 import { Trash2, X } from 'lucide-react'
 
 interface RegistroPulidoCardProps {
@@ -95,5 +96,6 @@ export default function RegistroPulidoCard({ registro, orden, moldes, usuarioEma
         </>
     )
 
-    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-cyan-50/40" />
+    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-cyan-50/40"
+        extra={<EstadoEntregaOf of={registro.orden_fabricacion} />} />
 }
