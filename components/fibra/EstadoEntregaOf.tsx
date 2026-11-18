@@ -40,7 +40,9 @@ export default function EstadoEntregaOf({ of }: { of: string | number | null | u
     const r = estado.resultado
     const vista = VISTA[r.estado]
     const { Icono } = vista
-    const revisado = new Date(r.calculado_at).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    const fechaRev = new Date(r.calculado_at)
+    const revisado = fechaRev.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    const revisadoCorto = fechaRev.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })
     return (
         <div className="flex items-center gap-2 min-w-0">
             <button type="button" onClick={e => { e.stopPropagation(); setAbierto(true) }} title="Ver el análisis de componentes"
@@ -48,24 +50,25 @@ export default function EstadoEntregaOf({ of }: { of: string | number | null | u
                 <Icono size={16} className={`${vista.color} shrink-0`} />
                 <div className="min-w-0">
                     {titulo}
-                    <p className={`text-xs font-black leading-tight mt-0.5 flex items-center gap-1.5 ${vista.color}`}>
+                    {/* Un solo renglón: estado, conteo y hora de la revisión */}
+                    <p className={`text-xs font-black leading-tight mt-0.5 flex items-center gap-1.5 whitespace-nowrap ${vista.color}`}>
                         {vista.texto(r)}
                         <span className="text-[10px] font-semibold text-slate-500">{r.cubiertos}/{r.exigidos}</span>
-                    </p>
-                    <p className="text-[10px] font-semibold text-slate-500 leading-tight mt-0.5 whitespace-nowrap flex items-center gap-1"
-                        title={estado.errorActualizar
-                            ? `No se pudo actualizar (${estado.errorActualizar}); se muestra la revisión anterior`
-                            : `Fecha y hora de la última consulta a SAP. Se actualiza sola cada hora en punto (próxima: ${proximaActualizacion()})`}>
-                        Revisado {revisado}
-                        {estado.actualizando && <span className="flex items-center gap-0.5 text-sky-700"><Loader2 size={10} className="animate-spin" /> actualizando…</span>}
-                        {estado.errorActualizar && <AlertTriangle size={10} className="text-amber-600" />}
+                        <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1"
+                            title={estado.errorActualizar
+                                ? `No se pudo actualizar (${estado.errorActualizar}); se muestra la revisión del ${revisado}`
+                                : `Revisado ${revisado}. Se actualiza sola cada hora en punto (próxima: ${proximaActualizacion()})`}>
+                            · {revisadoCorto}
+                            {estado.actualizando && <Loader2 size={10} className="animate-spin text-sky-700" />}
+                            {estado.errorActualizar && <AlertTriangle size={10} className="text-amber-600" />}
+                        </span>
                     </p>
                 </div>
                 <ChevronRight size={14} className="text-slate-400 shrink-0" />
             </button>
-            <button type="button" onClick={e => { e.stopPropagation(); revisarEntrega(of) }} disabled={estado.actualizando} title="Consultar SAP de nuevo"
-                className="h-7 px-2 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-[10px] font-bold flex items-center gap-1 shrink-0 disabled:opacity-50">
-                <RefreshCw size={12} className={estado.actualizando ? 'animate-spin' : ''} /> Actualizar
+            <button type="button" onClick={e => { e.stopPropagation(); revisarEntrega(of) }} disabled={estado.actualizando} title="Actualizar: consultar SAP de nuevo" aria-label="Actualizar"
+                className="h-7 w-7 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] flex items-center justify-center shrink-0 disabled:opacity-50">
+                <RefreshCw size={13} className={estado.actualizando ? 'animate-spin' : ''} />
             </button>
             {abierto && createPortal(<AnalisisEntrega of={String(of)} r={r} onClose={() => setAbierto(false)} />, document.body)}
         </div>

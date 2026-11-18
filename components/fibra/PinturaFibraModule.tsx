@@ -11,6 +11,7 @@ import ModalBuscarMolde from '../pintura/ModalBuscarMolde'
 import PintarOrdenFranja from './PintarOrdenFranja'
 import { recargarFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
 import { esKitReparacion } from '@/lib/fibra/kitReparacion'
+import { cediSoloSap } from '@/lib/fibra/completadaSap'
 import { registrarKitReparacionFv } from '@/lib/supabase/queries/fibra_administracion'
 
 
@@ -116,9 +117,10 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
     const pintarOrden = async (orden: OrdenFabricacion, molde: Molde | null): Promise<boolean> => {
         const kit = esKitReparacion(orden.producto_descripcion)
         if (!molde && !kit) { alert('Error: Debe seleccionar un Molde.'); return false }
-        const sumEtapas = (orden.pintura || 0) + (orden.pulido || 0) + (orden.reparacion || 0) + (orden.saldo || 0) +
+        const sumEtapas = (orden.pintura || 0) + (orden.herrajes || 0) + (orden.pulido || 0) + (orden.reparacion || 0) + (orden.saldo || 0) +
             (orden.empaque || 0) + (orden.transito || 0) + (orden.vaciado || 0) + (orden.estanteria || 0) +
-            (orden.acabado || 0) + (orden.reparacion_larga || 0) + (orden.digitado || 0) + (orden.cedi || 0)
+            (orden.acabado || 0) + (orden.reparacion_larga || 0) + (orden.digitado || 0) + (orden.cedi || 0) +
+            cediSoloSap(orden)   // unidades completadas en SAP sin registro en planta
         const cantidadMax = Math.max(0, orden.cantidad || orden.cantidad_programada || 0)
         if (cantidadMax > 0 && sumEtapas >= cantidadMax) {
             alert(`Acción bloqueada: La sumatoria de piezas en etapas (${sumEtapas}) de la orden ${orden.orden_fabricacion} ya alcanzó la cantidad máxima permitida (${cantidadMax}).`)
