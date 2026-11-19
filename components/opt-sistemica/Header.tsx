@@ -215,7 +215,9 @@ export default function Header({
               subItems: [
                 { label: 'Mármol Sintético', path: '/marmol' },
                 { label: 'Muebles', path: '/muebles' },
-                { label: 'Fibra de Vidrio', path: '/fibra' }
+                { label: 'CEFI', path: '/cefi' },
+                { label: 'Fibra de Vidrio', path: '/fibra' },
+                { label: 'Superficies (RTM)', path: '/superficies' }
               ]
             },
             { label: 'Tablero de Control', path: '/indicadores-productividad', icon: (

@@ -188,9 +188,9 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                         />
                     </div>
                     <button
-                        onClick={actualizarTodasEnPantalla}
+                        onClick={() => actualizarTodasEnPantalla('MS')}
                         disabled={revisando}
-                        title="Actualizar los componentes para la entrega de todas las órdenes en pantalla (consulta SAP una por una; se actualiza sola cada hora en punto)"
+                        title="Actualizar los componentes para la entrega de todas las órdenes en pantalla (consulta SAP en bloque; el servidor la actualiza sola: faltantes cada hora, OK cada 3 horas)"
                         className="h-9 px-4 rounded-lg bg-[#324354] hover:bg-[#254153] text-white text-xs font-bold uppercase tracking-wide flex items-center gap-2 shrink-0 shadow-sm disabled:opacity-60"
                     >
                         <RefreshCw size={15} className={revisando ? 'animate-spin' : ''} />
