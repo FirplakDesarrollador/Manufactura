@@ -6,6 +6,7 @@ import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from
 import { getRegistrosParaDigitado } from '@/lib/supabase/queries/digitado'
 import { Search, Eraser, Loader2, Calendar, RefreshCw, Keyboard } from 'lucide-react'
 import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
+import ResumenFaltantes from '../fibra/ResumenFaltantes'
 import { actualizarTodasEnPantalla, useRevisionEnCurso, useVersionRevision, tieneFaltantes, fijarGrupo, useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
 import DigitadoList from './DigitadoList'
 import OrdenCard from '../pintura/OrdenCard'
@@ -218,6 +219,7 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                             {conFaltantes === 1 ? 'orden con faltantes de componentes' : 'órdenes con faltantes de componentes'}
                         </span>
                     )}
+                    <ResumenFaltantes ofs={filteredOrdenes.map(o => o.orden_fabricacion)} />
                 </div>
             </div>
 
