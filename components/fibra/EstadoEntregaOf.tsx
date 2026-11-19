@@ -57,7 +57,7 @@ export default function EstadoEntregaOf({ of }: { of: string | number | null | u
                         <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1"
                             title={estado.errorActualizar
                                 ? `No se pudo actualizar (${estado.errorActualizar}); se muestra la revisión del ${revisado}`
-                                : `Revisado ${revisado}. Se actualiza sola cada hora en punto (próxima: ${proximaActualizacion()})`}>
+                                : `Revisado ${revisado}. Se actualiza sola en el servidor: con faltantes cada hora, en OK cada 3 horas (próxima corrida: ${proximaActualizacion()})`}>
                             · {revisadoCorto}
                             {estado.actualizando && <Loader2 size={10} className="animate-spin text-sky-700" />}
                             {estado.errorActualizar && <AlertTriangle size={10} className="text-amber-600" />}
@@ -109,7 +109,7 @@ function AnalisisEntrega({ of, r, onClose }: { of: string; r: ResultadoEntrega; 
                         <span className="text-xs font-black uppercase bg-[#324354]/10 text-[#324354] px-2.5 py-1 rounded-md">Componentes para la entrega</span>
                         <h2 className="text-xl font-black text-[#324354] mt-2">OF {of}</h2>
                         <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                            Revisado {hora}. Se compara lo que falta por descontar de cada componente (requerido − ya consumido en SAP) contra la existencia de su bodega. No incluye mano de obra.
+                            Revisado {hora}. Se compara lo que falta por descontar de cada componente (requerido − ya consumido en SAP) contra la existencia de su bodega. No incluye mano de obra, CIF ni piezas del despiece de Muebles (CMPD09).
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

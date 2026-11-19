@@ -46,7 +46,7 @@ export default function HomePage() {
 
         let { data: userData } = await supabase
             .from('usuarios')
-            .select('id, permisos')
+            .select('id, permisos, planta_muebles')
             .eq('uuid', authUser.id)
             .maybeSingle()
 
@@ -54,7 +54,7 @@ export default function HomePage() {
             // Auto-vinculación por correo electrónico (insensible a mayúsculas/minúsculas)
             const { data: emailUser } = await supabase
                 .from('usuarios')
-                .select('id, permisos')
+                .select('id, permisos, planta_muebles')
                 .ilike('correo', authUser.email)
                 .maybeSingle()
 
@@ -78,7 +78,7 @@ export default function HomePage() {
         // Lógica de redirección automática si solo tiene UNA aplicación total
         const appPaths: Record<string, string> = {
             modulos: '/marmol',
-            muebles: '/muebles',
+            muebles: String((userData as any)?.planta_muebles || '').toLowerCase() === 'cefi' ? '/cefi' : '/muebles',
             calidad: '/calidad',
             fibra: '/fibra',
             configuracion: '/configuracion',
