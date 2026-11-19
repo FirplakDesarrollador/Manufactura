@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { PrintActions } from '@/components/mtto-autonomo/PrintActions';
 import BackButton from '@/components/mtto-autonomo/BackButton';
 import MaquinaFicha from '@/components/mtto-autonomo/MaquinaFicha';
+import RelacionarMaquinas from '@/components/mtto-autonomo/RelacionarMaquinas';
 
 export const revalidate = 0;
 
@@ -168,6 +169,9 @@ export default async function PuestaDetallePage({ params }: { params: Promise<{ 
             <BackButton />
             <PrintActions />
           </div>
+
+          <RelacionarMaquinas idPuesta={id} planta={enc.planta || decodedPlanta} proceso={enc.proceso || ''}
+            equipos={[...new Map(items.map(it => [it.equipo, { equipo: it.equipo, id_maquina: it.id_maquina }])).values()]} />
 
           <div style={{
             backgroundColor: '#1A435B', color: 'white', borderRadius: '12px', padding: '0.8rem 1.5rem', marginBottom: '1rem',
