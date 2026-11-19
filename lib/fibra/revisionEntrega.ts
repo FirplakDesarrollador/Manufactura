@@ -30,7 +30,9 @@ const UNA_HORA = 60 * 60000
 
 const estados = new Map<string, EstadoRevision>()
 const oyentes = new Set<() => void>()
-const avisar = () => oyentes.forEach(f => f())
+let version = 0
+const avisar = () => { version++; oyentes.forEach(f => f()) }
+const suscribir = (f: () => void) => { oyentes.add(f); return () => { oyentes.delete(f) } }
 
 // Último resultado de cada OF, aparte del estado visible y guardado en el navegador: si ya hubo una revisión, nunca se
 // vuelve a "Analizando…" (ni al recargar la página); se muestra ese resultado mientras llega el nuevo.
@@ -112,6 +114,61 @@ function desmontar(of: string) {
     const n = (enPantalla.get(of) || 0) - 1
     if (n > 0) enPantalla.set(of, n); else enPantalla.delete(of)
     if (!enPantalla.size && reloj) { clearTimeout(reloj); reloj = null }
+}
+
+/** Botón general "Actualizar": vuelve a revisar todas las OF en pantalla (una a la vez, sin borrar lo que se ve). */
+export function actualizarTodasEnPantalla() { actualizarPantalla() }
+
+/** true mientras alguna OF en pantalla se está revisando (para el giro del botón general). */
+export function useRevisionEnCurso(): boolean {
+    return useSyncExternalStore(
+        f => { oyentes.add(f); return () => { oyentes.delete(f) } },
+        () => [...enPantalla.keys()].some(of => { const e = estados.get(of); return e?.fase === 'analizando' || (e?.fase === 'listo' && !!e.actualizando) }),
+        () => false,
+    )
+}
+
+/** Estado actual de la revisión de una OF (sin lanzarla). */
+export function estadoRevision(of: string | number | null | undefined): EstadoRevision | undefined {
+    return estados.get(String(of ?? '').trim())
+}
+
+/** true si la OF tiene componentes faltantes (con el último resultado conocido, aunque se esté actualizando). */
+export function tieneFaltantes(of: string | number | null | undefined): boolean {
+    const e = estadoRevision(of)
+    return e?.fase === 'listo' && e.resultado.estado === 'faltante'
+}
+
+/** Se vuelve a renderizar cada vez que cambia alguna revisión (para ordenar listas por estado). */
+export function useVersionRevision(): number {
+    return useSyncExternalStore(suscribir, () => version, () => 0)
+}
+
+// Grupos de OF (p. ej. las órdenes del Digitado MS) guardados en el navegador, para que el menú cuente las OF con
+// faltantes aunque el módulo no esté abierto.
+const CLAVE_GRUPOS = 'revision-entrega-grupos'
+const grupos = new Map<string, string[]>()
+try {
+    if (typeof window !== 'undefined') {
+        for (const [k, v] of Object.entries(JSON.parse(window.localStorage.getItem(CLAVE_GRUPOS) || '{}') as Record<string, string[]>)) {
+            if (Array.isArray(v)) grupos.set(k, v)
+        }
+    }
+} catch { /* ignorar */ }
+
+/** Registra las OF de un grupo (reemplaza las anteriores). */
+export function fijarGrupo(nombre: string, ofs: (string | null | undefined)[]) {
+    const lista = [...new Set(ofs.map(o => String(o ?? '').trim()).filter(o => /^\d+$/.test(o)))].sort()
+    const previa = grupos.get(nombre)
+    if (previa && previa.join(',') === lista.join(',')) return
+    grupos.set(nombre, lista)
+    try { window.localStorage.setItem(CLAVE_GRUPOS, JSON.stringify(Object.fromEntries(grupos))) } catch { /* ignorar */ }
+    avisar()
+}
+
+/** Cantidad de OF del grupo con componentes faltantes. */
+export function useFaltantesGrupo(nombre: string): number {
+    return useSyncExternalStore(suscribir, () => (grupos.get(nombre) || []).filter(tieneFaltantes).length, () => 0)
 }
 
 /** Hora (texto) de la próxima actualización programada. */

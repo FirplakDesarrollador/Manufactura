@@ -11,6 +11,7 @@ import {
 } from '@/lib/supabase/queries/administracion'
 import { getAllMoldes } from '@/lib/supabase/queries/pintura'
 import OrdenCard from '../pintura/OrdenCard'
+import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
 import {
     RefreshCw,
     Search,
@@ -440,44 +441,45 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                         ) : (
                             filteredOrdenes.map((item) => (
                                 <div key={item.id} className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
-                                <div className="flex gap-3 items-stretch">
-                                    <div className="flex flex-col gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm justify-center">
-                                        <button
-                                            onClick={() => toggleOrden(item.id)}
-                                            className={`p-2 rounded-lg transition-colors ${expandedOrdenes.has(item.id) ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'}`}
-                                            title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
-                                        >
-                                            <ChevronsUpDown size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => setDetalleOf(item.orden_fabricacion)}
-                                            className="p-2 text-[#324354] hover:bg-slate-100 rounded-lg transition-colors bg-slate-50"
-                                            title="Detalle de la orden en SAP (lista de materiales, comentarios)"
-                                        >
-                                            <FileText size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => setEditModal({ type: 'of', item })}
-                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50"
-                                            title="Editar Orden"
-                                        >
-                                            <Edit2 size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete('of', item.id)}
-                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-red-50/50"
-                                            title="Eliminar Orden"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
+                                {/* Igual que Administración FV: tarjeta (con el detalle SAP junto a la OF) y franja inferior con
+                                    Ver piezas, componentes para la entrega y las acciones */}
+                                <div className="bg-white border-2 border-gray-300 rounded-lg">
+                                    <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none">
                                         <OrdenCard
                                             orden={item}
                                             isActive={false}
                                             onClick={() => setEditModal({ type: 'of', item })}
                                             moldes={allMoldes}
                                         />
+                                    </div>
+                                    <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1 flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1.5">
+                                        <button
+                                            onClick={() => toggleOrden(item.id)}
+                                            className={`h-9 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-colors ${expandedOrdenes.has(item.id) ? 'bg-[#324354] text-white border-[#324354]' : 'bg-white text-[#324354] border-[#e2ded5] hover:bg-[#F6F3EE]'}`}
+                                            title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
+                                        >
+                                            <ChevronsUpDown size={15} />
+                                            {expandedOrdenes.has(item.id) ? 'Ocultar piezas' : 'Ver piezas'}
+                                        </button>
+                                        <EstadoEntregaOf of={item.orden_fabricacion} />
+                                        <div className="ml-auto flex gap-2 shrink-0">
+                                            <button
+                                                onClick={() => setEditModal({ type: 'of', item })}
+                                                className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                title="Editar Orden"
+                                            >
+                                                <Edit2 size={15} />
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete('of', item.id)}
+                                                className="h-9 px-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                title="Eliminar Orden"
+                                            >
+                                                <Trash2 size={15} />
+                                                Eliminar
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 {expandedOrdenes.has(item.id) && (

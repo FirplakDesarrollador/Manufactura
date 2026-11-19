@@ -13,7 +13,22 @@ import PulidoModule from '@/components/pulido/PulidoModule'
 import AcabadoModule from '@/components/acabado/AcabadoModule'
 import ReparacionModule from '@/components/reparacion/ReparacionModule'
 import EmpaqueModule from '@/components/empaque/EmpaqueModule'
-import DigitadoModule from '@/components/digitado/DigitadoModule'
+import DigitadoModule, { GRUPO_DIGITADO_MS } from '@/components/digitado/DigitadoModule'
+import { useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
+import MoldesFibraModule from '@/components/fibra/moldes/MoldesFibraModule'
+import IconoMolde from '@/components/fibra/IconoMolde'
+
+// Bolita roja del menú: órdenes de Digitado con componentes faltantes para la entrega (última revisión de SAP)
+function AvisoFaltantesDigitado({ abierto }: { abierto: boolean }) {
+    const n = useFaltantesGrupo(GRUPO_DIGITADO_MS)
+    if (!n) return null
+    return (
+        <b title={`${n} OF con componentes faltantes para la entrega`}
+            className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${abierto ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+            {n > 99 ? '99+' : n}
+        </b>
+    )
+}
 import CediModule from '@/components/cedi/CediModule'
 import ParametrosModule from '@/components/parametros/ParametrosModule'
 import AdministracionModule from '@/components/administracion/AdministracionModule'
@@ -182,15 +197,29 @@ export default function MarmorPage() {
                                 key={m.id}
                                 onClick={() => setActiveModule(m.id)}
                                 title={sidebarOpen ? undefined : m.label}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === m.id
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === m.id
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{m.icono}</svg>
                                 <span>{m.label}</span>
+                                {m.id === 'digitado' && <AvisoFaltantesDigitado abierto={sidebarOpen} />}
                             </button>
                         ))}
+
+                        {/* Moldes (igual que en FV, abre con los de MS): consulta para cualquier usuario; liberar pide Administración */}
+                        <button
+                            onClick={() => setActiveModule('moldes')}
+                            title={sidebarOpen ? undefined : 'Moldes'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'moldes'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <IconoMolde />
+                            <span>Moldes</span>
+                        </button>
                     </nav>
                 </aside>
 
@@ -223,6 +252,8 @@ export default function MarmorPage() {
                             <ParametrosModule userEmail={user?.email || ''} />
                         ) : activeModule === 'administracion' && hasPermission('administracion') ? (
                             <AdministracionModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'moldes' ? (
+                            <MoldesFibraModule puedeLiberar={hasPermission('administracion')} plantaInicial="MS" />
                         ) : (
                             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                                 <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">

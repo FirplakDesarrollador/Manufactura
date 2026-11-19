@@ -198,6 +198,19 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                             <div className="flex items-center gap-1 text-cyan-600 mb-1">
                                 <Clipboard size={14} className="shrink-0" />
                                 <span className="text-xs font-bold text-gray-900 truncate">OF: {orden.orden_fabricacion}</span>
+                                {/* Detalle de la orden en SAP (igual que en FV) */}
+                                {conDetalle && (
+                                    <span
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={e => { e.stopPropagation(); setVerDetalle(true) }}
+                                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setVerDetalle(true) } }}
+                                        className="ml-auto shrink-0 p-1 -my-1 rounded text-[#7B8E90] hover:text-[#324354] hover:bg-slate-100 transition-colors cursor-pointer"
+                                        title="Detalle de la orden en SAP (lista de materiales, comentarios)"
+                                    >
+                                        <FileText size={16} />
+                                    </span>
+                                )}
                             </div>
                             <div className="text-[11px] font-bold text-cyan-600 truncate">Pedido: {orden.pedido || (orden as any).numero_pedido || 'Sin pedido'}</div>
                         </>

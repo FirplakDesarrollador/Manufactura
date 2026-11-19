@@ -4,10 +4,23 @@ import React, { useState, useEffect } from 'react'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from '@/lib/supabase/queries/pintura'
 import { getRegistrosParaDigitado } from '@/lib/supabase/queries/digitado'
-import { Search, Eraser, Loader2, Calendar } from 'lucide-react'
+import { Search, Eraser, Loader2, Calendar, RefreshCw, Keyboard } from 'lucide-react'
+import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
+import { actualizarTodasEnPantalla, useRevisionEnCurso, useVersionRevision, tieneFaltantes, fijarGrupo, useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
 import DigitadoList from './DigitadoList'
 import OrdenCard from '../pintura/OrdenCard'
 import { toast } from 'sonner'
+
+export const GRUPO_DIGITADO_MS = 'ms-digitado'
+
+const tienePiezasDigitado = (o: OrdenFabricacion) => (
+    (o.pulido || 0) > 0 ||
+    (o.desgelcada || 0) > 0 ||
+    (o.empaque || 0) > 0 ||
+    (o.acabado || 0) > 0 ||
+    (o.digitado || 0) > 0 ||
+    (o.transito || 0) > 0
+)
 
 export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
@@ -18,6 +31,10 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
     const [searchText, setSearchText] = useState('')
     const [fechaFiltro, setFechaFiltro] = useState<string | null>(null)
     const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
+    // Componentes para la entrega (misma revisión de SAP que FV): giro del botón general mientras revisa
+    const revisando = useRevisionEnCurso()
+    useVersionRevision() // reordena la lista cuando llega una revisión
+    const conFaltantes = useFaltantesGrupo(GRUPO_DIGITADO_MS)
 
     useEffect(() => {
         loadData()
@@ -43,6 +60,16 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
         }
     }
 
+    // Abrir/cerrar las piezas de la orden (copia el número de OF al abrir, como antes)
+    const alternarOrden = (o: OrdenFabricacion) => {
+        if (selectedOrderId === o.id) { setSelectedOrderId(null); return }
+        setSelectedOrderId(o.id)
+        if (o.orden_fabricacion) {
+            navigator.clipboard.writeText(o.orden_fabricacion)
+            toast.success(`Orden ${o.orden_fabricacion} copiada`)
+        }
+    }
+
     const clearFilters = () => {
         setSearchText('')
         setFechaFiltro(null)
@@ -65,17 +92,12 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
             o.fecha_entrega_estimada === fechaFiltro
         )
 
-        const hasRelevantPieces = (
-            (o.pulido || 0) > 0 ||
-            (o.desgelcada || 0) > 0 ||
-            (o.empaque || 0) > 0 ||
-            (o.acabado || 0) > 0 ||
-            (o.digitado || 0) > 0 ||
-            (o.transito || 0) > 0
-        )
-
-        return matchesSearch && matchesFecha && hasRelevantPieces
+        return matchesSearch && matchesFecha && tienePiezasDigitado(o)
     }).sort((a, b) => {
+        // Primero las órdenes con componentes faltantes para la entrega (SAP)
+        const fa = tieneFaltantes(a.orden_fabricacion) ? 0 : 1
+        const fb = tieneFaltantes(b.orden_fabricacion) ? 0 : 1
+        if (fa !== fb) return fa - fb
         const dateAStr = a.fecha_ideal_produccion || a.fecha_entrega_estimada
         const dateBStr = b.fecha_ideal_produccion || b.fecha_entrega_estimada
         const dateA = dateAStr ? new Date(dateAStr).getTime() : Infinity
@@ -84,6 +106,12 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
         const valB = isNaN(dateB) ? Infinity : dateB
         return valA - valB
     })
+
+    // Órdenes del módulo (sin filtros de búsqueda ni fecha): el menú cuenta las que tienen faltantes
+    useEffect(() => {
+        if (loading) return
+        fijarGrupo(GRUPO_DIGITADO_MS, ordenes.filter(tienePiezasDigitado).map(o => o.orden_fabricacion))
+    }, [ordenes, loading])
 
     const todayStr = new Date().toLocaleDateString('es-ES')
 
@@ -158,6 +186,15 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs text-slate-800"
                         />
                     </div>
+                    <button
+                        onClick={actualizarTodasEnPantalla}
+                        disabled={revisando}
+                        title="Actualizar los componentes para la entrega de todas las órdenes en pantalla (consulta SAP una por una; se actualiza sola cada hora en punto)"
+                        className="h-9 px-4 rounded-lg bg-[#324354] hover:bg-[#254153] text-white text-xs font-bold uppercase tracking-wide flex items-center gap-2 shrink-0 shadow-sm disabled:opacity-60"
+                    >
+                        <RefreshCw size={15} className={revisando ? 'animate-spin' : ''} />
+                        {revisando ? 'Revisando componentes…' : 'Actualizar componentes'}
+                    </button>
                     <div className="flex gap-1 items-stretch">
                         <button
                             className="px-3 bg-blue-600 text-white rounded-lg shadow-md active:scale-95"
@@ -173,8 +210,14 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                         </button>
                     </div>
                 </div>
-                <div className="mt-2 text-xs font-bold text-blue-600 uppercase tracking-widest">
-                    Ordenes encontradas: {filteredOrdenes.length}
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-bold text-blue-600 uppercase tracking-widest">
+                    <span>Ordenes encontradas: {filteredOrdenes.length}</span>
+                    {conFaltantes > 0 && (
+                        <span className="flex items-center gap-1.5 normal-case tracking-normal text-[#d14747]" title="Órdenes con componentes faltantes para la entrega (SAP); se muestran primero">
+                            <b className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow">{conFaltantes > 99 ? '99+' : conFaltantes}</b>
+                            {conFaltantes === 1 ? 'orden con faltantes de componentes' : 'órdenes con faltantes de componentes'}
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -192,22 +235,25 @@ export default function DigitadoModule({ userEmail }: { userEmail: string }) {
                 ) : (
                     filteredOrdenes.map(o => (
                         <div key={o.id} className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                            <OrdenCard
-                                orden={o}
-                                isActive={o.id === selectedOrderId}
-                                onClick={() => {
-                                    if (selectedOrderId === o.id) {
-                                        setSelectedOrderId(null)
-                                    } else {
-                                        setSelectedOrderId(o.id)
-                                        if (o.orden_fabricacion) {
-                                            navigator.clipboard.writeText(o.orden_fabricacion)
-                                            toast.success(`Orden ${o.orden_fabricacion} copiada`)
-                                        }
-                                    }
-                                }}
-                                moldes={allMoldes}
-                            />
+                            {/* Tarjeta de la orden con franja inferior: componentes para la entrega (SAP) y Registrar Digitado */}
+                            <div className={`bg-white border-2 rounded-lg ${o.id === selectedOrderId ? 'border-cyan-500 ring-4 ring-cyan-500/20' : 'border-gray-300'}`}>
+                                <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none">
+                                    <OrdenCard
+                                        orden={o}
+                                        isActive={o.id === selectedOrderId}
+                                        onClick={() => alternarOrden(o)}
+                                        moldes={allMoldes}
+                                    />
+                                </div>
+                                <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1 flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1.5">
+                                    <EstadoEntregaOf of={o.orden_fabricacion} />
+                                    <button onClick={() => alternarOrden(o)}
+                                        className={`ml-auto h-9 px-4 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors ${o.id === selectedOrderId ? 'bg-white text-[#324354] border border-[#e2ded5] hover:bg-[#F6F3EE]' : 'bg-[#324354] hover:bg-[#254153] text-white'}`}
+                                        title="Ver las piezas de la orden para registrar el digitado">
+                                        <Keyboard size={16} /> {o.id === selectedOrderId ? 'Ocultar piezas' : 'Registrar Digitado'}
+                                    </button>
+                                </div>
+                            </div>
                             {o.id === selectedOrderId && (
                                 <div className="border-2 border-t-0 border-cyan-500 rounded-b-lg overflow-hidden -mt-2 bg-slate-50 shadow-inner">
                                     <DigitadoList
