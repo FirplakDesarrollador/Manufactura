@@ -3,6 +3,8 @@
 import React from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarDigitado } from '@/lib/supabase/queries/fibra_digitado'
+import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
+import EstadoEntregaOf from '../EstadoEntregaOf'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
 import AccionesPiezaFibra from '../AccionesPiezaFibra'
 import { Keyboard } from 'lucide-react'
@@ -22,12 +24,14 @@ export default function PiezaDigitadoCard({ registro, orden, moldes, usuarioEmai
         <AccionesPiezaFibra
             principal={{
                 id: 'Transito', label: 'Registrar Digitado', icon: Keyboard, title: 'Registrar el digitado y pasar la pieza a Tránsito',
-                accion: () => registrarDigitado(registro.registrer || '', usuarioEmail)
+                // Al pasar a Tránsito se vuelve a revisar en segundo plano
+                accion: async () => { const r = await registrarDigitado(registro.registrer || '', usuarioEmail); revisarEntrega(registro.orden_fabricacion); return r }
             }}
             onHecho={onRefresh}
             mensajeError="Hubo un error al registrar el digitado."
         />
     )
 
-    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-slate-100/60" />
+    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-slate-100/60"
+        extra={<EstadoEntregaOf of={registro.orden_fabricacion} desde={registro.empaque_fecha} />} />
 }

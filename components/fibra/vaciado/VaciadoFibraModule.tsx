@@ -71,7 +71,8 @@ export default function VaciadoFibraModule({ userEmail }: { userEmail: string })
                 loading={loading}
                 placeholder="OF / Producto / Pedido / Molde..."
                 extra={
-                    <div className="flex h-8 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    // En celular no se muestra (se reporta directo); Tabla Kilos queda para computador y tablet
+                    <div className="hidden sm:flex h-8 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                         <button
                             onClick={() => setActiveTab('reportar')}
                             className={`flex items-center gap-1.5 px-3 rounded-md text-[11px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'reportar' ? 'bg-[#254153] text-white' : 'text-slate-500 hover:text-[#254153]'}`}

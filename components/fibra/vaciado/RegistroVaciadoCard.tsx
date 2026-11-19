@@ -14,7 +14,7 @@ interface RegistroVaciadoCardProps {
     onRefresh: () => void
 }
 
-// Misma tarjeta de orden que Pintura (OrdenCard) + franja de la pieza: serial, fecha de pintura, masa teórica y acciones
+// Misma tarjeta de orden que Pintura (OrdenCard) + franja de la pieza: serial, fecha de pintura y acciones
 export default function RegistroVaciadoCard({ registro, orden, moldes, usuarioEmail, onRefresh }: RegistroVaciadoCardProps) {
     const [loading, setLoading] = useState(false)
     const [confirmingDesgelcar, setConfirmingDesgelcar] = useState(false)
@@ -90,5 +90,5 @@ export default function RegistroVaciadoCard({ registro, orden, moldes, usuarioEm
         </>
     )
 
-    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-amber-50/40" />
+    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-amber-50/40" pesos="resina" />
 }

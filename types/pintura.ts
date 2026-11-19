@@ -41,6 +41,8 @@ export interface OrdenFabricacion {
     fecha_ideal_entrega_produccion?: string | null
     fecha_prometida_entrega?: string | null
     fechas_semaforo_actualizadas?: string | null
+    cantidad_completada_sap?: number | null  // FV: unidades completadas (recibidas) en SAP
+
 }
 
 export interface Molde {

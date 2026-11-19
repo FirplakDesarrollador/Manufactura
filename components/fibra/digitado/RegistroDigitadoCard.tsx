@@ -3,6 +3,8 @@
 import React, { useState } from 'react'
 import { RegistroTrazabilidad } from '@/types/pintura'
 import { registrarDigitado, reversarDigitado } from '@/lib/supabase/queries/fibra_digitado'
+import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
+import EstadoEntregaOf from '../EstadoEntregaOf'
 import { Keyboard, Send, Eraser, Loader2 } from 'lucide-react'
 
 interface RegistroDigitadoCardProps {
@@ -19,6 +21,7 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
         setLoading(true)
         try {
             await registrarDigitado(registro.registrer || '', usuarioEmail)
+            revisarEntrega(registro.orden_fabricacion)   // en segundo plano: componentes para la entrega
             onRefresh()
         } catch (error) {
             console.error('Error:', error)
@@ -82,6 +85,13 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
                             <p className="text-base font-black text-orange-600 tracking-tighter">{registro.molde_serial}</p>
                         </div>
                     </div>
+
+                    {/* Componentes para la entrega: en guacal (pendiente de digitar) y en Tránsito */}
+                    {(registro.estado === 'Empaque' || registro.estado === 'Transito') && (
+                        <div className="mt-2 px-2 py-1.5 rounded-lg bg-[#F6F3EE] border border-[#e2ded5]">
+                            <EstadoEntregaOf of={registro.orden_fabricacion} desde={registro.estado === 'Transito' ? registro.digitado_fecha : registro.empaque_fecha} />
+                        </div>
+                    )}
                 </div>
 
                 {/* Actions */}

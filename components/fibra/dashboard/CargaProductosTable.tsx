@@ -1,133 +1,115 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+'use client'
 
-export interface CargaProductosRow {
-    productoSku: string
-    productoDescripcion: string
-    grupo: string
-    color: string
-    totalOrdenes: number
-    piezasProgramadas: number
-}
+import React, { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Loader2, RefreshCw, Search } from 'lucide-react'
+import { getOrdenesFabricacion } from '@/lib/supabase/queries/fibra'
+import type { OrdenFabricacion } from '@/types/pintura'
+
+// Carga de productos de FIBRA (antes leía la vista de Mármol query_carga_productos y, si no había datos, mostraba
+// productos de ejemplo inventados): las OF pendientes de Fibra agrupadas por producto, con la cantidad, lo programado
+// (por iniciar), lo que está en proceso en planta y lo que ya llegó a CEDI.
+
+type Fila = { sku: string; descripcion: string; grupo: string; ordenes: number; cantidad: number; programado: number; enProceso: number; cedi: number }
+
+const n = (v: unknown) => Math.max(0, Number(v) || 0)
+const enProceso = (o: OrdenFabricacion) =>
+    n(o.pintura) + n(o.vaciado) + n(o.herrajes) + n(o.pulido) + n(o.acabado) + n(o.reparacion) + n(o.reparacion_larga) + n(o.empaque) + n(o.digitado) + n(o.transito)
+// Grupo = primera palabra de la descripción (HIDROMASAJE, HIDROAERO, BAÑERA, FALDON, KIT…)
+const grupo = (d: string) => (d.trim().split(/\s+/)[0] || '—').toUpperCase()
 
 export default function CargaProductosTable() {
-    const [data, setData] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
+    const [filas, setFilas] = useState<Fila[] | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    const [cargando, setCargando] = useState(false)
+    const [busqueda, setBusqueda] = useState('')
 
-    useEffect(() => {
-        const loadData = async () => {
-            setLoading(true)
-            try {
-                // Hacemos el request a Supabase usando 'query_carga_productos' 
-                // Asegúrate de que este nombre corresponda al de tu vista en la base de datos
-                const { data: result, error } = await supabase.from('query_carga_productos').select('*')
-                
-                if (error) {
-                    console.error("Error fetching carga productos:", error)
-                }
-                
-                if (result && result.length > 0) {
-                    setData(result)
-                } else {
-                    setData([
-                        {
-                            productoSku: 'PROD-001',
-                            productoDescripcion: 'Lavamanos Mármol Sintético',
-                            grupo: 'Lavamanos',
-                            color: 'Blanco',
-                            totalOrdenes: 150,
-                            piezasProgramadas: 120
-                        },
-                        {
-                            productoSku: 'PROD-002',
-                            productoDescripcion: 'Mesón Cocina 120x60',
-                            grupo: 'Mesones',
-                            color: 'Gris Granito',
-                            totalOrdenes: 45,
-                            piezasProgramadas: 40
-                        },
-                        {
-                            productoSku: 'PROD-003',
-                            productoDescripcion: 'Bañera Rectangular',
-                            grupo: 'Bañeras',
-                            color: 'Beige',
-                            totalOrdenes: 12,
-                            piezasProgramadas: 12
-                        }
-                    ])
-                }
-            } catch (error) {
-                console.error("Error:", error)
-            } finally {
-                setLoading(false)
+    const cargar = async () => {
+        setCargando(true); setError(null)
+        try {
+            const ordenes = await getOrdenesFabricacion()
+            const mapa = new Map<string, Fila>()
+            for (const o of ordenes) {
+                const sku = String(o.producto_sku || '').trim() || '—'
+                const desc = String(o.producto_descripcion || '').trim()
+                const f = mapa.get(sku) || { sku, descripcion: desc, grupo: grupo(desc), ordenes: 0, cantidad: 0, programado: 0, enProceso: 0, cedi: 0 }
+                f.ordenes++; f.cantidad += n(o.cantidad || o.cantidad_programada); f.programado += n(o.programado)
+                f.enProceso += enProceso(o); f.cedi += n(o.cedi)
+                mapa.set(sku, f)
             }
-        }
-        
-        loadData()
-    }, [])
+            setFilas([...mapa.values()].sort((a, b) => b.programado - a.programado || b.cantidad - a.cantidad))
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'No se pudieron leer las órdenes de Fibra')
+        } finally { setCargando(false) }
+    }
+    useEffect(() => { cargar() }, [])
+
+    const visibles = useMemo(() => {
+        const q = busqueda.trim().toLowerCase()
+        return (filas || []).filter(f => !q || f.sku.toLowerCase().includes(q) || f.descripcion.toLowerCase().includes(q) || f.grupo.toLowerCase().includes(q))
+    }, [filas, busqueda])
+    const tot = visibles.reduce((a, f) => ({ ordenes: a.ordenes + f.ordenes, cantidad: a.cantidad + f.cantidad, programado: a.programado + f.programado, enProceso: a.enProceso + f.enProceso, cedi: a.cedi + f.cedi }), { ordenes: 0, cantidad: 0, programado: 0, enProceso: 0, cedi: 0 })
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col animate-in fade-in duration-500">
-            <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="text-sm font-bold text-[#254153]">Tabla de Carga de Productos</h3>
-                <span className="text-xs bg-[#00bcd4]/10 text-[#00bcd4] px-2 py-1 rounded-full font-medium">
-                    {data.length} registros
-                </span>
+        <div className="p-3 sm:p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[200px]">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar SKU, producto o grupo…"
+                        className="w-full h-8 pl-9 pr-3 bg-white border border-[#e2ded5] rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-[#7B8E90]" />
+                </div>
+                <button onClick={cargar} disabled={cargando} className="h-8 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] text-xs font-bold flex items-center gap-1.5 hover:bg-[#F6F3EE] disabled:opacity-50">
+                    <RefreshCw size={14} className={cargando ? 'animate-spin' : ''} /> Recargar
+                </button>
+                <span className="text-xs font-bold text-[#324354] bg-[#324354]/10 px-2 py-1 rounded-lg">{visibles.length} producto(s)</span>
             </div>
-            <div className="flex-1 overflow-auto">
-                {loading ? (
-                    <div className="flex items-center justify-center h-40">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#254153]"></div>
-                    </div>
+
+            {error && <div className="px-3 py-2 rounded-lg bg-[#d14747]/10 border border-[#d14747]/40 text-[#d14747] text-xs font-bold flex items-center gap-2"><AlertTriangle size={14} /> {error}</div>}
+
+            <div className="bg-white rounded-2xl border border-[#e2ded5] shadow-sm overflow-auto">
+                {filas === null ? (
+                    <div className="py-16 flex items-center justify-center gap-2 text-slate-500 text-sm font-semibold"><Loader2 className="animate-spin" size={18} /> Cargando órdenes de Fibra…</div>
                 ) : (
-                    <table className="w-full text-sm text-left whitespace-nowrap">
-                        <thead className="text-xs text-[#254153] bg-gray-100 sticky top-0 z-10 shadow-sm uppercase font-black tracking-wider">
-                            <tr>
-                                <th className="px-4 py-3 border-b">SKU</th>
-                                <th className="px-4 py-3 border-b">Descripción</th>
-                                <th className="px-4 py-3 border-b">Grupo</th>
-                                <th className="px-4 py-3 border-b">Color</th>
-                                <th className="px-4 py-3 border-b text-center">Órdenes</th>
-                                <th className="px-4 py-3 border-b text-center hidden md:table-cell">Programado</th>
+                    <table className="w-full text-xs">
+                        <thead className="bg-[#324354] text-white sticky top-0">
+                            <tr className="text-[10px] uppercase">
+                                <th className="px-3 py-2 text-left">SKU</th>
+                                <th className="px-3 py-2 text-left">Producto</th>
+                                <th className="px-3 py-2 text-left">Grupo</th>
+                                <th className="px-3 py-2 text-right">OF</th>
+                                <th className="px-3 py-2 text-right">Cantidad</th>
+                                <th className="px-3 py-2 text-right">Programado</th>
+                                <th className="px-3 py-2 text-right">En proceso</th>
+                                <th className="px-3 py-2 text-right">CEDI</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {data.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                                        No hay datos disponibles
-                                    </td>
+                        <tbody className="divide-y divide-slate-100">
+                            {visibles.length === 0 ? (
+                                <tr><td colSpan={8} className="py-10 text-center text-slate-400 font-semibold">No hay órdenes de Fibra pendientes{busqueda ? ' que coincidan' : ''}</td></tr>
+                            ) : visibles.map(f => (
+                                <tr key={f.sku} className="hover:bg-slate-50">
+                                    <td className="px-3 py-1.5 font-bold text-[#324354] whitespace-nowrap">{f.sku}</td>
+                                    <td className="px-3 py-1.5 font-semibold text-slate-700">{f.descripcion || '—'}</td>
+                                    <td className="px-3 py-1.5 text-slate-500">{f.grupo}</td>
+                                    <td className="px-3 py-1.5 text-right font-bold text-[#324354]">{f.ordenes}</td>
+                                    <td className="px-3 py-1.5 text-right">{f.cantidad}</td>
+                                    <td className={`px-3 py-1.5 text-right font-black ${f.programado ? 'text-[#7a5f0e]' : 'text-slate-300'}`}>{f.programado}</td>
+                                    <td className={`px-3 py-1.5 text-right font-bold ${f.enProceso ? 'text-[#324354]' : 'text-slate-300'}`}>{f.enProceso}</td>
+                                    <td className={`px-3 py-1.5 text-right font-bold ${f.cedi ? 'text-[#2f7a40]' : 'text-slate-300'}`}>{f.cedi}</td>
                                 </tr>
-                            ) : (
-                                data.map((row, index) => (
-                                    <tr 
-                                        key={index} 
-                                        className="hover:bg-[#f8fafc] transition-colors"
-                                    >
-                                        <td className="px-4 py-2.5 font-bold text-[#254153]">
-                                            {row.productoSku || row.sku || row.producto_sku || '-'}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-gray-600 truncate max-w-[300px]" title={row.productoDescripcion || row.descripcion || row.producto_descripcion}>
-                                            {row.productoDescripcion || row.descripcion || row.producto_descripcion || '-'}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-gray-700">
-                                            {row.grupo ?? '-'}
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                                {row.color ?? '-'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-center text-blue-600 font-bold bg-blue-50/30">
-                                            {row.totalOrdenes ?? row.total_ordenes ?? row.ordenes ?? '-'}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-center text-[#00bcd4] font-bold bg-[#00bcd4]/5 hidden md:table-cell">
-                                            {row.piezasProgramadas ?? row.piezas_programadas ?? row.programado ?? '-'}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
+                            ))}
                         </tbody>
+                        {visibles.length > 0 && (
+                            <tfoot className="bg-[#F6F3EE] font-black text-[#324354] sticky bottom-0">
+                                <tr>
+                                    <td className="px-3 py-2" colSpan={3}>Totales ({visibles.length} productos)</td>
+                                    <td className="px-3 py-2 text-right">{tot.ordenes}</td>
+                                    <td className="px-3 py-2 text-right">{tot.cantidad}</td>
+                                    <td className="px-3 py-2 text-right">{tot.programado}</td>
+                                    <td className="px-3 py-2 text-right">{tot.enProceso}</td>
+                                    <td className="px-3 py-2 text-right">{tot.cedi}</td>
+                                </tr>
+                            </tfoot>
+                        )}
                     </table>
                 )}
             </div>

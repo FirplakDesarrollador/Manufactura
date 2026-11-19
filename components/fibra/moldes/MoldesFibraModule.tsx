@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Boxes, RefreshCw, Search, X, Unlock, AlertTriangle, Loader2 } from 'lucide-react'
+import IconoMolde from '../IconoMolde'
+import { RefreshCw, Search, X, Unlock, AlertTriangle, Loader2 } from 'lucide-react'
 import { getMoldesUbicados, liberarMoldes, MoldeUbicado } from '@/lib/supabase/queries/fibra_moldes'
 
 // Moldes por tipo de bañera: estado de cada molde, dónde está la pieza que lo ocupa y botón para liberarlo.
@@ -24,12 +25,13 @@ const estiloMolde = (m: MoldeUbicado) => {
 const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const fechaCorta = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
 
-export default function MoldesFibraModule({ puedeLiberar }: { puedeLiberar: boolean }) {
+// `plantaInicial`: planta que se muestra al abrir (FV en Control de Piso Fibra, MS en Control de Piso Mármol)
+export default function MoldesFibraModule({ puedeLiberar, plantaInicial = 'FV' }: { puedeLiberar: boolean; plantaInicial?: 'FV' | 'MS' }) {
     const [moldes, setMoldes] = useState<MoldeUbicado[]>([])
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [busqueda, setBusqueda] = useState('')
-    const [planta, setPlanta] = useState<'FV' | 'MS' | 'todas'>('FV')
+    const [planta, setPlanta] = useState<'FV' | 'MS' | 'todas'>(plantaInicial)
     const [filtro, setFiltro] = useState<FiltroEstado>('todos')
     const [liberando, setLiberando] = useState(false)
 
@@ -122,7 +124,7 @@ export default function MoldesFibraModule({ puedeLiberar }: { puedeLiberar: bool
             <div className="bg-white border-b border-[#e2ded5] px-3 py-1.5 shrink-0">
                 <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-2 gap-y-1.5">
                     <div className="flex items-center gap-2 text-[#324354] shrink-0">
-                        <Boxes className="w-4 h-4" />
+                        <IconoMolde className="w-4 h-4" />
                         <h2 className="text-sm font-black whitespace-nowrap">Moldes</h2>
                         <select value={planta} onChange={e => setPlanta(e.target.value as typeof planta)} title="Planta"
                             className="h-7 px-1.5 rounded-lg border border-slate-300 bg-white text-[11px] font-black text-[#254153] outline-none cursor-pointer">

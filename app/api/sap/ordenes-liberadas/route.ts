@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fechasSemaforoPorOf } from '@/lib/sap/fechasSemaforo';
+import { fetchSAP, SAP_BASE_URL } from '@/lib/sap';
 
 async function fetchSapQueryPages(baseUrl: string, sessionId: string, queryName: string): Promise<any[]> {
     const headers = {
@@ -397,6 +398,26 @@ export async function GET() {
         };
 
         const fibraRows = mappedRows.filter(r => isFibraSku(r.producto_sku, r.producto_descripcion));
+
+        // Pedido vinculado (orden de venta) de las OF de Fibra: la consulta directa de SAP no lo trae (solo el respaldo de
+        // Cloudflare), así que se completa con el "Pedido vinculado" de la OF en SAP (ProductionOrderOriginNumber),
+        // de a 20 OF por consulta y una consulta a la vez. Si SAP no responde, el pedido queda como venía.
+        const sinPedido = fibraRows.filter(r => !String(r.numero_pedido || '').trim() && /^\d+$/.test(String(r.orden_fabricacion)));
+        for (let i = 0; i < sinPedido.length; i += 20) {
+            const lote = sinPedido.slice(i, i + 20);
+            try {
+                const filtro = lote.map(r => `DocumentNumber eq ${r.orden_fabricacion}`).join(' or ');
+                const res = await fetchSAP(`${SAP_BASE_URL}/ProductionOrders?$select=DocumentNumber,ProductionOrderOriginNumber&$filter=${encodeURIComponent(filtro)}`,
+                    { method: 'GET', headers: { Prefer: 'odata.maxpagesize=50' } });
+                if (!res.ok) { console.warn(`[ordenes-liberadas] SAP no entregó el pedido vinculado (${res.status})`); continue; }
+                const pedidos = new Map<string, string>(((await res.json()).value || [])
+                    .filter((o: any) => o.ProductionOrderOriginNumber)
+                    .map((o: any) => [String(o.DocumentNumber), String(o.ProductionOrderOriginNumber)]));
+                for (const r of lote) { const p = pedidos.get(String(r.orden_fabricacion)); if (p) r.numero_pedido = p; }
+            } catch (e) {
+                console.warn('[ordenes-liberadas] Error trayendo el pedido vinculado de SAP:', e);
+            }
+        }
         let totalFibraUpserted = 0;
         let avisoFechasSemaforo: string | null = null;
 
@@ -438,6 +459,8 @@ export async function GET() {
                     molde_descripcion: r.molde_descripcion,
                     kilos_gelcoat: r.kilos_gelcoat,
                     componentes: r.componentes || null,
+                    // Unidades ya completadas (recibidas) en SAP: cuentan como CEDI aunque no se registraran en planta
+                    cantidad_completada_sap: Number(r.cantCompletada) || 0,
                     modificado_por: 'Sistema SAP',
                     ...(fechas ? {
                         ...(fechas.get(String(r.orden_fabricacion).trim()) ?? sinFecha),
@@ -446,11 +469,19 @@ export async function GET() {
                 }));
 
             const BATCH_SIZE = 50;
+            let sinColumnaCompletada = false;
             for (let i = 0; i < cleanFibraBatch.length; i += BATCH_SIZE) {
-                const batch = cleanFibraBatch.slice(i, i + BATCH_SIZE);
-                const { error: errFibra } = await supabase
+                let batch: Record<string, unknown>[] = cleanFibraBatch.slice(i, i + BATCH_SIZE);
+                if (sinColumnaCompletada) batch = batch.map(({ cantidad_completada_sap, ...resto }) => resto);
+                let { error: errFibra } = await supabase
                     .from('ordenes_fabricacion_fibra')
                     .upsert(batch, { onConflict: 'orden_fabricacion' });
+                // Sin la columna cantidad_completada_sap (falta fibra_completada_sap.sql): se guardan las órdenes sin ella
+                if (errFibra && /cantidad_completada_sap/i.test(errFibra.message)) {
+                    sinColumnaCompletada = true;
+                    batch = batch.map(({ cantidad_completada_sap, ...resto }) => resto);
+                    ({ error: errFibra } = await supabase.from('ordenes_fabricacion_fibra').upsert(batch, { onConflict: 'orden_fabricacion' }));
+                }
                 if (errFibra) {
                     console.error('Error upserting ordenes_fabricacion_fibra:', errFibra);
                     if (fechas && !avisoFechasSemaforo) {
