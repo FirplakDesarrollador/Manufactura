@@ -31,6 +31,9 @@ export async function GET(request: Request) {
             const item = String(l.ItemNo || '').trim(); if (!item) continue;
             const descripcion = String(l.ItemName || '');
             if (grupoMaterial(descripcion) === 'mo') continue;
+            // Muebles: las CMPD09 son las piezas del despiece (base, entrepaño, laterales…) que se cortan en planta y
+            // nunca tienen existencia en SAP; no se exigen (confirmado por el usuario, 2026-11-18)
+            if (item.toUpperCase().startsWith('CMPD09')) continue;
             const bodega = String(l.Warehouse || '').trim();
             const k = `${item}|${bodega}`;
             const x = req.get(k) || { item, descripcion, bodega, requerido: 0, consumido: 0 };

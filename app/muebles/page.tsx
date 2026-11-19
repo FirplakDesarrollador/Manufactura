@@ -7,7 +7,20 @@ import CorteModule from '@/components/muebles/CorteModule'
 import EnchapeModule from '@/components/muebles/EnchapeModule'
 import InspeccionModule from '@/components/muebles/InspeccionModule'
 import EmpaqueModule from '@/components/muebles/EmpaqueModule'
-import DigitadoModule from '@/components/muebles/DigitadoModule'
+import DigitadoModule, { grupoDigitadoMuebles } from '@/components/muebles/DigitadoModule'
+import { useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
+
+// Bolita roja del menú: órdenes de Digitado con componentes faltantes para la entrega (última revisión de SAP)
+function AvisoFaltantesDigitado({ planta, abierto }: { planta: string; abierto: boolean }) {
+    const n = useFaltantesGrupo(grupoDigitadoMuebles(planta))
+    if (!n) return null
+    return (
+        <b title={`${n} OF con componentes faltantes para la entrega`}
+            className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${abierto ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+            {n > 99 ? '99+' : n}
+        </b>
+    )
+}
 import TransitoModule from '@/components/muebles/TransitoModule'
 import CediModule from '@/components/muebles/CediModule'
 import AdministracionModule from '@/components/muebles/AdministracionModule'
@@ -19,6 +32,7 @@ import ConfigurarTurnosModal from '@/components/muebles/ConfigurarTurnosModal'
 import ConfigurarSupervisoresModal from '@/components/muebles/ConfigurarSupervisoresModal'
 import CambiarPlantaModal from '@/components/muebles/CambiarPlantaModal'
 import ErrorBoundary from '@/components/common/ErrorBoundary'
+import Header from '@/components/opt-sistemica/Header'
 import { getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
 import { setTareaActiva } from '@/lib/supabase/queries/usuarios'
 
@@ -192,84 +206,56 @@ export default function MueblesPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <header className="bg-[#254153] border-b border-[#1a2e3b] sticky top-0 z-50 shadow-md">
-                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <div className="flex items-center space-x-3">
-                            <button
-                                onClick={() => router.push('/home/selection')}
-                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
-                                title="Volver a Selección"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                </svg>
-                            </button>
-                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center overflow-hidden">
-                                <img src="/assets/images/Logo-Firplak-Azul.png" alt="Logo" className="w-8 h-auto" onError={(e:any) => e.target.src = "https://placehold.co/40x40/white/254153?text=FP"} />
-                            </div>
-                            <h1 className="text-xl font-bold text-white">Manufactura - Muebles</h1>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm text-gray-200">Bienvenido</p>
-                                <p className="text-white font-semibold">{profile?.nombre || user?.email || 'Usuario'}</p>
-                            </div>
-                            <button
-                                onClick={handleSignOut}
-                                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm"
-                            >
-                                Cerrar Sesión
-                            </button>
-                            <button
-                                onClick={() => setSidebarOpen(!sidebarOpen)}
-                                className="text-white hover:bg-[#1a2e3b] p-2 rounded-lg transition-colors border border-white/20"
-                                title="Toggle Sidebar"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            {/* Mismo banner de toda la app (como Control de Piso MS y FV): menú, título, logo y usuario */}
+            <Header title={`Control de Piso ${(profile?.planta_muebles || 'Muebles').toLowerCase() === 'cefi' ? 'CEFI' : 'Muebles (MBL)'}`} subtitle="" compact={true}
+                userEmail={user?.email} showLogout={true} onLogout={handleSignOut} />
 
-            <div className="flex min-h-[calc(100vh-4rem)] relative">
-                {/* Sidebar Backdrop (Mobile only) */}
+            <div className="flex min-h-[calc(100vh-3rem)] relative">
+                {/* Fondo oscuro del menú abierto (solo celular) */}
                 {sidebarOpen && (
-                    <div
-                        className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300"
-                        onClick={() => setSidebarOpen(false)}
-                    />
+                    <div className="fixed inset-0 top-12 bg-black/50 z-40 md:hidden transition-opacity duration-300" onClick={() => setSidebarOpen(false)} />
                 )}
 
-                {/* Sidebar */}
+                {/* Menú lateral igual al de MS y FV: recogible a solo íconos */}
+                <div className="w-12 shrink-0 md:hidden" />
                 <aside
-                    className={`fixed md:relative inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out bg-white border-r border-gray-200 shadow-lg
-                        ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-0'}
-                        overflow-hidden`}
+                    className={`fixed md:sticky top-12 bottom-0 md:h-[calc(100vh-3rem)] left-0 z-50 md:z-30 shrink-0 transition-all duration-300 ease-in-out bg-white border-r border-[#e2ded5] shadow-sm overflow-hidden
+                        ${sidebarOpen ? 'w-52' : 'w-12'}`}
                 >
-                    <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
+                    <nav onClick={e => { if (window.innerWidth < 768 && (e.target as HTMLElement).closest('button') && !(e.target as HTMLElement).closest('[title$="menú de módulos"]')) setSidebarOpen(false) }}
+                        className={`p-2 space-y-1 overflow-y-auto h-full [&_button>svg]:w-4 [&_button>svg]:h-4 [&_button>svg]:shrink-0 ${sidebarOpen ? '' : '[&_button>span]:hidden [&_button]:justify-center [&_button]:px-0'}`}>
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            className="flex items-center space-x-2 px-3 h-8 mb-1 rounded-lg w-full text-[10px] font-black uppercase tracking-wider text-[#324354] bg-[#F6F3EE] hover:bg-[#e2ded5] transition-colors"
+                            title={sidebarOpen ? 'Recoger menú de módulos' : 'Abrir menú de módulos'}
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? 'M11 19l-7-7 7-7m8 14l-7-7 7-7' : 'M13 5l7 7-7 7M5 5l7 7-7 7'} />
+                            </svg>
+                            <span className="flex-1 text-left">Módulos {(profile?.planta_muebles || 'Muebles').toLowerCase() === 'cefi' ? 'CEFI' : 'MBL'}</span>
+                        </button>
+
                         {filteredMenuItems.map((item) => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveModule(item.id)}
-                                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium text-sm w-full ${activeModule === item.id
+                                title={sidebarOpen ? undefined : item.label}
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === item.id
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 {item.icon}
                                 <span>{item.label}</span>
+                                {item.id === 'digitado' && <AvisoFaltantesDigitado planta={profile?.planta_muebles || 'Muebles'} abierto={sidebarOpen} />}
                             </button>
                         ))}
 
-                        <div className="pt-4 border-t border-gray-200 mt-4 space-y-1">
+                        <div className="pt-2 border-t border-[#e2ded5] mt-2 space-y-1">
                             {utilityItems.map((item) => (
                                 <button
                                     key={item.id}
+                                    title={sidebarOpen ? undefined : item.label}
                                     onClick={() => {
                                       if (item.id === 'cambiar_planta') {
                                         setIsPlantaModalOpen(true);
@@ -281,7 +267,7 @@ export default function MueblesPage() {
                                         setActiveModule(item.id);
                                       }
                                     }}
-                                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors font-medium text-sm w-full text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]`}
+                                    className="flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]"
                                 >
                                     {item.icon}
                                     <span>{item.label}</span>
@@ -292,7 +278,7 @@ export default function MueblesPage() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 h-[calc(100vh-4rem)] bg-white overflow-hidden relative">
+                <main className="flex-1 min-w-0 h-[calc(100vh-3rem)] bg-white overflow-hidden relative">
                     <ErrorBoundary fallbackTitle="Error al cargar el módulo de Muebles">
                         <div className="h-full overflow-y-auto">
                             {activeModule === 'corte' ? (

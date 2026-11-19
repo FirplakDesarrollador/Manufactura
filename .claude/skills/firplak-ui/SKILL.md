@@ -35,7 +35,7 @@ Este skill concentra las reglas visuales de la aplicación. Complementa:
 ## 2. Banners y barras
 
 ### 2.0 Encabezados por niveles (estándar de toda la app)
-Aplica a todas las pantallas **excepto Control de Piso MS (`/marmol`) y Muebles (`/muebles`)**, que aún tienen su propio encabezado de planta.
+Aplica a todas las pantallas **excepto Control de Piso MS (`/marmol`), FV (`/fibra`) y Muebles (`/muebles`)**, que usan el mismo banner `Header` ("Control de Piso …") sin barra de pestañas y, en su lugar, un menú lateral recogible a íconos (`w-52` abierto / `w-12` recogido, botón crema "Módulos …" arriba, ítems `px-3 py-1.5 text-xs`, íconos 16 px, activo `bg-[#254153] text-white`, bolita roja de avisos `bg-[#d14747]`). Referencia: `app/marmol/page.tsx` (Muebles lo adoptó el 2026-11-18).
 - **Control de Piso FV (`/fibra`) ya usa el `Header` estándar** (título "Control de Piso Fibra (FV)"). Su menú de módulos de planta vive en un panel lateral propio (`w-52`, `sticky top-12`) que se recoge a una **barra de íconos** (`w-12`, nombre en `title`) con el botón **«/» "Módulos FV"** arriba del panel (reemplaza el botón ≡ del encabezado viejo; el ≡ del banner es solo el menú general). En celular arranca recogido y flota sobre el contenido al abrirlo. Referencia: `app/fibra/page.tsx`; aplicar igual a MS y Muebles cuando se migren.
 
 | Nivel | Qué es | Alto | Componente / clases |
