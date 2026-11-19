@@ -8,6 +8,7 @@ import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
 import { Search, X, Calendar, RefreshCw, Filter, FileText } from 'lucide-react'
 import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
+import ResumenFaltantes from '../fibra/ResumenFaltantes'
 import { actualizarTodasEnPantalla, useRevisionEnCurso, useVersionRevision, tieneFaltantes, fijarGrupo, useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
 
 /** Grupo de OF del Digitado de Muebles/CEFI (la bolita del menú cuenta las que tienen componentes faltantes). */
@@ -189,6 +190,7 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
                                     {conFaltantes === 1 ? 'orden con faltantes de componentes' : 'órdenes con faltantes de componentes'}
                                 </span>
                             )}
+                            <span className="ml-2"><ResumenFaltantes ofs={filteredOrdenes.map(o => o.orden_fabricacion)} /></span>
                         </div>
                     </div>
 

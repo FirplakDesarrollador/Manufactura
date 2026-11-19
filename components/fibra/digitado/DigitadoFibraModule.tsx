@@ -35,6 +35,7 @@ export default function DigitadoFibraModule({ userEmail }: { userEmail: string }
             sinPiezas="No hay piezas en guacal pendientes de digitar"
             renderPieza={p => <PiezaDigitadoCard {...p} usuarioEmail={userEmail} />}
             extra={pestanas}
+            resumenFaltantes
         />
     )
 }
