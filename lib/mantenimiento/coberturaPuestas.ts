@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase';
 
-// Cobertura de puestas a punto: cuántas hay por planta y proceso frente a las HDT vigentes (una por labor).
-// Referencia: cada HDT vigente (labor) debería tener su puesta a punto.
+// Cobertura de puestas a punto por planta y proceso.
+// Regla del indicador: cada proceso con al menos una HDT vigente debe tener al menos 1 puesta a punto
+// (no una por cada HDT). Las HDT se muestran solo como referencia de las labores del proceso.
 
 export const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
@@ -42,8 +43,19 @@ export async function cargarCobertura(): Promise<Record<string, Cobertura>> {
         if (h.labor) f.labores.push(h.labor);
         f.proceso = titulo(h.proceso || f.proceso); // el nombre de la HDT es más limpio ("Vaciado" y no "VACIADO FV")
     }
-    for (const c of Object.values(res)) c.procesos.sort((a, b) => (b.hdts - b.puestas) - (a.hdts - a.puestas) || a.proceso.localeCompare(b.proceso, 'es'));
+    // Primero los procesos que faltan (con HDT y sin puesta a punto)
+    const falta = (p: FilaCobertura) => (p.hdts > 0 && p.puestas === 0 ? 0 : 1);
+    for (const c of Object.values(res)) c.procesos.sort((a, b) => falta(a) - falta(b) || a.proceso.localeCompare(b.proceso, 'es'));
     return res;
+}
+
+// Indicador: procesos que requieren puesta a punto (tienen HDT vigente) vs. los que ya tienen al menos una
+export function indicadorCobertura(c: Cobertura) {
+    const requeridos = c.procesos.filter(p => p.hdts > 0);
+    const cubiertos = requeridos.filter(p => p.puestas > 0).length;
+    const faltan = requeridos.length - cubiertos;
+    const pct = requeridos.length ? Math.round((cubiertos / requeridos.length) * 100) : 0;
+    return { requeridos: requeridos.length, cubiertos, faltan, pct };
 }
 
 export const coberturaDe = (todas: Record<string, Cobertura>, planta: string): Cobertura =>

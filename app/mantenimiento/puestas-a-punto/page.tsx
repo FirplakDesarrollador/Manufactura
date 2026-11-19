@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { supabaseTH } from '@/lib/mtto-autonomo/supabaseTH';
 import Header from '@/components/opt-sistemica/Header';
 import { useRouter } from 'next/navigation';
-import { Cobertura, cargarCobertura, coberturaDe } from '@/lib/mantenimiento/coberturaPuestas';
+import { Cobertura, cargarCobertura, coberturaDe, indicadorCobertura } from '@/lib/mantenimiento/coberturaPuestas';
 
 interface PuestaCompleta {
   id: string | number;
@@ -216,15 +216,14 @@ export default function PuestasAPuntoPage() {
                   <h3 className="card-title-centered" style={{ fontSize: '1.2rem', marginBottom: 0 }}>{planta}</h3>
                   {cobertura && (() => {
                     const c = coberturaDe(cobertura, planta);
-                    const faltan = c.procesos.reduce((s, p) => s + Math.max(0, p.hdts - p.puestas), 0);
-                    const pct = c.hdts ? Math.min(100, Math.round(((c.hdts - faltan) / c.hdts) * 100)) : 0;
+                    const { requeridos, cubiertos, faltan, pct } = indicadorCobertura(c);
                     return (
                       <div style={{ width: '100%', maxWidth: '240px', fontSize: '0.8rem', color: '#475569', textAlign: 'center' }}>
-                        <div><b style={{ color: '#324354' }}>{c.puestas}</b> puesta(s) a punto · <b style={{ color: '#324354' }}>{c.hdts}</b> HDT vigentes</div>
+                        <div><b style={{ color: '#324354' }}>{cubiertos}</b> de <b style={{ color: '#324354' }}>{requeridos}</b> procesos con puesta a punto · {c.puestas} registradas</div>
                         <div style={{ height: '6px', borderRadius: '99px', background: '#F6F3EE', overflow: 'hidden', margin: '6px 0 4px' }}>
                           <div style={{ height: '100%', width: pct + '%', borderRadius: '99px', background: faltan ? '#324354' : '#59a96a' }} />
                         </div>
-                        <div style={{ fontWeight: 700, color: faltan ? '#d14747' : '#59a96a' }}>{c.hdts ? (faltan ? 'Faltan ' + faltan + ' según las HDT' : 'Completo según las HDT') : 'Sin HDT vigentes'}</div>
+                        <div style={{ fontWeight: 700, color: faltan ? '#d14747' : '#59a96a' }}>{requeridos ? (faltan ? 'Faltan ' + faltan + ' proceso(s) sin puesta a punto' : 'Todos los procesos tienen puesta a punto') : 'Sin HDT vigentes'}</div>
                       </div>
                     );
                   })()}

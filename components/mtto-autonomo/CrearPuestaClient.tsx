@@ -7,6 +7,7 @@ import Image from 'next/image';
 import React from 'react';
 import { generateConsecutivo, insertDetallesPuesta } from '@/lib/mtto-autonomo/utils';
 import MaquinaSelect, { useMaquinasCatalogo } from './MaquinaSelect';
+import { Cobertura, cargarCobertura, coberturaDe } from '@/lib/mantenimiento/coberturaPuestas';
 import { 
   DndContext, 
   closestCenter, 
@@ -135,7 +136,8 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
   const [plantas, setPlantas] = useState<Item[]>([]);
 
   const [nombrePuesta, setNombrePuesta] = useState('PUESTA A PUNTO PULIDO');
-  const [proceso, setProceso] = useState('PULIDO');
+  const [proceso, setProceso] = useState('');
+  const [cobertura, setCobertura] = useState<Record<string, Cobertura> | null>(null);
   const [plantaSeleccionada, setPlantaSeleccionada] = useState(decodeURIComponent(plantaUrl));
   const [responsables, setResponsables] = useState<string[]>(['']);
   const [supervisores, setSupervisores] = useState<string[]>(['']);
@@ -162,7 +164,18 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
       if (plats) setPlantas(plats.map(p => ({ id: p.id, label: p.planta })));
     }
     load();
+    cargarCobertura().then(setCobertura).catch(() => setCobertura({}));
   }, []);
+
+  // Procesos de la planta seleccionada: los que tienen HDT vigente (los mismos del conteo de cobertura)
+  const procesosPlanta: Item[] = cobertura
+    ? coberturaDe(cobertura, plantaSeleccionada).procesos.filter(p => p.hdts > 0).map(p => ({ id: p.clave, label: p.proceso }))
+    : [];
+  const elegirProceso = (val: string) => {
+    setProceso(val);
+    // Si el nombre sigue siendo el automático, lo ajusta al proceso elegido
+    if (!nombrePuesta.trim() || /^PUESTA A PUNTO/i.test(nombrePuesta)) setNombrePuesta(`PUESTA A PUNTO ${val.toUpperCase()}`);
+  };
 
   const addMaquina = () => setMaquinas([...maquinas, { id: uuidv4(), nombre: '', id_maquina: null, puntos: [{ id: uuidv4(), revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
   const removeMaquina = (mId: string) => setMaquinas(maquinas.filter(m => m.id !== mId));
@@ -214,6 +227,7 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
 
   const handleSubmit = async (e: any) => {
     if (e) e.preventDefault();
+    if (!proceso) { setErrorDb('Seleccione el proceso de la puesta a punto.'); return; }
     setLoading(true);
     try {
       const dateObj = new Date(fechaCreacion + 'T12:00:00'); // Use mid-day to avoid TZ issues
@@ -353,14 +367,7 @@ export default function CrearPuestaClient({ planta: plantaUrl }: { planta: strin
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <SearchableSelect label="PLANTA" options={plantas} value={plantaSeleccionada} onChange={setPlantaSeleccionada} placeholder="Seleccione..." style={{ flex: '1 1 200px' }} />
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '120px' }}>
-            <label style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase' }}>PROCESO</label>
-            <input 
-              value={proceso} 
-              onChange={(e) => setProceso(e.target.value)} 
-              style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px 10px', color: 'white', fontSize: '0.8rem', outline: 'none', minHeight: '34px', fontWeight: 600 }} 
-            />
-          </div>
+          <SearchableSelect label="PROCESO" options={procesosPlanta} value={proceso} onChange={elegirProceso} placeholder={cobertura ? (procesosPlanta.length ? 'Seleccione...' : 'Planta sin HDT vigentes') : 'Cargando...'} style={{ flex: '1 1 200px' }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '80px' }}>
             <label style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase' }}>VERSIÓN</label>

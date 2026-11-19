@@ -26,6 +26,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { v4 as uuidv4 } from 'uuid';
 import MaquinaSelect, { useMaquinasCatalogo } from '@/components/mtto-autonomo/MaquinaSelect';
 import { insertDetallesPuesta } from '@/lib/mtto-autonomo/utils';
+import { Cobertura, cargarCobertura, coberturaDe, claveProceso } from '@/lib/mantenimiento/coberturaPuestas';
 
 interface Item {
   id: string | number;
@@ -87,6 +88,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
   const [empleados, setEmpleados] = useState<Item[]>([]);
   const [plantas, setPlantas] = useState<Item[]>([]);
   const [enc, setEnc] = useState(encabezadoInicial);
+  const [cobertura, setCobertura] = useState<Record<string, Cobertura> | null>(null);
   
   // Estados para múltiples responsables y supervisores
   const [responsables, setResponsables] = useState<string[]>(
@@ -131,9 +133,16 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
       if (plats) setPlantas(plats.map(p => ({ id: p.id, label: p.planta })));
     }
     load();
+    cargarCobertura().then(setCobertura).catch(() => setCobertura({}));
   }, []);
 
   const updateEnc = (field: string, val: any) => setEnc({ ...enc, [field]: val });
+
+  // Procesos de la planta (los que tienen HDT vigente); el proceso actual se conserva aunque no esté en la lista
+  const procesosPlanta: Item[] = cobertura
+    ? coberturaDe(cobertura, enc.planta || planta).procesos.filter(p => p.hdts > 0).map(p => ({ id: p.clave, label: p.proceso }))
+    : [];
+  if (enc.proceso && !procesosPlanta.some(p => p.id === claveProceso(enc.proceso))) procesosPlanta.unshift({ id: 'actual', label: enc.proceso });
   const maquinasCatalogo = useMaquinasCatalogo();
   const addGroup = () => setGroups([...groups, { id: uuidv4(), equipo: '', id_maquina: null, items: [{ id: uuidv4(), punto_a_revisar: '', criticidad: 'Media', frecuencia: 'Cada turno' }] }]);
   const removeGroup = (gId: string) => setGroups(groups.filter(g => g.id !== gId));
@@ -301,10 +310,7 @@ export default function ModificarPuestaClient({ planta, id, encabezadoInicial, d
         <div style={{ display: 'flex', gap: '0.8rem', flex: '2 1 600px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <SearchableSelect label="PLANTA" options={plantas} value={enc.planta} onChange={(v) => updateEnc('planta', v)} placeholder="Planta" />
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100px' }}>
-            <label style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' }}>PROCESO</label>
-            <input value={enc.proceso} onChange={(e) => updateEnc('proceso', e.target.value)} style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '4px 8px', color: 'white', fontSize: '0.75rem', outline: 'none' }} />
-          </div>
+          <SearchableSelect label="PROCESO" options={procesosPlanta} value={enc.proceso || ''} onChange={(v) => updateEnc('proceso', v)} placeholder={cobertura ? 'Seleccione...' : 'Cargando...'} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '150px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
