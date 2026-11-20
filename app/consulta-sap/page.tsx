@@ -524,6 +524,9 @@ export default function ConsultaSAPPage() {
     // Estado para ordenamiento de tabla Componentes
     const [compSortCol, setCompSortCol] = useState<keyof ComponentItem | null>(null)
     const [compSortDir, setCompSortDir] = useState<'asc' | 'desc'>('asc')
+    // Orden de la Lista de Materiales (Consulta por Producto): clic en el encabezado, igual que en Consulta Órdenes
+    const [bomSortCol, setBomSortCol] = useState<string | null>(null)
+    const [bomSortDir, setBomSortDir] = useState<'asc' | 'desc'>('asc')
 
     // Anchos redimensionables para tabla Componentes
     const [compColWidths, setCompColWidths] = useState<Record<string, number>>({
@@ -1159,6 +1162,29 @@ export default function ConsultaSAPPage() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Entregas_Produccion");
         XLSX.writeFile(workbook, `FPK_Entregas_Produccion_${new Date().toISOString().slice(0, 10)}.xlsx`);
         toast.success("Archivo Excel de Entregas Producción descargado exitosamente");
+    };
+
+    const handleBomSort = (col: string) => {
+        if (bomSortCol === col) setBomSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+        else { setBomSortCol(col); setBomSortDir('asc') }
+    };
+    // Números con formato de SAP ("11.03", "$ 1.234,50") se comparan como número; lo demás como texto
+    const numeroBom = (v: unknown): number | null => {
+        if (typeof v === 'number') return v
+        const t = String(v ?? '').replace(/[^0-9.,-]/g, '')
+        if (!t || !/[0-9]/.test(t)) return null
+        const n = Number(t.includes(',') ? t.split('.').join('').replace(',', '.') : t)
+        return isNaN(n) ? null : n
+    };
+    const ordenarBom = <T,>(filas: T[]): T[] => {
+        if (!bomSortCol) return filas
+        const signo = bomSortDir === 'asc' ? 1 : -1
+        return [...filas].sort((a, b) => {
+            const va = (a as Record<string, unknown>)[bomSortCol], vb = (b as Record<string, unknown>)[bomSortCol]
+            const na = numeroBom(va), nb = numeroBom(vb)
+            if (na != null && nb != null) return (na - nb) * signo
+            return String(va ?? '').localeCompare(String(vb ?? ''), 'es', { numeric: true }) * signo
+        })
     };
 
     const renderSortIcon = (currentCol: string, activeCol: string | null, dir: 'asc' | 'desc') => {
@@ -2588,27 +2614,27 @@ export default function ConsultaSAPPage() {
                                                 <table className="w-full border-collapse text-[11px] font-sans table-auto whitespace-nowrap select-text">
                                                     <thead className="sticky top-0 bg-[#eceae6] border-b border-[#c2c0bb] shadow-sm select-none z-10">
                                                         <tr className="text-gray-800 font-semibold">
-                                                            <th className="px-1.5 py-1 border-r border-[#c2c0bb] text-center w-8">#</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Tipo</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Nº</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Descripción</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Cantidad</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Nombre de unidad de medida</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Almacén</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Método emisión</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Lista de precios</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción total</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Precio unitario</th>
-                                                <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Total</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Comentarios</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Cta.WIP</th>
+                                                            <th className="px-1.5 py-1 border-r border-[#c2c0bb] text-center w-8 cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('id')} title="Ordenar por #">#{renderSortIcon('id', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('tipo')} title="Ordenar por Tipo">Tipo{renderSortIcon('tipo', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('no')} title="Ordenar por Nº">Nº{renderSortIcon('no', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('descripcion')} title="Ordenar por Descripción">Descripción{renderSortIcon('descripcion', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('cantidad')} title="Ordenar por Cantidad">Cantidad{renderSortIcon('cantidad', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('uom')} title="Ordenar por Nombre de unidad de medida">Nombre de unidad de medida{renderSortIcon('uom', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('almacen')} title="Ordenar por Almacén">Almacén{renderSortIcon('almacen', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('metodoEmision')} title="Ordenar por Método emisión">Método emisión{renderSortIcon('metodoEmision', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('costoEst')} title="Ordenar por Costo estándar de producción">Costo estándar de producción{renderSortIcon('costoEst', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('listaPrecios')} title="Ordenar por Lista de precios">Lista de precios{renderSortIcon('listaPrecios', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('costoEstTotal')} title="Ordenar por Costo estándar de producción total">Costo estándar de producción total{renderSortIcon('costoEstTotal', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('precioUnitario')} title="Ordenar por Precio unitario">Precio unitario{renderSortIcon('precioUnitario', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('total')} title="Ordenar por Total">Total{renderSortIcon('total', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('comentarios')} title="Ordenar por Comentarios">Comentarios{renderSortIcon('comentarios', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('ctaWip')} title="Ordenar por Cta.WIP">Cta.WIP{renderSortIcon('ctaWip', bomSortCol, bomSortDir)}</th>
                                                             <th className="px-2 py-1 text-center">Secuen...</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-[#e0ddd5] select-text">
                                                         {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? (
-                                                            activeItem.bomComponents.map((row, idx) => (
+                                                            ordenarBom(activeItem.bomComponents).map((row, idx) => (
                                                                 <tr key={idx} className="h-5 hover:bg-[#fff9e6] select-text cursor-text">
                                                                     <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600 select-text">{row.id}</td>
                                                                     <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800 select-text">{row.tipo}</td>

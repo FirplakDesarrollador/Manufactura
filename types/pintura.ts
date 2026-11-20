@@ -86,6 +86,7 @@ export interface RegistroTrazabilidad {
     digitado_fecha?: string
     transito_fecha?: string
     cedi_fecha?: string
+    of_pendiente?: boolean   // false = la OF ya se cerró (en SAP o en la app)
     estado?: string
     numero_pedido?: string
     producto_sku?: string
