@@ -37,7 +37,7 @@ export default function ReglasMedicionView() {
             .then(({ data }) => setPersonal((data || []).map(e => ({ nombre: limpio(e.nombreCompleto), planta: norm(e.planta) }))));
     }, []);
     const enPersonal = new Set(personal.map(p => norm(p.nombre)));
-    const [nuevaPersona, setNuevaPersona] = useState<Record<RolSP, string>>({ 'Líder': '', 'Supervisor': '', 'Jefe': '' });
+    const [nuevaPersona, setNuevaPersona] = useState<Record<RolSP, string>>({ 'Líder': '', 'Supervisor': '', 'Jefe': '', 'Gerente': '' });
 
     useEffect(() => {
         (async () => {
@@ -76,11 +76,18 @@ export default function ReglasMedicionView() {
         ...b, herramientas: b.herramientas.map((h, k) => {
             if (k !== i) return h;
             const fr = { ...(h.frecuencia || {}) };
-            const actual = fr[rol] || { semana: 0, festivo: null };
+            const actual = fr[rol] || { semana: 0, festivo: null, periodo: rol === 'Gerente' ? 'mes' as const : 'semana' as const };
             const n = v === '' ? null : Math.max(0, Math.min(20, Math.round(Number(v) || 0)));
             const nuevo = { ...actual, [campo]: n };
-            if (campo === 'semana' && n === null) delete fr[rol]; else fr[rol] = { semana: nuevo.semana ?? 0, festivo: nuevo.festivo ?? null };
+            if (campo === 'semana' && n === null) delete fr[rol]; else fr[rol] = { semana: nuevo.semana ?? 0, festivo: nuevo.festivo ?? null, periodo: actual.periodo || 'semana' };
             return { ...h, frecuencia: fr };
+        })
+    }));
+    const cambiarPeriodo = (i: number, rol: RolSP, periodo: 'semana' | 'mes') => setBorrador(b => b && ({
+        ...b, herramientas: b.herramientas.map((h, k) => {
+            const fr = h.frecuencia?.[rol];
+            if (k !== i || !fr) return h;
+            return { ...h, frecuencia: { ...h.frecuencia, [rol]: { ...fr, periodo, festivo: periodo === 'mes' ? null : fr.festivo } } };
         })
     }));
     const cambiarPlantaPersona = (nombre: string, planta: string) => setBorrador(b => b && ({ ...b, plantaPersona: { ...(b.plantaPersona || {}), [nombre]: planta } }));
@@ -106,7 +113,7 @@ export default function ReglasMedicionView() {
         columnasTotal.forEach(c => { porCol[c.key] = 0; });
         ROLES_SP.forEach(rol => {
             const fr = h.frecuencia?.[rol];
-            if (!fr || h.roles[rol] !== 'aplica') return;
+            if (!fr || fr.periodo === 'mes' || h.roles[rol] !== 'aplica') return;
             const cant = conFestivo && fr.festivo != null ? fr.festivo : fr.semana;
             (r?.personas[rol] || []).forEach(n => {
                 const pl = r?.plantaPersona?.[n] || '';
@@ -238,8 +245,8 @@ export default function ReglasMedicionView() {
             {/* Frecuencia mínima por semana (por herramienta y rol); en semanas con festivo puede bajar */}
             <div className="rounded-xl border border-slate-200 overflow-x-auto">
                 <div className="px-3 py-2 bg-[#F6F3EE] border-b border-slate-200 flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="text-xs font-black uppercase text-[#324354]">Frecuencia mínima por semana</h3>
-                    <span className="text-[10px] text-slate-500">Cantidad que cada persona debe cumplir por semana · entre paréntesis, en semanas con festivo · "—" sin frecuencia definida</span>
+                    <h3 className="text-xs font-black uppercase text-[#324354]">Frecuencia mínima</h3>
+                    <span className="text-[10px] text-slate-500">Cantidad que cada persona debe cumplir por semana o por mes · entre paréntesis, en semanas con festivo · "—" sin frecuencia definida</span>
                 </div>
                 <table className="w-full text-xs border-collapse min-w-[640px]">
                     <thead>
@@ -262,14 +269,21 @@ export default function ReglasMedicionView() {
                                                     <input type="number" min={0} max={20} value={fr?.semana ?? ''} placeholder="—" title="Por semana"
                                                         onChange={e => cambiarFrecuencia(i, rol, 'semana', e.target.value)}
                                                         className="w-12 h-6 px-1 text-center bg-white border border-amber-300 rounded text-xs font-black outline-none focus:ring-2 focus:ring-amber-200" />
-                                                    <span className="text-[10px] text-slate-500">festivo</span>
-                                                    <input type="number" min={0} max={20} value={fr?.festivo ?? ''} placeholder="—" title="En semanas con festivo" disabled={!fr}
-                                                        onChange={e => cambiarFrecuencia(i, rol, 'festivo', e.target.value)}
-                                                        className="w-12 h-6 px-1 text-center bg-white border border-amber-300 rounded text-xs font-black outline-none focus:ring-2 focus:ring-amber-200 disabled:opacity-40" />
+                                                    <select value={fr?.periodo || 'semana'} disabled={!fr} onChange={e => cambiarPeriodo(i, rol, e.target.value as 'semana' | 'mes')} title="Periodo"
+                                                        className="h-6 text-[10px] font-bold bg-white border border-amber-300 rounded outline-none disabled:opacity-40">
+                                                        <option value="semana">/ semana</option>
+                                                        <option value="mes">/ mes</option>
+                                                    </select>
+                                                    {fr?.periodo !== 'mes' && <>
+                                                        <span className="text-[10px] text-slate-500">festivo</span>
+                                                        <input type="number" min={0} max={20} value={fr?.festivo ?? ''} placeholder="—" title="En semanas con festivo" disabled={!fr}
+                                                            onChange={e => cambiarFrecuencia(i, rol, 'festivo', e.target.value)}
+                                                            className="w-12 h-6 px-1 text-center bg-white border border-amber-300 rounded text-xs font-black outline-none focus:ring-2 focus:ring-amber-200 disabled:opacity-40" />
+                                                    </>}
                                                 </div>
                                             ) : fr ? (
                                                 <span className={`font-black ${aplica ? 'text-[#324354]' : 'text-slate-400'}`} title={aplica ? '' : 'Tiene frecuencia, pero la herramienta no aplica a este rol'}>
-                                                    {fr.semana} / semana{fr.festivo != null && fr.festivo !== fr.semana ? <span className="text-[#7a5f0e]"> ({fr.festivo} con festivo)</span> : fr.festivo != null ? <span className="text-slate-500"> (igual con festivo)</span> : null}
+                                                    {fr.semana} / {fr.periodo === 'mes' ? 'mes' : 'semana'}{fr.periodo !== 'mes' && fr.festivo != null && fr.festivo !== fr.semana ? <span className="text-[#7a5f0e]"> ({fr.festivo} con festivo)</span> : fr.periodo !== 'mes' && fr.festivo != null ? <span className="text-slate-500"> (igual con festivo)</span> : null}
                                                 </span>
                                             ) : <span className="text-slate-300">—</span>}
                                         </td>
@@ -286,7 +300,7 @@ export default function ReglasMedicionView() {
                 <div className="px-3 py-2 bg-[#F6F3EE] border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <h3 className="text-xs font-black uppercase text-[#324354]">Revisiones esperadas por semana · por planta</h3>
-                        <p className="text-[10px] text-slate-500">Frecuencia × personas de cada rol en la planta (según la planta de cada persona, abajo). Solo herramientas con frecuencia definida.</p>
+                        <p className="text-[10px] text-slate-500">Frecuencia × personas de cada rol en la planta (según la planta de cada persona, abajo). Solo herramientas con frecuencia semanal definida (las mensuales, como la del Gerente, no se suman aquí).</p>
                     </div>
                     <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]">
                         {([[false, 'Semana normal'], [true, 'Semana con festivo']] as const).map(([v, t]) => (
@@ -324,7 +338,7 @@ export default function ReglasMedicionView() {
             </div>
 
             {/* Personas por rol */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                 {ROLES_SP.map(rol => (
                     <div key={rol} className="rounded-xl border border-slate-200 p-3">
                         <div className="flex items-center justify-between mb-2">
