@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fechasSemaforoPorOf } from '@/lib/sap/fechasSemaforo';
 import { fetchSAP, SAP_BASE_URL } from '@/lib/sap';
+import { barrerOfCerradasSap } from '@/lib/fibra/cierreSap';
 
 async function fetchSapQueryPages(baseUrl: string, sessionId: string, queryName: string): Promise<any[]> {
     const headers = {
@@ -546,9 +547,14 @@ export async function GET() {
             }
         }
 
+        // Las piezas de las OF que SAP cerró salen del proceso (a CEDI, con el motivo en su trazabilidad)
+        let piezasFvCerradasSap: number | string = 0
+        try { piezasFvCerradasSap = (await barrerOfCerradasSap()).length } catch (e: any) { piezasFvCerradasSap = e?.message || String(e) }
+
         return NextResponse.json({
             success: true,
             error: false,
+            piezasFvCerradasSap,
             message: `200 - Se consultaron ${mappedRows.length} órdenes de fabricación liberadas directamente desde SAP Service Layer.`,
             total: mappedRows.length,
             totalMarmol: msUpsertBatch.length,

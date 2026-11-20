@@ -10,6 +10,7 @@ import IndicadoresCalidadView, { MAIN_SUBHEADER_TABS, type MainTabKey } from "@/
 import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView";
 import RmoldDashboard from "@/components/indicadores/RmoldDashboard";
 import CumplimientoSPDashboard from "@/components/sistema-produccion/CumplimientoSPDashboard";
+import ProductividadView from "@/components/productividad/ProductividadView";
 
 // Plant keys supported
 type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
@@ -422,7 +423,7 @@ export default function IndicadoresProductividadPage() {
             )}
 
             {/* Main Area */}
-            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" || viewMode === "rmold" ? "max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
+            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" || viewMode === "rmold" || viewMode === "productividad" ?"max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
                 {viewMode === "hora-a-hora" ? (
                     <div className="w-full animate-in fade-in duration-300">
                         <HoraAHoraPlantasView fecha={fechaISO} />
@@ -452,16 +453,9 @@ export default function IndicadoresProductividadPage() {
                         ></iframe>
                     </div>
                 ) : viewMode === "productividad" ? (
-                    <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
-                        <iframe
-                            title="Power BI Nivel de Productividad"
-                            width="100%"
-                            height="100%"
-                            src={POWERBI_URLS.productividad}
-                            frameBorder="0"
-                            allowFullScreen={true}
-                            className="w-full h-full border-none"
-                        ></iframe>
+                    // Productividad de las plantas desde Supabase (reemplaza el Power BI "Nivel de Productividad")
+                    <div className="w-full animate-in fade-in duration-300">
+                        <ProductividadView />
                     </div>
                 ) : viewMode === "ausentismo" ? (
                     <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">

@@ -8,6 +8,9 @@ import {
     KG_POR_MINUTO_MS, TOLERANCIA_REFLEJADOS_MIN, causasReflejadoMs, cargarPersonasMs, minutosParoAusentismo, personasAusentes, cargarDatosAutoMs, cargarInformesMs, construirTextoExcelMs, construirTextoMs, guardarInformeMs,
     manualVacio, metaKilosPorDefecto, minutosParoKilos
 } from '@/lib/informe-turno/ms';
+import { FAMILIAS, NOMBRE_FAMILIA } from '@/lib/productividad/calculo';
+import { catalogoParos } from '@/lib/productividad/datos';
+import { registrarProductividadDesdeInformeMs } from '@/lib/productividad/desdeInformeMs';
 
 const hoyBogota = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
 const fechaLarga = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -162,6 +165,20 @@ export default function FormularioMs() {
     const [m, setM] = useState<ManualMs>(manualVacio());
     const [guardando, setGuardando] = useState(false);
     const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
+    // Familia más usada en el histórico de paros de MS para cada causa (sugerencia al reflejar)
+    const [familiaSugerida, setFamiliaSugerida] = useState<Map<string, string>>(new Map());
+    useEffect(() => {
+        catalogoParos('MS').then(lista => {
+            const m = new Map<string, Map<string, number>>();
+            for (const p of lista) {
+                const d = (p.descripcion || '').trim().toUpperCase(), f = (p.familia || '').trim().toUpperCase();
+                if (!d || !f) continue;
+                if (!m.has(d)) m.set(d, new Map());
+                m.get(d)!.set(f, (m.get(d)!.get(f) || 0) + 1);
+            }
+            setFamiliaSugerida(new Map([...m.entries()].map(([d, c]) => [d, [...c.entries()].sort((a, b) => b[1] - a[1])[0][0]])));
+        }).catch(() => undefined);
+    }, []);
     const [copiado, setCopiado] = useState<'whatsapp' | 'excel' | null>(null);
 
     useEffect(() => {
@@ -296,7 +313,7 @@ export default function FormularioMs() {
         <div className="space-y-1.5" data-paros={lista}>
             <span className="text-[11px] font-black uppercase text-slate-600">{titulo}</span>
             {m[lista].map((p, i) => (
-                <div key={i} className="grid grid-cols-[80px_1fr_auto] gap-2 items-start">
+                <div key={i} className={`grid ${lista === 'reflejados' ? 'grid-cols-[80px_1fr_130px_auto]' : 'grid-cols-[80px_1fr_auto]'} gap-2 items-start`}>
                     <input type="number" inputMode="decimal" min={0} step="any" value={p.minutos} onChange={e => setParo(lista, i, 'minutos', e.target.value)} placeholder={minutosOpcional ? 'min' : '0'} className={campo} title="Minutos" />
                     <div>
                         <ConSugerencias value={p.causa} onChange={v => setParo(lista, i, 'causa', v)} placeholder="Causa (ej. avería en extractor de cabina #2, se apagaba)"
@@ -305,6 +322,17 @@ export default function FormularioMs() {
                             <span className="text-[10px] font-bold text-rose-700">Paro repetido: sume los minutos en una sola fila.</span>
                         )}
                     </div>
+                    {lista === 'reflejados' && (() => {
+                        const sugerida = familiaSugerida.get(p.causa.trim().toUpperCase()) || '';
+                        const valor = p.familia || sugerida;
+                        return (
+                            <select value={valor} onChange={e => setParo(lista, i, 'familia', e.target.value)} title="Familia de la pérdida (cuenta en Productividad)"
+                                className={`${campo} ${!valor && p.causa.trim() ? 'border-rose-500 bg-rose-50' : ''}`}>
+                                <option value="">Familia…</option>
+                                {FAMILIAS.map(f => <option key={f} value={f}>{NOMBRE_FAMILIA[f]}</option>)}
+                            </select>
+                        );
+                    })()}
                     <button type="button" onClick={() => quitarParo(lista, i)} className="w-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg" title="Quitar"><Trash2 className="w-4 h-4" /></button>
                 </div>
             ))}
@@ -318,11 +346,27 @@ export default function FormularioMs() {
     const guardar = async () => {
         if (hayRepetidos) return avisoRepetidos();
         if (excedido) return avisoExcedido();
+        // La familia sugerida se toma como elegida si el supervisor no la cambió
+        const reflejados = mFinal.reflejados.map(p => ({ ...p, familia: p.familia || familiaSugerida.get(p.causa.trim().toUpperCase()) || '' }));
+        if (reflejados.some(p => p.causa.trim() && !p.familia)) {
+            setMensaje({ ok: false, texto: 'Elija la familia de cada paro reflejado (Funcional, Inducido, Explotación o Avería): se usa en las pérdidas de Productividad.' });
+            return;
+        }
+        const manualFinal = { ...mFinal, reflejados };
         setGuardando(true);
         setMensaje(null);
         try {
-            await guardarInformeMs(supabase, { id: existente?.id, fecha, manual: mFinal, auto, texto });
-            setMensaje({ ok: true, texto: `Informe del ${fechaLarga(fecha)} guardado.` });
+            await guardarInformeMs(supabase, { id: existente?.id, fecha, manual: manualFinal, auto, texto });
+            // Registro en Productividad (antes se pegaba en el Excel): si falla, el informe ya quedó guardado
+            let prod = '';
+            try {
+                const { data } = await supabase.auth.getUser();
+                await registrarProductividadDesdeInformeMs(fecha, manualFinal, auto, data.user?.email ?? null);
+                prod = ' También quedó registrado en Productividad.';
+            } catch (e: any) {
+                prod = ` No se pudo registrar en Productividad: ${e?.message || e}`;
+            }
+            setMensaje({ ok: !prod.startsWith(' No'), texto: `Informe del ${fechaLarga(fecha)} guardado.${prod}` });
             setRecarga(n => n + 1);
         } catch (e: any) {
             setMensaje({ ok: false, texto: e?.message || 'No se pudo guardar el informe' });

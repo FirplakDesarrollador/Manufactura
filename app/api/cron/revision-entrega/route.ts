@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { revisarYGuardar } from '@/lib/revisionEntregaGuardar';
+import { barrerOfCerradasSap } from '@/lib/fibra/cierreSap';
 
 // Cron de cada hora (vercel.json): mantiene al día la revisión de componentes para la entrega de TODAS las plantas.
 //  - OF con faltantes, sin dato o error: se revisan cada hora.
@@ -29,13 +30,17 @@ export async function GET() {
             .sort((a, b) => Number(a.estado === 'completo') - Number(b.estado === 'completo') || edad(b) - edad(a))
             .map(f => f.orden_fabricacion as string);
 
+        // FV: piezas de OF cerradas en SAP salen del proceso (a CEDI, con el motivo en su trazabilidad)
+        let cerradasSap: number | string = 0;
+        try { cerradasSap = (await barrerOfCerradasSap()).length; } catch (e: any) { cerradasSap = e?.message || String(e); }
+
         let revisadas = 0;
         for (let i = 0; i < pendientes.length && Date.now() - inicio < TOPE_MS; i += LOTE) {
             const lote = pendientes.slice(i, i + LOTE);
             await revisarYGuardar(lote, null);
             revisadas += lote.length;
         }
-        return NextResponse.json({ ok: true, enSeguimiento: data?.length || 0, porRevisar: pendientes.length, revisadas, segundos: Math.round((Date.now() - inicio) / 1000) });
+        return NextResponse.json({ ok: true, enSeguimiento: data?.length || 0, porRevisar: pendientes.length, revisadas, piezasFvCerradasSap: cerradasSap, segundos: Math.round((Date.now() - inicio) / 1000) });
     } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Error en el cron de revisión' }, { status: 500 });
     }

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import AvisoCierreSap from './AvisoCierreSap'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import {
@@ -375,6 +376,9 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     <StatCard label="Kg Hoy" value={stats.kilos.toFixed(1)} color="bg-[#324354] text-white" />
                 </div>
             </div>
+
+            {/* Piezas que salieron del proceso porque su OF se cerró en SAP */}
+            <AvisoCierreSap />
 
             {/* Controls */}
             <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 shadow-sm">

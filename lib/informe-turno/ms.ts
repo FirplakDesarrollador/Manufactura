@@ -43,7 +43,8 @@ export interface DatosAutoMs {
 }
 
 export interface FilaAusentismo { nombre: string; motivo: string }
-export interface FilaParo { minutos: string; causa: string }
+// familia: Funcional, Inducido, Explotación o Avería (solo en los paros reflejados: cuenta en las pérdidas de productividad)
+export interface FilaParo { minutos: string; causa: string; familia?: string }
 
 export interface ManualMs {
     ausentismos: FilaAusentismo[];
