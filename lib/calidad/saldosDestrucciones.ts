@@ -50,6 +50,22 @@ const normalizar = (s: string) => s
     .replace(/\s+/g, ' ')
     .trim();
 
+// Todas las páginas en paralelo (de a 6): primero se cuenta y luego se piden las páginas a la vez
+async function paginadoParalelo<T>(
+    contar: () => PromiseLike<{ count: number | null; error: any }>,
+    consulta: (desde: number, hasta: number) => PromiseLike<{ data: T[] | null; error: any }>
+): Promise<T[]> {
+    const { count, error } = await contar();
+    if (error) throw error;
+    const paginas = Math.ceil((count || 0) / 1000);
+    const todo: T[] = [];
+    for (let i = 0; i < paginas; i += 6) {
+        const lote = await Promise.all(Array.from({ length: Math.min(6, paginas - i) }, (_, k) => consulta((i + k) * 1000, (i + k) * 1000 + 999)));
+        for (const { data, error: e } of lote) { if (e) throw e; todo.push(...(data || [])); }
+    }
+    return todo;
+}
+
 async function paginado<T>(consulta: (desde: number, hasta: number) => PromiseLike<{ data: T[] | null; error: any }>): Promise<T[]> {
     let todo: T[] = [];
     for (let desde = 0; ; desde += 1000) {
@@ -104,12 +120,14 @@ export function costoUnitarioReferencia(referencia: string, costos: CostoSku[], 
 // Eventos automáticos de MS: registros de Calidad MS → Saldos ("Saldo - CAUSA" / "Destrucción - CAUSA")
 async function fetchEventosMsAutomaticos(sb: SupabaseClient, costos: CostoSku[]): Promise<EventoSD[]> {
     const desde = new Date(`${MS_AUTOMATICO_DESDE}T00:00:00-05:00`).toISOString();
-    const filas = await paginado<any>((d, h) => sb
-        .from('ms_reporte_defectos')
-        .select('id, created_at, defecto, producto:productos_defectos_ms (Referencia)')
-        .gte('created_at', desde)
-        .order('created_at', { ascending: true })
-        .range(d, h));
+    const filas = await paginadoParalelo<any>(
+        () => sb.from('ms_reporte_defectos').select('id', { count: 'exact', head: true }).gte('created_at', desde),
+        (d, h) => sb
+            .from('ms_reporte_defectos')
+            .select('id, created_at, defecto, producto:productos_defectos_ms (Referencia)')
+            .gte('created_at', desde)
+            .order('id', { ascending: true })
+            .range(d, h));
     const cache = new Map<string, number | null>();
     const eventos: EventoSD[] = [];
     for (const r of filas) {
@@ -235,4 +253,40 @@ export interface NuevoEventoSD {
 export async function guardarEventoSD(sb: SupabaseClient, e: NuevoEventoSD) {
     const { error } = await sb.from('calidad_saldos_destrucciones').insert({ ...e, origen: 'manual' });
     if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Caché de la carga (pestaña Saldos y Destrucciones del tablero): al volver a la pestaña se muestra de inmediato lo
+// ya cargado y se actualiza en segundo plano si tiene más de 2 minutos. El tablero de Calidad IFI la precarga.
+// ---------------------------------------------------------------------------
+const VIGENCIA_MS = 2 * 60 * 1000;
+let cacheSD: { t: number; datos: CargaSD | null; promesa: Promise<CargaSD> | null } = { t: 0, datos: null, promesa: null };
+
+export function datosSDEnCache(): CargaSD | null {
+    return cacheSD.datos;
+}
+
+export function cargarEventosSDCache(sb: SupabaseClient, forzar = false): Promise<CargaSD> {
+    const vigente = cacheSD.datos && Date.now() - cacheSD.t < VIGENCIA_MS;
+    if (!forzar && vigente) return Promise.resolve(cacheSD.datos as CargaSD);
+    if (!forzar && cacheSD.promesa) return cacheSD.promesa;
+    const p = cargarEventosSD(sb).then(d => {
+        cacheSD = { t: Date.now(), datos: d, promesa: null };
+        return d;
+    }).catch(e => {
+        cacheSD = { ...cacheSD, promesa: null };
+        throw e;
+    });
+    cacheSD = { ...cacheSD, promesa: p };
+    return p;
+}
+
+const cacheFabricadas = new Map<string, Record<string, number>>();
+export async function fetchFabricadasMsPorMesCache(sb: SupabaseClient, anios: number[]): Promise<Record<string, number>> {
+    const clave = anios.join(',');
+    const ya = cacheFabricadas.get(clave);
+    if (ya) return ya;
+    const f = await fetchFabricadasMsPorMes(sb, anios);
+    cacheFabricadas.set(clave, f);
+    return f;
 }

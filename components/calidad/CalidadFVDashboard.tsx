@@ -1,5 +1,6 @@
 'use client';
 
+import { useEstadoEnCache } from '@/lib/utils/cacheMemoria';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, ChevronDown, ChevronRight, ExternalLink, Loader2, Search, X } from 'lucide-react';
 import {
@@ -153,7 +154,8 @@ export default function CalidadFVDashboard({ powerBiUrl }: { powerBiUrl?: string
     const [verTotal, setVerTotal] = useState(true);
 
     // Piezas por año ya consultadas
-    const [porAnio, setPorAnio] = useState<Record<number, FvPieza[]>>({});
+    // En caché de memoria (5 min): al volver a la pestaña se muestra de inmediato
+    const [porAnio, setPorAnio] = useEstadoEnCache<Record<number, FvPieza[]>>('calidad-fv', {});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 

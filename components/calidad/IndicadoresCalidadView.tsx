@@ -1,5 +1,6 @@
 'use client';
 
+import { cargarEventosSDCache } from '@/lib/calidad/saldosDestrucciones';
 import { PLANTAS_CALIDAD } from '@/lib/calidad/plantasCalidadConfig';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -365,9 +366,17 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
 
     useEffect(() => {
         if (activeTab === 'SALDOS') {
-            void fetchSaldosSupabase();
+            // Primero el tablero principal de saldos; el panel de abajo consulta cuando ya cargó
+            void cargarEventosSDCache(supabase).catch(() => undefined).finally(() => { void fetchSaldosSupabase(); });
         }
     }, [fetchSaldosSupabase, activeTab]);
+
+    // Precarga de Saldos y Destrucciones mientras se ve Calidad IFI: al cambiar de pestaña aparece de inmediato
+    useEffect(() => {
+        if (activeTab !== 'CALIDAD_IFI' || soloMs || soloRmold) return;
+        const t = setTimeout(() => { void cargarEventosSDCache(supabase).catch(() => undefined); }, 2500);
+        return () => clearTimeout(t);
+    }, [activeTab, soloMs, soloRmold]);
 
     // --- CÁLCULOS ESTADÍSTICOS DE SALDOS Y DESTRUCCIONES ---
     const saldosMetrics = useMemo(() => {

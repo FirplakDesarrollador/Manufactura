@@ -27,9 +27,15 @@ for (const f of archivos) {
     // Filas: 3–14 defectos (código 1–12), 16 piezas revisadas, 18 piezas no conformes (índices base 0: 2–13, 15, 17)
     if (String(filas[15][1]).trim().toUpperCase().indexOf('PIEZAS REVISADAS') < 0) throw new Error(`${f}: la fila 16 no es "TOTAL DE PIEZAS REVISADAS"`)
     if (String(filas[17][1]).trim().toUpperCase().indexOf('NO CONFORMES') < 0) throw new Error(`${f}: la fila 18 no es "TOTAL PIEZAS NO CONFORMES"`)
+    // Cada archivo solo aporta los días de su mes (el mes con más fechas en el encabezado): las hojas traen días del
+    // mes siguiente (enero llega al 02/02 y febrero empieza el 02/02) y no deben pisarse ni duplicarse
+    const meses = {}
+    encabezado.forEach(v => { if (typeof v === 'number') { const m = XLSX.SSF.format('yyyy-mm', v); meses[m] = (meses[m] || 0) + 1 } })
+    const mesArchivo = Object.entries(meses).sort((a, b) => b[1] - a[1])[0]?.[0]
     for (let c = 2; c < encabezado.length; c++) {
         if (typeof encabezado[c] !== 'number') continue
         const fecha = XLSX.SSF.format('yyyy-mm-dd', encabezado[c])
+        if (fecha.slice(0, 7) !== mesArchivo) continue
         const revisadas = Number(filas[15][c]) || 0
         if (revisadas <= 0) continue
         const defectos = Array.from({ length: 12 }, (_, i) => Number(filas[2 + i][c]) || 0)

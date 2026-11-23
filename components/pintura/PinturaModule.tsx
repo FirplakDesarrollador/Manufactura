@@ -1,5 +1,6 @@
 'use client'
 
+import { moldeDeOtraReferencia } from '@/lib/fibra/moldesOrden'
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
 import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
@@ -98,8 +99,18 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             let codeMatch = sku.match(/PMOL\d*-(\d+)/i) || (selectedOrden.molde_sku ? selectedOrden.molde_sku.match(/PMOL\d*-(\d+)/i) : null)
             const targetCode = codeMatch ? codeMatch[1].replace(/^0+/, '') : ''
 
-            // Filter locally from allMoldes
-            const available = allMoldes
+            // 1) Moldes del tipo de molde de la orden (orden.molde_id = tipos_moldes.id, o el mismo SKU de molde).
+            //    Si el tipo tiene moldes, SOLO esos: la comparación por palabras traía moldes de otras referencias
+            //    (ej. "MOLDE LAVARROPAS" para cualquier lavarropas).
+            const tipoOrden = Number((selectedOrden as any).molde_id) || null
+            const skuMolde = (selectedOrden.molde_sku || '').trim().toLowerCase()
+            // Sin los moldes cuyo nombre es de otra referencia (asignados por error al tipo)
+            const delTipo = allMoldes.filter(m => !moldeDeOtraReferencia(m) && (
+                (tipoOrden != null && Number((m as any).tipo_molde_id) === tipoOrden) ||
+                (!!skuMolde && (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase() === skuMolde)))
+
+            // 2) Respaldo (referencias sin tipo de molde asignado): SKU, prefijo del serial y palabras de la descripción
+            const available = (delTipo.length > 0 ? delTipo.filter(m => m.estado === 'Disponible') : allMoldes
                 .filter(m => {
                     if (m.estado !== 'Disponible') return false
 
@@ -140,7 +151,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                     }
 
                     return false
-                })
+                }))
                 .sort((a, b) => a.vueltas_actuales - b.vueltas_actuales)
 
             setMoldesDisponibles(available)

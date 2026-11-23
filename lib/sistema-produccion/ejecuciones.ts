@@ -3,6 +3,8 @@
 //  - OPT              → módulo OPT Operativa (tabla OPT): "Created By", Create_at y Planta.
 //  - OPT Sistémica    → módulo OPT Sistémica (tabla opt_registros): correo de quien la hizo, fecha y planta.
 //  - Bitácora (BIT)   → módulo Bitácora (tabla seguimiento_bitacora): un día por supervisor con actividades completadas.
+//  - RRC              → asistencia del módulo Respuesta Rápida Calidad (registro_asistencia): un día por persona "Presente".
+//                       Por ahora solo se mide la asistencia; a futuro, la robustez de la RRC y el cierre de los temas abiertos.
 // Lo esperado sale de las Reglas de Medición: a cada persona del rol al que aplica la herramienta se le exige su
 // frecuencia (por semana, menos en semanas con festivo; o por mes). Cada vez exigida es un "cupo": ejecutado (1) o no (0).
 // Ejecutar de más no pasa de 100 %. La semana en curso se exige en proporción a los días hábiles transcurridos.
@@ -12,7 +14,7 @@ import { ROLES_SP, TRANSVERSAL, type ReglasSP, type RolSP } from './reglas'
 import { festivosColombia, festivoEnDiaLaboral } from '@/lib/festivosColombia'
 import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants'
 
-export const HERRAMIENTAS_AUTO = ['AF', 'OPT', 'OPTS', 'BIT'] as const
+export const HERRAMIENTAS_AUTO = ['AF', 'OPT', 'OPTS', 'BIT', 'RRC'] as const
 export type HerrAuto = typeof HERRAMIENTAS_AUTO[number]
 
 export type Ejecucion = { herr: HerrAuto; fecha: string; quien: string; email?: string | null; planta?: string | null }

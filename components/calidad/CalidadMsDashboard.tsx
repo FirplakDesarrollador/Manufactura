@@ -1,5 +1,6 @@
 'use client';
 
+import { useEstadoEnCache, leerCache, guardarCache } from '@/lib/utils/cacheMemoria';
 import { PLANTAS_CALIDAD, type PlantaCalidad } from '@/lib/calidad/plantasCalidadConfig';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, ChevronDown, ChevronRight, ExternalLink, Loader2, Search, X } from 'lucide-react';
@@ -154,10 +155,11 @@ export default function CalidadMsDashboard({ powerBiUrl, planta = PLANTAS_CALIDA
     const [verReparacion, setVerReparacion] = useState(false);
 
     // Piezas por año ya consultadas
-    const [porAnio, setPorAnio] = useState<Record<number, MsPiezaNormalizada[]>>({});
+    // En caché de memoria (5 min) por planta: al volver a la pestaña se muestra de inmediato
+    const [porAnio, setPorAnio] = useEstadoEnCache<Record<number, MsPiezaNormalizada[]>>(`calidad-dash:${planta.id}`, {});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const catalogos = useRef<{ catalogo: Map<number, string>; productos: Map<number, string> } | null>(null);
+    const catalogos = useRef<{ catalogo: Map<number, string>; productos: Map<number, string> } | null>(leerCache(`calidad-dash-cat:${planta.id}`) ?? null);
 
     const aniosDisponibles = useMemo(() => Array.from({ length: anioActual - ANIO_INICIO + 1 }, (_, i) => anioActual - i), [anioActual, ANIO_INICIO]);
     const todosLosAnios = anios.length === 0;
@@ -178,6 +180,7 @@ export default function CalidadMsDashboard({ powerBiUrl, planta = PLANTAS_CALIDA
                 if (!catalogos.current) {
                     const [catalogo, productos] = await Promise.all([fetchCatalogoDefectosMs(supabase, planta), fetchProductosMs(supabase, planta)]);
                     catalogos.current = { catalogo, productos };
+                    guardarCache(`calidad-dash-cat:${planta.id}`, catalogos.current);
                 }
                 const nuevos: Record<number, MsPiezaNormalizada[]> = {};
                 for (const a of pendientes) {

@@ -366,6 +366,7 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
                     criterio={itemAbierto.criterio}
                     configRegistro={itemAbierto.config}
                     tablaDefectos={catalogo?.tDefectos}
+                    moldeObligatorio={!!catalogo?.moldeObligatorio}
                     canConfig={canConfig}
                     onConfigSaved={cfg => setDefects(prev => prev.map(d => (d.id === itemAbierto.defectoId ? { ...d, ...cfg } : d)))}
                     estadistica={itemAbierto.defectoId != null ? stats?.porDefecto.get(itemAbierto.defectoId) ?? null : null}
