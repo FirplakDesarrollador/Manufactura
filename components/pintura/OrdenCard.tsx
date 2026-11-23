@@ -105,6 +105,25 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
     const disponibles = relevantMoldes.filter(m => m.estado === 'Disponible').length
     const enUso = relevantMoldes.filter(m => m.estado === 'En uso').length
     const enReparacion = relevantMoldes.filter(m => !['Disponible', 'En uso'].includes(m.estado)).length
+    const moldesDispConVueltas = relevantMoldes.filter(m => m.estado === 'Disponible' && m.vueltas_actuales != null)
+    const minVueltas = moldesDispConVueltas.length > 0 ? Math.min(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
+    const maxVueltas = moldesDispConVueltas.length > 0 ? Math.max(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
+    const getLimMolde = (m: any) => {
+        const atip = Number(m?.vueltas_mtto_atipicas ?? m?.vueltas_mto_atipicas ?? 0);
+        if (atip > 0) return atip;
+        const reg = Number(m?.vueltas_mtto ?? m?.vueltas_mto ?? 0);
+        if (reg > 0) return reg;
+        return Number(m?.vueltas_totales ?? 0);
+    };
+    const tienePasados = moldesDispConVueltas.some(m => {
+        const lim = getLimMolde(m);
+        return lim > 0 && m.vueltas_actuales >= lim;
+    });
+    const tieneCercanos = moldesDispConVueltas.some(m => {
+        const lim = getLimMolde(m);
+        return lim > 0 && m.vueltas_actuales < lim && (m.vueltas_actuales >= (lim - 2) || (m.vueltas_actuales / lim) >= 0.85);
+    });
+    const colorVueltas = tienePasados ? 'text-red-600' : tieneCercanos ? 'text-amber-600' : 'text-blue-600';
 
     const cantidadTotal = Math.max(0, orden.cantidad || orden.cantidad_programada || 0)
     // FV: unidades ya completadas en SAP sin registro en planta → cuentan como CEDI (y no como Programado)
@@ -319,6 +338,11 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                     <div className="text-green-600">Disponibles: <span className="text-gray-900">{orden.moldes_disponibles || disponibles}</span></div>
                     <div className="text-orange-600">Fabricación: <span className="text-gray-900">{orden.moldes_en_fabricacion || 0}</span></div>
                     <div className="text-yellow-600">En uso: <span className="text-gray-900">{orden.moldes_en_uso || enUso}</span></div>
+                    {minVueltas !== null && (
+                        <div className={`${colorVueltas}`} title={tienePasados ? 'Hay moldes pasados de vueltas de mantenimiento' : tieneCercanos ? 'Hay moldes cerca al mantenimiento' : 'Moldes en buen estado para usar'}>
+                            Vueltas: <span className="text-gray-900">{minVueltas === maxVueltas ? `${minVueltas}v` : `${minVueltas}-${maxVueltas}v`}</span>
+                        </div>
+                    )}
                 </div>
             </div>
             )}

@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import AvisoCierreSap from './AvisoCierreSap'
+import MoverOfFibra from './MoverOfFibra'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import {
@@ -376,6 +378,9 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                 </div>
             </div>
 
+            {/* Piezas que salieron del proceso porque su OF se cerró en SAP */}
+            <AvisoCierreSap />
+
             {/* Controls */}
             <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
                 <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-2 sm:gap-3">
@@ -500,6 +505,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                         </button>
                                         <EstadoEntregaOf of={item.orden_fabricacion} />
                                         <div className="ml-auto flex gap-2 shrink-0">
+                                            <MoverOfFibra orden={item} moldes={allMoldes} usuarioEmail={userEmail} onHecho={loadData} />
                                             <button
                                                 onClick={() => setEditModal({ type: 'of', item })}
                                                 className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-xs font-bold flex items-center gap-1.5 transition-colors"

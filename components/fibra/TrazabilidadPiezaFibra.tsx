@@ -4,7 +4,8 @@ import { parseDBTimestamp } from '@/lib/utils/date';
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { RegistroTrazabilidad } from '@/types/pintura'
-import { Clock, ChevronDown, X } from 'lucide-react'
+import { Clock, ChevronDown, X, AlertTriangle } from 'lucide-react'
+import { cierreSapDePieza } from '@/lib/fibra/cierreSap'
 
 // Fecha y hora de cada proceso ya registrado de una pieza FV. En la franja se ve por defecto el último proceso; si hay
 // más de uno, ese mismo bloque (▾) despliega la lista de todos en orden con el usuario que lo registró. La lista se
@@ -37,6 +38,14 @@ export default function TrazabilidadPiezaFibra({ registro }: { registro: Registr
     const abierta = pos !== null
     const lista = useRef<HTMLDivElement>(null)
     const cerrar = () => setPos(null)
+    // Si la pieza salió del proceso porque su OF se cerró en SAP, el motivo se muestra en la trazabilidad
+    const [cierreSap, setCierreSap] = useState<{ fecha: string; motivo: string } | null>(null)
+    useEffect(() => {
+        if (!abierta || registro.of_pendiente !== false || registro.estado !== 'Cedi' || !registro.registrer) return
+        let vivo = true
+        cierreSapDePieza(registro.registrer).then(c => { if (vivo) setCierreSap(c) }).catch(() => undefined)
+        return () => { vivo = false }
+    }, [abierta, registro.of_pendiente, registro.estado, registro.registrer])
 
     useEffect(() => {
         if (!abierta) return
@@ -125,6 +134,12 @@ export default function TrazabilidadPiezaFibra({ registro }: { registro: Registr
                             ))}
                         </tbody>
                     </table>
+                    {cierreSap && (
+                        <div className="px-3 py-2 border-t border-rose-200 bg-rose-50 text-[11px] text-rose-800 flex items-start gap-1.5">
+                            <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                            <span><b>{cierreSap.motivo}</b> · {formato(parseDBTimestamp(cierreSap.fecha))} · Sistema SAP</span>
+                        </div>
+                    )}
                 </div>
                 </div>,
                 document.body

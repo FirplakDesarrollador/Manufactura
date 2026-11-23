@@ -1,5 +1,7 @@
 'use client'
 
+import CarruselPestanas from '@/components/ui/CarruselPestanas'
+import MoverOfMs from './MoverOfMs'
 import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
@@ -28,8 +30,6 @@ import { toast } from 'sonner'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
 
 export default function AdministracionModule({ userEmail }: { userEmail?: string }) {
-    // userEmail available for future use
-    void userEmail;
     const [activeTab, setActiveTab] = useState<'of' | 'trazabilidad'>('of')
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
@@ -316,8 +316,9 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
     return (
         <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
             {/* Summary Cards */}
-            <div className="p-4 bg-white border-b border-slate-200">
-                <div className="flex flex-wrap gap-3 overflow-x-auto pb-2 no-scrollbar">
+            {/* Una sola fila: si no caben, carrusel con flechas */}
+            <div className="px-4 py-3 bg-white border-b border-slate-200">
+                <CarruselPestanas>
                     <StatCard label="Cantidad" value={stats.cantidad} color="bg-blue-50 text-blue-600" />
                     <StatCard label="Programado" value={stats.programado} color="bg-indigo-50 text-indigo-600" />
                     <StatCard label="Pintura Hoy" value={stats.pintura} color="bg-orange-50 text-orange-600" />
@@ -329,7 +330,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                     <StatCard label="Transito" value={stats.transito} color="bg-amber-50 text-amber-600" />
                     <StatCard label="Cedi Hoy" value={stats.cedi} color="bg-green-50 text-green-600" />
                     <StatCard label="Kg Hoy" value={stats.kilos.toFixed(1)} color="bg-blue-600 text-white" />
-                </div>
+                </CarruselPestanas>
             </div>
 
             {/* Controls */}
@@ -463,6 +464,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                         </button>
                                         <EstadoEntregaOf of={item.orden_fabricacion} />
                                         <div className="ml-auto flex gap-2 shrink-0">
+                                            <MoverOfMs orden={item} moldes={allMoldes} usuarioEmail={userEmail} onHecho={loadData} />
                                             <button
                                                 onClick={() => setEditModal({ type: 'of', item })}
                                                 className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-xs font-bold flex items-center gap-1.5 transition-colors"

@@ -22,6 +22,7 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     hdt: ['acceso_general', 'crear', 'editar', 'estadisticas'],
     fibra: ['cedi', 'pulido', 'ensayo', 'empaque', 'pintura', 'vaciado', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'administracion', 'planos'],
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
+    superficies: ['pulido', 'reparacion', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
     calidad: ['ms', 'editar', 'eliminar', 'configurar_defectos', 'saldos_y_destrucciones'],
     hora_a_hora: true,
@@ -38,7 +39,8 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     indicadores_productividad: true,
     asistencia: true,
     mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador'],
-    esquema_personal: ['editar']
+    esquema_personal: ['editar'],
+    inventarios_ciclicos: true
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -46,6 +48,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     fibra: 'Control de Piso (Fibra)',
     modulos: 'Control de Piso (Mármol)',
     muebles: 'Control de Piso (Muebles)',
+    superficies: 'Control de Piso (Superficies RTM)',
     calidad: 'Calidad MS',
     hora_a_hora: 'Hora a Hora',
     ficha_rcc: 'Ficha RRC', // Corrección del nombre solicitada por el usuario
@@ -61,7 +64,8 @@ const PERMISSION_LABELS: Record<string, string> = {
     indicadores_productividad: 'Tablero de Control',
     asistencia: 'Asistencia',
     mantenimiento: 'Mantenimiento (LILAC)',
-    esquema_personal: 'Esquema de Personal (además de jefes y coordinadores)'
+    esquema_personal: 'Esquema de Personal (además de jefes y coordinadores)',
+    inventarios_ciclicos: 'Inventarios Cíclicos'
 };
 
 const SUBMODULO_LABELS: Record<string, string> = {

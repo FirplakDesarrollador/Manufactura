@@ -1,5 +1,7 @@
 'use client';
 
+import { cargarEventosSDCache } from '@/lib/calidad/saldosDestrucciones';
+import { PLANTAS_CALIDAD } from '@/lib/calidad/plantasCalidadConfig';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -63,7 +65,6 @@ const POWERBI_URL_FV =
 
 const POWERBI_URL_MBL = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MBL || '';
 const POWERBI_URL_CEFI = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_CEFI || '';
-const POWERBI_URL_MOLDES = process.env.NEXT_PUBLIC_POWERBI_CALIDAD_MOLDES || '';
 
 // Pestañas Principales Solicitadas en el SubHeader
 export type MainTabKey = 'CALIDAD_IFI' | 'SALDOS' | 'PLAN_VIGILANCIA' | 'RRC' | 'QRQC';
@@ -230,13 +231,15 @@ interface IndicadoresCalidadViewProps {
     showMainHeader?: boolean;
     // Solo la sección de Mármol Sintético (pestaña Indicadores de Calidad MS); misma vista del tablero de control
     soloMs?: boolean;
+    // Solo la sección de Reparación de Moldes (pestaña Indicadores de Calidad RMOLD)
+    soloRmold?: boolean;
     // Pestañas controladas desde la página (el Tablero de Control las muestra como su tercer nivel)
     tab?: MainTabKey;
     onTabChange?: (tab: MainTabKey) => void;
     ocultarPestanas?: boolean;
 }
 
-export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false, tab, onTabChange, ocultarPestanas = false }: IndicadoresCalidadViewProps) {
+export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false, soloRmold = false, tab, onTabChange, ocultarPestanas = false }: IndicadoresCalidadViewProps) {
     const router = useRouter();
     const [userEmail, setUserEmail] = useState<string>('');
     
@@ -363,9 +366,17 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
 
     useEffect(() => {
         if (activeTab === 'SALDOS') {
-            void fetchSaldosSupabase();
+            // Primero el tablero principal de saldos; el panel de abajo consulta cuando ya cargó
+            void cargarEventosSDCache(supabase).catch(() => undefined).finally(() => { void fetchSaldosSupabase(); });
         }
     }, [fetchSaldosSupabase, activeTab]);
+
+    // Precarga de Saldos y Destrucciones mientras se ve Calidad IFI: al cambiar de pestaña aparece de inmediato
+    useEffect(() => {
+        if (activeTab !== 'CALIDAD_IFI' || soloMs || soloRmold) return;
+        const t = setTimeout(() => { void cargarEventosSDCache(supabase).catch(() => undefined); }, 2500);
+        return () => clearTimeout(t);
+    }, [activeTab, soloMs, soloRmold]);
 
     // --- CÁLCULOS ESTADÍSTICOS DE SALDOS Y DESTRUCCIONES ---
     const saldosMetrics = useMemo(() => {
@@ -486,7 +497,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
             )}
 
             {/* 2. SubHeader Oficial con Pestañas Agrupadas (no aplica en la vista solo MS) */}
-            {!soloMs && !ocultarPestanas && (
+            {!soloMs && !soloRmold && !ocultarPestanas && (
             <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center">
                 <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-1.5 justify-start md:justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {MAIN_SUBHEADER_TABS.map(tab => {
@@ -522,7 +533,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 1: CALIDAD GENERAL PLANTAS - IFI */}
                         {/* ------------------------------------------------------------- */}
-                        {!soloMs && (<>
+                        {!soloMs && !soloRmold && (<>
                         <section id="general-plantas" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
                             <CalidadGeneralIFI />
                         </section>
@@ -534,11 +545,13 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 2: MÁRMOL SINTÉTICO (MS) */}
                         {/* ------------------------------------------------------------- */}
+                        {!soloRmold && (
                         <section id="marmol-sintetico" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
                             <CalidadMsDashboard powerBiUrl={POWERBI_URL_MS} />
                         </section>
+                        )}
 
-                        {!soloMs && (<>
+                        {!soloMs && !soloRmold && (<>
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Fibra de Vidrio" plantKey="FV" />
 
@@ -784,95 +797,15 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
                         )}
                         </section>
 
-                        {/* LINEA DIVISORIA */}
-                        <PlantDivider title="Reparación de Moldes" plantKey="RMOLD" />
+                        </>)}
 
                         {/* ------------------------------------------------------------- */}
-                        {/* PLANTA 7: REPARACIÓN DE MOLDES (RMOLD) */}
+                        {/* PLANTA 7: REPARACIÓN DE MOLDES (RMOLD) — Calidad RMOLD (mismo tablero de MS) */}
                         {/* ------------------------------------------------------------- */}
-                        <section id="reparacion-moldes" className="bg-white rounded-3xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-base sm:text-lg font-black text-[#324354]">
-                                            Reparación de Moldes (RMOLD)
-                                        </h2>
-                                        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-extrabold rounded-full text-[10px] uppercase tracking-wider border border-rose-300">
-                                            Acondicionamiento y Moldes
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        Mantenimiento preventivo, desmanche, reconstrucción y control de calidad en moldes de planta
-                                    </p>
-                                </div>
-
-                                {POWERBI_URL_MOLDES ? (
-                                    <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                                        <button
-                                            onClick={() => togglePlantView('rmold', 'html')}
-                                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                                                plantViews.rmold === 'html'
-                                                    ? 'bg-[#324354] text-white shadow-sm'
-                                                    : 'text-slate-600 hover:text-black'
-                                            }`}
-                                        >
-                                            <BarChart3 className="w-3.5 h-3.5" />
-                                            <span>Tablero Dinámico</span>
-                                        </button>
-                                        <button
-                                            onClick={() => togglePlantView('rmold', 'powerbi')}
-                                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                                                plantViews.rmold === 'powerbi'
-                                                    ? 'bg-[#0084d1] text-white shadow-sm'
-                                                    : 'text-slate-600 hover:text-black'
-                                            }`}
-                                        >
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                            <span>Power BI</span>
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">
-                                        Tablero Nativo HTML
-                                    </span>
-                                )}
-                            </div>
-
-                            {plantViews.rmold === 'powerbi' && POWERBI_URL_MOLDES ? (
-                                <div className="w-full h-[600px] bg-slate-900 rounded-2xl overflow-hidden shadow-inner border border-slate-300">
-                                    <iframe
-                                        title="Power BI Calidad Moldes"
-                                        src={POWERBI_URL_MOLDES}
-                                        className="w-full h-full border-0"
-                                        allowFullScreen
-                                    />
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                    <div className="p-2.5 px-3 rounded-xl bg-emerald-50/80 border border-emerald-200 shadow-2xs flex flex-col justify-between">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wide">Calidad Reparación</span>
-                                            <span className="text-[10px] font-black bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded-full">Meta: 90%</span>
-                                        </div>
-                                        <div className="mt-1">
-                                            <p className="text-xl sm:text-2xl font-black text-emerald-700">92.0 %</p>
-                                            <p className="text-[10px] text-emerald-700 font-medium">Meta superada</p>
-                                        </div>
-                                    </div>
-                                    <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Moldes Entregados</span>
-                                        <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">46</p>
-                                    </div>
-                                    <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Moldes Recibidos</span>
-                                        <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">50</p>
-                                    </div>
-                                    <div className="p-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
-                                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Reincidencia</span>
-                                        <p className="text-xl sm:text-2xl font-black text-[#0084d1] mt-1">0.08</p>
-                                    </div>
-                                </div>
-                            )}
+                        {!soloMs && (<>
+                        {!soloRmold && <PlantDivider title="Reparación de Moldes" plantKey="RMOLD" />}
+                        <section id="reparacion-moldes" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
+                            <CalidadMsDashboard planta={PLANTAS_CALIDAD.rmold} />
                         </section>
                         </>)}
                     </div>

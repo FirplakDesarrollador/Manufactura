@@ -112,38 +112,59 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
                             <p className="font-medium">No se encontraron moldes</p>
                         </div>
                     ) : (
-                        filteredMoldes.map((molde) => (
-                            <div
-                                key={molde.id}
-                                className="flex items-center justify-between p-4 bg-white border-2 border-gray-50 rounded-xl shadow-sm hover:border-cyan-100 hover:shadow-md transition-all group"
-                            >
-                                <div className="flex-1 min-w-0 pr-4">
-                                    <div className="text-base font-bold text-cyan-700 truncate">
-                                        {molde.serial}
-                                    </div>
-                                    <div className="text-xs font-medium text-gray-500 mt-1">
-                                        {molde.molde_descripcion}
-                                    </div>
-                                    <div className={`text-[11px] font-bold mt-2 inline-block px-2 py-0.5 rounded-full ${molde.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
-                                        molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                        {molde.estado}
-                                    </div>
-                                </div>
+                        filteredMoldes.map((molde) => {
+                            const atip = Number((molde as any).vueltas_mtto_atipicas ?? molde.vueltas_mto_atipicas ?? 0);
+                            const reg = Number((molde as any).vueltas_mtto ?? molde.vueltas_mto ?? 0);
+                            const limite = atip > 0 ? atip : reg > 0 ? reg : Number(molde.vueltas_totales ?? 0);
+                            const pasadoMtto = limite > 0 && (molde.vueltas_actuales || 0) >= limite;
+                            const cercaMtto = limite > 0 && !pasadoMtto && (
+                                (molde.vueltas_actuales || 0) >= (limite - 2) || ((molde.vueltas_actuales || 0) / limite) >= 0.85
+                            );
+                            const vueltasBadgeClass = pasadoMtto
+                                ? 'bg-red-100 text-red-800 border-red-300'
+                                : cercaMtto
+                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                : 'bg-blue-100 text-blue-800 border-blue-300';
 
-                                {molde.estado === 'En uso' && (
-                                    <button
-                                        onClick={() => handleUpdateEstado(molde.id)}
-                                        disabled={updating === molde.id}
-                                        className="flex flex-col items-center justify-center p-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 transition-all shadow-md active:scale-95 disabled:bg-gray-300"
-                                        title="Liberar Molde"
-                                    >
-                                        <RefreshCw size={20} className={updating === molde.id ? 'animate-spin' : ''} />
-                                        <span className="text-[10px] font-bold mt-1">LIBERAR</span>
-                                    </button>
-                                )}
-                            </div>
-                        ))
+                            return (
+                                <div
+                                    key={molde.id}
+                                    className="flex items-center justify-between p-4 bg-white border-2 border-gray-50 rounded-xl shadow-sm hover:border-cyan-100 hover:shadow-md transition-all group"
+                                >
+                                    <div className="flex-1 min-w-0 pr-4">
+                                        <div className="text-base font-bold text-cyan-700 truncate">
+                                            {molde.serial}
+                                        </div>
+                                        <div className="text-xs font-medium text-gray-500 mt-1">
+                                            {molde.molde_descripcion}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <div className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${molde.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
+                                                molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                {molde.estado}
+                                            </div>
+                                            <div className={`text-xs font-black border px-2 py-0.5 rounded-md ${vueltasBadgeClass}`}>
+                                                {molde.vueltas_actuales ?? 0} {molde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}
+                                                {limite > 0 && ` / ${limite}`}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {molde.estado === 'En uso' && (
+                                        <button
+                                            onClick={() => handleUpdateEstado(molde.id)}
+                                            disabled={updating === molde.id}
+                                            className="flex flex-col items-center justify-center p-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 transition-all shadow-md active:scale-95 disabled:bg-gray-300"
+                                            title="Liberar Molde"
+                                        >
+                                            <RefreshCw size={20} className={updating === molde.id ? 'animate-spin' : ''} />
+                                            <span className="text-[10px] font-bold mt-1">LIBERAR</span>
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })
                     )}
                 </div>
             </div>

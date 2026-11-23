@@ -99,6 +99,9 @@ export async function GET(request: Request) {
     try {
         const params = new URL(request.url).searchParams;
         const soloOf = params.get('of');
+        // ?planta=rtm: Superficies (OF de ordenes_fabricacion_rtm_v, resultado en traslados_of_rtm); por defecto Fibra
+        const rtm = params.get('planta') === 'rtm';
+        const tablaRes = rtm ? 'traslados_of_rtm' : 'traslados_of_fv';
         // ?simular=1: calcula y devuelve el resultado sin guardarlo (pruebas)
         const simular = params.get('simular') === '1';
         if (soloOf && !/^\d+$/.test(soloOf)) return NextResponse.json({ error: 'Número de orden inválido' }, { status: 400 });
@@ -115,8 +118,8 @@ export async function GET(request: Request) {
         if (soloOf) ofs = [soloOf];
         else {
             // Las mismas OF que muestra la app (vista de Fibra: pendientes y de productos de Fibra)
-            const { data, error } = await supabase.from('ordenes_fabricacion_fv').select('orden_fabricacion');
-            if (error) return NextResponse.json({ error: `No se pudieron leer las OF de Fibra: ${error.message}` }, { status: 500 });
+            const { data, error } = await supabase.from(rtm ? 'ordenes_fabricacion_rtm_v' : 'ordenes_fabricacion_fv').select('orden_fabricacion');
+            if (error) return NextResponse.json({ error: `No se pudieron leer las OF de ${rtm ? 'Superficies' : 'Fibra'}: ${error.message}` }, { status: 500 });
             ofs = [...new Set((data || []).map(r => String(r.orden_fabricacion).trim()).filter(x => /^\d+$/.test(x)))];
         }
 
@@ -157,12 +160,12 @@ export async function GET(request: Request) {
         if (simular) return NextResponse.json({ filas });
 
         if (filas.length) {
-            const { error } = await supabase.from('traslados_of_fv').upsert(filas, { onConflict: 'orden_fabricacion' });
+            const { error } = await supabase.from(tablaRes).upsert(filas, { onConflict: 'orden_fabricacion' });
             if (error) return NextResponse.json({ error: /traslados_of_fv|relation|schema cache/i.test(error.message) ? 'Falta crear las tablas del módulo Traslados: ejecute traslados_fv.sql en Supabase.' : `No se pudo guardar la revisión: ${error.message}` }, { status: 500 });
         }
         // Revisión completa: se quitan las OF que ya no están pendientes
         if (!soloOf && ofs.length) {
-            await supabase.from('traslados_of_fv').delete().not('orden_fabricacion', 'in', `(${ofs.join(',')})`);
+            await supabase.from(tablaRes).delete().not('orden_fabricacion', 'in', `(${ofs.join(',')})`);
         }
 
         const cuenta = (e: string) => filas.filter(f => f.estado === e).length;

@@ -14,9 +14,23 @@ const ACCIONES: Record<string, string> = {
     devolver_programado: 'Devuelta a Programado',
     liberar_molde: 'Liberó molde',
     editar_registro: 'Editó registro',
-    eliminar_registro: 'Eliminó registro'
+    eliminar_registro: 'Eliminó registro',
+    cierre_sap: 'OF cerrada en SAP'
 }
-const ORIGENES: Record<string, string> = { mapa: 'Mapa', importar_excel: 'Excel', moldes: 'Moldes', administracion: 'Administración', pintura: 'Pintura' }
+const ORIGENES: Record<string, string> = { mapa: 'Mapa', importar_excel: 'Excel', moldes: 'Moldes', administracion: 'Administración', pintura: 'Pintura', sap: 'SAP' }
+// Motivo y, si el movimiento sobrescribió la fecha de un proceso donde la pieza ya había estado, la fecha y el usuario anteriores
+const CAMPO_PROCESO: Record<string, string> = {
+    pintura_fecha: 'Pintura', vaciado_fecha: 'Vaciado', herrajes_fecha: 'Herrajes', pulido_fecha: 'Pulido', reparacion_fecha: 'Reparación',
+    acabado_fecha: 'Ensayo', empaque_fecha: 'Huacales', digitado_fecha: 'Digitado', cedi_fecha: 'CEDI'
+}
+function detalleMovimiento(d: Record<string, unknown> | null) {
+    if (!d) return '—'
+    const partes: string[] = []
+    if (typeof d.motivo === 'string') partes.push(d.motivo)
+    const s = d.sobrescrito as { campo?: string; fecha?: string; usuario?: string | null } | undefined
+    if (s?.fecha) partes.push(`Antes: ${CAMPO_PROCESO[s.campo || ''] || s.campo} ${new Date(s.fecha).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}${s.usuario ? ` · ${s.usuario}` : ''}`)
+    return partes.length ? partes.join(' · ') : '—'
+}
 const COLOR_ACCION: Record<string, string> = {
     devolver_programado: 'bg-red-100 text-red-800', eliminar_registro: 'bg-red-100 text-red-800',
     liberar_molde: 'bg-amber-100 text-amber-800', editar_registro: 'bg-amber-100 text-amber-800'
@@ -94,7 +108,7 @@ export default function HistorialMovimientosFv({ onCerrar, ofInicial = '' }: { o
                         <table className="w-full text-xs">
                             <thead className="sticky top-0 bg-[#324354] text-white text-[10px] uppercase tracking-wider">
                                 <tr>
-                                    {['Fecha', 'Usuario', 'Acción', 'OF', 'Pieza', 'Antes', 'Después', 'Molde', 'Origen'].map(h => <th key={h} className="px-2 py-2 text-left font-black whitespace-nowrap">{h}</th>)}
+                                    {['Fecha', 'Usuario', 'Acción', 'OF', 'Pieza', 'Antes', 'Después', 'Molde', 'Origen', 'Detalle'].map(h => <th key={h} className="px-2 py-2 text-left font-black whitespace-nowrap">{h}</th>)}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -109,6 +123,7 @@ export default function HistorialMovimientosFv({ onCerrar, ofInicial = '' }: { o
                                         <td className="px-2 py-1.5 font-semibold">{lado(f.estado_despues, f.mesa_despues)}</td>
                                         <td className="px-2 py-1.5 font-mono">{f.molde_serial || '—'}</td>
                                         <td className="px-2 py-1.5 whitespace-nowrap text-slate-500">{ORIGENES[f.origen] || f.origen}</td>
+                                        <td className="px-2 py-1.5 text-slate-600 min-w-[180px]">{detalleMovimiento(f.detalle)}</td>
                                     </tr>
                                 ))}
                             </tbody>

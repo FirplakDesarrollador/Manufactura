@@ -180,6 +180,32 @@ export const DESTINOS_MOVIMIENTO_FV = {
 } as const
 export type DestinoMovimientoFv = keyof typeof DESTINOS_MOVIMIENTO_FV
 
+// Al mover una pieza a un proceso donde ya estuvo, su fecha y su usuario de ese proceso se sobrescriben con los del
+// movimiento. Para no perder la trazabilidad, los valores anteriores quedan en el historial (detalle.sobrescrito).
+export type Sobrescrito = { campo: string; fecha: string; usuario_id: number | null; usuario: string | null }
+async function nombresUsuarios(ids: number[]): Promise<Map<number, string>> {
+    if (ids.length === 0) return new Map()
+    const { data } = await supabase.from('usuarios').select('*').in('id', ids)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return new Map((data || []).map((u: any) => [u.id as number, String(u.nombre || u.nombre_completo || u.correo || u.id)]))
+}
+async function valoresAnteriores(registrers: string[], destino: DestinoMovimientoFv): Promise<Map<string, Sobrescrito>> {
+    const d = DESTINOS_MOVIMIENTO_FV[destino]
+    const res = new Map<string, Sobrescrito>()
+    if (registrers.length === 0) return res
+    const { data, error } = await supabase.from('trazabilidad_fv').select(`registrer, ${d.fecha}, ${d.usuario}`).in('registrer', registrers)
+    if (error) throw new Error(`No se pudo leer la trazabilidad anterior de la pieza: ${error.message}`)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filas = (data || []) as any[]
+    const nombres = await nombresUsuarios([...new Set(filas.map(f => f[d.usuario]).filter((x: unknown) => x != null))] as number[])
+    for (const f of filas) {
+        if (!f[d.fecha]) continue
+        const uid = f[d.usuario] ?? null
+        res.set(String(f.registrer), { campo: d.fecha, fecha: String(f[d.fecha]), usuario_id: uid, usuario: uid != null ? nombres.get(uid) ?? null : null })
+    }
+    return res
+}
+
 export async function moverPiezasOrdenFibra(ordenId: number, estadosOrigen: string[], destino: DestinoMovimientoFv, usuarioEmail: string) {
     const userId = await requireUserId(usuarioEmail)
     const d = DESTINOS_MOVIMIENTO_FV[destino]
@@ -192,6 +218,7 @@ export async function moverPiezasOrdenFibra(ordenId: number, estadosOrigen: stri
     if (errorPiezas) throw new Error(`No se pudieron leer las piezas de la orden: [${errorPiezas.code}] ${errorPiezas.message}`)
     if (!piezas || piezas.length === 0) throw new Error(`La orden no tiene piezas registradas en ${estadosOrigen.join(' / ')}.`)
 
+    const anteriores = await valoresAnteriores(piezas.map(p => String(p.registrer)), destino)
     const { data: movidas, error } = await supabase
         .from('trazabilidad_fv')
         .update({ estado: d.estado, [d.fecha]: new Date().toISOString(), [d.usuario]: userId })
@@ -207,7 +234,8 @@ export async function moverPiezasOrdenFibra(ordenId: number, estadosOrigen: stri
 
     await registrarMovimientosFv(piezas.map(p => ({
         origen: 'mapa' as const, accion: 'mover' as const, registrer: String(p.registrer), ordenId,
-        estadoAntes: p.estado, estadoDespues: d.estado, moldeId: p.molde_id ?? null, detalle: { destino, toda_la_orden: true }
+        estadoAntes: p.estado, estadoDespues: d.estado, moldeId: p.molde_id ?? null,
+        detalle: { destino, toda_la_orden: true, ...(anteriores.get(String(p.registrer)) ? { sobrescrito: anteriores.get(String(p.registrer)) } : {}) }
     })))
     return movidas.length
 }
@@ -313,12 +341,13 @@ export async function asignarMesaFv(registrer: string, mesa: string | null, orig
 // indicada o sin mesa.
 export async function moverPiezaFibra(registrer: string, destino: DestinoMovimientoFv, usuarioEmail: string, mesa: string | null = null, origen: OrigenMovimientoFv = 'mapa', motivo?: string) {
     const antes = await fotoObligatoria(registrer)
+    const anterior = (await valoresAnteriores([registrer], destino)).get(registrer)
     await cambiarEstadoPieza(registrer, antes, destino, usuarioEmail, mesa)
     await registrarMovimientosFv([{
         origen, accion: 'mover', registrer, ordenId: antes.ordenId,
         estadoAntes: antes.estado, estadoDespues: DESTINOS_MOVIMIENTO_FV[destino].estado,
         mesaAntes: antes.mesa, mesaDespues: mesa, moldeId: antes.moldeId,
-        detalle: { destino, ...(motivo ? { motivo } : {}) }
+        detalle: { destino, ...(motivo ? { motivo } : {}), ...(anterior ? { sobrescrito: anterior } : {}) }
     }])
 }
 

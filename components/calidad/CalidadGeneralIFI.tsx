@@ -1,6 +1,9 @@
 'use client';
 
+import { useEstadoEnCache } from '@/lib/utils/cacheMemoria';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// Ventanas en un portal (document.body): un ancestro con transform (animate-in) desubica los fixed
+import { createPortal } from 'react-dom';
 import { Check, Loader2, PencilLine, Plus, Save, Scale, X } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ReferenceLine, LabelList } from 'recharts';
 import { supabase } from '@/lib/supabase';
@@ -108,8 +111,9 @@ export default function CalidadGeneralIFI() {
     const [diasSel, setDiasSel] = useState<string[]>([]);
 
     // Datos por mes ya consultados ("YYYY-MM" → respuesta de la API)
-    const [datos, setDatos] = useState<Record<string, Respuesta>>({});
-    const [anual, setAnual] = useState<RespuestaAnual | null>(null);
+    // En caché de memoria (5 min): al volver a la pestaña Calidad IFI se muestra de inmediato
+    const [datos, setDatos] = useEstadoEnCache<Record<string, Respuesta>>('ifi-general:datos', {});
+    const [anual, setAnual] = useEstadoEnCache<RespuestaAnual | null>('ifi-general:anual', null);
     const todosLosAnios = anios.length === 0;
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -712,8 +716,8 @@ export default function CalidadGeneralIFI() {
             </div>
 
             {/* Modal: registrar calidad del día (MBL, CEFI, RTM) */}
-            {showPesos && (
-                <div data-ifi-conservar className="fixed inset-0 z-[10000] flex items-center justify-center p-3 bg-black/60" onMouseDown={e => { if (e.target === e.currentTarget && !pesosEstado.guardando) setShowPesos(false); }}>
+            {showPesos && typeof document !== 'undefined' && createPortal((
+                <div data-ifi-conservar className="fixed inset-0 z-[10000] flex items-center justify-center p-3 bg-black/60 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !pesosEstado.guardando) setShowPesos(false); }}>
                     <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-[#e2ded5] overflow-hidden">
                         <div className="px-5 py-4 border-b border-[#e2ded5] flex items-start justify-between">
                             <div>
@@ -773,10 +777,10 @@ export default function CalidadGeneralIFI() {
                         </div>
                     </div>
                 </div>
-            )}
+            ), document.body)}
 
-            {showRegistro && (
-                <div data-ifi-conservar className="fixed inset-0 z-[10000] flex items-center justify-center p-3 bg-black/60" onMouseDown={e => { if (e.target === e.currentTarget && !guardando) setShowRegistro(false); }}>
+            {showRegistro && typeof document !== 'undefined' && createPortal((
+                <div data-ifi-conservar className="fixed inset-0 z-[10000] flex items-center justify-center p-3 bg-black/60 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !guardando) setShowRegistro(false); }}>
                     <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-[#e2ded5] overflow-hidden">
                         <div className="px-5 py-4 border-b border-[#e2ded5] flex items-start justify-between">
                             <div>
@@ -839,7 +843,7 @@ export default function CalidadGeneralIFI() {
                         </div>
                     </div>
                 </div>
-            )}
+            ), document.body)}
         </div>
     );
 }

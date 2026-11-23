@@ -41,7 +41,9 @@ const ESTADO_FILA: Record<Fila['estado'], { label: string; color: string }> = {
 const num = (n: number) => Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 3 })
 const ORDEN_FILA = { faltante: 0, solicitado: 1, entregado: 2, no_exigido: 3 }
 
-export default function TrasladosFibraModule() {
+// planta='rtm': el mismo módulo para Superficies (tabla traslados_of_rtm y ?planta=rtm en la revisión)
+export default function TrasladosFibraModule({ planta = 'fv' }: { planta?: 'fv' | 'rtm' } = {}) {
+    const tablaTraslados = planta === 'rtm' ? 'traslados_of_rtm' : 'traslados_of_fv'
     const [datos, setDatos] = useState<Revision[] | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [revisando, setRevisando] = useState<string | null>(null)   // 'todas' o el Nº de OF
@@ -53,7 +55,7 @@ export default function TrasladosFibraModule() {
     const [verConsumibles, setVerConsumibles] = useState(false)
 
     const cargar = useCallback(async () => {
-        const { data, error: e } = await supabase.from('traslados_of_fv').select('*')
+        const { data, error: e } = await supabase.from(tablaTraslados).select('*')
         if (e) {
             setError(/traslados_of_fv|relation|schema cache/i.test(e.message) ? 'Falta crear las tablas del módulo Traslados: ejecute traslados_fv.sql en Supabase.' : e.message)
             setDatos([]); return
@@ -66,7 +68,7 @@ export default function TrasladosFibraModule() {
     const revisar = async (of?: string) => {
         setRevisando(of || 'todas'); setAviso(null)
         try {
-            const r = await fetch(`/api/sap/traslados-fv${of ? `?of=${of}` : ''}`, { cache: 'no-store' })
+            const r = await fetch(`/api/sap/traslados-fv?planta=${planta}${of ? `&of=${of}` : ''}`, { cache: 'no-store' })
             const d = await r.json().catch(() => ({}))
             if (!r.ok) throw new Error(d.error || `Error ${r.status}`)
             if (!of) setAviso(`Revisadas ${d.revisadas} OF en ${d.segundos} s.`)

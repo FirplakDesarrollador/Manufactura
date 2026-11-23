@@ -17,6 +17,10 @@
       "schedule": "0 10,17,22 * * 1-5"
     },
     {
+      "path": "/api/sap/traslados-fv?planta=rtm",
+      "schedule": "0 10,17,22 * * 1-5"
+    },
+    {
       "path": "/api/cron/revision-entrega",
       "schedule": "0 * * * *"
     }
