@@ -124,10 +124,15 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
                                     <div className="text-xs font-medium text-gray-500 mt-1">
                                         {molde.molde_descripcion}
                                     </div>
-                                    <div className={`text-[11px] font-bold mt-2 inline-block px-2 py-0.5 rounded-full ${molde.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
-                                        molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                        {molde.estado}
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <div className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${molde.estado === 'Disponible' ? 'bg-green-100 text-green-700' :
+                                            molde.estado === 'En uso' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                            {molde.estado}
+                                        </div>
+                                        <div className="text-xs font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md">
+                                            {molde.vueltas_actuales ?? 0} {molde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}
+                                        </div>
                                     </div>
                                 </div>
 

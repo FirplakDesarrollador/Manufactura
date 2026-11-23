@@ -105,6 +105,9 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
     const disponibles = relevantMoldes.filter(m => m.estado === 'Disponible').length
     const enUso = relevantMoldes.filter(m => m.estado === 'En uso').length
     const enReparacion = relevantMoldes.filter(m => !['Disponible', 'En uso'].includes(m.estado)).length
+    const moldesDispConVueltas = relevantMoldes.filter(m => m.estado === 'Disponible' && m.vueltas_actuales != null)
+    const minVueltas = moldesDispConVueltas.length > 0 ? Math.min(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
+    const maxVueltas = moldesDispConVueltas.length > 0 ? Math.max(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
 
     const cantidadTotal = Math.max(0, orden.cantidad || orden.cantidad_programada || 0)
     // FV: unidades ya completadas en SAP sin registro en planta → cuentan como CEDI (y no como Programado)
@@ -319,6 +322,11 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                     <div className="text-green-600">Disponibles: <span className="text-gray-900">{orden.moldes_disponibles || disponibles}</span></div>
                     <div className="text-orange-600">Fabricación: <span className="text-gray-900">{orden.moldes_en_fabricacion || 0}</span></div>
                     <div className="text-yellow-600">En uso: <span className="text-gray-900">{orden.moldes_en_uso || enUso}</span></div>
+                    {minVueltas !== null && (
+                        <div className="text-purple-600" title="Vueltas de los moldes disponibles">
+                            Vueltas: <span className="text-gray-900">{minVueltas === maxVueltas ? `${minVueltas}v` : `${minVueltas}-${maxVueltas}v`}</span>
+                        </div>
+                    )}
                 </div>
             </div>
             )}

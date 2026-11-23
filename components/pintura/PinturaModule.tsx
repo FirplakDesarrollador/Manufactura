@@ -463,42 +463,88 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                 >
                                     <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
                                         {selectedMolde 
-                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
+                                            ? `${selectedMolde.serial} · ${selectedMolde.vueltas_actuales} ${selectedMolde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}` 
                                             : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
                                     </span>
                                     <Search size={18} className="text-gray-400" />
                                 </div>
 
                                 {isMoldDropdownOpen && (
-                                    <div className="absolute bottom-full mb-2 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+                                    <div className="absolute bottom-full mb-2 w-full min-w-[320px] bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                                         <div className="p-2 border-b border-gray-100 bg-gray-50">
                                             <input
                                                 type="text"
                                                 autoFocus
-                                                placeholder="Buscar molde..."
+                                                placeholder="Buscar molde por serial..."
                                                 value={moldSearchText}
                                                 onChange={(e) => setMoldSearchText(e.target.value)}
-                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
                                             />
                                         </div>
-                                        <div className="max-h-[200px] overflow-y-auto">
+                                        {/* Encabezado con columna explícita de Vueltas */}
+                                        <div className="grid grid-cols-[1fr_auto] gap-2 px-4 py-2 bg-gray-100/80 border-b border-gray-200 text-[11px] font-black uppercase text-gray-500 tracking-wider">
+                                            <span>Molde / Serial</span>
+                                            <span className="text-right">Vueltas del Molde</span>
+                                        </div>
+                                        <div className="max-h-[220px] overflow-y-auto divide-y divide-gray-50">
                                             {moldesDisponibles
                                                 .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
-                                                .map((molde) => (
-                                                    <div
-                                                        key={molde.id}
-                                                        onClick={() => {
-                                                            setSelectedMolde(molde)
-                                                            checkMantenimiento(molde)
-                                                            setIsMoldDropdownOpen(false)
-                                                            setMoldSearchText('')
-                                                        }}
-                                                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
-                                                    >
-                                                        <span className="text-sm font-bold">{molde.serial}</span>
-                                                        <span className="text-xs text-cyan-600 font-bold">{molde.vueltas_actuales}v</span>
+                                                .length === 0 ? (
+                                                    <div className="px-4 py-6 text-center text-xs text-gray-400 font-medium">
+                                                        No se encontraron moldes disponibles
                                                     </div>
-                                                ))}
+                                                ) : (
+                                                    moldesDisponibles
+                                                        .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
+                                                        .map((molde) => {
+                                                            const limite = (molde.vueltas_mto_atipicas && molde.vueltas_mto_atipicas > 0)
+                                                                ? molde.vueltas_mto_atipicas
+                                                                : (molde.vueltas_mto || 0);
+                                                            const porcVueltas = limite > 0 ? (molde.vueltas_actuales / limite) : 0;
+                                                            const proximoMtto = porcVueltas >= 0.85;
+
+                                                            return (
+                                                                <div
+                                                                    key={molde.id}
+                                                                    onClick={() => {
+                                                                        setSelectedMolde(molde)
+                                                                        checkMantenimiento(molde)
+                                                                        setIsMoldDropdownOpen(false)
+                                                                        setMoldSearchText('')
+                                                                    }}
+                                                                    className="px-4 py-2.5 hover:bg-cyan-50 cursor-pointer grid grid-cols-[1fr_auto] gap-3 items-center transition-colors group"
+                                                                >
+                                                                    <div className="min-w-0 flex flex-col">
+                                                                        <span className="text-sm font-bold text-gray-900 group-hover:text-cyan-700 truncate">
+                                                                            {molde.serial}
+                                                                        </span>
+                                                                        {molde.molde_descripcion && (
+                                                                            <span className="text-[10px] text-gray-400 truncate leading-tight">
+                                                                                {molde.molde_descripcion}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex flex-col items-end shrink-0">
+                                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-black ${
+                                                                            proximoMtto 
+                                                                                ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                                                                                : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+                                                                        }`}>
+                                                                            <span>{molde.vueltas_actuales}</span>
+                                                                            <span className="font-semibold text-[10px]">
+                                                                                {molde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}
+                                                                            </span>
+                                                                        </span>
+                                                                        {limite > 0 && (
+                                                                            <span className="text-[9px] text-gray-400 font-semibold mt-0.5">
+                                                                                límite: {limite}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })
+                                                )}
                                         </div>
                                     </div>
                                 )}
@@ -509,8 +555,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                     </div>
                                 )}
                                 {selectedMolde && (
-                                    <div className="text-[10px] text-gray-500 px-1 mt-1 italic">
-                                        Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}
+                                    <div className="text-[10px] text-cyan-700 font-bold px-1 mt-1 flex items-center gap-2">
+                                        <span>Vueltas actuales: {selectedMolde.vueltas_actuales}</span>
+                                        <span className="text-gray-300">|</span>
+                                        <span>Límite Mto: {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}</span>
                                     </div>
                                 )}
                             </div>
