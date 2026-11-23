@@ -425,10 +425,14 @@ export async function GET() {
         if (fibraRows.length > 0) {
             const { data: nonPendingFibra } = await supabase
                 .from('ordenes_fabricacion_fibra')
-                .select('orden_fabricacion')
+                .select('orden_fabricacion, modificado_por')
                 .eq('pendiente', false);
 
-            const nonPendingFibraSet = new Set((nonPendingFibra || []).map(r => String(r.orden_fabricacion)));
+            // Las cerradas a mano (o canceladas) no se reactivan. Las que cerró el cierre automático porque no vinieron
+            // en una carga de SAP sí: si SAP las vuelve a traer liberadas, siguen abiertas (caso OF 2264019, 17/11/2026).
+            const CIERRE_AUTO = 'Sistema SAP (Cierre automático)';
+            const nonPendingFibraSet = new Set((nonPendingFibra || []).filter(r => r.modificado_por !== CIERRE_AUTO).map(r => String(r.orden_fabricacion)));
+            const reactivarFibra = new Set((nonPendingFibra || []).filter(r => r.modificado_por === CIERRE_AUTO).map(r => String(r.orden_fabricacion)));
 
             // 4.1 Las 4 fechas del Semáforo (T, Real Liberación, W y AF) viajan en el mismo upsert de la orden
             // (un upsert aparte solo con las fechas viola el NOT NULL de cantidad y no guardaba nada).
@@ -463,6 +467,7 @@ export async function GET() {
                     // Unidades ya completadas (recibidas) en SAP: cuentan como CEDI aunque no se registraran en planta
                     cantidad_completada_sap: Number(r.cantCompletada) || 0,
                     modificado_por: 'Sistema SAP',
+                    ...(reactivarFibra.has(String(r.orden_fabricacion)) ? { fecha_entrega_real: null } : {}),
                     ...(fechas ? {
                         ...(fechas.get(String(r.orden_fabricacion).trim()) ?? sinFecha),
                         fechas_semaforo_actualizadas: ahoraFechas
@@ -519,9 +524,31 @@ export async function GET() {
             if (fibraAbiertasErr) {
                 console.error('Error listando órdenes de fibra abiertas:', fibraAbiertasErr)
             } else {
-                const porCerrar = (fibraAbiertas || [])
+                const ausentes = (fibraAbiertas || [])
                     .map(o => String(o.orden_fabricacion))
                     .filter(of => of && !sapAbiertas.has(of))
+
+                // No basta con que la OF no venga en la consulta (una carga incompleta cerraba OF liberadas): se confirma
+                // en SAP que ya no está Liberada. Si SAP no responde, no se cierra nada (nunca un cierre sin confirmar).
+                const porCerrar: string[] = []
+                for (let i = 0; i < ausentes.length; i += 20) {
+                    const lote = ausentes.slice(i, i + 20)
+                    const numericas = lote.filter(of => /^[0-9]+$/.test(of))
+                    if (numericas.length === 0) continue
+                    try {
+                        const filtro = numericas.map(of => `DocumentNumber eq ${of}`).join(' or ')
+                        const res = await fetchSAP(`${SAP_BASE_URL}/ProductionOrders?$select=DocumentNumber,ProductionOrderStatus&$filter=${encodeURIComponent(filtro)}`,
+                            { method: 'GET', headers: { Prefer: 'odata.maxpagesize=50' } })
+                        if (!res.ok) { console.warn(`[ordenes-liberadas] SAP no confirmó el estado de ${numericas.length} OF de fibra (${res.status}): no se cierran`); continue }
+                        const estado = new Map<string, string>(((await res.json()).value || []).map((o: any) => [String(o.DocumentNumber), String(o.ProductionOrderStatus)]))
+                        for (const of of numericas) {
+                            const e = estado.get(of)
+                            if (e && e !== 'boposReleased') porCerrar.push(of)
+                        }
+                    } catch (e) {
+                        console.warn('[ordenes-liberadas] Error confirmando en SAP el cierre de OF de fibra:', e)
+                    }
+                }
 
                 for (let i = 0; i < porCerrar.length; i += 100) {
                     const lote = porCerrar.slice(i, i + 100)

@@ -191,6 +191,24 @@ export default function CalidadPage() {
                                 </span>
                             </button>
                         </div>
+
+                        {/* 7. Calidad Reparación de Moldes (RMOLD): mismo módulo de Calidad MS con los tipos de molde MS y FV */}
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <button
+                                onClick={() => router.push('/calidad/rmold')}
+                                className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
+                                    Calidad Reparación Moldes<br />
+                                    <span className="text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">RMOLD</span>
+                                </span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </main>

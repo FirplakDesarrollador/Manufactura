@@ -37,7 +37,8 @@ const nombreLimpio = (d: DefectoNombre) =>
 
 // Crea un defecto nuevo de MS: queda en el catálogo ms_defectos (registro en línea, reportes, histórico,
 // indicadores y Power BI lo toman de ahí) y con su criterio de aceptación y rechazo vinculado.
-export default function NuevoDefectoMsModal({ defectos, onClose, onCreated }: NuevoDefectoMsModalProps) {
+// tablaDefectos / plantaCriterios: catálogo y planta de criterios (MS por defecto; RMOLD: rmold_defectos y 'R moldes')
+export default function NuevoDefectoMsModal({ defectos, onClose, onCreated, tablaDefectos = 'ms_defectos', plantaCriterios = 'Ms' }: NuevoDefectoMsModalProps & { tablaDefectos?: string; plantaCriterios?: string }) {
     const siguiente = defectos.reduce((max, d) => Math.max(max, numeroVisible(d) ?? 0), 0) + 1
     const [numero, setNumero] = useState(String(siguiente))
     const [nombre, setNombre] = useState('')
@@ -76,11 +77,11 @@ export default function NuevoDefectoMsModal({ defectos, onClose, onCreated }: Nu
                 Requiere_Foto: requiereFoto,
                 Requiere_Referencia_Molde: requiereMolde
             }
-            let { data, error: insErr } = await supabase.from('ms_defectos').insert(fila).select().single()
+            let { data, error: insErr } = await supabase.from(tablaDefectos).insert(fila).select().single()
             // Si la tabla no genera el id sola, se usa el siguiente disponible
             if (insErr && (insErr.code === '23502' || /null value in column "id"/i.test(insErr.message))) {
                 const maxId = defectos.reduce((max, d) => Math.max(max, Number(d.id) || 0), 0)
-                ;({ data, error: insErr } = await supabase.from('ms_defectos').insert({ id: maxId + 1, ...fila }).select().single())
+                ;({ data, error: insErr } = await supabase.from(tablaDefectos).insert({ id: maxId + 1, ...fila }).select().single())
             }
             if (insErr || !data) throw new Error(insErr?.message || 'No se pudo crear el defecto.')
             const defecto = data as DefectoMsCatalogo
@@ -88,7 +89,7 @@ export default function NuevoDefectoMsModal({ defectos, onClose, onCreated }: Nu
             // Criterio vinculado (zonas, responsable, fotos… se completan después en el detalle)
             const { data: crit, error: critErr } = await supabase
                 .from('criterios_calidad_plantas')
-                .insert({ planta: 'Ms', codigo: String(n), defecto: nom, id_defecto_ms: defecto.id })
+                .insert({ planta: plantaCriterios, codigo: String(n), defecto: nom, id_defecto_ms: defecto.id })
                 .select()
                 .single()
             if (critErr) console.warn('Defecto creado, pero no su criterio:', critErr)

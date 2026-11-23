@@ -76,6 +76,7 @@ interface CriterioDetallePanelProps {
   plantaNombre: string;
   numero: number; // número visible del defecto
   idDefectoMs?: number | null; // id interno en ms_defectos (vínculo con los registros diarios)
+  tablaDefectos?: string; // catálogo del registro diario (ms_defectos por defecto; RMOLD: rmold_defectos)
   nombreDefecto: string;
   criterio: CriterioCalidad | null;
   canEdit: boolean;
@@ -120,6 +121,7 @@ const fmtNum = (v: number, d = 2) => v.toLocaleString('es-CO', { minimumFraction
 // con los campos editables y las herramientas de fotos (adjuntar, tomar, anotar, principal, eliminar).
 export default function CriterioDetallePanel({
   planta,
+  tablaDefectos,
   plantaNombre,
   numero,
   idDefectoMs,
@@ -322,7 +324,7 @@ export default function CriterioDetallePanel({
           Requiere_Foto: !!cfgForm.Requiere_Foto,
           Requiere_Referencia_Molde: !!cfgForm.Requiere_Referencia_Molde
         };
-        const { error: cfgErr } = await supabase.from('ms_defectos').update(cfg).eq('id', idDefectoMs);
+        const { error: cfgErr } = await supabase.from(tablaDefectos || 'ms_defectos').update(cfg).eq('id', idDefectoMs);
         if (cfgErr) throw new Error(`Configuración del registro: ${cfgErr.message}`);
         onConfigSaved?.(cfg);
       }

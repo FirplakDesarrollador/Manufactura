@@ -13,9 +13,16 @@ import { HourlyInspectionChart } from '@/components/calidad/HourlyInspectionChar
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import { usePlantaCalidad, defectoCuenta } from '@/lib/calidad/plantaCalidad'
+import { permisosCalidadRmold } from '@/lib/calidad/permisos'
 
+// Registro de defectos en línea de Calidad MS y de Calidad RMOLD (misma pantalla; la ruta decide la planta).
+// RMOLD: la referencia es el tipo de molde y, opcional, el serial del molde.
 export default function CalidadMsReportPage() {
     const router = useRouter()
+    const planta = usePlantaCalidad()
+    const [moldesTipo, setMoldesTipo] = useState<{ id: number; serial: string }[]>([])
+    const [selectedMolde, setSelectedMolde] = useState<string>('')
     const [user, setUser] = useState<User | null>(null)
 
     interface User {
@@ -81,11 +88,13 @@ export default function CalidadMsReportPage() {
         
         const { data: localUser } = await supabase
             .from('usuarios')
-            .select('id, permisos')
+            .select('id, permisos, correo, nombre, rol')
             .eq('uuid', userData.user.id)
             .single()
 
-        if (!localUser?.permisos?.calidad?.ms) {
+        const permRmold = planta.id === 'rmold' ? permisosCalidadRmold(localUser) : null
+        const sinAcceso = permRmold ? !(permRmold.registro || permRmold.hora_a_hora) : !localUser?.permisos?.calidad?.ms
+        if (sinAcceso) {
             router.push('/home')
             return
         }
@@ -102,9 +111,9 @@ export default function CalidadMsReportPage() {
         }
 
         const [productsRes, defectsRes, reportsRes] = await Promise.all([
-            supabase.from('productos_defectos_ms').select('*').order('Referencia'),
-            supabase.from('ms_defectos').select('*').order('id'),
-            supabase.from('query_ms_reporte_defectos_dia').select('*')
+            supabase.from(planta.tReferencias).select('*').order('Referencia'),
+            supabase.from(planta.tDefectos).select('*').order('id'),
+            supabase.from(planta.vDia).select('*')
         ])
 
         if (productsRes.data) setProducts(productsRes.data)
@@ -112,15 +121,8 @@ export default function CalidadMsReportPage() {
         if (reportsRes.data) {
             setTodaysReports(reportsRes.data)
             
-            const isIgnoredDefect = (defectName: string) => {
-                const cleanName = defectName.replace(/^\s*\d+\.\s*/, '').trim().toLowerCase()
-                return [
-                    'saldos/destrucciones',
-                    'opaco',
-                    'error en pedido referencia',
-                    'quebrados logistica'
-                ].includes(cleanName)
-            }
+            // Defectos que no hacen defectuosa la pieza (MS: Opaco y los de logística; RMOLD: ninguno)
+            const isIgnoredDefect = (defectName: string) => !defectoCuenta(planta, defectName)
             
             const total = reportsRes.data.length
             const defectuosos = reportsRes.data.filter(r => {
@@ -136,7 +138,7 @@ export default function CalidadMsReportPage() {
         }
 
         setLoading(false)
-    }, [router])
+    }, [router, planta])
 
     useEffect(() => {
         const load = async () => {
@@ -186,7 +188,7 @@ export default function CalidadMsReportPage() {
         let fotoUrl = null
 
         if (fileToUpload) {
-            const fileName = `ms-defectos/${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+            const fileName = `${planta.carpetaFotos}/${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
             const { error: uploadError } = await supabase.storage
                 .from('fichas-media')
                 .upload(fileName, fileToUpload)
@@ -208,10 +210,12 @@ export default function CalidadMsReportPage() {
             defecto: selectedDefectNames,
             created_at: new Date().toISOString(),
             ...(fotoUrl ? { fotoUrl } : {}),
-            ...(moldeRef ? { Molde: moldeRef } : {})
+            ...(moldeRef ? { Molde: moldeRef } : {}),
+            // RMOLD: serial del molde revisado (opcional)
+            ...(planta.conSerial && selectedMolde ? { Molde: moldesTipo.find(m => String(m.id) === selectedMolde)?.serial ?? moldeRef, molde_id: parseInt(selectedMolde) } : {})
         }
 
-        const { error } = await supabase.from('ms_reporte_defectos').insert(reportData)
+        const { error } = await supabase.from(planta.tReportes).insert(reportData)
         
         setIsUploading(false)
         
@@ -223,6 +227,8 @@ export default function CalidadMsReportPage() {
             await fetchData()
             setSelectedDefects({})
             setSelectedProduct('')
+            setSelectedMolde('')
+            setMoldesTipo([])
             setPhotoFile(null)
         }
     }
@@ -235,7 +241,8 @@ export default function CalidadMsReportPage() {
 
         const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
         
-        const requiresMolde = selectedDefectsList.some(d => d.Requiere_Referencia_Molde)
+        // En RMOLD, si ya se escogió el serial no se vuelve a pedir la referencia del molde
+        const requiresMolde = selectedDefectsList.some(d => d.Requiere_Referencia_Molde) && !(planta.conSerial && selectedMolde)
         if (requiresMolde) {
             setMoldeInputValue('')
             setIsMoldeModalOpen(true)
@@ -284,7 +291,7 @@ export default function CalidadMsReportPage() {
                 Requiere_Referencia_Molde: d.Requiere_Referencia_Molde,
             }))
             
-            const { error } = await supabase.from('ms_defectos').upsert(updates)
+            const { error } = await supabase.from(planta.tDefectos).upsert(updates)
             
             if (error) {
                 console.error('Error updating defects settings:', error)
@@ -314,7 +321,7 @@ export default function CalidadMsReportPage() {
         <div className="min-h-screen bg-white flex flex-col font-sans">
             {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
             <Header
-                title="Calidad MS"
+                title={planta.titulo}
                 subtitle=""
                 compact={true}
                 userEmail={user?.email}
@@ -333,15 +340,30 @@ export default function CalidadMsReportPage() {
                             <SearchableSelect
                                 name="producto"
                                 options={products.map((p) => p.Referencia)}
-                                placeholder="SELECCIONAR REFERENCIA DE PRODUCTO"
+                                placeholder={planta.placeholderReferencia}
                                 defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
                                 onValueChange={(val) => {
                                     const product = products.find(p => p.Referencia === val)
                                     setSelectedProduct(product ? product.id.toString() : '')
+                                    // RMOLD: seriales del tipo de molde escogido
+                                    setSelectedMolde('')
+                                    setMoldesTipo([])
+                                    if (planta.conSerial && product) {
+                                        void supabase.from('moldes').select('id, serial').eq('tipo_molde_id', product.id).neq('estado', 'Destruido').order('serial')
+                                            .then(({ data }) => setMoldesTipo((data || []).map(m => ({ id: m.id, serial: String(m.serial ?? '') }))))
+                                    }
                                 }}
                                 className="w-full h-7 bg-white border border-gray-300 rounded px-2.5 text-[#254153] font-bold text-[11px] focus:border-[#254153] outline-none transition-all flex items-center"
                             />
                         </div>
+                        {planta.conSerial && (
+                            <select value={selectedMolde} onChange={e => setSelectedMolde(e.target.value)} disabled={!selectedProduct}
+                                title="Serial del molde revisado (opcional)"
+                                className="h-7 w-28 shrink-0 bg-white border border-gray-300 rounded px-1.5 text-[#254153] font-bold text-[11px] outline-none disabled:opacity-50">
+                                <option value="">{selectedProduct && !moldesTipo.length ? 'Sin seriales' : 'Serial…'}</option>
+                                {moldesTipo.map(m => <option key={m.id} value={m.id}>{m.serial}</option>)}
+                            </select>
+                        )}
 
                         <button
                             onClick={handleSave}
@@ -406,10 +428,12 @@ export default function CalidadMsReportPage() {
                             <span className="text-sm 2xl:text-base font-bold text-[#F24E4E]">{stats.defectuosos}</span>
                             <span className="text-[10px] font-medium text-gray-500">Defectuosos</span>
                         </div>
+                        {planta.saldos && (
                         <div className="flex items-center space-x-1" title="Saldos y destrucciones del día">
                             <BrokenSinkIcon className="w-4 h-4" />
                             <span className="text-sm 2xl:text-base font-bold text-[#254153]">{stats.saldos}</span>
                         </div>
+                        )}
                         <div className="flex items-center">
                             <span className="text-sm 2xl:text-base font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
                         </div>

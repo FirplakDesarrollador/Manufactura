@@ -9,7 +9,8 @@ import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import CriterioDetallePanel from '@/components/calidad/CriterioDetallePanel'
 import { CODIGOS_CRITERIOS_ANTIGUOS, CriterioCalidad, PLANTAS_CRITERIOS, plantaCriterios } from '@/lib/calidad/criterios'
-import { puedeEditarCalidad, permisosCalidadMs } from '@/lib/calidad/permisos'
+import { puedeEditarCalidad, permisosCalidadMs, permisosCalidadRmold } from '@/lib/calidad/permisos'
+import { PLANTAS_CALIDAD, usePlantaCalidad } from '@/lib/calidad/plantaCalidad'
 import {
     EstadisticasDefectosMs,
     MS_FECHA_INICIO_BI,
@@ -78,8 +79,14 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
     const [statsLoading, setStatsLoading] = useState(false)
     const [statsError, setStatsError] = useState<string | null>(null)
 
-    const esMs = planta === 'Ms'
+    // MS y RMOLD usan el catálogo de su registro diario (ms_defectos / rmold_defectos) con estadísticas;
+    // las demás plantas, solo sus criterios. "esMs" = planta con catálogo.
+    const catalogo = planta === PLANTAS_CALIDAD.ms.plantaCriterios ? PLANTAS_CALIDAD.ms : planta === PLANTAS_CALIDAD.rmold.plantaCriterios ? PLANTAS_CALIDAD.rmold : null
+    const esMs = !!catalogo
     const plantaInfo = plantaCriterios(planta)
+    // Botones de la barra: solo si la planta elegida es la del módulo por el que se entró (/calidad/ms o /calidad/rmold)
+    const plantaRuta = usePlantaCalidad()
+    const [usuario, setUsuario] = useState<any>(null)
 
     // La planta elegida queda en la dirección (?planta=Fv) para compartir o recargar
     useEffect(() => {
@@ -106,35 +113,48 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
             }
             setUserEmail(user.email)
 
-            const [defRes, critRes, userRes] = await Promise.all([
-                supabase.from('ms_defectos').select('*').order('id'),
+            const [critRes, userRes] = await Promise.all([
                 supabase.from('criterios_calidad_plantas').select('*'),
                 supabase.from('usuarios').select('nombre, correo, rol, permisos').ilike('correo', user.email || '').maybeSingle()
             ])
-            // Permisos de Calidad MS por botón: Criterios (ver/editar) y Configuración (ver/editar)
+            setUsuario(userRes.data)
             const permMs = permisosCalidadMs(userRes.data as any)
-            setCanEditMs(permMs.criterios === 'editar')
             setCanEdit(puedeEditarCalidad(userRes.data) || permMs.criterios === 'editar')
-            setCanConfig(permMs.configuracion === 'editar')
-            if (defRes.error) console.warn('Error cargando ms_defectos:', defRes.error)
             if (critRes.error) console.warn('Error cargando criterios_calidad_plantas:', critRes.error)
-            setDefects(defRes.data || [])
             setCriterios(critRes.data || [])
             setLoading(false)
         }
         void load()
     }, [router])
 
-    // Estadísticas del registro diario MS: se calculan la primera vez que se ve MS
     useEffect(() => {
-        if (!esMs || loading || stats || statsLoading || statsError) return
+        if (!catalogo) { setDefects([]); return }
+        // Permisos por botón de la planta: Criterios (ver/editar) y Configuración (ver/editar)
+        const perm = catalogo.id === 'rmold' ? permisosCalidadRmold(usuario) : permisosCalidadMs(usuario)
+        setCanEditMs(perm.criterios === 'editar')
+        setCanConfig(perm.configuracion === 'editar')
+        setStats(null)
+        setStatsError(null)
+        let vivo = true
+        void supabase.from(catalogo.tDefectos).select('*').order('id').then(({ data, error }) => {
+            if (!vivo) return
+            if (error) console.warn(`Error cargando ${catalogo.tDefectos}:`, error)
+            setDefects(data || [])
+        })
+        return () => { vivo = false }
+    }, [catalogo, usuario])
+
+    // Estadísticas del registro diario de la planta: se calculan la primera vez que se ve
+    useEffect(() => {
+        if (!catalogo || loading || stats || statsLoading || statsError || defects.length === 0) return
         const cargar = async () => {
             setStatsLoading(true)
             try {
-                const catalogo = new Map<number, string>(defects.map(d => [Number(d.id), String(d.Defecto || d.defecto || '')]))
+                const nombres = new Map<number, string>(defects.map(d => [Number(d.id), String(d.Defecto || d.defecto || '')]))
                 const hasta = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
-                const rows = await fetchMsReportes(supabase, `${MS_FECHA_INICIO_BI}T00:00:00Z`, `${hasta}T00:00:00Z`, 'id, created_at, defecto')
-                setStats(calcularEstadisticasDefectos(normalizarPiezas(rows, catalogo)))
+                const inicio = catalogo.id === 'ms' ? MS_FECHA_INICIO_BI : catalogo.inicio
+                const rows = await fetchMsReportes(supabase, `${inicio}T00:00:00Z`, `${hasta}T00:00:00Z`, 'id, created_at, defecto', {}, catalogo)
+                setStats(calcularEstadisticasDefectos(normalizarPiezas(rows, nombres, undefined, catalogo)))
             } catch (err: any) {
                 console.warn('Error calculando estadísticas de defectos:', err)
                 setStatsError(err?.message || 'Error consultando el registro diario')
@@ -143,11 +163,11 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
             }
         }
         void cargar()
-    }, [esMs, loading, stats, statsLoading, statsError, defects])
+    }, [catalogo, loading, stats, statsLoading, statsError, defects])
 
     const items = useMemo<ItemCriterio[]>(() => {
         const dePlanta = criterios.filter(c => c.planta === planta)
-        if (planta === 'Ms') {
+        if (catalogo) {
             // El número visible está en el nombre ("68. Pestaña…") y puede ser distinto del id interno;
             // el criterio se vincula por id_defecto_ms o, en su defecto, por código = número visible.
             const byDefectoId = new Map(dePlanta.filter(c => c.id_defecto_ms != null).map(c => [Number(c.id_defecto_ms), c]))
@@ -248,7 +268,7 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
                     </div>
 
                     <div className="order-3 min-[1200px]:order-none w-full min-[1200px]:w-auto flex justify-center z-20">
-                        {esMs && mostrarBotonesMs && <CalidadMsNavButtons activeTab="criterios" hasSettingsPermission={true} />}
+                        {esMs && mostrarBotonesMs && catalogo?.id === plantaRuta.id && <CalidadMsNavButtons activeTab="criterios" hasSettingsPermission={true} />}
                     </div>
 
                     <div className="order-2 min-[1200px]:order-none flex items-center justify-center sm:justify-end gap-2 w-full sm:w-auto sm:ml-auto min-[1200px]:ml-0 min-[1200px]:justify-self-end">
@@ -345,6 +365,7 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
                     nombreDefecto={itemAbierto.nombre}
                     criterio={itemAbierto.criterio}
                     configRegistro={itemAbierto.config}
+                    tablaDefectos={catalogo?.tDefectos}
                     canConfig={canConfig}
                     onConfigSaved={cfg => setDefects(prev => prev.map(d => (d.id === itemAbierto.defectoId ? { ...d, ...cfg } : d)))}
                     estadistica={itemAbierto.defectoId != null ? stats?.porDefecto.get(itemAbierto.defectoId) ?? null : null}
@@ -358,6 +379,8 @@ export default function CriteriosCalidadView({ plantaInicial = 'Ms', mostrarBoto
             {nuevoMsOpen && (
                 <NuevoDefectoMsModal
                     defectos={defects}
+                    tablaDefectos={catalogo?.tDefectos}
+                    plantaCriterios={planta}
                     onClose={() => setNuevoMsOpen(false)}
                     onCreated={(defecto, criterio) => {
                         setDefects(prev => [...prev, defecto])
