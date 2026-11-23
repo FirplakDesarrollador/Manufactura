@@ -22,6 +22,8 @@ function toDbRow(ev: EvaluacionHoraHora) {
         creado_por: ev.realizadoPor || ev.creadoPor || "",
         creado_por_email: ev.creadoPorEmail || "",
         tiempo_ciclo_teorico: ev.tiempoCicloTeorico,
+        tipo_producto: ev.tipoProducto || null,
+        descripcion_producto: ev.descripcionProducto || null,
         tiempo_inicio: ev.tiempoInicio,
         tiempo_fin: ev.tiempoFin,
         tiempo_total: ev.tiempoTotal,
@@ -75,6 +77,8 @@ function fromDbRow(row: any): EvaluacionHoraHora {
         realizadoPor: row.realizado_por || row.creado_por || "",
         compromiso: compromiso,
         tiempoCicloTeorico: Number(row.tiempo_ciclo_teorico),
+        tipoProducto: row.tipo_producto || "",
+        descripcionProducto: row.descripcion_producto || "",
         tiempoInicio: Number(row.tiempo_inicio),
         tiempoFin: row.tiempo_fin ? Number(row.tiempo_fin) : null,
         tiempoTotal: Number(row.tiempo_total),
@@ -97,15 +101,27 @@ function fromDbRow(row: any): EvaluacionHoraHora {
     };
 }
 
+// Mientras no se ejecute hora_hora_tipo_producto.sql, las columnas nuevas no existen: se guarda sin ellas
+// y el tipo y la descripción quedan al inicio del comentario para no perderlos.
+const COLS_NUEVAS = /tipo_producto|descripcion_producto/;
+function sinColumnasNuevas(row: ReturnType<typeof toDbRow>) {
+    const { tipo_producto, descripcion_producto, ...resto } = row;
+    const etiqueta = [tipo_producto, descripcion_producto].filter(Boolean).join(" · ");
+    return etiqueta ? { ...resto, comentario_general: `[Bañera: ${etiqueta}] ${String(resto.comentario_general || "").replace(/^\[Bañera: [^\]]*\]\s*/, "")}`.trim() } : resto;
+}
+
 // ─── CRUD Operations ─────────────────────────────────────────────
 
 export async function insertEvaluacion(ev: EvaluacionHoraHora) {
     const supabase = createClient();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from(TABLE)
         .insert(toDbRow(ev))
         .select("consecutivo")
         .single();
+    if (error && COLS_NUEVAS.test(error.message)) {
+        ({ data, error } = await supabase.from(TABLE).insert(sinColumnasNuevas(toDbRow(ev))).select("consecutivo").single());
+    }
     if (error) throw error;
     return data?.consecutivo as number;
 }
@@ -152,10 +168,13 @@ export async function limpiarCopiasSubidas(): Promise<number> {
 
 export async function updateEvaluacion(ev: EvaluacionHoraHora) {
     const supabase = createClient();
-    const { error } = await supabase
+    let { error } = await supabase
         .from(TABLE)
         .update(toDbRow(ev))
         .eq("id", ev.id);
+    if (error && COLS_NUEVAS.test(error.message)) {
+        ({ error } = await supabase.from(TABLE).update(sinColumnasNuevas(toDbRow(ev))).eq("id", ev.id));
+    }
     if (error) throw error;
 }
 

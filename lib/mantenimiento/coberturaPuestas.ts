@@ -15,6 +15,13 @@ const titulo = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase
 export type FilaCobertura = { clave: string; proceso: string; puestas: number; hdts: number; labores: string[] };
 export type Cobertura = { planta: string; puestas: number; hdts: number; procesos: FilaCobertura[] };
 
+// Ajustes de procesos por planta para las puestas a punto (no cambian las HDT):
+// - renombrar: el proceso de la HDT se cuenta con otro nombre (clave → nombre)
+// - excluir: procesos que no requieren puesta a punto
+const AJUSTES: Record<string, { renombrar?: Record<string, string>; excluir?: string[] }> = {
+    'fibra de vidrio': { renombrar: { empaque: 'Huacales' }, excluir: ['alistamiento'] }
+};
+
 export async function cargarCobertura(): Promise<Record<string, Cobertura>> {
     const [enc, hdt] = await Promise.all([
         supabase.from('puestas_a_punto_encabezado').select('planta, proceso, estado_puesta_a_punto'),
@@ -24,9 +31,12 @@ export async function cargarCobertura(): Promise<Record<string, Cobertura>> {
     if (hdt.error) throw new Error(`No se pudieron leer las HDT: ${hdt.error.message}`);
 
     const res: Record<string, Cobertura> = {};
+    const excluido = (planta: string, proceso: string | null) => !!AJUSTES[sinTildes(planta || '')]?.excluir?.includes(claveProceso(proceso));
     const fila = (planta: string, proceso: string | null) => {
         const kp = sinTildes(planta || '');
         const c = (res[kp] ||= { planta, puestas: 0, hdts: 0, procesos: [] });
+        const nuevo = AJUSTES[kp]?.renombrar?.[claveProceso(proceso)];
+        if (nuevo) proceso = nuevo;
         const clave = claveProceso(proceso);
         let f = c.procesos.find(x => x.clave === clave);
         if (!f) { f = { clave, proceso: titulo(proceso || 'Sin proceso'), puestas: 0, hdts: 0, labores: [] }; c.procesos.push(f); }
@@ -34,14 +44,16 @@ export async function cargarCobertura(): Promise<Record<string, Cobertura>> {
     };
     for (const e of enc.data || []) {
         if (sinTildes(e.estado_puesta_a_punto || '') === 'eliminada') continue;
+        if (excluido(e.planta, e.proceso)) continue;
         const { c, f } = fila(e.planta, e.proceso);
         c.puestas++; f.puestas++;
     }
     for (const h of hdt.data || []) {
+        if (excluido(h.planta, h.proceso)) continue;
         const { c, f } = fila(h.planta, h.proceso);
         c.hdts++; f.hdts++;
         if (h.labor) f.labores.push(h.labor);
-        f.proceso = titulo(h.proceso || f.proceso); // el nombre de la HDT es más limpio ("Vaciado" y no "VACIADO FV")
+        if (!AJUSTES[sinTildes(h.planta || '')]?.renombrar?.[claveProceso(h.proceso)]) f.proceso = titulo(h.proceso || f.proceso); // el nombre de la HDT es más limpio ("Vaciado" y no "VACIADO FV")
     }
     // Primero los procesos que faltan (con HDT y sin puesta a punto)
     const falta = (p: FilaCobertura) => (p.hdts > 0 && p.puestas === 0 ? 0 : 1);
