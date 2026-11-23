@@ -263,6 +263,7 @@ export default function Header({
               subItems: [
                 { label: 'Indicadores Calidad', path: '/calidad' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
+                { label: 'Calidad Reparación Moldes (RMOLD)', path: '/calidad/rmold' },
                 { label: 'Calidad FV (Atajo)', path: URL_CALIDAD_FV_POWERAPPS },
                 { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
                 { label: 'Criterios de Aceptación y Rechazo', path: '/calidad/criterios' },

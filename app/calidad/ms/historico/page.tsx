@@ -1,5 +1,6 @@
 'use client'
 
+import { usePlantaCalidad, defectoCuenta } from '@/lib/calidad/plantaCalidad'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -50,6 +51,7 @@ type SortColumn = 'id' | 'created_at' | 'tipo' | 'producto' | 'defecto' | 'molde
 
 export default function HistoricoDefectosPage() {
     const router = useRouter()
+    const planta = usePlantaCalidad()
     const [loading, setLoading] = useState(true)
     const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<HistoricoReporte[]>([])
@@ -95,8 +97,8 @@ export default function HistoricoDefectosPage() {
     useEffect(() => {
         const loadCatalogs = async () => {
             const [prodRes, defRes] = await Promise.all([
-                supabase.from('productos_defectos_ms').select('id, Referencia').order('Referencia'),
-                supabase.from('ms_defectos').select('id, Defecto, defecto, nombre, Nombre').order('id')
+                supabase.from(planta.tReferencias).select('id, Referencia').order('Referencia'),
+                supabase.from(planta.tDefectos).select('id, Defecto, defecto, nombre, Nombre').order('id')
             ])
             if (prodRes.data) setProductsCatalog(prodRes.data)
             if (defRes.data) setDefectsCatalog(defRes.data)
@@ -108,8 +110,9 @@ export default function HistoricoDefectosPage() {
         setLoading(true)
         try {
             let query = supabase
-                .from('ms_reporte_defectos')
-                .select(`
+                .from(planta.tReportes)
+                // String(): con el nombre de la tabla en una variable, el tipo del select no se puede deducir
+                .select(String(`
                     id,
                     created_at,
                     create_by,
@@ -117,8 +120,8 @@ export default function HistoricoDefectosPage() {
                     defecto,
                     Molde,
                     fotoUrl,
-                    producto:productos_defectos_ms (Referencia)
-                `, { count: 'exact' })
+                    producto:${planta.tReferencias} (Referencia)
+                `), { count: 'exact' })
                 .order('created_at', { ascending: false })
 
             if (startDate) {
@@ -133,7 +136,9 @@ export default function HistoricoDefectosPage() {
             const queryLimit = (startDate || endDate) ? 5000 : 1000
             query = query.limit(queryLimit)
 
-            const { data, count, error } = await query
+            const { data: dataRaw, count, error } = await query
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const data = dataRaw as unknown as any[] | null
 
             if (error) {
                 console.error('Error fetching defects history:', error)
@@ -344,7 +349,7 @@ export default function HistoricoDefectosPage() {
         try {
             let uploadedPhotoUrl = selectedDetailReport.fotoUrl
             if (editPhotoFile) {
-                const fileName = `ms-defectos/${Date.now()}-${editPhotoFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+                const fileName = `${planta.carpetaFotos}/${Date.now()}-${editPhotoFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
                 const { error: uploadError } = await supabase.storage
                     .from('fichas-media')
                     .upload(fileName, editPhotoFile)
@@ -368,7 +373,7 @@ export default function HistoricoDefectosPage() {
             }
 
             const { error: updateError } = await supabase
-                .from('ms_reporte_defectos')
+                .from(planta.tReportes)
                 .update(updatePayload)
                 .eq('id', selectedDetailReport.id)
 
@@ -397,7 +402,7 @@ export default function HistoricoDefectosPage() {
         setIsDeleting(true)
         try {
             const { error } = await supabase
-                .from('ms_reporte_defectos')
+                .from(planta.tReportes)
                 .delete()
                 .eq('id', deleteConfirmReport.id)
             if (error) {
@@ -443,7 +448,7 @@ export default function HistoricoDefectosPage() {
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
             {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
             <Header
-                title="Calidad MS"
+                title={planta.titulo}
                 subtitle=""
                 compact={true}
                 userEmail={userEmail}

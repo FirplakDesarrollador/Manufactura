@@ -6,11 +6,14 @@ import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import IndicadoresCalidadView from '@/components/calidad/IndicadoresCalidadView'
+import { usePlantaCalidad } from '@/lib/calidad/plantaCalidad'
 
 // Indicadores generales de calidad MS: la misma sección "Mármol Sintético (MS)" del tablero de control
 // (IndicadoresCalidadView con soloMs), así cualquier cambio en el tablero se refleja aquí.
+// En /calidad/rmold/indicadores muestra la sección de Reparación de Moldes (soloRmold).
 export default function IndicadoresCalidadMsPage() {
     const router = useRouter()
+    const planta = usePlantaCalidad()
     const [userEmail, setUserEmail] = useState<string | undefined>()
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
 
@@ -41,7 +44,7 @@ export default function IndicadoresCalidadMsPage() {
     return (
         <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans">
             <Header
-                title="Calidad MS"
+                title={planta.titulo}
                 subtitle=""
                 compact={true}
                 userEmail={userEmail}
@@ -56,7 +59,7 @@ export default function IndicadoresCalidadMsPage() {
                 </div>
             </div>
 
-            <IndicadoresCalidadView soloMs />
+            <IndicadoresCalidadView soloMs={planta.id === 'ms'} soloRmold={planta.id === 'rmold'} />
         </div>
     )
 }
