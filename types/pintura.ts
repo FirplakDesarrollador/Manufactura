@@ -54,8 +54,10 @@ export interface Molde {
     vueltas_totales: number
     vueltas_actuales: number
     vueltas_acumuladas?: number
-    vueltas_mto: number
-    vueltas_mto_atipicas: number
+    vueltas_mto?: number
+    vueltas_mto_atipicas?: number
+    vueltas_mtto?: number
+    vueltas_mtto_atipicas?: number
     linea: string
 }
 

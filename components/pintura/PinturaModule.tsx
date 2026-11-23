@@ -261,13 +261,20 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         setSelectedDate('')
     }
 
-    const checkMantenimiento = (molde: Molde) => {
-        const threshold = molde.vueltas_mto_atipicas > 0 
-            ? molde.vueltas_mto_atipicas - 1
-            : molde.vueltas_mto - 1;
+    const getLimiteMolde = (molde: any): number => {
+        const atip = Number(molde?.vueltas_mtto_atipicas ?? molde?.vueltas_mto_atipicas ?? 0);
+        if (atip > 0) return atip;
+        const reg = Number(molde?.vueltas_mtto ?? molde?.vueltas_mto ?? 0);
+        if (reg > 0) return reg;
+        return Number(molde?.vueltas_totales ?? 0);
+    };
 
-        if (molde.vueltas_actuales >= threshold) {
-            const isNew = molde.vueltas_mto_atipicas === 1;
+    const checkMantenimiento = (molde: Molde) => {
+        const limite = getLimiteMolde(molde);
+        const threshold = limite > 0 ? limite - 1 : 0;
+
+        if (threshold > 0 && molde.vueltas_actuales >= threshold) {
+            const isNew = ((molde as any).vueltas_mtto_atipicas ?? molde.vueltas_mto_atipicas) === 1;
             const title = isNew ? '🆕 Molde nuevo 🆕' : '⚠️ Molde para desmanchar ⚠️';
             const message = isNew 
                 ? `El ${molde.molde_descripcion} # ${molde.serial} Se debe encerar en el puesto`
@@ -497,9 +504,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                                     moldesDisponibles
                                                         .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
                                                         .map((molde) => {
-                                                            const limite = (molde.vueltas_mto_atipicas && molde.vueltas_mto_atipicas > 0)
-                                                                ? molde.vueltas_mto_atipicas
-                                                                : (molde.vueltas_mto || 0);
+                                                            const limite = getLimiteMolde(molde);
 
                                                             // Semaforización de vueltas:
                                                             // - Rojo: se pasó de las vueltas de mantenimiento (vueltas_actuales >= limite)
@@ -570,9 +575,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                     </div>
                                 )}
                                 {selectedMolde && (() => {
-                                    const lim = (selectedMolde.vueltas_mto_atipicas && selectedMolde.vueltas_mto_atipicas > 0)
-                                        ? selectedMolde.vueltas_mto_atipicas
-                                        : (selectedMolde.vueltas_mto || 0);
+                                    const lim = getLimiteMolde(selectedMolde);
                                     const pas = lim > 0 && selectedMolde.vueltas_actuales >= lim;
                                     const cer = lim > 0 && !pas && (
                                         selectedMolde.vueltas_actuales >= (lim - 2) || (selectedMolde.vueltas_actuales / lim) >= 0.85

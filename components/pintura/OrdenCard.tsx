@@ -108,12 +108,19 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
     const moldesDispConVueltas = relevantMoldes.filter(m => m.estado === 'Disponible' && m.vueltas_actuales != null)
     const minVueltas = moldesDispConVueltas.length > 0 ? Math.min(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
     const maxVueltas = moldesDispConVueltas.length > 0 ? Math.max(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
+    const getLimMolde = (m: any) => {
+        const atip = Number(m?.vueltas_mtto_atipicas ?? m?.vueltas_mto_atipicas ?? 0);
+        if (atip > 0) return atip;
+        const reg = Number(m?.vueltas_mtto ?? m?.vueltas_mto ?? 0);
+        if (reg > 0) return reg;
+        return Number(m?.vueltas_totales ?? 0);
+    };
     const tienePasados = moldesDispConVueltas.some(m => {
-        const lim = (m.vueltas_mto_atipicas && m.vueltas_mto_atipicas > 0) ? m.vueltas_mto_atipicas : (m.vueltas_mto || 0);
+        const lim = getLimMolde(m);
         return lim > 0 && m.vueltas_actuales >= lim;
     });
     const tieneCercanos = moldesDispConVueltas.some(m => {
-        const lim = (m.vueltas_mto_atipicas && m.vueltas_mto_atipicas > 0) ? m.vueltas_mto_atipicas : (m.vueltas_mto || 0);
+        const lim = getLimMolde(m);
         return lim > 0 && m.vueltas_actuales < lim && (m.vueltas_actuales >= (lim - 2) || (m.vueltas_actuales / lim) >= 0.85);
     });
     const colorVueltas = tienePasados ? 'text-red-600' : tieneCercanos ? 'text-amber-600' : 'text-blue-600';
