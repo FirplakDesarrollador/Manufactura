@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BookOpenCheck, Loader2, X } from 'lucide-react';
 import {
@@ -107,6 +108,15 @@ const etiquetaGran = (k: string, g: Gran, variosAnios: boolean) =>
 const nombreGran = (k: string, g: Gran) =>
     g === 'dia' ? k.split('-').reverse().join('/') : g === 'semana' ? `Semana ${Number(k.slice(6))} · ${k.slice(0, 4)}`
         : g === 'mes' ? `${MESES[Number(k.slice(5, 7)) - 1]} ${k.slice(0, 4)}` : `Año ${k}`;
+
+// Posición del mouse en la pantalla: el cuadro de información se dibuja fijo junto al puntero, en un portal
+const raton = { x: 0, y: 0 };
+if (typeof window !== 'undefined') window.addEventListener('mousemove', e => { raton.x = e.clientX; raton.y = e.clientY; }, { passive: true });
+const TooltipFlotante = (props: any) => {
+    if (!props.active || !props.payload?.length || typeof document === 'undefined') return null;
+    const x = Math.min(raton.x + 14, window.innerWidth - 240), y = Math.min(raton.y + 14, window.innerHeight - 170);
+    return createPortal(<div style={{ position: 'fixed', left: Math.max(8, x), top: Math.max(8, y), zIndex: 300, pointerEvents: 'none' }}><TooltipCumpl {...props} /></div>, document.body);
+};
 
 const TooltipCumpl = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -529,7 +539,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="label" tick={{ fontSize: cols.length > 24 ? 8 : 10 }} interval={cols.length > 60 ? 'preserveStartEnd' : 0} />
                 <YAxis tick={{ fontSize: 9 }} width={32} domain={[0, 100]} tickFormatter={v => `${v}%`} />
-                <Tooltip content={<TooltipCumpl />} cursor={{ fill: '#f1f5f9' }} />
+                <Tooltip content={<TooltipFlotante />} cursor={{ fill: '#f1f5f9' }} wrapperStyle={{ visibility: 'visible' }} />
                 <ReferenceLine y={LIM_SUP} stroke={COLOR_META} strokeDasharray="4 4" strokeWidth={1.5}
                     label={{ value: `Sup. ${LIM_SUP}%`, position: 'left', offset: 36, fill: COLOR_META, fontSize: 9, fontWeight: 800 }} />
                 <ReferenceLine y={LIM_INF} stroke={COLOR_LIM_INF} strokeDasharray="4 4" strokeWidth={1.5}
@@ -552,7 +562,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={v => `${v}%`} />
                 <YAxis type="category" dataKey="nombre" width={anchoEje} tick={{ fontSize: 10, fill: '#334155' }} interval={0} />
-                <Tooltip content={<TooltipCumpl />} cursor={{ fill: '#f1f5f9' }} />
+                <Tooltip content={<TooltipFlotante />} cursor={{ fill: '#f1f5f9' }} wrapperStyle={{ visibility: 'visible' }} />
                 <ReferenceLine x={META_SP} stroke={COLOR_META} strokeDasharray="4 4" strokeWidth={1.5} />
                 <Bar dataKey="valor" radius={[0, 4, 4, 0]} barSize={14} isAnimationActive={false} cursor="pointer"
                     onClick={(d: any) => { const k = d?.payload?.key ?? d?.key; if (k) onSel(sel === k ? null : k); }}>
