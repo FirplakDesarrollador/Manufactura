@@ -79,15 +79,27 @@ export function calcularCupos(ejecuciones: Ejecucion[], reglas: ReglasSP, desde:
     const anios = new Set<number>()
     for (let a = Number(desde.slice(0, 4)); a <= Number(hoy.slice(0, 4)); a++) anios.add(a)
     const semanasFestivo = new Set<string>()
-    anios.forEach(a => festivosColombia(a).forEach(f => { if (festivoEnDiaLaboral(f.fecha)) semanasFestivo.add(semanaDe(f.fecha).clave) }))
+    const diasFestivos = new Set<string>()
+    anios.forEach(a => festivosColombia(a).forEach(f => { if (festivoEnDiaLaboral(f.fecha)) { semanasFestivo.add(semanaDe(f.fecha).clave); diasFestivos.add(f.fecha) } }))
+    // Días hábiles de la semana (lunes a viernes, sin festivos) hasta hoy: las veces no hechas se reparten en ellos
+    const diasHabiles = (lunes: string) => [0, 1, 2, 3, 4].map(i => sumarDias(lunes, i)).filter(d => d <= hoy && !diasFestivos.has(d))
 
     const cupos: Cupo[] = []
     const plantaDe = (nombre: string) => { const p = reglas.plantaPersona?.[nombre]; return p && p !== TRANSVERSAL ? p : null }
-    const empujar = (herr: HerrAuto, persona: string, rol: RolSP, exigidos: number, hechas: Ejecucion[], fechaFalta: string) => {
-        const hechos = Math.min(hechas.length, exigidos)
-        for (let i = 0; i < exigidos; i++) {
-            const e = i < hechos ? hechas[i] : null
-            cupos.push({ herr, persona, rol, fecha: e ? e.fecha : fechaFalta, planta: (e && plantaSP(e.planta)) || plantaDe(persona), ejec: e ? 1 : 0 })
+    const empujar = (herr: HerrAuto, persona: string, rol: RolSP, exigidos: number, hechas: Ejecucion[], fechaFalta: string, diasLibres: string[] = []) => {
+        // Herramientas diarias: una ejecución por día (dos el mismo día no cubren dos días)
+        const unaPorDia = diasLibres.length > 0
+        const usadas: Ejecucion[] = []
+        for (const e of hechas) {
+            if (usadas.length >= exigidos) break
+            if (unaPorDia && usadas.some(u => u.fecha === e.fecha)) continue
+            usadas.push(e)
+        }
+        usadas.forEach(e => cupos.push({ herr, persona, rol, fecha: e.fecha, planta: plantaSP(e.planta) || plantaDe(persona), ejec: 1 }))
+        // Las no hechas: en los días hábiles sin ejecución (en orden); si faltan días, en la fecha de cierre del periodo
+        const libres = diasLibres.filter(d => !usadas.some(u => u.fecha === d))
+        for (let i = 0; i < exigidos - usadas.length; i++) {
+            cupos.push({ herr, persona, rol, fecha: libres[i] ?? fechaFalta, planta: plantaDe(persona), ejec: 0 })
         }
     }
 
@@ -128,7 +140,10 @@ export function calcularCupos(ejecuciones: Ejecucion[], reglas: ReglasSP, desde:
                     const dias = Math.min(5, Math.max(0, Math.round((Date.parse(hoy) - Date.parse(lunes)) / 86400000) + 1))
                     exigidos = Math.max(Math.floor((completa * dias) / 5), Math.min(enSemana.length, completa))
                 }
-                empujar(herr, nombre, rol, exigidos, enSemana, viernes < hoy ? viernes : hoy)
+                // Frecuencia diaria (≥ días hábiles de la semana, ej. Bitácora o RRC 5 / semana): cada día hábil es una vez exigida
+                const habiles = diasHabiles(lunes)
+                const diaria = completa >= habiles.length && habiles.length > 0
+                empujar(herr, nombre, rol, exigidos, enSemana, viernes < hoy ? viernes : hoy, diaria ? habiles : [])
             }
         }
     }
