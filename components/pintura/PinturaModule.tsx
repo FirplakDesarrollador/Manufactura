@@ -500,8 +500,21 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                                             const limite = (molde.vueltas_mto_atipicas && molde.vueltas_mto_atipicas > 0)
                                                                 ? molde.vueltas_mto_atipicas
                                                                 : (molde.vueltas_mto || 0);
-                                                            const porcVueltas = limite > 0 ? (molde.vueltas_actuales / limite) : 0;
-                                                            const proximoMtto = porcVueltas >= 0.85;
+
+                                                            // Semaforización de vueltas:
+                                                            // - Rojo: se pasó de las vueltas de mantenimiento (vueltas_actuales >= limite)
+                                                            // - Amarillo: ya está cerca al mantenimiento (faltan <= 2 vueltas o >= 85% del límite)
+                                                            // - Azul: está bien usar el molde
+                                                            const pasadoMtto = limite > 0 && molde.vueltas_actuales >= limite;
+                                                            const cercaMtto = limite > 0 && !pasadoMtto && (
+                                                                molde.vueltas_actuales >= (limite - 2) || (molde.vueltas_actuales / limite) >= 0.85
+                                                            );
+
+                                                            const badgeColor = pasadoMtto
+                                                                ? 'bg-red-100 text-red-800 border-red-300'
+                                                                : cercaMtto
+                                                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                                : 'bg-blue-100 text-blue-800 border-blue-300';
 
                                                             return (
                                                                 <div
@@ -525,21 +538,23 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                                                         )}
                                                                     </div>
                                                                     <div className="flex flex-col items-end shrink-0">
-                                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-black ${
-                                                                            proximoMtto 
-                                                                                ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                                                                                : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
-                                                                        }`}>
+                                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-black border ${badgeColor}`}>
                                                                             <span>{molde.vueltas_actuales}</span>
                                                                             <span className="font-semibold text-[10px]">
                                                                                 {molde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}
                                                                             </span>
                                                                         </span>
-                                                                        {limite > 0 && (
-                                                                            <span className="text-[9px] text-gray-400 font-semibold mt-0.5">
-                                                                                límite: {limite}
-                                                                            </span>
-                                                                        )}
+                                                                        <span className="text-[9px] font-semibold mt-0.5 flex items-center gap-1">
+                                                                            {limite > 0 && (
+                                                                                <span className="text-gray-400">límite: {limite}</span>
+                                                                            )}
+                                                                            {pasadoMtto && (
+                                                                                <span className="text-red-600 font-bold">(Vencido)</span>
+                                                                            )}
+                                                                            {cercaMtto && (
+                                                                                <span className="text-amber-600 font-bold">(Próximo)</span>
+                                                                            )}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                             );
@@ -554,13 +569,32 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                         {debugInfo}
                                     </div>
                                 )}
-                                {selectedMolde && (
-                                    <div className="text-[10px] text-cyan-700 font-bold px-1 mt-1 flex items-center gap-2">
-                                        <span>Vueltas actuales: {selectedMolde.vueltas_actuales}</span>
-                                        <span className="text-gray-300">|</span>
-                                        <span>Límite Mto: {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}</span>
-                                    </div>
-                                )}
+                                {selectedMolde && (() => {
+                                    const lim = (selectedMolde.vueltas_mto_atipicas && selectedMolde.vueltas_mto_atipicas > 0)
+                                        ? selectedMolde.vueltas_mto_atipicas
+                                        : (selectedMolde.vueltas_mto || 0);
+                                    const pas = lim > 0 && selectedMolde.vueltas_actuales >= lim;
+                                    const cer = lim > 0 && !pas && (
+                                        selectedMolde.vueltas_actuales >= (lim - 2) || (selectedMolde.vueltas_actuales / lim) >= 0.85
+                                    );
+                                    const colorStyle = pas 
+                                        ? 'bg-red-50 text-red-800 border-red-200' 
+                                        : cer 
+                                        ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                        : 'bg-blue-50 text-blue-800 border-blue-200';
+                                    const estadoTexto = pas 
+                                        ? '🚨 Pasado de mantenimiento' 
+                                        : cer 
+                                        ? '⚠️ Cerca de mantenimiento' 
+                                        : '✓ Bien para usar';
+
+                                    return (
+                                        <div className={`text-[11px] font-bold px-2.5 py-1 mt-1.5 rounded-lg border flex items-center justify-between ${colorStyle}`}>
+                                            <span>Vueltas: {selectedMolde.vueltas_actuales} / {lim > 0 ? lim : 'Sin límite'}</span>
+                                            <span>{estadoTexto}</span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>
