@@ -19,7 +19,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import FiltroPbi, { semanaIso } from '@/components/calidad/FiltroPbi';
 import RegistrarSaldoModal from '@/components/calidad/RegistrarSaldoModal';
-import { COLOR_TIPO_SD, CostoSku, EventoSD, NOMBRE_TIPO_SD, PLANTAS_SD, TipoSD, cargarEventosSD, fetchFabricadasMsPorMes } from '@/lib/calidad/saldosDestrucciones';
+import { COLOR_TIPO_SD, CostoSku, EventoSD, NOMBRE_TIPO_SD, PLANTAS_SD, TipoSD, cargarEventosSDCache, datosSDEnCache, fetchFabricadasMsPorMesCache } from '@/lib/calidad/saldosDestrucciones';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -157,10 +157,16 @@ export default function CalidadSaldosDashboard() {
     const [registrando, setRegistrando] = useState(false);
     const [recarga, setRecarga] = useState(0);
 
+    // Si ya hay datos en caché (precarga desde Calidad IFI o visita anterior) se muestran de inmediato
+    useEffect(() => {
+        const ya = datosSDEnCache();
+        if (ya) { setEventos(ya.eventos); setCostos(ya.costos); setAvisos(ya.avisos); setLoading(false); }
+    }, []);
+
     useEffect(() => {
         let vivo = true;
-        setLoading(true);
-        cargarEventosSD(supabase)
+        if (!datosSDEnCache() || recarga > 0) setLoading(true);
+        cargarEventosSDCache(supabase, recarga > 0)
             .then(d => { if (vivo) { setEventos(d.eventos); setCostos(d.costos); setAvisos(d.avisos); setError(null); } })
             .catch(e => { if (vivo) setError(e?.message || 'No se pudieron cargar los saldos y destrucciones'); })
             .finally(() => { if (vivo) setLoading(false); });
@@ -173,7 +179,7 @@ export default function CalidadSaldosDashboard() {
     useEffect(() => {
         if (!aniosConEventos) return;
         let vivo = true;
-        fetchFabricadasMsPorMes(supabase, aniosConEventos.split(',').map(Number))
+        fetchFabricadasMsPorMesCache(supabase, aniosConEventos.split(',').map(Number))
             .then(f => { if (vivo) setFabricadas(f); })
             .catch(() => { if (vivo) setFabricadas({}); });
         return () => { vivo = false; };

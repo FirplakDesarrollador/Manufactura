@@ -13,7 +13,9 @@ interface User {
         muebles?: any;
         fibra?: any;
         calidad?: any;
+        superficies?: any;
     }
+    esAdmin?: boolean
 }
 
 export default function SelectionPage() {
@@ -32,14 +34,16 @@ export default function SelectionPage() {
 
         const { data: userData } = await supabase
             .from('usuarios')
-            .select('permisos, planta_muebles')
+            .select('permisos, planta_muebles, rol')
             .eq('uuid', authUser.id)
             .single()
 
         const combinedUser: User = {
             id: authUser.id,
             email: authUser.email,
-            permisos: (userData?.permisos as any) || {}
+            permisos: (userData?.permisos as any) || {},
+            // Administradores o quien administra usuarios (Configuración General): ven Superficies sin el permiso propio
+            esAdmin: String((userData as any)?.rol || '').toLowerCase().includes('admin') || (userData as any)?.permisos?.configuracion === true
         }
 
         setUser(combinedUser)
@@ -193,14 +197,13 @@ export default function SelectionPage() {
                         </div>
                     )}
 
-                    {/* Superficies (RTM): en construcción */}
-                    {(hasApp('modulos') || hasApp('muebles') || hasApp('fibra')) && (
+                    {/* Superficies (RTM / Inyección): permiso propio "superficies" o administrador */}
+                    {(hasApp('superficies') || user?.esAdmin) && (
                         <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
                             <button
                                 onClick={() => router.push('/superficies')}
                                 className="relative w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
                             >
-                                <span className="absolute top-2 right-2 text-[8px] 2xl:text-[9px] font-black uppercase bg-[#deb841]/25 text-[#8a6d10] px-1.5 py-0.5 rounded">En construcción</span>
                                 <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
                                     <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4" />

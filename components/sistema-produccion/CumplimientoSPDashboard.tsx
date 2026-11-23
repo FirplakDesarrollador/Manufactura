@@ -70,7 +70,7 @@ interface Empleado { nombreCompleto: string; correo_electronico: string | null; 
 interface Filtro { herr?: string | null; planta?: string | null; persona?: string | null }
 
 // Cumplimiento de un conjunto de observaciones: cada semana vale su % (histórico) o, en la app, el promedio de sus
-// herramientas: cada una ejecutadas ÷ exigidas según su frecuencia (RRC: asistencias ÷ registros); así una herramienta
+// herramientas: cada una ejecutadas ÷ exigidas según su frecuencia (RRC: días presente ÷ exigidos); así una herramienta
 // diaria no pesa más que una semanal. El periodo es el promedio de sus semanas, como el "PROMEDIO MENSUAL" del Excel.
 function resumen(obs: Obs[]) {
     const semanas = new Map<string, { vals: number[]; grupos: Map<string, { ejec: number; total: number }> }>();
@@ -121,7 +121,7 @@ const TooltipCumpl = ({ active, payload }: any) => {
                 <p className="flex justify-between gap-3"><span className="text-slate-600">Meta</span><span className="font-black text-slate-800">{META_SP} %</span></p>
             )}
             {d.programadas > 0 && <p className="flex justify-between gap-3"><span className="text-slate-600">Ejecutadas / exigidas</span><span className="font-black text-slate-800">{d.ejecutadas} / {d.programadas}</span></p>}
-            {d.rrcRegistros > 0 && <p className="flex justify-between gap-3"><span className="text-slate-600">Asistencia RRC</span><span className="font-black text-slate-800">{d.rrcPresentes} / {d.rrcRegistros}</span></p>}
+            {d.rrcRegistros > 0 && <p className="flex justify-between gap-3"><span className="text-slate-600">Asistencia RRC (presente / exigida)</span><span className="font-black text-slate-800">{d.rrcPresentes} / {d.rrcRegistros}</span></p>}
             {d.semanas > 1 && <p className="text-[10px] text-slate-400">Promedio de {d.semanas} semanas</p>}
             {d.conHistorico && <p className="text-[10px] text-slate-400">Incluye histórico del Excel ILU</p>}
         </div>
@@ -247,27 +247,26 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             if (!dias.has(k)) dias.set(k, { herr: 'BIT', fecha: fechaLocal(x.fecha), quien: u.nombre, email: nombreDeCorreo(u.correo), planta: plantas.get(x.plantillas_actividades?.id_planta) || null });
         });
         ej.push(...dias.values());
+        // RRC: cada día con asistencia "Presente" en el módulo RRC es una ejecución; se exige la frecuencia de las reglas
+        // (por ahora solo asistencia; a futuro, robustez de la RRC y cierre de los temas abiertos)
+        const diasRrc = new Set<string>();
+        asistencias.forEach(x => {
+            if (x.estado !== 'Presente' || !x.fecha) return;
+            const completo = resolveNombreCompleto(x.responsable);
+            const fecha = x.fecha.slice(0, 10);
+            const k = `${norm(completo)}|${fecha}`;
+            if (diasRrc.has(k)) return;
+            diasRrc.add(k);
+            ej.push({ herr: 'RRC', fecha, quien: completo, planta: procesoPersonaRRC.get(norm(completo)) || procesoPersonaRRC.get(norm(x.responsable)) || null });
+        });
         const desde = finHistorico ? new Date(Date.parse(`${finHistorico}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : `${anioActual}-01-01`;
         const { cupos, sinPersona } = calcularCupos(ej, reglas, desde, hoy);
         return { cuposApp: cupos.map(c => ({ ...c, persona: aliasPersonaSP(titulo(c.persona)), rolP: rolTablero(c.rol) })), sinPersona };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [crudo, reglas, finHistorico, hoy, empPorCorreo]);
+    }, [crudo, reglas, finHistorico, hoy, empPorCorreo, asistencias, procesoPersonaRRC]);
 
-    // RRC desde la app: cada registro de asistencia (después del histórico del Excel) es una observación del grupo RRC
-    const rrcApp = useMemo(() => asistencias
-        .filter(x => x.fecha && x.fecha <= hoy && (!finHistorico || x.fecha > finHistorico))
-        .map(x => {
-            const completo = resolveNombreCompleto(x.responsable);
-            return {
-                fecha: x.fecha.slice(0, 10),
-                persona: aliasPersonaSP(titulo(completo)),
-                rolP: rolDeCargo(empPorCorreo.get(norm(completo))?.cargo),
-                planta: procesoPersonaRRC.get(norm(completo)) || procesoPersonaRRC.get(norm(x.responsable)) || null,
-                ejec: x.estado === 'Presente' ? 1 : 0,
-            };
-        }),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [asistencias, finHistorico, hoy, empPorCorreo, procesoPersonaRRC]);
+    // RRC: se mide con los cupos de la frecuencia (cuposApp, herramienta RRC); ya no como presentes ÷ registros
+    const rrcApp = useMemo(() => [] as { fecha: string; persona: string; rolP: Rol; planta: string | null; ejec: number }[], []);
 
     // Observaciones según el filtro cruzado (herramienta / planta / persona)
     const observaciones = (f: Filtro): Obs[] => {
@@ -513,7 +512,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                     </div>
                 )}
                 {!loading && sinPersona > 0 && (
-                    <p className="text-[10px] font-semibold text-slate-500" title="Ejecuciones de Hora-Hora, OPT, OPT Sistémica o Bitácora hechas por personas que no están en las Reglas de Medición (no tienen frecuencia exigida)">
+                    <p className="text-[10px] font-semibold text-slate-500" title="Ejecuciones de Hora-Hora, OPT, OPT Sistémica, Bitácora o asistencias a la RRC de personas que no están en las Reglas de Medición (no tienen frecuencia exigida)">
                         {sinPersona} ejecución(es) de personas que no están en las Reglas de Medición no se cuentan.
                     </p>
                 )}

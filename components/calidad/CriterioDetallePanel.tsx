@@ -77,6 +77,7 @@ interface CriterioDetallePanelProps {
   numero: number; // número visible del defecto
   idDefectoMs?: number | null; // id interno en ms_defectos (vínculo con los registros diarios)
   tablaDefectos?: string; // catálogo del registro diario (ms_defectos por defecto; RMOLD: rmold_defectos)
+  moldeObligatorio?: boolean; // RMOLD: "Referencia de molde" siempre activa y sin poder cambiarla
   nombreDefecto: string;
   criterio: CriterioCalidad | null;
   canEdit: boolean;
@@ -122,6 +123,7 @@ const fmtNum = (v: number, d = 2) => v.toLocaleString('es-CO', { minimumFraction
 export default function CriterioDetallePanel({
   planta,
   tablaDefectos,
+  moldeObligatorio = false,
   plantaNombre,
   numero,
   idDefectoMs,
@@ -322,7 +324,7 @@ export default function CriterioDetallePanel({
           Al_azul: Number(cfgForm.Al_azul) || 0,
           Al_roja: Number(cfgForm.Al_roja) || 0,
           Requiere_Foto: !!cfgForm.Requiere_Foto,
-          Requiere_Referencia_Molde: !!cfgForm.Requiere_Referencia_Molde
+          Requiere_Referencia_Molde: moldeObligatorio || !!cfgForm.Requiere_Referencia_Molde
         };
         const { error: cfgErr } = await supabase.from(tablaDefectos || 'ms_defectos').update(cfg).eq('id', idDefectoMs);
         if (cfgErr) throw new Error(`Configuración del registro: ${cfgErr.message}`);
@@ -434,11 +436,12 @@ export default function CriterioDetallePanel({
           { key: 'Requiere_Foto', label: 'Requiere foto' },
           { key: 'Requiere_Referencia_Molde', label: 'Referencia de molde' }
         ] as const).map(t => {
-          const activo = !!cfg[t.key];
+          const fijo = moldeObligatorio && t.key === 'Requiere_Referencia_Molde';
+          const activo = fijo || !!cfg[t.key];
           return (
             <div key={t.key} className={`p-3 rounded-xl border space-y-1 ${editConfig ? 'bg-amber-50/40 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
               <span className="text-[10px] font-black text-slate-500 uppercase block">{t.label}</span>
-              {editConfig ? (
+              {editConfig && !fijo ? (
                 <button
                   type="button"
                   onClick={() => setCfgForm(prev => ({ ...prev, [t.key]: !prev[t.key] }))}

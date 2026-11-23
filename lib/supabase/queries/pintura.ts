@@ -152,6 +152,8 @@ export async function getAllMoldes(): Promise<Molde[]> {
             const raw = rawMap.get(m.id)
             return {
                 ...m,
+                // Nombre propio del molde (para descartar moldes asignados por error a otro tipo)
+                nombre_articulo: m.nombre_articulo ?? raw?.nombre_articulo ?? null,
                 molde_sku: m.molde_sku || m.tipo_molde_sku || raw?.tipo_molde_sku || '',
                 molde_descripcion: m.molde_descripcion || m.nombre_articulo || raw?.nombre_articulo || raw?.descripcion_molde || ''
             }

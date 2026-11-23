@@ -147,18 +147,22 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
 }
 
 export async function getAllMoldes(): Promise<Molde[]> {
-    const { data, error } = await supabase
-        .from('query_moldes')
-        .select('*')
-        .neq('estado', 'Destruido')
+    // El nombre propio de cada molde (moldes.nombre_articulo) no viene en la vista: sirve para descartar moldes
+    // asignados por error a otro tipo de molde
+    const [{ data, error }, crudos] = await Promise.all([
+        supabase.from('query_moldes').select('*').neq('estado', 'Destruido'),
+        supabase.from('moldes').select('id, nombre_articulo').neq('estado', 'Destruido')
+    ])
 
     if (error) {
         console.error('Error fetching all moldes:', error)
         return []
     }
+    const nombre = new Map((crudos.data || []).map((r: any) => [r.id, r.nombre_articulo as string | null]))
 
     return (data || []).map((m: any) => ({
         ...m,
+        nombre_articulo: m.nombre_articulo ?? nombre.get(m.id) ?? null,
         molde_sku: m.molde_sku || m.tipo_molde_sku || '',
         molde_descripcion: m.molde_descripcion || m.nombre_articulo || ''
     }))

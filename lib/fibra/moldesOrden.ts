@@ -10,6 +10,15 @@ export function moldesDisponiblesOrden(orden: OrdenFabricacion, todos: Molde[]):
 
 // Todos los moldes de la referencia de la orden, en cualquier estado (ordenando Disponibles primero)
 export function moldesDeOrden(orden: OrdenFabricacion, todos: Molde[]): Molde[] {
+    // Si la orden tiene tipo de molde (molde_id = tipos_moldes.id) y ese tipo tiene moldes, SOLO esos;
+    // la comparación por SKU, serial y palabras queda de respaldo para referencias sin tipo asignado.
+    const tipoOrden = Number((orden as any).molde_id) || null
+    if (tipoOrden != null) {
+        const delTipo = todos.filter(m => m.estado !== 'Destruido' && Number((m as any).tipo_molde_id) === tipoOrden && !moldeDeOtraReferencia(m))
+        if (delTipo.length > 0) {
+            return delTipo.sort((a, b) => (a.estado === 'Disponible' ? 0 : 1) - (b.estado === 'Disponible' ? 0 : 1) || a.vueltas_actuales - b.vueltas_actuales)
+        }
+    }
     const sku = (orden.molde_sku || orden.producto_sku || orden.sku || '').trim().toLowerCase()
     const targetDesc = (orden.molde_descripcion || orden.producto_descripcion || '').trim().toLowerCase()
 
@@ -54,4 +63,26 @@ export function moldesDeOrden(orden: OrdenFabricacion, todos: Molde[]): Molde[] 
             if (a.estado !== 'Disponible' && b.estado === 'Disponible') return 1
             return a.vueltas_actuales - b.vueltas_actuales
         })
+}
+
+// Nombre de molde normalizado (sin tildes, × → X, sin "MOLDE"/"MODELO"/acabado): para comparar el nombre del molde
+// con el de su tipo de molde
+const normNombre = (t: string | null | undefined) => String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[×*]/g, 'X').replace(/\b(MOLDE|MODELO|BRILLANTE|MATE|SOFT|NUEVO)\b/g, ' ').replace(/\s*X\s*/g, 'X').replace(/\s+/g, ' ').trim()
+
+// ¿El molde es de otra referencia? (caso tipo 474: moldes de Doha, Oslo, Versa y Santorini asignados a la Aqua 80x60)
+// Se compara su nombre propio (nombre_articulo) con el de su tipo (molde_descripcion) de forma tolerante a errores
+// de escritura ("MOLEPDLAVAPLATOS KOA 63X51" sigue siendo un Koa 63X51):
+//  - si los dos tienen medida (63X51, 80X60…), es de otra referencia cuando ninguna medida coincide;
+//  - si el molde no tiene medida, cuando ninguna de sus palabras (de 4 letras o más) aparece en el nombre del tipo.
+// Los moldes sin nombre o "Molde Nuevo" no se descartan.
+const medidas = (t: string) => (t.match(/[0-9]+(?:[.,][0-9]+)?X[0-9]+(?:[.,][0-9]+)?/g) || []) as string[]
+export function moldeDeOtraReferencia(m: Molde): boolean {
+    const propio = normNombre((m as any).nombre_articulo)
+    const delTipo = normNombre(m.molde_descripcion)
+    if (!propio || !delTipo || propio === delTipo) return false
+    const mp = medidas(propio), mt = medidas(delTipo)
+    if (mp.length && mt.length) return !mp.some(x => mt.includes(x))
+    const palabras = propio.split(' ').filter(w => w.length > 3 && !/^[0-9]/.test(w))
+    return palabras.length > 0 && !palabras.some(w => delTipo.includes(w))
 }

@@ -241,8 +241,15 @@ export default function CalidadMsReportPage() {
 
         const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
         
+        // RMOLD: todo registro exige el molde. Se escoge el serial; si el tipo no tiene seriales, se escribe la referencia.
+        if (planta.moldeObligatorio && !selectedMolde && moldesTipo.length > 0) {
+            alert('Seleccione el serial del molde revisado: en Reparación de Moldes es obligatorio.')
+            return
+        }
         // En RMOLD, si ya se escogió el serial no se vuelve a pedir la referencia del molde
-        const requiresMolde = selectedDefectsList.some(d => d.Requiere_Referencia_Molde) && !(planta.conSerial && selectedMolde)
+        const requiresMolde = planta.moldeObligatorio
+            ? !selectedMolde
+            : selectedDefectsList.some(d => d.Requiere_Referencia_Molde) && !(planta.conSerial && selectedMolde)
         if (requiresMolde) {
             setMoldeInputValue('')
             setIsMoldeModalOpen(true)
@@ -288,7 +295,7 @@ export default function CalidadMsReportPage() {
                 Al_azul: d.Al_azul,
                 Al_roja: d.Al_roja,
                 Requiere_Foto: d.Requiere_Foto,
-                Requiere_Referencia_Molde: d.Requiere_Referencia_Molde,
+                Requiere_Referencia_Molde: planta.moldeObligatorio ? true : d.Requiere_Referencia_Molde,
             }))
             
             const { error } = await supabase.from(planta.tDefectos).upsert(updates)
@@ -358,7 +365,7 @@ export default function CalidadMsReportPage() {
                         </div>
                         {planta.conSerial && (
                             <select value={selectedMolde} onChange={e => setSelectedMolde(e.target.value)} disabled={!selectedProduct}
-                                title="Serial del molde revisado (opcional)"
+                                title={planta.moldeObligatorio ? 'Serial del molde revisado (obligatorio)' : 'Serial del molde revisado (opcional)'}
                                 className="h-7 w-28 shrink-0 bg-white border border-gray-300 rounded px-1.5 text-[#254153] font-bold text-[11px] outline-none disabled:opacity-50">
                                 <option value="">{selectedProduct && !moldesTipo.length ? 'Sin seriales' : 'Serial…'}</option>
                                 {moldesTipo.map(m => <option key={m.id} value={m.id}>{m.serial}</option>)}
@@ -489,6 +496,7 @@ export default function CalidadMsReportPage() {
             <DefectsSettingsModal 
                 isOpen={isSettingsOpen && !!permisosMs?.configuracion}
                 soloLectura={!configEditable}
+                moldeObligatorio={planta.moldeObligatorio}
                 onClose={() => setIsSettingsOpen(false)} 
                 defects={defects}
                 onSave={handleSaveSettings}

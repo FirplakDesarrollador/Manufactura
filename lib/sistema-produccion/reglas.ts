@@ -48,14 +48,16 @@ export type ReglasSP = {
     // Se usa para el total de revisiones esperadas por planta.
     plantaPersona?: Record<string, string>
 }
-// RRC: se califica con la asistencia del módulo RRC (presentes ÷ registros), como su Ranking de Asistencia Individual
-export const FUENTE_RRC = 'App · Asistencia RRC (presentes ÷ registros); hasta 24/10/2026, histórico Excel ILU'
+// RRC: días con asistencia "Presente" en el módulo RRC contra la frecuencia de las reglas (por ahora solo asistencia;
+// a futuro se medirá la robustez de la RRC y el cierre de los temas abiertos)
+export const FUENTE_RRC = 'App · Asistencia RRC según la frecuencia (automático). A futuro: robustez de la RRC y cierre de temas abiertos'
 // Herramientas que se miden en automático desde el historial de su módulo (lib/sistema-produccion/ejecuciones.ts)
 export const FUENTES_AUTO: Record<string, string> = {
     AF: 'App · Historial Hora a Hora (automático)',
     OPT: 'App · Historial OPT Operativa (automático)',
     OPTS: 'App · Historial OPT Sistémica (automático)',
     BIT: 'App · Historial Bitácora (automático)',
+    RRC: FUENTE_RRC,
 }
 export const TRANSVERSAL = 'TRANSVERSAL'
 

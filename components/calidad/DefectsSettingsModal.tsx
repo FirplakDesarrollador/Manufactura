@@ -21,6 +21,8 @@ interface DefectsSettingsModalProps {
     onSave: (updatedDefects: DefectoMS[]) => Promise<void>
     // Permiso "Ver" de Configuración: se consulta sin poder modificar
     soloLectura?: boolean
+    // RMOLD: todo registro exige el molde; "Referencia molde" queda activa y no se puede cambiar
+    moldeObligatorio?: boolean
 }
 
 export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
@@ -28,7 +30,8 @@ export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
     onClose,
     defects,
     onSave,
-    soloLectura = false
+    soloLectura = false,
+    moldeObligatorio = false
 }) => {
     const [localDefects, setLocalDefects] = useState<DefectoMS[]>([])
     const [isSaving, setIsSaving] = useState(false)
@@ -165,10 +168,12 @@ export const DefectsSettingsModal: React.FC<DefectsSettingsModalProps> = ({
                                                 </label>
                                             </td>
                                             <td className="px-4 py-2 text-center">
-                                                <label className="inline-flex items-center cursor-pointer">
+                                                <label className={`inline-flex items-center ${moldeObligatorio ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                                                    title={moldeObligatorio ? 'En Reparación de Moldes todo registro exige el molde' : undefined}>
                                                     <input
                                                         type="checkbox"
-                                                        checked={!!defect.Requiere_Referencia_Molde}
+                                                        checked={moldeObligatorio || !!defect.Requiere_Referencia_Molde}
+                                                        disabled={moldeObligatorio}
                                                         onChange={(e) => handleUpdate(originalIndex, 'Requiere_Referencia_Molde', e.target.checked)}
                                                         className="sr-only peer"
                                                     />

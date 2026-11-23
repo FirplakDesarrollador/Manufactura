@@ -169,3 +169,11 @@
     scrollbar-width: none !important;
   }
 }
+/* Gráficas (Recharts): sin el marco gris de foco que el navegador dibuja al hacer clic en una barra o en la gráfica */
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible,
+.recharts-surface:focus {
+  outline: none;
+}
