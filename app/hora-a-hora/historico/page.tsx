@@ -63,6 +63,7 @@ function DetailModal({ item, onClose, resolveUserName }: { item: EvaluacionHoraH
                         </div>
                         <h2 className="text-lg font-black leading-tight">{item.operario}</h2>
                         <p className="text-xs opacity-80 mt-0.5">{item.puesto} · {item.linea} ({item.planta})</p>
+                        {item.tipoProducto && <p className="text-xs opacity-80 mt-0.5">Bañera {item.tipoProducto}{item.descripcionProducto ? ` · ${item.descripcionProducto}` : ""}</p>}
                         <p className="text-[11px] opacity-60 mt-0.5">
                             {format(new Date(item.tiempoInicio), "dd/MM/yyyy HH:mm")}
                         </p>
@@ -827,6 +828,7 @@ export default function Historico() {
                                             </TableCell>
                                             <TableCell className="py-1.5 whitespace-normal break-words align-middle">
                                                 <div className="text-slate-800"><b>{item.planta}</b> <span className="text-slate-500">· {item.puesto}</span></div>
+                                                {item.tipoProducto && <div className="text-xs text-slate-500">{item.tipoProducto}{item.descripcionProducto ? ` · ${item.descripcionProducto}` : ""}</div>}
                                             </TableCell>
                                             <TableCell className="py-1.5 whitespace-normal break-words align-middle">
                                                 <div className="font-medium text-slate-800">{item.operario}</div>

@@ -37,6 +37,13 @@ const TIEMPO_RECOMENDADO_SEG: Record<string, number> = {
 }
 const fmtMin = (seg: number) => (seg / 60).toLocaleString("es-CO", { maximumFractionDigits: 3 })
 
+// FV: el tiempo de ciclo depende del tipo de bañera
+const TIPOS_BANERA_FV: { tipo: string; seg: number; ejemplo: string }[] = [
+    { tipo: "Sencilla", seg: 1020, ejemplo: "17 min" },
+    { tipo: "Hidromasaje", seg: 2040, ejemplo: "34 min" },
+    { tipo: "Multipersonal", seg: 3060, ejemplo: "51 min" },
+];
+
 // Planta del formulario → nombre(s) de la planta en Talento Humano (para listar sus operarios)
 const PLANTA_TALENTO_HUMANO: Record<string, string[]> = {
     MS: ["marmol sintetico", "marmol (calidad)"],
@@ -144,7 +151,10 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
         operario: evaluacionActual?.operario || "",
         realizadoPor: evaluacionActual?.realizadoPor || "",
         tiempoCicloTeorico: evaluacionActual?.tiempoCicloTeorico?.toString() || "",
+        tipoProducto: evaluacionActual?.tipoProducto || "",
+        descripcionProducto: evaluacionActual?.descripcionProducto || "",
     });
+    const esFV = formData.planta === "FV";
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -154,16 +164,32 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
         if (name === "planta") {
             const actual = formData.tiempoCicloTeorico.trim();
             const eraRecomendado = !actual || Object.values(TIEMPO_RECOMENDADO_SEG).some(t => Number(actual) === t);
+            const eraDeBanera = TIPOS_BANERA_FV.some(t => Number(actual) === t.seg);
             const rec = TIEMPO_RECOMENDADO_SEG[value];
-            setFormData({ ...formData, planta: value, tiempoCicloTeorico: eraRecomendado ? (rec ? String(rec) : "") : formData.tiempoCicloTeorico });
+            const cambiar = eraRecomendado || eraDeBanera;
+            // FV: el tiempo lo define el tipo de bañera, se limpia hasta que se elija
+            setFormData({
+                ...formData, planta: value,
+                tiempoCicloTeorico: value === "FV" ? (cambiar ? "" : formData.tiempoCicloTeorico) : (cambiar ? (rec ? String(rec) : "") : formData.tiempoCicloTeorico),
+                tipoProducto: value === "FV" ? formData.tipoProducto : "",
+                descripcionProducto: value === "FV" ? formData.descripcionProducto : "",
+            });
+            return;
+        }
+        if (name === "tipoProducto") {
+            const t = TIPOS_BANERA_FV.find(x => x.tipo === value);
+            setFormData({ ...formData, tipoProducto: value, tiempoCicloTeorico: t ? String(t.seg) : formData.tiempoCicloTeorico });
             return;
         }
         setFormData({ ...formData, [name]: value });
     };
 
-    const tiempoRecomendado = TIEMPO_RECOMENDADO_SEG[formData.planta];
+    const tipoBanera = TIPOS_BANERA_FV.find(t => t.tipo === formData.tipoProducto);
+    const tiempoRecomendado = esFV ? tipoBanera?.seg : TIEMPO_RECOMENDADO_SEG[formData.planta];
 
-    const isFormValid = Object.values(formData).every(val => val.trim() !== "") && Number(formData.tiempoCicloTeorico) > 0;
+    const { tipoProducto, descripcionProducto, ...basicos } = formData;
+    const isFormValid = Object.values(basicos).every(val => val.trim() !== "") && Number(formData.tiempoCicloTeorico) > 0
+        && (!esFV || (tipoProducto.trim() !== "" && descripcionProducto.trim() !== ""));
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -172,6 +198,8 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
         const data = {
             ...formData,
             tiempoCicloTeorico: Number(formData.tiempoCicloTeorico),
+            tipoProducto: esFV ? formData.tipoProducto : "",
+            descripcionProducto: esFV ? formData.descripcionProducto.trim() : "",
             creadoPor: currentUserName,
             creadoPorEmail: currentUserEmail,
             realizadoPor: formData.realizadoPor || currentUserName,
@@ -261,6 +289,32 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                             />
                         </div>
 
+                        {esFV && (
+                            <div className="space-y-2">
+                                <Label htmlFor="tipoProducto">Tipo de bañera</Label>
+                                <Select value={formData.tipoProducto} onValueChange={(val) => val !== null && handleSelect("tipoProducto", val)}>
+                                    <SelectTrigger id="tipoProducto" className={`border-slate-300 ${!formData.tipoProducto && 'text-slate-500'}`}>
+                                        <SelectValue placeholder="Seleccionar tipo de bañera" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {TIPOS_BANERA_FV.map(t => (
+                                            <SelectItem key={t.tipo} value={t.tipo}>{t.tipo} · {t.ejemplo}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-slate-500">El tipo define el tiempo de ciclo teórico.</p>
+                            </div>
+                        )}
+
+                        {esFV && (
+                            <div className="space-y-2">
+                                <Label htmlFor="descripcionProducto">Descripción de la bañera</Label>
+                                <Input id="descripcionProducto" name="descripcionProducto" value={formData.descripcionProducto} onChange={handleChange}
+                                    placeholder="Ej. Tahití, Honolulu, Cataluña..." className="border-slate-300" required />
+                                <p className="text-xs text-slate-500">Referencia de la bañera que se evalúa.</p>
+                            </div>
+                        )}
+
                         <div className="space-y-2 relative">
                             <div className="flex items-center gap-2 relative">
                                 <Label htmlFor="tiempo">Tiempo Ciclo Teórico (segundos)</Label>
@@ -274,7 +328,7 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                                         <p className="font-bold mb-1 text-slate-700">Ejemplos de referencia:</p>
                                         <ul className="list-disc pl-4 space-y-1 text-slate-500 font-medium">
                                             <li><span className="text-slate-700 font-bold">MS:</span> 60 segundos</li>
-                                            <li><span className="text-slate-700 font-bold">FV:</span> 17 minutos (1020 segs)</li>
+                                            <li><span className="text-slate-700 font-bold">FV:</span> sencilla 17 min (1020 segs), hidromasaje 34 min (2040 segs), multipersonal 51 min (3060 segs)</li>
                                             <li><span className="text-slate-700 font-bold">RTM:</span> 42 minutos (2520 segs)</li>
                                             <li><span className="text-slate-700 font-bold">MBL:</span> 0,421 min/pieza (25,26 segs)</li>
                                             <li><span className="text-slate-700 font-bold">CEFI:</span> 0,421 min/pieza (25,26 segs)</li>
@@ -295,9 +349,13 @@ export default function BasicInfoStep({ onNext }: { onNext: () => void }) {
                                     Equivale a: <span className="font-bold text-primary">{(Number(formData.tiempoCicloTeorico) / 60).toFixed(2)} minutos</span>
                                 </p>
                             )}
-                            {formData.planta && (tiempoRecomendado ? (
+                            {formData.planta && (esFV && !tipoBanera ? (
                                 <p className="text-sm font-semibold text-[#d14747] mt-1">
-                                    Este es el tiempo recomendado de la planta {formData.planta} ({fmtMin(tiempoRecomendado)} min = {tiempoRecomendado.toLocaleString("es-CO")} segs), verifícalo y corrígelo.
+                                    Seleccione el tipo de bañera para asignar el tiempo de ciclo teórico.
+                                </p>
+                            ) : tiempoRecomendado ? (
+                                <p className="text-sm font-semibold text-[#d14747] mt-1">
+                                    Este es el tiempo recomendado {esFV ? `para bañera ${tipoBanera?.tipo.toLowerCase()}` : `de la planta ${formData.planta}`} ({fmtMin(tiempoRecomendado)} min = {tiempoRecomendado.toLocaleString("es-CO")} segs), verifícalo y corrígelo.
                                     {Number(formData.tiempoCicloTeorico) !== tiempoRecomendado && (
                                         <button type="button" onClick={() => setFormData({ ...formData, tiempoCicloTeorico: String(tiempoRecomendado) })} className="ml-1 underline font-bold hover:text-[#a83636]">Usar el recomendado</button>
                                     )}

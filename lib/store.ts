@@ -26,6 +26,8 @@ export type EvaluacionHoraHora = {
     realizadoPor: string; // persona que realiza la evaluación
     compromiso: string; // compromiso / retroalimentación
     tiempoCicloTeorico: number; // seconds per piece
+    tipoProducto?: string; // FV: tipo de bañera (Sencilla / Hidromasaje / Multipersonal)
+    descripcionProducto?: string; // FV: referencia de la bañera (Tahití, Honolulu, Cataluña...)
     tiempoInicio: number;
     tiempoFin: number | null;
     tiempoTotal: number;
