@@ -14,7 +14,7 @@ import {
     aliasPersonaSP, colorSemaforo, hoyIso, nombreHerramienta, nombrePlanta, promedio, semanaDe
 } from '@/lib/sistema-produccion/cumplimiento';
 import { REGLAS_INICIALES, completarReglas, type ReglasSP, type RolSP } from '@/lib/sistema-produccion/reglas';
-import { calcularCupos, type Ejecucion } from '@/lib/sistema-produccion/ejecuciones';
+import { calcularCupos, reglasSinMedicion, type Ejecucion } from '@/lib/sistema-produccion/ejecuciones';
 import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -601,6 +601,12 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                 {errores.length > 0 && (
                     <div className="p-2.5 bg-red-50 border border-red-300 rounded-xl text-xs font-bold text-red-800 space-y-0.5">
                         {errores.map(e => <p key={e} className="flex items-start gap-1.5"><AlertTriangle className="w-4 h-4 shrink-0" /> {e}</p>)}
+                    </div>
+                )}
+                {!loading && reglasSinMedicion(reglas).length > 0 && (
+                    <div className="p-2 bg-amber-50 border border-amber-300 rounded-xl text-[11px] font-semibold text-amber-900">
+                        <p className="font-black flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 shrink-0" /> Reglas en "Sí" que no se están midiendo (ajústelas en Reglas de Medición):</p>
+                        <ul className="list-disc pl-6">{reglasSinMedicion(reglas).map(t => <li key={t}>{t}</li>)}</ul>
                     </div>
                 )}
                 {!loading && sinPersona > 0 && (

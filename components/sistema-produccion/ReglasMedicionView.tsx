@@ -1,5 +1,6 @@
 'use client';
 
+import { HERRAMIENTAS_AUTO, reglasSinMedicion } from '@/lib/sistema-produccion/ejecuciones';
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, BookOpenCheck, Loader2, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -99,8 +100,16 @@ export default function ReglasMedicionView() {
         setGuardando(true); setError(null);
         const ahora = new Date().toISOString();
         const { error: e } = await supabase.from('sp_reglas_medicion').upsert({ clave: 'reglas', datos: borrador, actualizado_por: email, actualizado_at: ahora }, { onConflict: 'clave' });
+        if (e) { setGuardando(false); setError(/row-level security|policy/i.test(e.message) ? 'Solo los garantes del Sistema de Producción pueden guardar las reglas.' : e.message); return; }
+        // Verificación: se vuelve a leer lo guardado y se compara
+        const { data: v, error: ev } = await supabase.from('sp_reglas_medicion').select('datos, actualizado_at').eq('clave', 'reglas').maybeSingle();
         setGuardando(false);
-        if (e) { setError(/row-level security|policy/i.test(e.message) ? 'Solo los garantes del Sistema de Producción pueden guardar las reglas.' : e.message); return; }
+        // La base guarda el JSON con las claves en otro orden: se compara ordenándolas (y sin campos vacíos)
+        const canon = (x: unknown): unknown => Array.isArray(x) ? x.map(canon)
+            : x && typeof x === 'object' ? Object.fromEntries(Object.entries(x as Record<string, unknown>).filter(([, y]) => y !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, y]) => [k, canon(y)])) : x;
+        if (ev || !v || JSON.stringify(canon(v.datos)) !== JSON.stringify(canon(borrador))) {
+            setError(`Los cambios NO quedaron guardados en la base de datos${ev ? `: ${ev.message}` : ''}. Intente de nuevo o avise a Sistemas.`); return;
+        }
         setReglas(borrador); setBorrador(null); setMeta({ por: email, at: ahora, guardadas: true });
     };
 
@@ -297,6 +306,12 @@ export default function ReglasMedicionView() {
 
             {/* Total de revisiones esperadas por semana, por planta */}
             <div className="rounded-xl border border-slate-200 overflow-x-auto">
+                {reglasSinMedicion(r).length > 0 && (
+                    <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 text-[11px] font-semibold text-amber-900">
+                        <p className="font-black">Reglas en "Sí" que no se están midiendo en el tablero:</p>
+                        <ul className="list-disc pl-5">{reglasSinMedicion(r).map(t => <li key={t}>{t}</li>)}</ul>
+                    </div>
+                )}
                 <div className="px-3 py-2 bg-[#F6F3EE] border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <h3 className="text-xs font-black uppercase text-[#324354]">Revisiones esperadas por semana · por planta</h3>
@@ -322,7 +337,7 @@ export default function ReglasMedicionView() {
                         <tbody className="divide-y divide-slate-100">
                             {totales.map(t => (
                                 <tr key={t.codigo} className="hover:bg-[#F6F3EE]">
-                                    <td className="px-2 py-1.5 font-black text-[#324354] whitespace-nowrap">{t.nombre}</td>
+                                    <td className="px-2 py-1.5 font-black text-[#324354] whitespace-nowrap">{t.nombre}{!(HERRAMIENTAS_AUTO as readonly string[]).includes(t.codigo) && <span className="ml-1.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1" title="Aún no tiene fuente automática en la app: no entra en el cumplimiento del tablero">sin medición</span>}</td>
                                     {columnasTotal.map(c => <td key={c.key || 'sin'} className={`px-1.5 py-1.5 text-center font-bold ${t.porCol[c.key] ? 'text-[#324354]' : 'text-slate-300'}`}>{t.porCol[c.key] || '—'}</td>)}
                                     <td className="px-2 py-1.5 text-center font-black text-[#324354] bg-[#F6F3EE]">{t.total}</td>
                                 </tr>

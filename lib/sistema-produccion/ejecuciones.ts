@@ -46,6 +46,26 @@ const sumarDias = (iso: string, n: number) => { const d = new Date(`${iso}T00:00
 const lunesDe = (iso: string) => { const d = new Date(`${iso}T00:00:00Z`); const dia = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() - dia + 1); return isoUtc(d) }
 
 /**
+ * Reglas marcadas "Sí" que hoy no entran en la medición (sin falsos positivos: se avisa, no se asume):
+ *  - herramienta automática con un rol "Sí" sin frecuencia definida (no hay cuántas veces exigir);
+ *  - herramienta con un rol "Sí" que todavía no tiene fuente automática en la app.
+ */
+export function reglasSinMedicion(reglas: ReglasSP): string[] {
+    const out: string[] = []
+    for (const h of reglas.herramientas) {
+        const roles = ROLES_SP.filter(rol => h.roles[rol] === 'aplica' && (reglas.personas[rol] || []).length > 0)
+        if (!roles.length) continue
+        if ((HERRAMIENTAS_AUTO as readonly string[]).includes(h.codigo)) {
+            const sinFr = roles.filter(rol => !(h.frecuencia?.[rol]?.semana! > 0))
+            if (sinFr.length) out.push(`${h.nombre}: aplica a ${sinFr.join(', ')} pero no tiene frecuencia definida, así que no se le exige.`)
+        } else {
+            out.push(`${h.nombre}: aplica a ${roles.join(', ')} pero aún no tiene fuente automática en la app, así que no entra en el cumplimiento.`)
+        }
+    }
+    return out
+}
+
+/**
  * Cupos (exigidos y ejecutados) de las herramientas automáticas, desde `desde` (inclusive) hasta `hoy`.
  * `personaDe` convierte el nombre o correo de quien ejecutó en el nombre de la persona en las reglas (o null).
  */
@@ -109,6 +129,9 @@ export function calcularCupos(ejecuciones: Ejecucion[], reglas: ReglasSP, desde:
         for (const { nombre, rol } of personas) {
             const fr = h.frecuencia?.[rol]
             if (h.roles[rol] !== 'aplica' || !fr || !(fr.semana > 0)) continue
+            // Igual que "Revisiones esperadas" en las Reglas: no se exige a quien está en una planta marcada "No aplica"
+            const plantaRegla = reglas.plantaPersona?.[nombre]
+            if (plantaRegla && plantaRegla !== TRANSVERSAL && h.plantas[plantaRegla] === 'no_aplica') continue
             const hechas = porClave.get(`${nombre}|${herr}`) || []
 
             if (fr.periodo === 'mes') {
