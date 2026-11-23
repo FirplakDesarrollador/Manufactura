@@ -133,7 +133,7 @@ export function metaParaPersonas(tabla: MetaPersonas[], personas: number): numbe
 }
 
 const aNumero = (v: any) => (v == null ? null : Number(v));
-const normalizarRegistro = (r: any): RegistroRmold => ({
+export const normalizarRegistro = (r: any): RegistroRmold => ({
     ...r,
     moldes_ms: Number(r.moldes_ms) || 0,
     moldes_fv: Number(r.moldes_fv) || 0,
