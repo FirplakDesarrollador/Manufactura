@@ -11,6 +11,7 @@ import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView"
 import RmoldDashboard from "@/components/indicadores/RmoldDashboard";
 import CumplimientoSPDashboard from "@/components/sistema-produccion/CumplimientoSPDashboard";
 import ProductividadView from "@/components/productividad/ProductividadView";
+import { indicadoresRmoldDia, type IndicadoresRmoldDia } from "@/lib/informe-turno/rmoldTablero";
 
 // Plant keys supported
 type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
@@ -243,6 +244,8 @@ export default function IndicadoresProductividadPage() {
     const [fechaISO, setFechaISO] = useState<string>(getPreviousBusinessDayISO());
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
     const [loadingNS, setLoadingNS] = useState<boolean>(false);
+    // RMOLD: qué datos del día faltan (sin cierre o sin inspecciones de calidad): se avisa, nunca se inventan
+    const [avisoRmold, setAvisoRmold] = useState<string | null>(null);
 
     // Unified Plant Data State: stores initial/automatic values and user edits
     const [plantData, setPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
@@ -254,11 +257,13 @@ export default function IndicadoresProductividadPage() {
             // Calidad MS se lee de tablas con RLS: la API necesita el token de la sesión
             const { data: sessionData } = await supabase.auth.getSession();
             const accessToken = sessionData?.session?.access_token;
-            const [resNS, resCalidad] = await Promise.all([
+            const [resNS, resCalidad, rmoldDia] = await Promise.all([
                 fetch(`/api/indicadores/nivel-servicio?fecha=${targetFecha}`),
                 fetch(`/api/indicadores/calidad?fecha=${targetFecha}`, {
                     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
-                })
+                }),
+                // RMOLD en automático: cierre del día (productividad, nivel de servicio, personas) y Calidad RMOLD
+                indicadoresRmoldDia(supabase, targetFecha).catch(() => ({ cierre: null, calidad: null } as IndicadoresRmoldDia))
             ]);
 
             const jsonNS = resNS.ok ? await resNS.json() : null;
@@ -299,8 +304,27 @@ export default function IndicadoresProductividadPage() {
                     }
                 }
 
+                // RMOLD: cierre del día y Calidad RMOLD (se aplican al final; sin dato quedan en 0 y se avisa)
+                const c = rmoldDia.cierre;
+                const q = rmoldDia.calidad;
+                updated.RMOLD = {
+                    ...updated.RMOLD,
+                    productividadPzReal: c ? c.moldes : 0,
+                    productividadPzMeta: c && c.meta > 0 ? c.meta : updated.RMOLD.productividadPzMeta,
+                    nivelServicioReal: c?.nivelServicio ?? 0,
+                    totalPersonas: c ? c.personas + c.ausentes : 0,
+                    ausentismos: c ? c.ausentes : 0,
+                    calidadReal: q ? q.calidad : 0,
+                };
                 return updated;
             });
+            {
+                const faltan: string[] = [];
+                if (!rmoldDia.cierre) faltan.push('cierre diario de RMOLD (productividad, nivel de servicio y presentismo)');
+                else if (rmoldDia.cierre.nivelServicio == null) faltan.push('moldes esperados/entregados del cierre (nivel de servicio)');
+                if (!rmoldDia.calidad) faltan.push('inspecciones de Calidad RMOLD (calidad)');
+                setAvisoRmold(faltan.length ? `Sin dato el ${targetFecha.split('-').reverse().join('/')}: ${faltan.join('; ')}. Esos recuadros quedan en 0.` : null);
+            }
 
             const now = new Date();
             const horaStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -561,6 +585,13 @@ export default function IndicadoresProductividadPage() {
                                 )}
                             </div>
                         </div>
+
+                        {selectedPlant === "RMOLD" && (
+                            <p className="text-[11px] font-bold text-slate-500 -mt-2">
+                                RMOLD en automático: productividad, nivel de servicio y presentismo del <b>cierre diario de RMOLD</b>; calidad de <b>Calidad RMOLD</b>.
+                                {avisoRmold && <span className="block mt-1 text-rose-700">{avisoRmold}</span>}
+                            </p>
+                        )}
 
                         {/* Top Cards Grid (Ajustado la altura a 175px para cubrir perfectamente el espacio inferior) */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

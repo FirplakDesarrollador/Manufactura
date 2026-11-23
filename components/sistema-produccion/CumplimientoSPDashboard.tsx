@@ -155,7 +155,10 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     // Filtro Planta del encabezado (varias); el clic en la gráfica de plantas elige una sola
     const [plantasSel, setPlantasSel] = useState<string[]>([]);
     // Seguimiento (gráfica derecha): diario o semanal. La izquierda siempre es mensual.
-    const [granSeg, setGranSeg] = useState<'dia' | 'semana'>('dia');
+    const [granSeg, setGranSeg] = useState<'dia' | 'semana'>('semana');
+    // Clic en un mes: el seguimiento (semanal o diario) muestra solo las semanas o días de ese mes, aunque luego se
+    // elija una semana o un día; se quita con otro clic en el mes o con "Ver todo"
+    const [mesSeg, setMesSeg] = useState<string | null>(null);
     // Columna elegida en cualquiera de las dos gráficas (con su granularidad)
     const [sel, setSel] = useState<{ key: string; gran: Gran } | null>(null);
     const selPeriodo = sel?.key ?? null;
@@ -354,10 +357,11 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     const obsGeneral = useMemo(() => observaciones(cruce()).filter(pasaPeriodo),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [historico, cuposApp, rrcApp, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
-    const columnasDe = (gran: Gran) => {
+    const columnasDe = (gran: Gran, mes: string | null = null) => {
         const g = new Map<string, Obs[]>();
         obsGeneral.forEach(o => {
             if (gran === 'dia' && o.hist) return; // el histórico es semanal
+            if (mes && claveGran(o, 'mes') !== mes) return;
             const k = claveGran(o, gran);
             if (!g.has(k)) g.set(k, []);
             g.get(k)!.push(o);
@@ -370,7 +374,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const columnasMes = useMemo(() => columnasDe('mes'), [obsGeneral, variosAnios]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const columnasSeg = useMemo(() => columnasDe(granSeg), [obsGeneral, granSeg, variosAnios]);
+    const columnasSeg = useMemo(() => columnasDe(granSeg, mesSeg), [obsGeneral, granSeg, variosAnios, mesSeg]);
     useEffect(() => {
         if (!sel) return;
         const cols = sel.gran === 'mes' ? columnasMes : sel.gran === granSeg ? columnasSeg : [];
@@ -422,12 +426,87 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     ];
 
     const chips = [
-        sel && { texto: nombreGran(sel.key, sel.gran), quitar: () => setSel(null) },
+        sel && { texto: nombreGran(sel.key, sel.gran), quitar: () => { setSel(null); if (sel.gran === 'mes') setMesSeg(null); } },
+        mesSeg && sel?.gran !== 'mes' && { texto: `Mes: ${nombreGran(mesSeg, 'mes')}`, quitar: () => setMesSeg(null) },
         selHerr && { texto: nombreHerramienta(selHerr), quitar: () => setSelHerr(null) },
         selPlanta && { texto: selPlanta === SIN_PLANTA ? SIN_PLANTA : nombrePlanta(selPlanta), quitar: () => setSelPlanta(null) },
         selPersona && { texto: selPersona, quitar: () => setSelPersona(null) }
     ].filter(Boolean) as { texto: string; quitar: () => void }[];
-    const quitarTodo = () => { setSelPeriodo(null); setSelHerr(null); setSelPlanta(null); setSelPersona(null); };
+    // Detalle de lo calificado: cada vez exigida (app: ejecutada o no) y las semanas del histórico del Excel por persona,
+    // con los filtros del encabezado, la columna elegida (semana, día o mes) y los filtros cruzados (herramienta,
+    // planta, persona)
+    const detalle = useMemo(() => {
+        const filas: { fecha: string; semana: string; persona: string; rol: string; herr: string; planta: string; resultado: string; ok: boolean | null; hist: boolean }[] = [];
+        const plantas = selPlanta ? [selPlanta] : plantasSel;
+        cuposApp.forEach(c => {
+            const sm = semanaDe(c.fecha);
+            const o = { fecha: c.fecha, semana: sm.clave, viernes: sm.viernes, hist: false } as Obs;
+            if (!pasaPeriodo(o) || !enSel(o)) return;
+            if (selHerr && c.herr !== selHerr) return;
+            if (plantas.length && !plantas.includes(c.planta || SIN_PLANTA)) return;
+            if (selPersona && norm(c.persona) !== norm(selPersona)) return;
+            filas.push({ fecha: c.fecha, semana: `S${sm.semana}`, persona: c.persona, rol: c.rolP, herr: nombreHerramienta(c.herr), planta: c.planta || SIN_PLANTA,
+                resultado: c.ejec ? 'Ejecutada' : 'No ejecutada', ok: !!c.ejec, hist: false });
+        });
+        historico.forEach(h => {
+            if (h.nivel !== 'persona' || !h.persona) return;
+            const sm = semanaDe(h.fecha);
+            const o = { fecha: sm.viernes, semana: sm.clave, viernes: sm.viernes, hist: true } as Obs;
+            if (!pasaPeriodo(o) || !enSel(o)) return;
+            if (selHerr && (h.herramienta || null) !== selHerr) return;
+            if (plantas.length) return; // el histórico por persona no tiene planta
+            if (selPersona && norm(h.persona) !== norm(selPersona)) return;
+            filas.push({ fecha: sm.viernes, semana: `S${sm.semana}`, persona: titulo(h.persona), rol: h.rol || '—', herr: h.herramienta ? nombreHerramienta(h.herramienta) : 'Todas (Excel)',
+                planta: '—', resultado: `${Number(h.cumplimiento).toFixed(1)} %`, ok: h.cumplimiento >= META_SP ? true : h.cumplimiento < LIM_INF ? false : null, hist: true });
+        });
+        return filas.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.persona.localeCompare(b.persona) || a.herr.localeCompare(b.herr));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cuposApp, historico, sel, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
+    type Conteo = { exig: number; ejec: number }
+    const resumenDe = (clave: (f: typeof detalle[number]) => string) => {
+        const m = new Map<string, { exigidas: number; ejecutadas: number; hist: number[]; herr: Map<string, Conteo>; pers: Map<string, Conteo>; fechas: Set<string>; roles: Set<string>; plantas: Set<string> }>();
+        detalle.forEach(f => {
+            const k = clave(f);
+            if (!k || k === '—') return;
+            if (!m.has(k)) m.set(k, { exigidas: 0, ejecutadas: 0, hist: [], herr: new Map(), pers: new Map(), fechas: new Set(), roles: new Set(), plantas: new Set() });
+            const x = m.get(k)!;
+            if (f.rol && f.rol !== '—') x.roles.add(f.rol);
+            if (f.hist) { x.hist.push(parseFloat(f.resultado)); return; }
+            x.exigidas += 1;
+            if (f.ok) { x.ejecutadas += 1; x.fechas.add(f.fecha); }
+            const h = x.herr.get(f.herr) || { exig: 0, ejec: 0 }; h.exig += 1; if (f.ok) h.ejec += 1; x.herr.set(f.herr, h);
+            const pe = x.pers.get(f.persona) || { exig: 0, ejec: 0 }; pe.exig += 1; if (f.ok) pe.ejec += 1; x.pers.set(f.persona, pe);
+            if (f.planta && f.planta !== '—') x.plantas.add(f.planta);
+        });
+        return [...m.entries()].map(([nombre, x]) => {
+            const pct = x.exigidas ? (x.ejecutadas / x.exigidas) * 100 : (promedio(x.hist) ?? 0);
+            const personas = [...x.pers.entries()].map(([n, c]) => ({ n, ...c, cumple: c.exig > 0 && (c.ejec / c.exig) * 100 >= META_SP }))
+            return {
+                nombre, exigidas: x.exigidas, ejecutadas: x.ejecutadas, pct, cumple: pct >= META_SP, soloExcel: !x.exigidas,
+                herramientas: [...x.herr.entries()].map(([n, c]) => ({ n, ...c })).sort((a, b) => a.n.localeCompare(b.n)),
+                fechas: [...x.fechas].sort().reverse(),
+                personas, personasNoCumplen: personas.filter(q => !q.cumple).map(q => q.n).sort(),
+                rol: [...x.roles].join(', '), plantas: [...x.plantas].sort().join(', ')
+            };
+        }).sort((a, b) => a.pct - b.pct || a.nombre.localeCompare(b.nombre));
+    };
+    const resumenPersona = useMemo(() => resumenDe(f => f.persona),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [detalle]);
+    // Por herramienta: solo lo exigido en la app (el histórico del Excel por persona no separa herramientas)
+    const resumenHerramienta = useMemo(() => resumenDe(f => (f.hist ? '' : f.herr)),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [detalle]);
+    const resumenPlanta = useMemo(() => resumenDe(f => (f.hist ? '' : f.planta)),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [detalle]);
+    const [buscaDetalle, setBuscaDetalle] = useState('');
+    const detalleVisible = useMemo(() => {
+        const t = norm(buscaDetalle);
+        return t ? detalle.filter(f => [f.persona, f.herr, f.planta, f.resultado, f.rol].some(v => norm(v).includes(t))) : detalle;
+    }, [detalle, buscaDetalle]);
+
+    const quitarTodo = () => { setMesSeg(null); setSelPeriodo(null); setSelHerr(null); setSelPlanta(null); setSelPersona(null); };
 
     const cargador = <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
     const vacio = (t: string) => <div className="h-full flex items-center justify-center text-xs font-bold text-slate-500 text-center px-4">{t}</div>;
@@ -442,10 +521,13 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                 onClick={(e: any) => {
                     const idx = e?.activeIndex != null ? Number(e.activeIndex) : NaN;
                     const col = Number.isInteger(idx) ? cols[idx] : cols.find(c => c.label === String(e?.activeLabel));
-                    if (col) setSel(prev => (prev && prev.key === col.key && prev.gran === g ? null : { key: col.key, gran: g }));
+                    if (!col) return;
+                    const quitar = !!sel && sel.key === col.key && sel.gran === g;
+                    setSel(quitar ? null : { key: col.key, gran: g });
+                    if (g === 'mes') setMesSeg(quitar ? null : col.key);
                 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={cols.length > 30 ? 'preserveStartEnd' : 0} />
+                <XAxis dataKey="label" tick={{ fontSize: cols.length > 24 ? 8 : 10 }} interval={cols.length > 60 ? 'preserveStartEnd' : 0} />
                 <YAxis tick={{ fontSize: 9 }} width={32} domain={[0, 100]} tickFormatter={v => `${v}%`} />
                 <Tooltip content={<TooltipCumpl />} cursor={{ fill: '#f1f5f9' }} />
                 <ReferenceLine y={LIM_SUP} stroke={COLOR_META} strokeDasharray="4 4" strokeWidth={1.5}
@@ -453,10 +535,10 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                 <ReferenceLine y={LIM_INF} stroke={COLOR_LIM_INF} strokeDasharray="4 4" strokeWidth={1.5}
                     label={{ value: `Inf. ${LIM_INF}%`, position: 'left', offset: 36, fill: COLOR_LIM_INF, fontSize: 9, fontWeight: 800 }} />
                 <Bar dataKey="valor" radius={[4, 4, 0, 0]} isAnimationActive={false} cursor="pointer" maxBarSize={48}>
-                    {cols.map(c => <Cell key={c.key} fill={colorColectivo(c.valor)} fillOpacity={sel && !(sel.gran === g && sel.key === c.key) ? 0.3 : 1} />)}
+                    {cols.map(c => <Cell key={c.key} fill={colorColectivo(c.valor)} fillOpacity={sel && sel.gran === g && sel.key !== c.key ? 0.3 : mesSeg && g === 'mes' && c.key !== mesSeg ? 0.3 : 1} />)}
                     <LabelList dataKey="valor" position="top" content={(p: any) => {
-                        if (p.value == null || (cols.length > 20 && p.index % 2 === 1)) return null;
-                        return <text x={p.x + p.width / 2} y={p.y - 5} textAnchor="middle" fontSize={cols.length > 20 ? 8 : 10} fontWeight={800} fill="#334155">{Number(p.value).toFixed(cols.length > 20 ? 0 : 1)}</text>;
+                        if (p.value == null || (cols.length > 60 && p.index % 2 === 1)) return null;
+                        return <text x={p.x + p.width / 2} y={p.y - 5} textAnchor="middle" fontSize={cols.length > 24 ? 7.5 : cols.length > 20 ? 8 : 10} fontWeight={800} fill="#334155">{Number(p.value).toFixed(cols.length > 20 ? 0 : 1)}</text>;
                     }} />
                 </Bar>
             </BarChart>
@@ -482,7 +564,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     );
 
     return (
-        <section className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] overflow-hidden" style={altoPx ? { height: altoPx } : undefined}>
+        <section className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5]">
             {/* Alto de cada gráfica: con alto fijo, lo que queda después del encabezado, las tarjetas y los títulos, repartido en 2 filas */}
             <div className="space-y-2" style={{ ['--sp-h' as string]: altoPx ? `${Math.max(120, Math.floor((altoPx - 250) / 2))}px` : 'max(220px, calc((100dvh - 382px) / 2))' } as React.CSSProperties}>
                 {/* Encabezado: título y acción a la izquierda, filtros a la derecha */}
@@ -565,7 +647,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                     <div className="lg:col-span-7 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200">
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                             <h3 className="min-w-0 truncate text-xs sm:text-sm font-black text-slate-800">
-                                Seguimiento {granSeg === 'dia' ? 'Diario' : 'Semanal'} {sufijo || 'FIRPLAK'}
+                                Seguimiento {granSeg === 'dia' ? 'Diario' : 'Semanal'} {sufijo || 'FIRPLAK'}{mesSeg ? ` · ${nombreGran(mesSeg, 'mes')}` : ''}
                             </h3>
                             <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px] shrink-0">
                                 {([['dia', 'Diario'], ['semana', 'Semanal']] as const).map(([g, t]) => (
@@ -618,6 +700,110 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+
+                {/* Resumen por persona y por planta: quién cumple y quién no (meta del Sistema de Producción), con los mismos filtros */}
+                {([['persona', 'Resumen por persona', resumenPersona], ['planta', 'Resumen por planta', resumenPlanta], ['herramienta', 'Resumen por herramienta', resumenHerramienta]] as const).map(([tipo, tit, filas]) => (
+                    <div key={tipo} className="bg-white rounded-xl p-2.5 shadow-xs border border-slate-200">
+                        <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5">
+                            {tit}
+                            <span className="ml-2 text-[10px] font-bold">
+                                <span className="text-emerald-700">{filas.filter(f => f.cumple).length} cumplen</span>
+                                <span className="text-slate-400"> · </span>
+                                <span className="text-rose-700">{filas.filter(f => !f.cumple).length} no cumplen</span>
+                                <span className="text-slate-400"> (meta {META_SP} %)</span>
+                            </span>
+                        </h3>
+                        <div className="max-h-[420px] overflow-auto">
+                            <table className="w-full text-[11px]">
+                                <thead className="sticky top-0 z-10 bg-[#324354] text-white text-[10px] uppercase">
+                                    <tr>
+                                        <th className="px-2 py-1.5 text-left font-black whitespace-nowrap">{tipo === 'persona' ? 'Persona' : tipo === 'planta' ? 'Planta' : 'Herramienta'}</th>
+                                        {tipo === 'persona' && <th className="px-2 py-1.5 text-left font-black whitespace-nowrap">Rol · Planta</th>}
+                                        {tipo !== 'persona' && <th className="px-2 py-1.5 text-left font-black whitespace-nowrap">Personas</th>}
+                                        {tipo !== 'herramienta' && <th className="px-2 py-1.5 text-left font-black whitespace-nowrap">Herramientas (ejecutadas / exigidas)</th>}
+                                        <th className="px-2 py-1.5 text-left font-black whitespace-nowrap">Fechas en que se ejecutó</th>
+                                        {['Exigidas', 'Ejecutadas', 'No ejec.', 'Cumplimiento', 'Estado'].map(h => <th key={h} className="px-2 py-1.5 text-right font-black whitespace-nowrap">{h}</th>)}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 align-top">
+                                    {filas.map(f => (
+                                        <tr key={f.nombre} className="hover:bg-[#F6F3EE]">
+                                            <td className="px-2 py-1.5 font-semibold text-[#324354] whitespace-nowrap">{f.nombre}{f.soloExcel && <span className="ml-1 text-[9px] text-slate-400">(Excel)</span>}</td>
+                                            {tipo === 'persona' && <td className="px-2 py-1.5 text-slate-500 whitespace-nowrap">{[f.rol, f.plantas].filter(Boolean).join(' · ') || '—'}</td>}
+                                            {tipo !== 'persona' && (
+                                                <td className="px-2 py-1.5 min-w-[180px]">
+                                                    <span className="font-bold text-[#324354]">{f.personas.length}</span>
+                                                    {f.personasNoCumplen.length > 0 && <span className="text-rose-700" title={f.personasNoCumplen.join(', ')}> · {f.personasNoCumplen.length} no cumplen: {f.personasNoCumplen.slice(0, 4).join(', ')}{f.personasNoCumplen.length > 4 ? `, +${f.personasNoCumplen.length - 4}` : ''}</span>}
+                                                </td>
+                                            )}
+                                            {tipo !== 'herramienta' && (
+                                                <td className="px-2 py-1.5 min-w-[220px]">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {f.herramientas.map(h => (
+                                                            <span key={h.n} className={`px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${h.exig && (h.ejec / h.exig) * 100 >= META_SP ? 'bg-emerald-50 text-emerald-700' : h.ejec ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
+                                                                {h.n} {h.ejec}/{h.exig}
+                                                            </span>
+                                                        ))}
+                                                        {!f.herramientas.length && <span className="text-slate-400">—</span>}
+                                                    </div>
+                                                </td>
+                                            )}
+                                            <td className="px-2 py-1.5 min-w-[200px] text-slate-600" title={f.fechas.map(x => x.split('-').reverse().join('/')).join(', ')}>
+                                                {f.fechas.length ? <>{f.fechas.slice(0, 10).map(x => x.slice(8, 10) + '/' + x.slice(5, 7)).join(', ')}{f.fechas.length > 10 && <span className="text-slate-400"> +{f.fechas.length - 10} más</span>}</> : <span className="text-rose-600 font-bold">Ninguna</span>}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-right">{f.exigidas || '—'}</td>
+                                            <td className="px-2 py-1.5 text-right text-emerald-700 font-bold">{f.exigidas ? f.ejecutadas : '—'}</td>
+                                            <td className="px-2 py-1.5 text-right text-rose-700 font-bold">{f.exigidas ? f.exigidas - f.ejecutadas : '—'}</td>
+                                            <td className="px-2 py-1.5 text-right font-black whitespace-nowrap">{f.pct.toFixed(1)} %</td>
+                                            <td className="px-2 py-1.5 text-right">
+                                                <span className={`px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${f.cumple ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{f.cumple ? 'Cumple' : 'No cumple'}</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {!filas.length && <tr><td colSpan={9} className="px-2 py-6 text-center text-slate-500">{loading ? 'Cargando…' : 'Sin datos para los filtros elegidos.'}</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))}
+
+                {/* Detalle de lo calificado: todo lo exigido con su resultado (lo elegido en las gráficas y los filtros) */}
+                <div className="bg-white rounded-xl p-2.5 shadow-xs border border-slate-200">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <h3 className="text-xs sm:text-sm font-black text-slate-800">
+                            Detalle de lo calificado{chips.length ? ` · ${chips.map(c => c.texto).join(' · ')}` : ' · periodo de los filtros'}
+                            <span className="ml-2 text-[10px] font-bold text-slate-500">
+                                {detalle.filter(f => !f.hist && f.ok).length} de {detalle.filter(f => !f.hist).length} ejecutadas{detalle.some(f => f.hist) ? ` · ${detalle.filter(f => f.hist).length} semana(s) del Excel` : ''}
+                            </span>
+                        </h3>
+                        <input value={buscaDetalle} onChange={e => setBuscaDetalle(e.target.value)} placeholder="Buscar persona, herramienta, planta…"
+                            className="h-7 w-full sm:w-64 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-semibold outline-none focus:ring-2 focus:ring-[#7B8E90]" />
+                    </div>
+                    <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
+                        <table className="w-full text-[11px]">
+                            <thead className="sticky top-0 bg-[#324354] text-white text-[10px] uppercase">
+                                <tr>{['Fecha', 'Semana', 'Persona', 'Rol', 'Herramienta', 'Planta', 'Resultado'].map(h => <th key={h} className="px-2 py-1.5 text-left font-black whitespace-nowrap">{h}</th>)}</tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {detalleVisible.slice(0, 2000).map((f, i) => (
+                                    <tr key={i} className="hover:bg-[#F6F3EE]">
+                                        <td className="px-2 py-1 font-mono whitespace-nowrap">{f.fecha.split('-').reverse().join('/')}</td>
+                                        <td className="px-2 py-1">{f.semana}</td>
+                                        <td className="px-2 py-1 font-semibold text-[#324354] whitespace-nowrap">{f.persona}</td>
+                                        <td className="px-2 py-1 text-slate-500">{f.rol}</td>
+                                        <td className="px-2 py-1">{f.herr}</td>
+                                        <td className="px-2 py-1 text-slate-500">{f.planta}</td>
+                                        <td className="px-2 py-1">
+                                            <span className={`px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${f.ok === true ? 'bg-emerald-50 text-emerald-700' : f.ok === false ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{f.resultado}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {!detalleVisible.length && <tr><td colSpan={7} className="px-2 py-6 text-center text-slate-500">{loading ? 'Cargando…' : 'Sin registros para los filtros elegidos.'}</td></tr>}
+                            </tbody>
+                        </table>
+                        {detalleVisible.length > 2000 && <p className="text-[10px] text-slate-500 p-2">Se muestran 2.000 de {detalleVisible.length}: elija una semana o filtre para ver el resto.</p>}
                     </div>
                 </div>
             </div>
