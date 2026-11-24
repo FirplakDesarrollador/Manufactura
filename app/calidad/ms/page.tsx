@@ -18,11 +18,21 @@ import { permisosCalidadRmold } from '@/lib/calidad/permisos'
 
 // Registro de defectos en línea de Calidad MS y de Calidad RMOLD (misma pantalla; la ruta decide la planta).
 // RMOLD: la referencia es el tipo de molde y, opcional, el serial del molde.
+// Opción al final de la lista de moldes (RMOLD) para escribir el molde a mano
+const NO_APARECE = '✍️ No aparece – escribir a mano'
+
 export default function CalidadMsReportPage() {
     const router = useRouter()
     const planta = usePlantaCalidad()
     const [moldesTipo, setMoldesTipo] = useState<{ id: number; serial: string }[]>([])
     const [selectedMolde, setSelectedMolde] = useState<string>('')
+    // RMOLD: si el molde no aparece o está mal marcado, se escribe a mano (nombre y serial) o solo el serial
+    const [moldeManual, setMoldeManual] = useState(false)
+    const [serialManual, setSerialManual] = useState(false)
+    const [nombreManual, setNombreManual] = useState('')
+    const [serialEscrito, setSerialEscrito] = useState('')
+    const [claveSelect, setClaveSelect] = useState(0)
+    const limpiarManual = () => { setMoldeManual(false); setSerialManual(false); setNombreManual(''); setSerialEscrito(''); setClaveSelect(k => k + 1) }
     const [user, setUser] = useState<User | null>(null)
 
     interface User {
@@ -176,7 +186,7 @@ export default function CalidadMsReportPage() {
     }
 
     const executeSave = async (fileToUpload: File | null = photoFile, moldeRef?: string) => {
-        if (!selectedProduct) return
+        if (!selectedProduct && !moldeManual) return
         
         const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
         const selectedDefectNames = selectedDefectsList.map(d => ({ 
@@ -204,15 +214,18 @@ export default function CalidadMsReportPage() {
             fotoUrl = data.publicUrl
         }
 
+        const escrito = planta.conSerial && (moldeManual || serialManual)
         const reportData = {
-            producto_id: parseInt(selectedProduct),
+            producto_id: moldeManual ? null : parseInt(selectedProduct),
             create_by: user?.localId,
             defecto: selectedDefectNames,
             created_at: new Date().toISOString(),
             ...(fotoUrl ? { fotoUrl } : {}),
             ...(moldeRef ? { Molde: moldeRef } : {}),
             // RMOLD: serial del molde revisado (opcional)
-            ...(planta.conSerial && selectedMolde ? { Molde: moldesTipo.find(m => String(m.id) === selectedMolde)?.serial ?? moldeRef, molde_id: parseInt(selectedMolde) } : {})
+            ...(planta.conSerial && selectedMolde && !escrito ? { Molde: moldesTipo.find(m => String(m.id) === selectedMolde)?.serial ?? moldeRef, molde_id: parseInt(selectedMolde) } : {}),
+            // Molde escrito a mano (no aparece o está mal marcado): nombre (si no se escogió de la lista) y serial
+            ...(escrito ? { Molde: serialEscrito.trim(), molde_id: null, molde_manual: moldeManual ? nombreManual.trim() : null, molde_escrito: true } : {})
         }
 
         const { error } = await supabase.from(planta.tReportes).insert(reportData)
@@ -230,12 +243,26 @@ export default function CalidadMsReportPage() {
             setSelectedMolde('')
             setMoldesTipo([])
             setPhotoFile(null)
+            limpiarManual()
         }
     }
 
     const handleSave = async () => {
-        if (!selectedProduct) {
+        if (moldeManual && (!nombreManual.trim() || !serialEscrito.trim())) {
+            alert('Escriba el nombre del molde y su serial.')
+            return
+        }
+        if (serialManual && !serialEscrito.trim()) {
+            alert('Escriba el serial del molde.')
+            return
+        }
+        if (!selectedProduct && !moldeManual) {
             alert('Por favor selecciona un producto')
+            return
+        }
+        // Molde escrito a mano: ya se tiene el molde, no se pide la referencia
+        if (planta.conSerial && (moldeManual || serialManual)) {
+            await continueSave(serialEscrito.trim())
             return
         }
 
@@ -343,14 +370,30 @@ export default function CalidadMsReportPage() {
                     {/* Left: Product Selector & Save button (oculto si el usuario solo ve Hora a hora) */}
                     {soloHoraAHora ? <div /> : (
                     <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-min min-[1200px]:max-w-[520px] 2xl:max-w-[600px]">
+                        {planta.conSerial && moldeManual ? (
+                            <div className="flex-1 min-w-[160px] flex items-center gap-1">
+                                <input value={nombreManual} onChange={e => setNombreManual(e.target.value)} placeholder="Nombre del molde (escrito)" autoFocus
+                                    title="El molde no aparece o está mal marcado: escriba su nombre"
+                                    className="flex-1 min-w-0 h-7 bg-amber-50 border border-amber-400 rounded px-2.5 text-[#254153] font-bold text-[11px] outline-none focus:ring-2 focus:ring-amber-200" />
+                                <button type="button" onClick={limpiarManual} title="Volver a la lista de moldes"
+                                    className="h-7 px-1.5 rounded border border-gray-300 bg-white text-gray-500 hover:text-[#254153] text-[11px] font-bold shrink-0">✕</button>
+                            </div>
+                        ) : (
                         <div className="flex-1 min-w-[160px] [contain:inline-size]">
                             <SearchableSelect
+                                key={claveSelect}
                                 name="producto"
-                                options={products.map((p) => p.Referencia)}
+                                options={planta.conSerial ? [...products.map((p) => p.Referencia), NO_APARECE] : products.map((p) => p.Referencia)}
                                 placeholder={planta.placeholderReferencia}
                                 defaultValue={products.find(p => p.id.toString() === selectedProduct)?.Referencia || ''}
                                 onValueChange={(val) => {
+                                    if (planta.conSerial && val === NO_APARECE) {
+                                        setSelectedProduct(''); setSelectedMolde(''); setMoldesTipo([]); setSerialManual(false)
+                                        setMoldeManual(true)
+                                        return
+                                    }
                                     const product = products.find(p => p.Referencia === val)
+                                    setSerialManual(false); setSerialEscrito('')
                                     setSelectedProduct(product ? product.id.toString() : '')
                                     // RMOLD: seriales del tipo de molde escogido
                                     setSelectedMolde('')
@@ -363,14 +406,24 @@ export default function CalidadMsReportPage() {
                                 className="w-full h-7 bg-white border border-gray-300 rounded px-2.5 text-[#254153] font-bold text-[11px] focus:border-[#254153] outline-none transition-all flex items-center"
                             />
                         </div>
-                        {planta.conSerial && (
-                            <select value={selectedMolde} onChange={e => setSelectedMolde(e.target.value)} disabled={!selectedProduct}
+                        )}
+                        {planta.conSerial && (moldeManual || serialManual ? (
+                            <div className="flex items-center gap-1 shrink-0">
+                                <input value={serialEscrito} onChange={e => setSerialEscrito(e.target.value)} placeholder="Serial (escrito)" autoFocus={serialManual}
+                                    title="Serial del molde escrito a mano"
+                                    className="h-7 w-28 bg-amber-50 border border-amber-400 rounded px-2 text-[#254153] font-bold text-[11px] outline-none focus:ring-2 focus:ring-amber-200" />
+                                {serialManual && <button type="button" onClick={() => { setSerialManual(false); setSerialEscrito('') }} title="Volver a la lista de seriales"
+                                    className="h-7 px-1.5 rounded border border-gray-300 bg-white text-gray-500 hover:text-[#254153] text-[11px] font-bold">✕</button>}
+                            </div>
+                        ) : (
+                            <select value={selectedMolde} onChange={e => { if (e.target.value === '__escribir') { setSelectedMolde(''); setSerialManual(true); return } setSelectedMolde(e.target.value) }} disabled={!selectedProduct}
                                 title={planta.moldeObligatorio ? 'Serial del molde revisado (obligatorio)' : 'Serial del molde revisado (opcional)'}
                                 className="h-7 w-28 shrink-0 bg-white border border-gray-300 rounded px-1.5 text-[#254153] font-bold text-[11px] outline-none disabled:opacity-50">
                                 <option value="">{selectedProduct && !moldesTipo.length ? 'Sin seriales' : 'Serial…'}</option>
                                 {moldesTipo.map(m => <option key={m.id} value={m.id}>{m.serial}</option>)}
+                                <option value="__escribir">✍️ No aparece – escribir</option>
                             </select>
-                        )}
+                        ))}
 
                         <button
                             onClick={handleSave}

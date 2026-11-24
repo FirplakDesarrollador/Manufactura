@@ -2,7 +2,7 @@
 
 import { createPortal } from 'react-dom';
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookOpenCheck, Loader2, X } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Eraser, Loader2, X } from 'lucide-react';
 import {
     ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList, ReferenceLine
 } from 'recharts';
@@ -10,11 +10,12 @@ import { supabase } from '@/lib/supabase';
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import FiltroPbi from '@/components/calidad/FiltroPbi';
 import {
-    HistoricoSP, META_SP, PLANTAS_SP,
+    HistoricoSP, META_SP, PLANTAS_SP, cargarPlantasSP, codigoPlantaSP,
     aliasPersonaSP, colorSemaforo, hoyIso, nombreHerramienta, nombrePlanta, promedio, semanaDe
 } from '@/lib/sistema-produccion/cumplimiento';
-import { REGLAS_INICIALES, completarReglas, type ReglasSP, type RolSP } from '@/lib/sistema-produccion/reglas';
-import { calcularCupos, type Ejecucion } from '@/lib/sistema-produccion/ejecuciones';
+import { REGLAS_INICIALES, completarReglas, nombreEnReglas, type ReglasSP, type RolSP } from '@/lib/sistema-produccion/reglas';
+import { calcularCuposVersiones, reglasVigentes, type Ejecucion, type VersionReglas } from '@/lib/sistema-produccion/ejecuciones';
+import { actualizarTrabajoEstandarizado, type TESemana } from '@/lib/sistema-produccion/trabajoEstandarizado';
 import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -26,6 +27,8 @@ const COLOR_LIM_INF = '#d14747';
 const colorColectivo = (v: number | null | undefined) =>
     v === null || v === undefined ? '#cbd5e1' : v >= LIM_SUP ? '#59a96a' : v >= LIM_INF ? '#deb841' : '#d14747';
 const SIN_PLANTA = 'Sin planta';
+// ¿Las plantas de un registro (varias si la persona tiene varias) entran en las plantas elegidas?
+const enPlantas = (suyas: string[], elegidas: string[]) => !elegidas.length || (suyas.length ? suyas.some(p => elegidas.includes(p)) : elegidas.includes(SIN_PLANTA));
 const fechaLocal = (v: string | null | undefined) => {
     if (!v) return '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
@@ -59,13 +62,15 @@ interface Obs {
     valor?: number;     // histórico
     ejec?: number;      // app: 1 ejecutada (o presente en la RRC), 0 no
     hist: boolean;
-    grupo?: string;     // app: herramienta (AF, OPT, OPTS, BIT o RRC)
+    grupo?: string;     // app: herramienta (AF, OPT, OPTS, BIT, RRC o TE)
+    valorApp?: number;  // app: % ya calculado (Trabajo Estandarizado por planta: 50 % cobertura + 50 % calidad HDT)
 }
+
 // Asistencia a la Respuesta Rápida Calidad (módulo RRC): la calificación es presentes ÷ registros, como su ranking
 interface AsistenciaRRC { fecha: string; responsable: string; estado: string }
 // Proceso de la RRC → planta del Sistema de Producción (Diseño, Ingeniería y Manufactura no son planta)
 const PLANTA_DE_PROCESO_RRC: Record<string, string> = {
-    'marmol sintetico': 'MS', 'muebles': 'MBLES', 'fibra de vidrio': 'FV', 'calidad': 'CALIDAD', 'cefi': 'CEFI', 'mantenimiento': 'MANTENIMIENTO',
+    'marmol sintetico': 'MS', 'muebles': 'MBL', 'fibra de vidrio': 'FV', 'calidad': 'CALID', 'cefi': 'CEFI', 'mantenimiento': 'MTTO',
 };
 interface Empleado { nombreCompleto: string; correo_electronico: string | null; cargo: string | null }
 interface Filtro { herr?: string | null; planta?: string | null; persona?: string | null }
@@ -74,19 +79,24 @@ interface Filtro { herr?: string | null; planta?: string | null; persona?: strin
 // herramientas: cada una ejecutadas ÷ exigidas según su frecuencia (RRC: días presente ÷ exigidos); así una herramienta
 // diaria no pesa más que una semanal. El periodo es el promedio de sus semanas, como el "PROMEDIO MENSUAL" del Excel.
 function resumen(obs: Obs[]) {
-    const semanas = new Map<string, { vals: number[]; grupos: Map<string, { ejec: number; total: number }> }>();
+    const semanas = new Map<string, { vals: number[]; grupos: Map<string, { ejec: number; total: number; pcts: number[] }> }>();
     obs.forEach(o => {
         if (!semanas.has(o.semana)) semanas.set(o.semana, { vals: [], grupos: new Map() });
         const s = semanas.get(o.semana)!;
         if (o.hist) { s.vals.push(o.valor!); return; }
         const g = o.grupo || '';
-        if (!s.grupos.has(g)) s.grupos.set(g, { ejec: 0, total: 0 });
-        const x = s.grupos.get(g)!; x.total += 1; x.ejec += o.ejec!;
+        if (!s.grupos.has(g)) s.grupos.set(g, { ejec: 0, total: 0, pcts: [] });
+        const x = s.grupos.get(g)!;
+        if (o.valorApp != null) { x.pcts.push(o.valorApp); return; }
+        x.total += 1; x.ejec += o.ejec!;
     });
+    // Cada herramienta pesa igual en la semana: las de frecuencia (ejecutadas ÷ exigidas) y TE (promedio de sus plantas)
+    const valorGrupo = (g: { ejec: number; total: number; pcts: number[] }) => (g.pcts.length ? promedio(g.pcts)! : (g.ejec / g.total) * 100);
     const valores = [...semanas.values()].map(s => (s.vals.length ? promedio(s.vals)!
-        : s.grupos.size ? promedio([...s.grupos.values()].map(g => (g.ejec / g.total) * 100))! : null))
+        : s.grupos.size ? promedio([...s.grupos.values()].map(valorGrupo))! : null))
         .filter((v): v is number => v !== null);
-    const opt = obs.filter(o => !o.hist && o.grupo !== 'RRC');
+    const te = obs.filter(o => !o.hist && o.valorApp != null);
+    const opt = obs.filter(o => !o.hist && o.grupo !== 'RRC' && o.valorApp == null);
     const rrc = obs.filter(o => !o.hist && o.grupo === 'RRC');
     return {
         valor: promedio(valores),
@@ -95,7 +105,8 @@ function resumen(obs: Obs[]) {
         ejecutadas: opt.reduce((a, o) => a + (o.ejec || 0), 0),
         rrcRegistros: rrc.length,
         rrcPresentes: rrc.reduce((a, o) => a + (o.ejec || 0), 0),
-        conHistorico: obs.some(o => o.hist)
+        conHistorico: obs.some(o => o.hist),
+        te: promedio(te.map(o => o.valorApp!))
     };
 }
 
@@ -132,6 +143,7 @@ const TooltipCumpl = ({ active, payload }: any) => {
             )}
             {d.programadas > 0 && <p className="flex justify-between gap-3"><span className="text-slate-600">Ejecutadas / exigidas</span><span className="font-black text-slate-800">{d.ejecutadas} / {d.programadas}</span></p>}
             {d.rrcRegistros > 0 && <p className="flex justify-between gap-3"><span className="text-slate-600">Asistencia RRC (presente / exigida)</span><span className="font-black text-slate-800">{d.rrcPresentes} / {d.rrcRegistros}</span></p>}
+            {d.te != null && <p className="flex justify-between gap-3"><span className="text-slate-600">Trabajo Estandarizado (HDT)</span><span className="font-black text-slate-800">{pct(d.te)}</span></p>}
             {d.semanas > 1 && <p className="text-[10px] text-slate-400">Promedio de {d.semanas} semanas</p>}
             {d.conHistorico && <p className="text-[10px] text-slate-400">Incluye histórico del Excel ILU</p>}
         </div>
@@ -157,6 +169,9 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     const [procesoPersonaRRC, setProcesoPersonaRRC] = useState<Map<string, string>>(new Map());
     const [loading, setLoading] = useState(true);
     const [errores, setErrores] = useState<string[]>([]);
+    const [teSemanal, setTeSemanal] = useState<TESemana[]>([]);
+    // Versiones de las reglas con su fecha de vigencia (cada semana se mide con la vigente en esa semana)
+    const [versiones, setVersiones] = useState<VersionReglas[]>([]);
 
     const [anios, setAnios] = useState<number[]>([anioActual]);
     const [meses, setMeses] = useState<number[]>([]);
@@ -182,6 +197,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         let vivo = true;
         (async () => {
             const errs: string[] = [];
+            await cargarPlantasSP();
             const [rg, hh, op, r, bt, pl, us, h, e, a, cr, cp] = await Promise.all([
                 supabase.from('sp_reglas_medicion').select('datos').eq('clave', 'reglas').maybeSingle(),
                 supabase.from('Hora_Hora').select('*').gte('fecha', '2026-01-01'),
@@ -205,9 +221,13 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             if (h.error) errs.push(`Histórico Excel ILU: ${h.error.message}${/does not exist|schema cache/.test(h.error.message) ? ' (falta ejecutar sistema_produccion_cumplimiento.sql)' : ''}`);
             if (e.error) errs.push(`Empleados: ${e.error.message}`);
             if (!vivo) return;
-            if (rg.data?.datos) setReglas(completarReglas(rg.data.datos as ReglasSP));
+            const reglasCargadas = completarReglas((rg.data?.datos as ReglasSP) || REGLAS_INICIALES);
+            if (rg.data?.datos) setReglas(reglasCargadas);
+            const vr = await supabase.from('sp_reglas_versiones').select('vigente_desde, datos').order('vigente_desde', { ascending: true });
+            if (vr.error) errs.push(`Versiones de las reglas: ${/sp_reglas_versiones|relation|schema cache/i.test(vr.error.message) ? 'falta ejecutar sp_reglas_versiones.sql; se usan las reglas actuales para todas las semanas' : vr.error.message}`);
+            else setVersiones(((vr.data || []) as { vigente_desde: string; datos: ReglasSP }[]).map(x => ({ desde: x.vigente_desde, reglas: completarReglas(x.datos) })));
             setCrudo({ hh: hh.data || [], opt: op.data || [], opts: r.data || [], bit: bt.data || [], plantas: pl.data || [], usuarios: us.data || [] });
-            setHistorico(((h.data as HistoricoSP[]) || []).map(x => ({ ...x, persona: x.persona ? aliasPersonaSP(x.persona) : x.persona, cumplimiento: Number(x.cumplimiento) })));
+            setHistorico(((h.data as HistoricoSP[]) || []).map(x => ({ ...x, planta: x.planta ? codigoPlantaSP(x.planta) : x.planta, persona: x.persona ? nombreEnReglas(aliasPersonaSP(x.persona), reglasCargadas) : x.persona, cumplimiento: Number(x.cumplimiento) })));
             setEmpleados((e.data as Empleado[]) || []);
             setAsistencias((a.data as AsistenciaRRC[]) || []);
             // Persona de la RRC → planta, según su proceso
@@ -220,8 +240,19 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             setProcesoPersonaRRC(pp);
             setErrores(errs);
             setLoading(false);
+
+            // Trabajo Estandarizado por planta (no bloquea el resto del tablero)
+            try {
+                const { filas, errores: errTE } = await actualizarTrabajoEstandarizado();
+                if (!vivo) return;
+                setTeSemanal(filas);
+                if (errTE.length) setErrores(prev => [...prev, ...errTE]);
+            } catch (e: any) {
+                if (vivo) setErrores(prev => [...prev, `Trabajo Estandarizado: ${e?.message || e}`]);
+            }
         })();
         return () => { vivo = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Personas: correo o nombre del agendamiento → nombre del empleado; el histórico trae nombres cortos
@@ -273,10 +304,19 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             ej.push({ herr: 'RRC', fecha, quien: completo, planta: procesoPersonaRRC.get(norm(completo)) || procesoPersonaRRC.get(norm(x.responsable)) || null });
         });
         const desde = finHistorico ? new Date(Date.parse(`${finHistorico}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : `${anioActual}-01-01`;
-        const { cupos, sinPersona } = calcularCupos(ej, reglas, desde, hoy);
+        const vs: VersionReglas[] = versiones.length ? versiones : [{ desde: '2000-01-03', reglas }];
+        const { cupos, sinPersona } = calcularCuposVersiones(ej, vs, desde, hoy);
         return { cuposApp: cupos.map(c => ({ ...c, persona: aliasPersonaSP(titulo(c.persona)), rolP: rolTablero(c.rol) })), sinPersona };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [crudo, reglas, finHistorico, hoy, empPorCorreo, asistencias, procesoPersonaRRC]);
+    }, [crudo, reglas, versiones, finHistorico, hoy, empPorCorreo, asistencias, procesoPersonaRRC]);
+
+    // Trabajo Estandarizado: un % por planta y semana (50 % cobertura + 50 % calidad HDT), según las reglas
+    const teApp = useMemo(() => {
+        return teSemanal.filter(x => {
+            const h = (reglasVigentes(versiones, x.fecha) || reglas).herramientas.find(y => y.codigo === 'TE');
+            return x.te != null && !!h && Object.values(h.roles).includes('aplica') && h.plantas[x.planta] !== 'no_aplica';
+        });
+    }, [teSemanal, reglas, versiones]);
 
     // RRC: se mide con los cupos de la frecuencia (cuposApp, herramienta RRC); ya no como presentes ÷ registros
     const rrcApp = useMemo(() => [] as { fecha: string; persona: string; rolP: Rol; planta: string | null; ejec: number }[], []);
@@ -299,11 +339,18 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             });
         }
         cuposApp.forEach(c => {
+            if (c.extra) return;
             if (f.herr && c.herr !== f.herr) return;
-            if (plantas.length && !plantas.includes(c.planta || SIN_PLANTA)) return;
+            if (!enPlantas(c.plantas, plantas)) return;
             if (f.persona && norm(c.persona) !== norm(f.persona)) return;
             const s = semanaDe(c.fecha);
             out.push({ fecha: c.fecha, semana: s.clave, viernes: s.viernes, ejec: c.ejec, hist: false, grupo: c.herr });
+        });
+        // TE es por planta: no entra cuando se mira una persona
+        if ((!f.herr || f.herr === 'TE') && !f.persona) teApp.forEach(x => {
+            if (plantas.length && !plantas.includes(x.planta)) return;
+            const s = semanaDe(x.fecha);
+            out.push({ fecha: x.fecha, semana: x.semana, viernes: s.viernes, valorApp: x.te!, hist: false, grupo: 'TE' });
         });
         if (!f.herr || f.herr === 'RRC') rrcApp.forEach(x => {
             if (plantas.length && !plantas.includes(x.planta || SIN_PLANTA)) return;
@@ -336,8 +383,9 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         historico.forEach(h => s.add(semanaDe(h.fecha).viernes));
         cuposApp.forEach(c => s.add(c.fecha));
         rrcApp.forEach(x => s.add(x.fecha));
+        teApp.forEach(x => s.add(x.fecha));
         return [...s].sort();
-    }, [historico, cuposApp, rrcApp]);
+    }, [historico, cuposApp, rrcApp, teApp]);
     const aniosDisponibles = useMemo(() => {
         const s = new Set(fechasConDato.map(f => Number(f.slice(0, 4))));
         s.add(anioActual);
@@ -366,7 +414,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     // 1) Cumplimiento general FIRPLAK en el tiempo
     const obsGeneral = useMemo(() => observaciones(cruce()).filter(pasaPeriodo),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [historico, cuposApp, rrcApp, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
+        [historico, cuposApp, rrcApp, teApp, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
     const columnasDe = (gran: Gran, mes: string | null = null) => {
         const g = new Map<string, Obs[]>();
         obsGeneral.forEach(o => {
@@ -398,18 +446,19 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         historico.forEach(h => { if (h.herramienta) codigos.add(h.herramienta); });
         cuposApp.forEach(c => codigos.add(c.herr));
         if (rrcApp.length) codigos.add('RRC');
+        if (teApp.length) codigos.add('TE');
         return [...codigos].map(c => ({ key: c, nombre: nombreHerramienta(c), ...categoria({ ...cruce('herr'), herr: c }) }))
             .filter(x => x.valor !== null).sort((a, b) => b.valor! - a.valor!);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [historico, cuposApp, rrcApp, selPlanta, selPersona, selPeriodo, sel, plantasSel, anios, meses, semanasSel, diasSel]);
+    }, [historico, cuposApp, rrcApp, teApp, selPlanta, selPersona, selPeriodo, sel, plantasSel, anios, meses, semanasSel, diasSel]);
     const porPlanta = useMemo(() => {
         const plantas = plantasSel.length ? [...plantasSel] : PLANTAS_SP.map(p => p.value);
-        if (!plantasSel.length && (cuposApp.some(c => !c.planta) || rrcApp.some(x => !x.planta))) plantas.push(SIN_PLANTA);
+        if (!plantasSel.length && (cuposApp.some(c => !c.plantas.length) || rrcApp.some(x => !x.planta))) plantas.push(SIN_PLANTA);
         return plantas.map(p => ({ key: p, nombre: p, titulo: p === SIN_PLANTA ? SIN_PLANTA : `${p} · ${nombrePlanta(p)}`, ...categoria({ ...cruce('planta'), planta: p }) }))
-            .filter(x => x.valor !== null || x.key !== SIN_PLANTA)
+            .filter(x => x.valor !== null)
             .sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1) || a.key.localeCompare(b.key));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [historico, cuposApp, rrcApp, selHerr, selPersona, selPeriodo, sel, plantasSel, anios, meses, semanasSel, diasSel]);
+    }, [historico, cuposApp, rrcApp, teApp, selHerr, selPersona, selPeriodo, sel, plantasSel, anios, meses, semanasSel, diasSel]);
     const personas = useMemo(() => {
         const m = new Map<string, { nombre: string; rol: Rol }>();
         historico.forEach(h => { if (h.nivel === 'persona' && h.persona) m.set(norm(h.persona), { nombre: titulo(h.persona), rol: (h.rol as Rol) || 'Otro' }); });
@@ -422,7 +471,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         .map(p => ({ key: p.nombre, nombre: p.nombre, rol: p.rol, ...categoria({ ...cruce('persona'), persona: p.nombre }) }))
         .filter(x => x.valor !== null).sort((a, b) => b.valor! - a.valor!),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [personas, rol, historico, cuposApp, rrcApp, selHerr, selPlanta, selPeriodo, sel, plantasSel, anios, meses, semanasSel, diasSel]);
+        [personas, rol, historico, cuposApp, rrcApp, teApp, selHerr, selPlanta, selPeriodo, sel, plantasSel, anios, meses, semanasSel, diasSel]);
 
     // Tarjetas: periodos fijos (hoy, semana, mes y año en curso) con el filtro cruzado; la general con los filtros
     const kpiDe = (pasa: (o: Obs) => boolean) => resumen(observaciones(cruce()).filter(pasa));
@@ -446,17 +495,17 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     // con los filtros del encabezado, la columna elegida (semana, día o mes) y los filtros cruzados (herramienta,
     // planta, persona)
     const detalle = useMemo(() => {
-        const filas: { fecha: string; semana: string; persona: string; rol: string; herr: string; planta: string; resultado: string; ok: boolean | null; hist: boolean }[] = [];
+        const filas: { fecha: string; semana: string; persona: string; rol: string; herr: string; planta: string; resultado: string; ok: boolean | null; hist: boolean; te?: number; plantas?: string[]; extra?: boolean }[] = [];
         const plantas = selPlanta ? [selPlanta] : plantasSel;
         cuposApp.forEach(c => {
             const sm = semanaDe(c.fecha);
             const o = { fecha: c.fecha, semana: sm.clave, viernes: sm.viernes, hist: false } as Obs;
             if (!pasaPeriodo(o) || !enSel(o)) return;
             if (selHerr && c.herr !== selHerr) return;
-            if (plantas.length && !plantas.includes(c.planta || SIN_PLANTA)) return;
+            if (!enPlantas(c.plantas, plantas)) return;
             if (selPersona && norm(c.persona) !== norm(selPersona)) return;
-            filas.push({ fecha: c.fecha, semana: `S${sm.semana}`, persona: c.persona, rol: c.rolP, herr: nombreHerramienta(c.herr), planta: c.planta || SIN_PLANTA,
-                resultado: c.ejec ? 'Ejecutada' : 'No ejecutada', ok: !!c.ejec, hist: false });
+            filas.push({ fecha: c.fecha, semana: `S${sm.semana}`, persona: c.persona, rol: c.rolP, herr: nombreHerramienta(c.herr), planta: c.plantas.join(', ') || SIN_PLANTA, plantas: c.plantas.length ? c.plantas : [SIN_PLANTA],
+                resultado: c.extra ? 'Ejecutada (adicional)' : c.ejec ? 'Ejecutada' : 'No ejecutada', ok: !!c.ejec, hist: false, extra: !!c.extra });
         });
         historico.forEach(h => {
             if (h.nivel !== 'persona' || !h.persona) return;
@@ -469,30 +518,54 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             filas.push({ fecha: sm.viernes, semana: `S${sm.semana}`, persona: titulo(h.persona), rol: h.rol || '—', herr: h.herramienta ? nombreHerramienta(h.herramienta) : 'Todas (Excel)',
                 planta: '—', resultado: `${Number(h.cumplimiento).toFixed(1)} %`, ok: h.cumplimiento >= META_SP ? true : h.cumplimiento < LIM_INF ? false : null, hist: true });
         });
+        if ((!selHerr || selHerr === 'TE') && !selPersona) teApp.forEach(x => {
+            const sm = semanaDe(x.fecha);
+            const o = { fecha: x.fecha, semana: x.semana, viernes: sm.viernes, hist: false } as Obs;
+            if (!pasaPeriodo(o) || !enSel(o)) return;
+            if (plantas.length && !plantas.includes(x.planta)) return;
+            const f1 = (v: number | null) => (v == null ? '—' : `${v.toFixed(1)} %`);
+            filas.push({ fecha: x.fecha, semana: `S${sm.semana}`, persona: '—', rol: 'Planta', herr: nombreHerramienta('TE'), planta: x.planta, plantas: [x.planta],
+                resultado: `${f1(x.te)} (cobertura ${f1(x.cobertura)} · calidad HDT ${f1(x.calidad)})`, ok: x.te! >= META_SP ? true : x.te! < LIM_INF ? false : null, hist: false, te: x.te! });
+        });
         return filas.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.persona.localeCompare(b.persona) || a.herr.localeCompare(b.herr));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cuposApp, historico, sel, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
-    type Conteo = { exig: number; ejec: number }
-    const resumenDe = (clave: (f: typeof detalle[number]) => string) => {
-        const m = new Map<string, { exigidas: number; ejecutadas: number; hist: number[]; herr: Map<string, Conteo>; pers: Map<string, Conteo>; fechas: Set<string>; roles: Set<string>; plantas: Set<string> }>();
-        detalle.forEach(f => {
-            const k = clave(f);
+    }, [cuposApp, teApp, historico, sel, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
+    type Conteo = { exig: number; ejec: number; pcts?: number[]; extra?: number }
+    const resumenDe = (clave: (f: typeof detalle[number]) => string | string[]) => {
+        const m = new Map<string, { exigidas: number; ejecutadas: number; hist: number[]; adicionales: number; herr: Map<string, Conteo>; pers: Map<string, Conteo>; fechas: Set<string>; roles: Set<string>; plantas: Set<string> }>();
+        detalle.forEach(f => { ([] as string[]).concat(clave(f)).forEach(k => {
             if (!k || k === '—') return;
-            if (!m.has(k)) m.set(k, { exigidas: 0, ejecutadas: 0, hist: [], herr: new Map(), pers: new Map(), fechas: new Set(), roles: new Set(), plantas: new Set() });
+            if (!m.has(k)) m.set(k, { exigidas: 0, ejecutadas: 0, hist: [], adicionales: 0, herr: new Map(), pers: new Map(), fechas: new Set(), roles: new Set(), plantas: new Set() });
             const x = m.get(k)!;
             if (f.rol && f.rol !== '—') x.roles.add(f.rol);
             if (f.hist) { x.hist.push(parseFloat(f.resultado)); return; }
+            if (f.te != null) {
+                const h = x.herr.get(f.herr) || { exig: 0, ejec: 0, pcts: [] }; (h.pcts ||= []).push(f.te); x.herr.set(f.herr, h);
+                (f.plantas || []).forEach(p => x.plantas.add(p));
+                return;
+            }
+            if (f.extra) {
+                // Adicional: se ve en ejecutadas y fechas, pero no cambia lo exigido ni el cumplimiento
+                x.adicionales += 1; x.fechas.add(f.fecha);
+                const ha = x.herr.get(f.herr) || { exig: 0, ejec: 0 }; ha.extra = (ha.extra || 0) + 1; x.herr.set(f.herr, ha);
+                const pa = x.pers.get(f.persona) || { exig: 0, ejec: 0 }; pa.extra = (pa.extra || 0) + 1; x.pers.set(f.persona, pa);
+                (f.plantas || []).forEach(p => x.plantas.add(p));
+                return;
+            }
             x.exigidas += 1;
             if (f.ok) { x.ejecutadas += 1; x.fechas.add(f.fecha); }
             const h = x.herr.get(f.herr) || { exig: 0, ejec: 0 }; h.exig += 1; if (f.ok) h.ejec += 1; x.herr.set(f.herr, h);
             const pe = x.pers.get(f.persona) || { exig: 0, ejec: 0 }; pe.exig += 1; if (f.ok) pe.ejec += 1; x.pers.set(f.persona, pe);
-            if (f.planta && f.planta !== '—') x.plantas.add(f.planta);
-        });
+            (f.plantas || []).forEach(p => x.plantas.add(p));
+        }); });
         return [...m.entries()].map(([nombre, x]) => {
-            const pct = x.exigidas ? (x.ejecutadas / x.exigidas) * 100 : (promedio(x.hist) ?? 0);
+            // Con TE (un % por planta): promedio de las herramientas, cada una con su %; sin TE, ejecutadas ÷ exigidas
+            const pctsTE = [...x.herr.values()].flatMap(h => h.pcts || []);
+            const pctHerr = (h: Conteo) => (h.pcts?.length ? promedio(h.pcts)! : h.exig ? (h.ejec / h.exig) * 100 : 0);
+            const pct = pctsTE.length ? promedio([...x.herr.values()].map(pctHerr))! : x.exigidas ? (x.ejecutadas / x.exigidas) * 100 : (promedio(x.hist) ?? 0);
             const personas = [...x.pers.entries()].map(([n, c]) => ({ n, ...c, cumple: c.exig > 0 && (c.ejec / c.exig) * 100 >= META_SP }))
             return {
-                nombre, exigidas: x.exigidas, ejecutadas: x.ejecutadas, pct, cumple: pct >= META_SP, soloExcel: !x.exigidas,
+                nombre, exigidas: x.exigidas, ejecutadas: x.ejecutadas, adicionales: x.adicionales, pct, cumple: pct >= META_SP, soloExcel: !x.exigidas && !pctsTE.length,
                 herramientas: [...x.herr.entries()].map(([n, c]) => ({ n, ...c })).sort((a, b) => a.n.localeCompare(b.n)),
                 fechas: [...x.fechas].sort().reverse(),
                 personas, personasNoCumplen: personas.filter(q => !q.cumple).map(q => q.n).sort(),
@@ -507,7 +580,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     const resumenHerramienta = useMemo(() => resumenDe(f => (f.hist ? '' : f.herr)),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [detalle]);
-    const resumenPlanta = useMemo(() => resumenDe(f => (f.hist ? '' : f.planta)),
+    const resumenPlanta = useMemo(() => resumenDe(f => (f.hist ? [] : f.plantas || [])),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [detalle]);
     const [buscaDetalle, setBuscaDetalle] = useState('');
@@ -517,6 +590,9 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     }, [detalle, buscaDetalle]);
 
     const quitarTodo = () => { setMesSeg(null); setSelPeriodo(null); setSelHerr(null); setSelPlanta(null); setSelPersona(null); };
+    // Borrar filtros: lo elegido en las gráficas y los filtros del encabezado (el año vuelve al año en curso)
+    const hayFiltros = !!(mesSeg || sel || selHerr || selPlanta || selPersona || plantasSel.length || meses.length || semanasSel.length || diasSel.length || rol !== 'todos' || anios.length !== 1 || anios[0] !== anioActual);
+    const borrarFiltros = () => { quitarTodo(); setPlantasSel([]); setAnios([anioActual]); setMeses([]); setSemanasSel([]); setDiasSel([]); setRol('todos'); };
 
     const cargador = <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
     const vacio = (t: string) => <div className="h-full flex items-center justify-center text-xs font-bold text-slate-500 text-center px-4">{t}</div>;
@@ -557,7 +633,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
 
     // Barras horizontales de una categoría: clic = filtro cruzado; la elegida queda resaltada
     const barrasCategoria = (datos: any[], sel: string | null, onSel: (k: string | null) => void, anchoEje = 128) => (
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" debounce={80} style={{ overflow: 'hidden' }}>
             <BarChart data={datos} layout="vertical" margin={{ top: 4, right: 44, left: 4, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={v => `${v}%`} />
@@ -587,6 +663,11 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                             title="Ver las reglas con las que se mide el cumplimiento">
                             <BookOpenCheck className="w-3.5 h-3.5" /> Reglas de Medición del Sistema
                         </a>
+                        <button type="button" onClick={borrarFiltros} disabled={!hayFiltros}
+                            className="px-2 py-0.5 bg-white border border-[#e2ded5] hover:bg-[#F6F3EE] text-[#324354] rounded-lg text-[11px] font-bold flex items-center gap-1 whitespace-nowrap disabled:opacity-40 disabled:cursor-default"
+                            title="Quita lo elegido en las gráficas y los filtros Planta, Mes, Semana y Día (el año vuelve al año en curso)">
+                            <Eraser className="w-3.5 h-3.5" /> Borrar filtros
+                        </button>
                     </div>
                     <div className="flex flex-wrap items-start gap-1.5 w-full lg:w-auto">
                         <FiltroPbi compacto titulo="Planta" seleccion={plantasSel} opciones={PLANTAS_SP.map(p => ({ value: p.value, label: `${p.value} · ${p.label}` }))}
@@ -679,7 +760,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                     <div className="lg:col-span-3 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200">
                         <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5 truncate">Cumplimiento por Herramienta</h3>
                         {/* Alto mínimo por barra para que los nombres no se monten; si no caben, se desplaza */}
-                        <div className="h-[var(--sp-h)] w-full overflow-y-auto">
+                        <div className="h-[var(--sp-h)] w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
                             {loading ? cargador : !porHerramienta.length ? vacio('Sin datos por herramienta.') : (
                                 <div style={{ height: `max(100%, ${porHerramienta.length * 30 + 30}px)` }}>{barrasCategoria(porHerramienta, selHerr, setSelHerr, 112)}</div>
                             )}
@@ -687,7 +768,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                     </div>
                     <div className="lg:col-span-4 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200">
                         <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5 truncate">Cumplimiento por Planta</h3>
-                        <div className="h-[var(--sp-h)] w-full overflow-y-auto">
+                        <div className="h-[var(--sp-h)] w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
                             {loading ? cargador : !porPlanta.length ? vacio('Sin datos por planta.') : (
                                 <div style={{ height: `max(100%, ${porPlanta.length * 20 + 30}px)` }}>{barrasCategoria(porPlanta, selPlanta, setSelPlanta, 92)}</div>
                             )}
@@ -703,7 +784,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                                 ))}
                             </div>
                         </div>
-                        <div className="h-[var(--sp-h)] w-full overflow-y-auto">
+                        <div className="h-[var(--sp-h)] w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
                             {loading ? cargador : !porPersona.length ? vacio('Sin datos por persona.') : (
                                 <div style={{ height: Math.max(porPersona.length * 24 + 16, 180) }}>
                                     {barrasCategoria(porPersona, selPersona, setSelPersona, 170)}
@@ -752,8 +833,8 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                                                 <td className="px-2 py-1.5 min-w-[220px]">
                                                     <div className="flex flex-wrap gap-1">
                                                         {f.herramientas.map(h => (
-                                                            <span key={h.n} className={`px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${h.exig && (h.ejec / h.exig) * 100 >= META_SP ? 'bg-emerald-50 text-emerald-700' : h.ejec ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
-                                                                {h.n} {h.ejec}/{h.exig}
+                                                            <span key={h.n} className={`px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${(h.pcts?.length ? promedio(h.pcts)! : h.exig ? (h.ejec / h.exig) * 100 : 0) >= META_SP ? 'bg-emerald-50 text-emerald-700' : h.ejec || h.pcts?.length ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
+                                                                {h.n} {h.pcts?.length ? `${promedio(h.pcts)!.toFixed(1)} %` : `${h.ejec + (h.extra || 0)}/${h.exig}`}
                                                             </span>
                                                         ))}
                                                         {!f.herramientas.length && <span className="text-slate-400">—</span>}
@@ -764,7 +845,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                                                 {f.fechas.length ? <>{f.fechas.slice(0, 10).map(x => x.slice(8, 10) + '/' + x.slice(5, 7)).join(', ')}{f.fechas.length > 10 && <span className="text-slate-400"> +{f.fechas.length - 10} más</span>}</> : <span className="text-rose-600 font-bold">Ninguna</span>}
                                             </td>
                                             <td className="px-2 py-1.5 text-right">{f.exigidas || '—'}</td>
-                                            <td className="px-2 py-1.5 text-right text-emerald-700 font-bold">{f.exigidas ? f.ejecutadas : '—'}</td>
+                                            <td className="px-2 py-1.5 text-right text-emerald-700 font-bold" title={f.adicionales ? `${f.ejecutadas} de lo exigido + ${f.adicionales} adicional(es) (no suben el cumplimiento por encima de 100 %)` : undefined}>{f.exigidas || f.adicionales ? f.ejecutadas + f.adicionales : '—'}</td>
                                             <td className="px-2 py-1.5 text-right text-rose-700 font-bold">{f.exigidas ? f.exigidas - f.ejecutadas : '—'}</td>
                                             <td className="px-2 py-1.5 text-right font-black whitespace-nowrap">{f.pct.toFixed(1)} %</td>
                                             <td className="px-2 py-1.5 text-right">
@@ -785,7 +866,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                         <h3 className="text-xs sm:text-sm font-black text-slate-800">
                             Detalle de lo calificado{chips.length ? ` · ${chips.map(c => c.texto).join(' · ')}` : ' · periodo de los filtros'}
                             <span className="ml-2 text-[10px] font-bold text-slate-500">
-                                {detalle.filter(f => !f.hist && f.ok).length} de {detalle.filter(f => !f.hist).length} ejecutadas{detalle.some(f => f.hist) ? ` · ${detalle.filter(f => f.hist).length} semana(s) del Excel` : ''}
+                                {detalle.filter(f => !f.hist && f.ok && !f.extra && f.te == null).length} de {detalle.filter(f => !f.hist && !f.extra && f.te == null).length} ejecutadas{detalle.some(f => f.extra) ? ` · ${detalle.filter(f => f.extra).length} adicional(es)` : ''}{detalle.some(f => f.hist) ? ` · ${detalle.filter(f => f.hist).length} semana(s) del Excel` : ''}
                             </span>
                         </h3>
                         <input value={buscaDetalle} onChange={e => setBuscaDetalle(e.target.value)} placeholder="Buscar persona, herramienta, planta…"

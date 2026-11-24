@@ -275,8 +275,10 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
         const ciclosTotales = validCycles.length;
         const tiempoPromedio = ciclosTotales > 0 ? validCycles.reduce((s, c) => s + c.duracion, 0) / ciclosTotales : 0;
         const piezasReales = ciclosTotales;
-        // Igual que en el wizard: tiempo medido de los ciclos válidos / ciclo teórico, sin redondear.
-        // Con Math.floor un solo ciclo más rápido que el teórico (1919 s vs 2040 s) daba 0 piezas teóricas y 0% de rendimiento.
+        // Misma fórmula que al registrar (lib/store.ts): tiempo medido = suma de los ciclos válidos (ya editados);
+        // piezas teóricas = tiempo medido ÷ ciclo teórico, sin redondear (antes se redondeaba hacia abajo con el
+        // tiempo total viejo y casi siempre daba 100 %, o 0 % con un solo ciclo más rápido que el teórico);
+        // rendimiento = reales ÷ teóricas = teórico ÷ promedio real
         const tiempoTotal = validCycles.reduce((s, c) => s + c.duracion, 0);
         const piezasTeoricas = tiempoCicloTeorico > 0 ? tiempoTotal / tiempoCicloTeorico : 0;
         const rendimiento = piezasTeoricas > 0 ? (piezasReales / piezasTeoricas) * 100 : 0;
@@ -292,7 +294,7 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
             planta, linea, puesto, operario, tiempoCicloTeorico,
             realizadoPor,
             compromiso,
-            ciclos, ciclosTotales, tiempoPromedio, tiempoTotal, piezasReales, piezasTeoricas, rendimiento,
+            ciclos, ciclosTotales, tiempoTotal, tiempoPromedio, piezasReales, piezasTeoricas, rendimiento,
             piezasTotalesCalidad: piezasTotales,
             piezasBuenas,
             piezasDefectuosas: defectos,

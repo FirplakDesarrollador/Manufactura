@@ -27,6 +27,7 @@ export interface MsReporteRaw {
     defecto: any;
     Reparacion?: string | null;
     producto?: { Referencia?: string | null } | null;
+    molde_manual?: string | null;   // RMOLD: nombre del molde escrito a mano
 }
 
 export interface MsDefectoCatalogo {
@@ -156,6 +157,7 @@ export function normalizarPiezas(
             referencia:
                 r.producto?.Referencia ||
                 (r.producto_id != null && productos?.get(Number(r.producto_id))) ||
+                (r.molde_manual ? `${r.molde_manual} (escrito)` : '') ||
                 (!esMs && r.producto_id == null ? 'Histórico (sin molde)' : `Producto #${r.producto_id ?? '-'}`),
             defectos,
             esBuena,
@@ -383,7 +385,7 @@ export async function fetchMsReportes(
     opciones: { soloConFoto?: boolean } = {},
     planta: PlantaCalidad = MS
 ): Promise<MsReporteRaw[]> {
-    const cols = columnas ?? `id, created_at, producto_id, defecto, Reparacion, producto:${planta.tReferencias} (Referencia)`;
+    const cols = (columnas ?? `id, created_at, producto_id, defecto, Reparacion, producto:${planta.tReferencias} (Referencia)`) + (planta.conSerial ? ', molde_manual' : '');
     let countQuery = client
         .from(planta.tReportes)
         .select('id', { count: 'exact', head: true })
