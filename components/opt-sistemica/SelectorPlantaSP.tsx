@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { PLANTAS_SP } from '@/lib/sistema-produccion/cumplimiento';
+import React, { useEffect, useState } from 'react';
+import { PLANTAS_SP, cargarPlantasSP } from '@/lib/sistema-produccion/cumplimiento';
 
 // Planta o área donde se hace la OPT / programación: alimenta el cumplimiento por planta
 // del tablero de Estadísticas de Producción.
@@ -10,6 +10,9 @@ export default function SelectorPlantaSP({ value, onChange, label = 'Planta / Á
   onChange: (v: string) => void;
   label?: string;
 }) {
+  // Plantas activas de la Nomenclatura de Plantas (las nuevas aparecen solas)
+  const [, setListas] = useState(0);
+  useEffect(() => { cargarPlantasSP().then(() => setListas(n => n + 1)); }, []);
   return (
     <div style={{ marginTop: '16px' }}>
       <label

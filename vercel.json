@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/revision-entrega",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/te-semanal",
+      "schedule": "0 4 * * 1"
     }
   ]
 }

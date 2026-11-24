@@ -4,7 +4,7 @@
 // Valores iniciales tomados del Excel "ILU CONSOLIDADO 1.xlsx" (hojas Lider, Supervisores, Jefes, % SUPERVISORES,
 // % JEFES, LIDERES %, Herramienta y RRC).
 
-import { PLANTAS_SP } from './cumplimiento'
+import { PLANTAS_SP, codigoPlantaSP } from './cumplimiento'
 
 export type EstadoRegla = 'aplica' | 'no_aplica' | 'formacion' | 'por_definir'
 export const ESTADOS_REGLA: Record<EstadoRegla, { label: string; corto: string; clase: string; ayuda: string }> = {
@@ -44,9 +44,10 @@ export type ReglasSP = {
     calculo: string[]                // cómo se calcula (texto)
     herramientas: HerramientaRegla[]
     personas: Record<RolSP, string[]>
-    // Planta de cada persona (código de planta, "TRANSVERSAL" si cubre varias, vacío = por definir).
-    // Se usa para el total de revisiones esperadas por planta.
-    plantaPersona?: Record<string, string>
+    // Plantas de cada persona (códigos de planta; vacía = por definir). Una persona puede tener varias: cuenta en cada
+    // una de sus plantas (el indicador de cada planta promedia a todas sus personas). Antes era un solo código o
+    // "TRANSVERSAL" (se lee como lista; "TRANSVERSAL" queda sin planta para que se definan las plantas).
+    plantaPersona?: Record<string, string | string[]>
 }
 // RRC: días con asistencia "Presente" en el módulo RRC contra la frecuencia de las reglas (por ahora solo asistencia;
 // a futuro se medirá la robustez de la RRC y el cierre de los temas abiertos)
@@ -58,8 +59,15 @@ export const FUENTES_AUTO: Record<string, string> = {
     OPTS: 'App · Historial OPT Sistémica (automático)',
     BIT: 'App · Historial Bitácora (automático)',
     RRC: FUENTE_RRC,
+    TE: 'App · HDT por planta (automático): 50 % Cobertura del puesto + 50 % Calidad de la HDT',
 }
 export const TRANSVERSAL = 'TRANSVERSAL'
+/** Plantas de una persona según las reglas (lista; acepta el formato viejo de un solo código). */
+export function plantasDePersona(reglas: Pick<ReglasSP, 'plantaPersona'> | null | undefined, nombre: string): string[] {
+    const v = reglas?.plantaPersona?.[nombre]
+    const l = Array.isArray(v) ? v : v ? [v] : []
+    return [...new Set(l.filter(p => p && p !== TRANSVERSAL).map(codigoPlantaSP))]
+}
 
 // Garantes del Sistema de Producción: únicos que pueden modificar las reglas
 // (Estiven Londoño tiene dos correos: el del directorio y el que usa en la app)
@@ -72,14 +80,17 @@ export const esGaranteSP = (email?: string | null) =>
     !!email && GARANTES_SP.some(g => g.correos.includes(email.trim().toLowerCase()))
 
 // Plantas: 'A' aplica, '0' = 0 % en el Excel (se contaba en el promedio, pero hay que confirmar si aplica), 'N' sin dato
+// (las marcas siguen el orden viejo de 11 plantas; las demás plantas quedan "Por definir")
+const ORDEN_VIEJO = ['FV', 'MS', 'MBL', 'CEFI', 'CALID', 'MOLD', 'CEDI', 'ALM', 'MTTO', 'RMOLD', 'SG']
 const plantas = (marcas: string): Record<string, EstadoRegla> => {
     const m: Record<string, EstadoRegla> = {}
-    PLANTAS_SP.forEach((p, i) => { m[p.value] = marcas[i] === 'A' ? 'aplica' : 'por_definir' })
+    PLANTAS_SP.forEach(p => { m[p.value] = 'por_definir' })
+    ORDEN_VIEJO.forEach((p, i) => { m[p] = marcas[i] === 'A' ? 'aplica' : 'por_definir' })
     return m
 }
 const roles = (l: EstadoRegla, s: EstadoRegla, j: EstadoRegla, g: EstadoRegla = 'no_aplica'): Record<RolSP, EstadoRegla> => ({ 'Líder': l, 'Supervisor': s, 'Jefe': j, 'Gerente': g })
 
-// Orden de plantas: FV, MS, MBLES, CEFI, CALIDAD, MOLDES, CEDI, ALMACEN, MANTENIMIENTO, RR MOLDES, SERVICIOS
+// Orden de las marcas: FV, MS, MBL, CEFI, CALID, MOLD, CEDI, ALM, MTTO, RMOLD, SG
 export const REGLAS_INICIALES: ReglasSP = {
     metaIndividual: 90,
     limiteSuperior: 80,
@@ -89,7 +100,7 @@ export const REGLAS_INICIALES: ReglasSP = {
         'Cada semana vale su porcentaje; un mes o un año es el promedio de sus semanas (como el "PROMEDIO MENSUAL" del Excel ILU).',
         'Meta individual (por herramienta, planta y persona): 90 %.',
         'Cumplimiento colectivo FIRPLAK: límite superior 80 % y límite inferior 60 % (gráficas por mes y de seguimiento).',
-        'Frecuencia mínima por semana: Hora-Hora 4 por supervisor (3 en semanas con festivo); OPT 1 por supervisor; OPT Sistémica 1 por jefe o coordinador. Gerente: OPT Sistémica 1 por mes.',
+        'Frecuencia mínima por semana: Hora-Hora 4 por supervisor (3 en semanas con festivo); OPT Operativa 1 por supervisor; OPT Sistémica 1 por jefe o coordinador. Gerente: OPT Sistémica 1 por mes.',
         'Hasta la semana del 24/10/2026 se usa el histórico del Excel ILU CONSOLIDADO; desde la semana siguiente calcula la app.',
         'En el Excel, una planta con 0 % se promediaba igual que las demás: por eso esas casillas quedan "Por definir" hasta que los garantes confirmen si aplica.',
     ],
@@ -101,7 +112,7 @@ export const REGLAS_INICIALES: ReglasSP = {
         { codigo: 'GI', nombre: 'Gestión de Indicadores', fuente: 'App · Agendamiento OPT Sistémica', roles: roles('no_aplica', 'aplica', 'aplica'), plantas: plantas('AAAAAA00AA0') },
         { codigo: '5S', nombre: "5'S", fuente: 'Sin medición (solo plan de formación)', nota: 'Aparece en el plan de formación de supervisores y jefes, pero no en sus hojas de cumplimiento.', roles: roles('no_aplica', 'formacion', 'formacion'), plantas: plantas('NNNNNNNNNNN') },
         { codigo: 'RRC', nombre: 'Respuesta Rápida Calidad (RRC)', fuente: FUENTE_RRC, nota: 'Plantas según la asistencia RRC del Excel; Mantenimiento no aparece.', roles: roles('no_aplica', 'aplica', 'aplica'), plantas: plantas('AAA0A00A0A0') },
-        { codigo: 'OPT', nombre: 'OPT', fuente: 'App · Agendamiento OPT Sistémica', roles: roles('no_aplica', 'aplica', 'aplica'), plantas: plantas('0AAAA000000'), frecuencia: { 'Supervisor': { semana: 1, festivo: 1 } } },
+        { codigo: 'OPT', nombre: 'OPT Operativa', fuente: 'App · Agendamiento OPT Sistémica', roles: roles('no_aplica', 'aplica', 'aplica'), plantas: plantas('0AAAA000000'), frecuencia: { 'Supervisor': { semana: 1, festivo: 1 } } },
         { codigo: 'OPTS', nombre: 'OPT Sistémica', fuente: 'Solo histórico Excel ILU', roles: roles('no_aplica', 'no_aplica', 'aplica', 'aplica'), plantas: plantas('AAAAAA00AA0'), frecuencia: { 'Jefe': { semana: 1, festivo: 1 }, 'Gerente': { semana: 1, periodo: 'mes' } } },
         { codigo: 'MA', nombre: 'Mantenimiento Autónomo', fuente: 'App · Agendamiento OPT Sistémica', nota: 'Existe en la app, pero no en el Excel ILU: sin regla definida.', roles: roles('por_definir', 'por_definir', 'por_definir'), plantas: plantas('NNNNNNNNNNN') },
         { codigo: 'BE', nombre: 'Bajas Estadísticas', fuente: 'App · Agendamiento OPT Sistémica', nota: 'Existe en la app, pero no en el Excel ILU: sin regla definida.', roles: roles('por_definir', 'por_definir', 'por_definir'), plantas: plantas('NNNNNNNNNNN') },
@@ -204,6 +215,25 @@ export const RENOMBRES_PERSONAS: Record<string, string> = {
     'Sara Aguilar': 'Sara María Aguilar Sierra',
 }
 
+/**
+ * Nombre de una persona tal como está en las Reglas (nombre completo). El histórico del Excel usa nombres cortos
+ * ("Osnar Mejia"): primero la tabla de renombres; si no, la persona de las reglas cuyo nombre contiene todas las
+ * palabras ("mejia" ⊂ "mejias"), solo si hay una sola. Si no se reconoce, queda el nombre como venía.
+ */
+export function nombreEnReglas(nombre: string, reglas: Pick<ReglasSP, 'personas'>): string {
+    const n = (x: string) => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[.\s]+/g, ' ').trim()
+    const k = n(nombre || '')
+    if (!k) return nombre
+    const ren = Object.entries(RENOMBRES_PERSONAS).find(([a]) => n(a) === k)
+    if (ren) return ren[1]
+    const todas = [...new Set(Object.values(reglas.personas || {}).flat())]
+    const exacta = todas.find(p => n(p) === k)
+    if (exacta) return exacta
+    const pal = k.split(' ')
+    const cand = todas.filter(p => { const w = n(p).split(' '); return pal.every(x => w.some(y => y.startsWith(x))) })
+    return cand.length === 1 ? cand[0] : nombre
+}
+
 // Reglas guardadas antes de que existiera un campo: se completan con los valores iniciales (por código de herramienta)
 export function completarReglas(r: ReglasSP): ReglasSP {
     const ini = new Map(REGLAS_INICIALES.herramientas.map(h => [h.codigo, h]))
@@ -213,15 +243,21 @@ export function completarReglas(r: ReglasSP): ReglasSP {
     const personas = Object.fromEntries(Object.entries(r.personas).map(([rol, l]) => [rol, [...new Set((l || []).map(ren))]])) as ReglasSP['personas']
     for (const rol of ROLES_SP) if (!personas[rol]) personas[rol] = [...(REGLAS_INICIALES.personas[rol] || [])]
     const guardadas = Object.fromEntries(Object.entries(r.plantaPersona || {}).map(([n, p]) => [ren(n), p]))
-    const plantaPersona = { ...(REGLAS_INICIALES.plantaPersona || {}), ...guardadas }
-    const calculoG = calculo.map(t => /Frecuencia mínima por semana/.test(t) && !/Gerente/.test(t) ? `${t.replace(/\.$/, '')}. Gerente: OPT Sistémica 1 por mes.` : t)
+    const juntas = { ...(REGLAS_INICIALES.plantaPersona || {}), ...guardadas }
+    const plantaPersona: Record<string, string[]> = Object.fromEntries(Object.keys(juntas).map(n => [n, plantasDePersona({ plantaPersona: juntas }, n)]))
+    const calculoG0 = calculo.map(t => t.replace(/OPT (\d+) por supervisor/, 'OPT Operativa $1 por supervisor'))
+    const calculoG = calculoG0.map(t => /Frecuencia mínima por semana/.test(t) && !/Gerente/.test(t) ? `${t.replace(/\.$/, '')}. Gerente: OPT Sistémica 1 por mes.` : t)
     const herramientas = r.herramientas.map(h => {
         const base = ini.get(h.codigo)
         const frecuencia = { ...(h.frecuencia || base?.frecuencia || {}) }
         ROLES_SP.forEach(rol => { if (!(rol in (r.personas || {})) && base?.frecuencia?.[rol] && !frecuencia[rol]) frecuencia[rol] = base.frecuencia[rol] })
+        // Plantas: códigos viejos → nomenclatura; las plantas nuevas quedan "Por definir"
+        const plantasH: Record<string, EstadoRegla> = {}
+        Object.entries(h.plantas || {}).forEach(([k, v]) => { const c = codigoPlantaSP(k); if (!(c in plantasH) || k === c) plantasH[c] = v })
+        PLANTAS_SP.forEach(p => { if (!plantasH[p.value]) plantasH[p.value] = 'por_definir' })
         const roles = { ...h.roles } as Record<RolSP, EstadoRegla>
         ROLES_SP.forEach(rol => { if (!roles[rol]) roles[rol] = base?.roles[rol] || 'no_aplica' })
-        return { ...h, roles, frecuencia, fuente: FUENTES_AUTO[h.codigo] || (h.codigo === 'RRC' && /Solo histórico/i.test(h.fuente) ? FUENTE_RRC : h.fuente) }
+        return { ...h, nombre: h.codigo === 'OPT' ? 'OPT Operativa' : h.nombre, plantas: plantasH, roles, frecuencia, fuente: FUENTES_AUTO[h.codigo] || (h.codigo === 'RRC' && /Solo histórico/i.test(h.fuente) ? FUENTE_RRC : h.fuente) }
     })
     return { ...r, calculo: calculoG, personas, plantaPersona, herramientas }
 }
