@@ -111,7 +111,7 @@ export default function GroupedHdtList({ groupedHdts, action }: GroupedHdtListPr
                                         {/* Main Item Card (Current Version) */}
                                         <div className="relative group/card-wrapper">
                                             <Link
-                                                href={`/hdt/${action === 'edit' ? 'edit' : 'view'}/${current.id}`}
+                                                href={`/hdt/view/${current.id}`} /* siempre abre en lectura; desde ahí se edita con el botón Editar */
                                                 className="bg-white border-2 border-transparent hover:border-brand-primary p-6 rounded-2xl flex items-center justify-between hover:shadow-lg transition-all group/card block"
                                             >
                                                 <div className="flex items-center gap-6">

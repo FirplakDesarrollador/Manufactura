@@ -1,15 +1,16 @@
 'use client'
 
 import NextImage from 'next/image'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Home, Save, Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Search, X, User, LayoutGrid, Printer, History, Clock, Check, GripVertical, ShieldAlert, RotateCcw, CheckCheck, ImagePlus } from 'lucide-react'
+import { ArrowLeft, Home, Save, Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Search, X, User, LayoutGrid, Printer, History, Clock, Check, GripVertical, ShieldAlert, RotateCcw, CheckCheck, ImagePlus, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano'
 import { Database } from '@/lib/hdt/database.types'
 import { isAuthorizedEditor, checkUserHdtEditPermission } from '@/lib/hdt/authorized-editors'
 import { moveToTrash } from '@/lib/hdt/papelera'
 import { insertHdtSteps, toStepInserts, uploadStepImage } from '@/lib/hdt/steps'
+import { medirCambios, HdtComparable, UMBRAL_PALABRAS, UMBRAL_CARACTERES } from '@/lib/hdt/cambios'
 import FotoCompleta from '@/components/mtto-autonomo/FotoCompleta'
 
 import {
@@ -139,6 +140,8 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
     const [isAutoSaving, setIsAutoSaving] = useState(false)
     const isFirstLoadRef = useRef(true)
     const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+    // Cómo estaba la HDT al abrirla: contra esto se miden los cambios para decidir si se crea nueva versión
+    const [base, setBase] = useState<HdtComparable | null>(null)
 
     // Form State
     const [formData, setFormData] = useState<Partial<HdtRow>>({
@@ -286,16 +289,8 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                     setCurrentMode('view')
                 }
 
-                // If mode is 'view' and HDT is vigente, check if user is authorized and switch to edit
-                if (mode === 'view' && hdtData.is_current) {
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (user?.email) {
-                        const authorized = await checkUserHdtEditPermission(user.email, user.id)
-                        if (authorized) {
-                            setCurrentMode('edit')
-                        }
-                    }
-                }
+                // En modo 'view' la HDT se queda en lectura aunque el usuario tenga permiso:
+                // para modificarla usa el botón "Editar" (antes pasaba a edición de entrada).
 
                 // Fetch Versions History (Contextual)
                 if (hdtData.codigo) {
@@ -320,6 +315,7 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
             if (hdtSteps && hdtSteps.length > 0) {
                 setSteps((hdtSteps as StepRow[]).map(s => ({ ...s, tempId: s.id || Math.random().toString(36).substring(2, 9) })))
             }
+            if (hdt) setBase({ hdt: hdt as Record<string, unknown>, steps: (hdtSteps || []) as Record<string, unknown>[] })
 
             // Fetch version history if codigo exists
             if (hdt) {
@@ -587,8 +583,18 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
         }
     };
 
+    // Cambios frente a la HDT como se abrió: más de 5 palabras o 35 caracteres → al guardar se crea nueva versión
+    const cambios = useMemo(
+        () => (base && mode !== 'create' ? medirCambios(base, { hdt: formData as Record<string, unknown>, steps: steps as Record<string, unknown>[] }) : null),
+        [base, formData, steps, mode]
+    )
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (cambios?.nuevaVersion) {
+            await handleCreateNewVersion()
+            return
+        }
         setSaving(true)
         setError(null)
 
@@ -726,8 +732,10 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                 savedAt: new Date().toISOString()
             }))
 
-            // 2. Sincronizar cabecera en Supabase si es versión vigente
-            if (formData.is_current) {
+            // 2. Sincronizar cabecera en Supabase si es versión vigente.
+            // Si los cambios ya alcanzan para una nueva versión, no se tocan los datos de la versión actual:
+            // quedan solo en la copia local hasta que se guarde (y se cree la nueva versión).
+            if (formData.is_current && !cambios?.nuevaVersion) {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { id: _, updated_at: __, ...cleanFormData } = formData
                 await (supabase.from('hdts') as any).update(cleanFormData).eq('id', hdtId)
@@ -1390,150 +1398,154 @@ export default function HdtForm({ hdtId, mode }: HdtFormProps) {
                     </section>
                 )}
 
-                {/* Floating Actions */}
+                {/* Barra flotante de acciones: navegación · herramientas · acción principal · eliminar */}
                 <div
                     role="toolbar"
                     aria-label="Acciones del formulario"
-                    className="fixed bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-2 md:px-4 z-50 hidden-print"
+                    className="fixed bottom-3 md:bottom-6 left-1/2 -translate-x-1/2 w-max max-w-[calc(100vw-1rem)] z-50 hidden-print"
                 >
-                    <div className="bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl p-3 md:p-4 shadow-2xl flex items-center justify-between gap-2 md:gap-4 flex-wrap sm:flex-nowrap" style={{border: '2px solid rgba(27,65,84,0.1)'}}>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => router.back()}
-                                className="h-10 w-10 md:h-12 md:w-12 bg-zinc-100 text-zinc-600 rounded-xl md:rounded-2xl font-bold hover:bg-zinc-200 transition-all flex items-center justify-center shrink-0"
-                                title={currentMode === 'view' || currentMode === 'breakdown' ? 'Volver' : 'Cancelar'}
-                                aria-label="Volver o Cancelar"
-                            >
-                                <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" aria-hidden="true" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => router.push('/hdt')}
-                                className="h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl font-bold transition-all flex items-center justify-center shrink-0"
-                                style={{background: 'rgba(27,65,84,0.1)', color: '#1b4154'}}
-                                title="Menú Principal"
-                                aria-label="Menú Principal"
-                            >
-                                <Home className="h-4 w-4 md:h-5 md:w-5" aria-hidden="true" />
-                            </button>
-                        </div>
-
-                        {(currentMode === 'view' || currentMode === 'breakdown') && (
-                            <button
-                                type="button"
-                                onClick={() => setCurrentMode(currentMode === 'view' ? 'breakdown' : 'view')}
-                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-brand-primary/10 text-brand-primary rounded-xl md:rounded-2xl font-bold hover:bg-brand-primary hover:text-white transition-all flex items-center gap-2 flex-1 sm:flex-none justify-center shrink-0"
-                            >
-                                <LayoutGrid className="h-4 w-4 md:h-5 md:w-5 hidden sm:block shrink-0" />
-                                <span className="whitespace-nowrap">{currentMode === 'view' ? 'Desglose' : 'Completa'}</span>
-                            </button>
-                        )}
-
-                        {(currentMode === 'view' || currentMode === 'edit') && versionHistory.length > 1 && (
-                            <button
-                                type="button"
-                                onClick={() => setShowVersionHistory(!showVersionHistory)}
-                                className={`px-4 md:px-6 py-2 md:py-3 text-sm md:text-base rounded-xl md:rounded-2xl font-bold transition-all flex items-center gap-2 flex-1 sm:flex-none justify-center shrink-0 ${showVersionHistory ? 'bg-orange-100 text-orange-700 border-2 border-orange-200' : 'bg-brand-primary/10 text-brand-primary hover:bg-brand-primary hover:text-white'}`}
-                            >
-                                <History className="h-4 w-4 md:h-5 md:w-5 hidden sm:block shrink-0" />
-                                <span className="whitespace-nowrap">{showVersionHistory ? 'Cerrar His.' : 'Versiones'}</span>
-                            </button>
-                        )}
-
-                        {(currentMode === 'view' || currentMode === 'breakdown') && (
-                            <button
-                                type="button"
-                                onClick={handlePrint}
-                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-zinc-800 text-white rounded-xl md:rounded-2xl font-bold hover:bg-black transition-all flex items-center gap-2 flex-1 sm:flex-none justify-center shrink-0"
-                                aria-label="Imprimir la hoja de trabajo"
-                            >
-                                <Printer className="h-4 w-4 md:h-5 md:w-5 shrink-0" aria-hidden="true" />
-                                <span className="whitespace-nowrap hidden sm:inline">Imprimir</span>
-                            </button>
-                        )}
-
-                        <div className="flex-1 flex justify-center order-first sm:order-none w-full sm:w-auto mb-2 sm:mb-0 empty:hidden">
-                            {error && (
-                                <div className="flex items-center gap-2 text-red-600 font-bold bg-red-50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl animate-bounce text-xs md:text-sm">
-                                    <AlertCircle className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
-                                    <span>{error}</span>
-                                </div>
-                            )}
-                            {success && (
-                                <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl animate-pulse text-xs md:text-sm">
-                                    <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
-                                    <span className="whitespace-nowrap">¡Guardado con éxito!</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {(currentMode === 'create' || currentMode === 'edit' || (currentMode === 'view' && canDelete && formData.is_current)) && (
-                            <button
-                                type="submit"
-                                disabled={saving}
-                                className="px-6 md:px-10 py-2.5 md:py-3 text-sm md:text-base text-white rounded-xl md:rounded-2xl font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0"
-                                style={{background: success ? '#16a34a' : '#1b4154'}}
-                            >
-                                {saving ? (
-                                    <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin shrink-0" />
-                                ) : success ? (
-                                    <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
-                                ) : (
-                                    <Save className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
+                    <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-2 shadow-2xl flex flex-col gap-2" style={{border: '1px solid rgba(27,65,84,0.15)'}}>
+                        {/* Mensajes: error, guardado, cambios y autoguardado */}
+                        {(error || success || isAutoSaving || lastAutoSave || (cambios && (cambios.palabras > 0 || cambios.caracteres > 0) && currentMode === 'edit')) && (
+                            <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-semibold">
+                                {error && (
+                                    <span className="flex items-center gap-1.5 text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+                                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}
+                                    </span>
                                 )}
-                                <span className="whitespace-nowrap">
-                                    {saving ? 'Guardando...' : success ? '¡Guardado!' : currentMode === 'create' ? 'Crear HDT' : 'Guardar Cambios'}
-                                </span>
-                            </button>
-                        )}
-
-                        {(currentMode === 'edit' || (currentMode === 'view' && canDelete && formData.is_current)) && (
-                            <button
-                                type="button"
-                                onClick={handleCreateNewVersion}
-                                disabled={creatingVersion || saving}
-                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-zinc-100 rounded-xl md:rounded-2xl font-bold transition-all flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0"
-                                style={{color: '#1b4154', border: '2px solid rgba(27,65,84,0.2)'}}
-                            >
-                                {creatingVersion ? (
-                                    <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin shrink-0" />
-                                ) : (
-                                    <History className="h-4 w-4 md:h-5 md:w-5 hidden sm:block shrink-0" />
+                                {success && (
+                                    <span className="flex items-center gap-1.5 text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-lg">
+                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />¡Guardado con éxito!
+                                    </span>
                                 )}
-                                <span className="whitespace-nowrap">Nueva Versión</span>
-                            </button>
-                        )}
-                        
-                        {/* Indicador de Autoguardado en tiempo real */}
-                        {lastAutoSave && !isAutoSaving && (
-                            <div className="hidden xl:flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-3.5 py-2 rounded-xl shadow-xs shrink-0">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                </span>
-                                <span>Autoguardado: {lastAutoSave}</span>
-                            </div>
-                        )}
-                        {isAutoSaving && (
-                            <div className="hidden xl:flex items-center gap-2 text-xs font-semibold text-brand-primary bg-brand-primary/10 border border-brand-primary/20 px-3.5 py-2 rounded-xl animate-pulse shrink-0">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                <span>Guardando cambios...</span>
+                                {cambios && (cambios.palabras > 0 || cambios.caracteres > 0) && currentMode === 'edit' && (
+                                    <span
+                                        className={`px-2.5 py-1 rounded-lg border ${cambios.nuevaVersion ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-zinc-600 bg-zinc-50 border-zinc-200'}`}
+                                        title={`Más de ${UMBRAL_PALABRAS} palabras o ${UMBRAL_CARACTERES} caracteres cambiados crea una nueva versión al guardar`}
+                                    >
+                                        {cambios.palabras} palabra{cambios.palabras === 1 ? '' : 's'} · {cambios.caracteres} caracter{cambios.caracteres === 1 ? '' : 'es'} cambiados
+                                        {cambios.nuevaVersion ? ` → se creará la versión ${(formData.version || 0) + 1}` : ''}
+                                    </span>
+                                )}
+                                {isAutoSaving ? (
+                                    <span className="flex items-center gap-1.5 text-brand-primary bg-brand-primary/10 px-2.5 py-1 rounded-lg">
+                                        <Loader2 className="h-3 w-3 animate-spin" />Autoguardando…
+                                    </span>
+                                ) : lastAutoSave && (
+                                    <span className="flex items-center gap-1.5 text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Autoguardado {lastAutoSave}
+                                    </span>
+                                )}
                             </div>
                         )}
 
-                        {canDelete && currentMode !== 'create' && (
-                            <button
-                                type="button"
-                                onClick={openDeleteModal}
-                                disabled={saving || deletingToTrash}
-                                className="px-4 md:px-6 py-2 md:py-3 text-sm md:text-base bg-red-50 text-red-600 border-2 border-red-200 rounded-xl md:rounded-2xl font-bold hover:bg-red-600 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50 flex-1 sm:flex-none justify-center shrink-0 shadow-xs"
-                                title="Eliminar HDT o versión"
-                            >
-                                <Trash2 className="h-4 w-4 md:h-5 md:w-5 hidden sm:block shrink-0" />
-                                <span className="whitespace-nowrap">Eliminar</span>
-                            </button>
-                        )}
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                            {/* Navegación */}
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => router.back()}
+                                    className="h-10 w-10 bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-all flex items-center justify-center shrink-0"
+                                    title={currentMode === 'view' || currentMode === 'breakdown' ? 'Volver' : 'Cancelar'}
+                                    aria-label="Volver o Cancelar"
+                                >
+                                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/hdt')}
+                                    className="h-10 w-10 bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-all flex items-center justify-center shrink-0"
+                                    title="Menú Principal"
+                                    aria-label="Menú Principal"
+                                >
+                                    <Home className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                            </div>
+
+                            <span className="hidden sm:block h-7 w-px bg-zinc-200" aria-hidden="true" />
+
+                            {/* Herramientas de consulta */}
+                            {(currentMode === 'view' || currentMode === 'breakdown') && (
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrentMode(currentMode === 'view' ? 'breakdown' : 'view')}
+                                    className="h-10 px-3.5 text-sm bg-brand-primary/10 text-brand-primary rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all flex items-center gap-2 shrink-0"
+                                >
+                                    <LayoutGrid className="h-4 w-4 shrink-0" />
+                                    <span className="whitespace-nowrap">{currentMode === 'view' ? 'Desglose' : 'Completa'}</span>
+                                </button>
+                            )}
+
+                            {(currentMode === 'view' || currentMode === 'edit') && versionHistory.length > 1 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowVersionHistory(!showVersionHistory)}
+                                    className={`h-10 px-3.5 text-sm rounded-xl font-bold transition-all flex items-center gap-2 shrink-0 ${showVersionHistory ? 'bg-orange-100 text-orange-700' : 'bg-brand-primary/10 text-brand-primary hover:bg-brand-primary hover:text-white'}`}
+                                >
+                                    <History className="h-4 w-4 shrink-0" />
+                                    <span className="whitespace-nowrap">{showVersionHistory ? 'Cerrar versiones' : 'Versiones'}</span>
+                                </button>
+                            )}
+
+                            {(currentMode === 'view' || currentMode === 'breakdown') && (
+                                <button
+                                    type="button"
+                                    onClick={handlePrint}
+                                    className="h-10 px-3.5 text-sm bg-brand-primary/10 text-brand-primary rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all flex items-center gap-2 shrink-0"
+                                    aria-label="Imprimir la hoja de trabajo"
+                                >
+                                    <Printer className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <span className="whitespace-nowrap">Imprimir</span>
+                                </button>
+                            )}
+
+                            {/* Acción principal */}
+                            {currentMode === 'view' && canDelete && formData.is_current && hdtId && (
+                                <button
+                                    type="button"
+                                    onClick={() => router.push(`/hdt/edit/${hdtId}`)}
+                                    className="h-10 px-5 text-sm text-white rounded-xl font-bold transition-all shadow-md hover:opacity-90 flex items-center gap-2 shrink-0"
+                                    style={{background: '#1b4154'}}
+                                >
+                                    <Pencil className="h-4 w-4 shrink-0" />
+                                    <span className="whitespace-nowrap">Editar HDT</span>
+                                </button>
+                            )}
+
+                            {(currentMode === 'create' || currentMode === 'edit') && (
+                                <button
+                                    type="submit"
+                                    disabled={saving || creatingVersion}
+                                    className="h-10 px-5 text-sm text-white rounded-xl font-bold transition-all shadow-md hover:opacity-90 flex items-center gap-2 disabled:opacity-50 shrink-0"
+                                    style={{background: success ? '#16a34a' : cambios?.nuevaVersion ? '#b45309' : '#1b4154'}}
+                                >
+                                    {saving || creatingVersion ? (
+                                        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                                    ) : success ? (
+                                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                    ) : (
+                                        <Save className="h-4 w-4 shrink-0" />
+                                    )}
+                                    <span className="whitespace-nowrap">
+                                        {saving || creatingVersion ? 'Guardando...' : success ? '¡Guardado!' : currentMode === 'create' ? 'Crear HDT' : cambios?.nuevaVersion ? 'Guardar como nueva versión' : 'Guardar Cambios'}
+                                    </span>
+                                </button>
+                            )}
+
+                            {/* Eliminar: solo icono para no ocupar espacio */}
+                            {canDelete && currentMode !== 'create' && (
+                                <button
+                                    type="button"
+                                    onClick={openDeleteModal}
+                                    disabled={saving || deletingToTrash}
+                                    className="h-10 w-10 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center disabled:opacity-50 shrink-0"
+                                    title="Eliminar HDT o versión"
+                                    aria-label="Eliminar HDT o versión"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </form>
