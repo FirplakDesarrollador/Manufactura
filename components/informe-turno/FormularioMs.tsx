@@ -8,7 +8,6 @@ import {
     KG_POR_MINUTO_MS, TOLERANCIA_REFLEJADOS_MIN, causasReflejadoMs, cargarPersonasMs, minutosParoAusentismo, personasAusentes, cargarDatosAutoMs, cargarInformesMs, construirTextoExcelMs, construirTextoMs, guardarInformeMs,
     manualVacio, metaKilosPorDefecto, minutosParoKilos
 } from '@/lib/informe-turno/ms';
-import { FAMILIAS, NOMBRE_FAMILIA } from '@/lib/productividad/calculo';
 import { catalogoParos } from '@/lib/productividad/datos';
 import { registrarProductividadDesdeInformeMs } from '@/lib/productividad/desdeInformeMs';
 
@@ -294,11 +293,14 @@ export default function FormularioMs() {
         </div>
     );
 
-    // Campo que por defecto muestra el dato de Control de Piso; si se escribe otro valor, manda el escrito
+    // Campo que por defecto muestra el dato de Control de Piso; si se escribe otro valor, manda el escrito.
+    // Si se borra, queda en BORRADO ('-'): el campo se ve vacío y el informe lo muestra sin dato,
+    // en vez de volver a llenarse solo con el dato de Control de Piso.
+    const BORRADO = '-';
     const conDefecto = (k: CampoNumero, label: string, auto: number | undefined, origen: string) => (
         <div>
             <label className={etiqueta}>{label}</label>
-            <input type="number" inputMode="decimal" min={0} step="any" value={m[k].trim() !== '' ? m[k] : auto != null ? String(auto) : ''} onChange={e => set(k, e.target.value)} placeholder="0" className={campo} />
+            <input type="number" inputMode="decimal" min={0} step="any" value={m[k] === BORRADO ? '' : m[k].trim() !== '' ? m[k] : auto != null ? String(auto) : ''} onChange={e => set(k, e.target.value === '' ? BORRADO : e.target.value)} placeholder="0" className={campo} />
             {m[k].trim() === '' ? (
                 <span className="text-[10px] font-bold text-sky-700 mt-0.5 inline-block">= {origen}</span>
             ) : auto != null && Number(m[k]) !== auto && (
@@ -313,7 +315,7 @@ export default function FormularioMs() {
         <div className="space-y-1.5" data-paros={lista}>
             <span className="text-[11px] font-black uppercase text-slate-600">{titulo}</span>
             {m[lista].map((p, i) => (
-                <div key={i} className={`grid ${lista === 'reflejados' ? 'grid-cols-[80px_1fr_130px_auto]' : 'grid-cols-[80px_1fr_auto]'} gap-2 items-start`}>
+                <div key={i} className="grid grid-cols-[80px_1fr_auto] gap-2 items-start">
                     <input type="number" inputMode="decimal" min={0} step="any" value={p.minutos} onChange={e => setParo(lista, i, 'minutos', e.target.value)} placeholder={minutosOpcional ? 'min' : '0'} className={campo} title="Minutos" />
                     <div>
                         <ConSugerencias value={p.causa} onChange={v => setParo(lista, i, 'causa', v)} placeholder="Causa (ej. avería en extractor de cabina #2, se apagaba)"
@@ -322,17 +324,6 @@ export default function FormularioMs() {
                             <span className="text-[10px] font-bold text-rose-700">Paro repetido: sume los minutos en una sola fila.</span>
                         )}
                     </div>
-                    {lista === 'reflejados' && (() => {
-                        const sugerida = familiaSugerida.get(p.causa.trim().toUpperCase()) || '';
-                        const valor = p.familia || sugerida;
-                        return (
-                            <select value={valor} onChange={e => setParo(lista, i, 'familia', e.target.value)} title="Familia de la pérdida (cuenta en Productividad)"
-                                className={`${campo} ${!valor && p.causa.trim() ? 'border-rose-500 bg-rose-50' : ''}`}>
-                                <option value="">Familia…</option>
-                                {FAMILIAS.map(f => <option key={f} value={f}>{NOMBRE_FAMILIA[f]}</option>)}
-                            </select>
-                        );
-                    })()}
                     <button type="button" onClick={() => quitarParo(lista, i)} className="w-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg" title="Quitar"><Trash2 className="w-4 h-4" /></button>
                 </div>
             ))}
@@ -346,12 +337,9 @@ export default function FormularioMs() {
     const guardar = async () => {
         if (hayRepetidos) return avisoRepetidos();
         if (excedido) return avisoExcedido();
-        // La familia sugerida se toma como elegida si el supervisor no la cambió
+        // El supervisor ya no elige el tipo de paro (familia): se toma solo la más usada en el histórico para esa causa,
+        // si existe, para Productividad. Si no hay histórico queda sin familia.
         const reflejados = mFinal.reflejados.map(p => ({ ...p, familia: p.familia || familiaSugerida.get(p.causa.trim().toUpperCase()) || '' }));
-        if (reflejados.some(p => p.causa.trim() && !p.familia)) {
-            setMensaje({ ok: false, texto: 'Elija la familia de cada paro reflejado (Funcional, Inducido, Explotación o Avería): se usa en las pérdidas de Productividad.' });
-            return;
-        }
         const manualFinal = { ...mFinal, reflejados };
         setGuardando(true);
         setMensaje(null);
@@ -471,9 +459,6 @@ export default function FormularioMs() {
                 {/* 2. Producción */}
                 <div>
                     <h3 className="text-sm font-black text-[#324354] mb-2">2. Producción</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
-                        {numero('programado', 'Programado del día', 'Piezas programadas: se usa en "Pintura 519 de 528", Vaciado y Acabado')}
-                    </div>
 
                     <div className="flex items-center gap-2 mb-1.5"><span className="text-[11px] font-black uppercase text-slate-600">Pintura</span><Auto fuente="Control de Piso" /></div>
                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
@@ -605,11 +590,10 @@ export default function FormularioMs() {
                         {numero('mesaTrabajo', 'Mesa de trabajo')}
                         {numero('barras', 'Barras')}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                         {numero('linea', 'Línea')}
                         {numero('lineaBuffer', 'Línea buffer')}
                         {numero('pulido', 'Pulido')}
-                        {numero('automantenimiento', 'Auto mantenimiento', undefined, '%')}
                     </div>
                 </div>
 

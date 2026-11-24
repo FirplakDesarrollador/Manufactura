@@ -277,7 +277,8 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
         const piezasReales = ciclosTotales;
         // Misma fórmula que al registrar (lib/store.ts): tiempo medido = suma de los ciclos válidos (ya editados);
         // piezas teóricas = tiempo medido ÷ ciclo teórico, sin redondear (antes se redondeaba hacia abajo con el
-        // tiempo total viejo y casi siempre daba 100 %); rendimiento = reales ÷ teóricas = teórico ÷ promedio real
+        // tiempo total viejo y casi siempre daba 100 %, o 0 % con un solo ciclo más rápido que el teórico);
+        // rendimiento = reales ÷ teóricas = teórico ÷ promedio real
         const tiempoTotal = validCycles.reduce((s, c) => s + c.duracion, 0);
         const piezasTeoricas = tiempoCicloTeorico > 0 ? tiempoTotal / tiempoCicloTeorico : 0;
         const rendimiento = piezasTeoricas > 0 ? (piezasReales / piezasTeoricas) * 100 : 0;

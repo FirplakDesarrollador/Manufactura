@@ -13,7 +13,7 @@ const TAMANOS = ['Pequena', 'Mediana', 'Grande'];
 // Defectos que se reportan en el bloque RRC, en el orden del informe. Se buscan en ms_defectos por palabras clave
 // (sin número, tildes ni mayúsculas) para no depender del texto exacto del catálogo.
 // Las claves se prueban en orden (de la más específica a la más general) y se usa la primera que encuentre algo:
-// así "despique" no suma los otros despiques (ruteadora, flauta, línea…) ni "perfor" la "Despicada en perforación".
+// así "despique" no suma los otros despiques (ruteadora, flauta, línea…).
 // El catálogo tiene errores de digitación (ej. "manipualción"), por eso se busca por fragmentos y no por el nombre exacto.
 export const RRC_MS: { nombre: string; claves: string[] }[] = [
     { nombre: 'Masa en gelcoat', claves: ['masa en gelcoat', 'masa en gel'] },
@@ -21,7 +21,6 @@ export const RRC_MS: { nombre: string; claves: string[] }[] = [
     { nombre: 'Despique por mala manipulación', claves: ['mala manip'] },
     { nombre: 'Pintura chorreada', claves: ['pintura chorread', 'chorread'] },
     { nombre: 'Rajado al desmoldar', claves: ['rajada al desmold', 'rajado al desmold'] },  // sin "rajad" suelto: no suma pegada al molde, gelcoat rajado ni contramolde
-    { nombre: 'Pieza dañada al perforar', claves: ['danada al perfor', 'pieza danada'] },
     { nombre: 'Pintura sin catalizador', claves: ['sin catalizador', 'catalizador'] },
     { nombre: 'Burbuja de aire en el acabado', claves: ['burbuja de aire en el acabado', 'burbuja de aire', 'burbuja'] }
 ];
@@ -331,8 +330,7 @@ export function construirTextoMs(fecha: string, m: ManualMs, a: DatosAutoMs | nu
     l.push('*OTROS:');
     l.push(`*Piezas de reparación: ${valor(m.reparacion)}`, `*Piezas desgelcadas: ${m.desgelcadas.trim() === '' && a ? miles(a.desgelcadas ?? 0) : valor(m.desgelcadas)}`, `*Mesones: ${valor(m.mesones)}`,
         `*Mesa de trabajo: ${valor(m.mesaTrabajo)}`, `*Barras: ${valor(m.barras)}`, '');
-    l.push(`*Línea: ${valor(m.linea)}`, `*Línea buffer: ${valor(m.lineaBuffer)}`, `*Pulido: ${valor(m.pulido)}`, '');
-    l.push(`*Auto mantenimiento: ${num(m.automantenimiento) == null ? '-' : `${miles(num(m.automantenimiento)!)} %`}`);
+    l.push(`*Línea: ${valor(m.linea)}`, `*Línea buffer: ${valor(m.lineaBuffer)}`, `*Pulido: ${valor(m.pulido)}`);
 
     return l.join('\n');
 }
@@ -396,7 +394,7 @@ export function construirTextoExcelMs(fecha: string, m: ManualMs, a: DatosAutoMs
     l.push(`Piezas vaciadas Ultracaster\t${ultracaster}`, `Colores\t${a ? a.colores : ''}`, `Piezas revisadas en inspección\t${a ? a.revisadas : ''}`);
     l.push(`Ausentismos\t${aus.map(x => `${x.nombre.trim()}${x.motivo.trim() ? ` (${x.motivo.trim().toLowerCase()})` : ''}`).join('; ')}`);
     l.push(`Piezas de reparación\t${n(m.reparacion)}`, `Piezas desgelcadas\t${desgelcadas}`, `Mesa de trabajo\t${n(m.mesaTrabajo)}`, `Barras\t${n(m.barras)}`);
-    l.push(`Línea\t${n(m.linea)}`, `Línea buffer\t${n(m.lineaBuffer)}`, `Pulido\t${n(m.pulido)}`, `Auto mantenimiento\t${num(m.automantenimiento) == null ? '' : `${num(m.automantenimiento)}%`}`);
+    l.push(`Línea\t${n(m.linea)}`, `Línea buffer\t${n(m.lineaBuffer)}`, `Pulido\t${n(m.pulido)}`);
     if (a) l.push(`RRC\t${a.rrc.map(r => `${r.nombre}: ${r.cantidad}`).join('; ')}`);
 
     // El mismo informe que antes llegaba por WhatsApp, como respaldo para Claude
