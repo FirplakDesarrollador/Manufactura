@@ -4,20 +4,52 @@
 
 export const META_SP = 90;
 
-// Plantas / áreas del Sistema de Producción (mismas del Excel). La sigla es lo que se guarda.
+import { supabase } from '@/lib/supabase';
+
+// Plantas / áreas del Sistema de Producción: las plantas activas de Configuración → Nomenclatura de Plantas
+// (tabla nomenclatura_plantas), con su código corto. El código es lo que se guarda.
+// Esta lista es la de respaldo; cargarPlantasSP() la reemplaza (en el mismo arreglo) por la de la tabla, así una planta
+// nueva en la Nomenclatura aparece sola en el Sistema de Producción.
+// Plantas de la nomenclatura que por ahora no se usan en el Sistema de Producción (no son principales): se ocultan
+export const PLANTAS_OCULTAS_SP = ['SG', 'MANUF', 'LOGI', 'EXPO', 'FPK-HOME-MED', 'FPK-HOME-BOG', 'EX', 'OC'];
 export const PLANTAS_SP: { value: string; label: string }[] = [
   { value: 'FV', label: 'Fibra de Vidrio' },
   { value: 'MS', label: 'Mármol Sintético' },
-  { value: 'MBLES', label: 'Muebles' },
+  { value: 'MBL', label: 'Muebles' },
   { value: 'CEFI', label: 'CEFI' },
-  { value: 'CALIDAD', label: 'Calidad' },
-  { value: 'MOLDES', label: 'Moldes' },
-  { value: 'CEDI', label: 'CEDI' },
-  { value: 'ALMACEN', label: 'Almacén' },
-  { value: 'MANTENIMIENTO', label: 'Mantenimiento' },
-  { value: 'RR MOLDES', label: 'RR Moldes' },
-  { value: 'SERVICIOS', label: 'Servicios' }
+  { value: 'RTM', label: 'RTM' },
+  { value: 'CALID', label: 'Calidad' },
+  { value: 'MOLD', label: 'Fabricación Moldes' },
+  { value: 'RMOLD', label: 'Reparación Moldes' },
+  { value: 'MTTO', label: 'Mantenimiento' },
+  { value: 'ALM', label: 'Almacén' },
+  { value: 'CEDI', label: 'Centro de Distribución' },
+  { value: 'TI', label: 'Tecnología e Informática' },
 ];
+// Códigos viejos del Sistema de Producción (Excel ILU y reglas guardadas antes) → código de la nomenclatura
+// (SERVICIOS ya es un código de la nomenclatura: Servicios a Cliente; no se renombra)
+export const RENOMBRE_PLANTA_SP: Record<string, string> = {
+  MBLES: 'MBL', CALIDAD: 'CALID', MOLDES: 'MOLD', 'RR MOLDES': 'RMOLD', MANTENIMIENTO: 'MTTO', ALMACEN: 'ALM',
+};
+// Alias de la Nomenclatura (normalizados) → código; los llena cargarPlantasSP()
+export const ALIAS_NOMENCLATURA = new Map<string, string>();
+let cargaPlantas: Promise<void> | null = null;
+/** Lee las plantas activas de la Nomenclatura de Plantas (una vez por sesión). Si falla, quedan las de respaldo. */
+export function cargarPlantasSP(): Promise<void> {
+  if (!cargaPlantas) cargaPlantas = (async () => {
+    const { data, error } = await supabase.from('nomenclatura_plantas').select('codigo, nombre_oficial, alias, activo').order('id', { ascending: true });
+    if (error || !data?.length) { cargaPlantas = null; return; }
+    const activas = (data as { codigo: string; nombre_oficial: string; alias: string[] | null; activo: boolean | null }[])
+      .filter(p => p.activo !== false && p.codigo && !PLANTAS_OCULTAS_SP.includes(p.codigo.trim()));
+    if (!activas.length) return;
+    PLANTAS_SP.splice(0, PLANTAS_SP.length, ...activas.map(p => ({ value: p.codigo.trim(), label: p.nombre_oficial || p.codigo })));
+    const n = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    ALIAS_NOMENCLATURA.clear();
+    activas.forEach(p => [p.nombre_oficial, ...(p.alias || [])].forEach(a => { if (a && !ALIAS_NOMENCLATURA.has(n(a))) ALIAS_NOMENCLATURA.set(n(a), p.codigo.trim()); }));
+  })();
+  return cargaPlantas;
+}
+export const codigoPlantaSP = (c: string | null | undefined) => (c ? RENOMBRE_PLANTA_SP[c] || c : c || '');
 
 // Herramientas: código guardado → nombre. OPTS y RRC solo vienen del histórico del Excel por ahora.
 export const HERRAMIENTAS_SP: Record<string, string> = {
@@ -26,7 +58,7 @@ export const HERRAMIENTAS_SP: Record<string, string> = {
   AF: 'Hora-Hora / AF',
   BIT: 'Bitácora',
   GI: 'Gestión de Indicadores',
-  OPT: 'OPT',
+  OPT: 'OPT Operativa',
   OPTS: 'OPT Sistémica',
   RRC: 'RRC',
   '5S': "5'S",

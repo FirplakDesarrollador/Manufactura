@@ -275,7 +275,11 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
         const ciclosTotales = validCycles.length;
         const tiempoPromedio = ciclosTotales > 0 ? validCycles.reduce((s, c) => s + c.duracion, 0) / ciclosTotales : 0;
         const piezasReales = ciclosTotales;
-        const piezasTeoricas = tiempoCicloTeorico > 0 ? Math.floor(item.tiempoTotal / tiempoCicloTeorico) : 0;
+        // Misma fórmula que al registrar (lib/store.ts): tiempo medido = suma de los ciclos válidos (ya editados);
+        // piezas teóricas = tiempo medido ÷ ciclo teórico, sin redondear (antes se redondeaba hacia abajo con el
+        // tiempo total viejo y casi siempre daba 100 %); rendimiento = reales ÷ teóricas = teórico ÷ promedio real
+        const tiempoTotal = validCycles.reduce((s, c) => s + c.duracion, 0);
+        const piezasTeoricas = tiempoCicloTeorico > 0 ? tiempoTotal / tiempoCicloTeorico : 0;
         const rendimiento = piezasTeoricas > 0 ? (piezasReales / piezasTeoricas) * 100 : 0;
         const defectos = Math.max(piezasTotales - piezasBuenas, 0);
         const calidad = piezasTotales > 0 ? (piezasBuenas / piezasTotales) * 100 : 0;
@@ -289,7 +293,7 @@ function EditModal({ item, onClose, onSave, onDelete }: { item: EvaluacionHoraHo
             planta, linea, puesto, operario, tiempoCicloTeorico,
             realizadoPor,
             compromiso,
-            ciclos, ciclosTotales, tiempoPromedio, piezasReales, piezasTeoricas, rendimiento,
+            ciclos, ciclosTotales, tiempoTotal, tiempoPromedio, piezasReales, piezasTeoricas, rendimiento,
             piezasTotalesCalidad: piezasTotales,
             piezasBuenas,
             piezasDefectuosas: defectos,
