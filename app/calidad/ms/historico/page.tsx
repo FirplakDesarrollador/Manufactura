@@ -37,6 +37,8 @@ interface HistoricoReporte {
     created_at: string
     create_by: number
     producto_id: number
+    molde_manual?: string | null   // RMOLD: molde escrito a mano (no aparecía o estaba mal marcado)
+    molde_escrito?: boolean | null
     defecto: any
     Molde?: string
     molde?: string
@@ -119,7 +121,7 @@ export default function HistoricoDefectosPage() {
                     producto_id,
                     defecto,
                     Molde,
-                    fotoUrl,
+                    fotoUrl,${planta.conSerial ? ' molde_manual, molde_escrito,' : ''}
                     producto:${planta.tReferencias} (Referencia)
                 `), { count: 'exact' })
                 .order('created_at', { ascending: false })
@@ -315,7 +317,7 @@ export default function HistoricoDefectosPage() {
                 r.id,
                 `"${dateStr}"`,
                 `"${tipo}"`,
-                `"${r.producto?.Referencia || 'Sin Referencia'}"`,
+                `"${r.producto?.Referencia || (r.molde_manual ? `${r.molde_manual} (escrito)` : 'Sin Referencia')}"`,
                 `"${defectNames.replace(/"/g, '""')}"`,
                 `"${r.Molde || r.molde || '-'}"`,
                 `"${r.usuario_nombre || '-'}"`,
@@ -668,7 +670,7 @@ export default function HistoricoDefectosPage() {
 
                                             {/* Referencia Producto */}
                                             <td className="px-5 py-3 whitespace-nowrap text-xs font-black text-[#254153]">
-                                                {report.producto?.Referencia || 'Sin Referencia'}
+                                                {report.producto?.Referencia || (report.molde_manual ? `${report.molde_manual} (escrito)` : 'Sin Referencia')}{report.molde_escrito && <span className="ml-1 text-[9px] font-black uppercase text-amber-800 bg-amber-100 border border-amber-300 rounded px-1" title="Molde escrito a mano (no aparecía o estaba mal marcado)">Manual</span>}
                                             </td>
 
                                             {/* Defectos */}
@@ -792,7 +794,7 @@ export default function HistoricoDefectosPage() {
                                 <div>
                                     <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Referencia de Producto</span>
                                     <span className="text-base font-black text-[#254153]">
-                                        {selectedDetailReport.producto?.Referencia || `ID: ${selectedDetailReport.producto_id}`}
+                                        {selectedDetailReport.producto?.Referencia || (selectedDetailReport.molde_manual ? `${selectedDetailReport.molde_manual} (escrito a mano)` : `ID: ${selectedDetailReport.producto_id}`)}
                                     </span>
                                 </div>
                                 <div>

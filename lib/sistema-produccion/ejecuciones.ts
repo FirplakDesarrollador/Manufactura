@@ -22,7 +22,9 @@ export const HERRAMIENTAS_POR_PLANTA = ['TE'] as const
 export type Ejecucion = { herr: HerrAuto; fecha: string; quien: string; email?: string | null; planta?: string | null }
 // plantas: las de la persona en las reglas (donde la herramienta no está "No aplica"); si no tiene, la registrada en la
 // ejecución; vacía = sin planta. Con varias plantas el cupo cuenta en cada una (el total FIRPLAK lo cuenta una vez).
-export type Cupo = { herr: HerrAuto; persona: string; rol: RolSP; plantas: string[]; fecha: string; ejec: 0 | 1 }
+// extra: ejecución de más (por encima de lo exigido en el periodo): se muestra como ejecutada, pero no suma al
+// cumplimiento (que no pasa de 100 %)
+export type Cupo = { herr: HerrAuto; persona: string; rol: RolSP; plantas: string[]; fecha: string; ejec: 0 | 1; extra?: boolean }
 
 const norm = (s: string | null | undefined) =>
     String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
@@ -156,6 +158,8 @@ export function calcularCupos(ejecuciones: Ejecucion[], reglas: ReglasSP, desde:
             usadas.push(e)
         }
         usadas.forEach(e => cupos.push({ herr, persona, rol, fecha: e.fecha, plantas: plantasEj(e), ejec: 1 }))
+        // Las de más también quedan (adicionales), para ver todo lo que hizo la persona
+        hechas.filter(e => !usadas.includes(e)).forEach(e => cupos.push({ herr, persona, rol, fecha: e.fecha, plantas: plantasEj(e), ejec: 1, extra: true }))
         // Las no hechas: en los días hábiles sin ejecución (en orden); si faltan días, en la fecha de cierre del periodo
         const libres = diasLibres.filter(d => !usadas.some(u => u.fecha === d))
         for (let i = 0; i < exigidos - usadas.length; i++) {

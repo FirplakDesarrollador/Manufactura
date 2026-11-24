@@ -339,6 +339,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             });
         }
         cuposApp.forEach(c => {
+            if (c.extra) return;
             if (f.herr && c.herr !== f.herr) return;
             if (!enPlantas(c.plantas, plantas)) return;
             if (f.persona && norm(c.persona) !== norm(f.persona)) return;
@@ -494,7 +495,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     // con los filtros del encabezado, la columna elegida (semana, día o mes) y los filtros cruzados (herramienta,
     // planta, persona)
     const detalle = useMemo(() => {
-        const filas: { fecha: string; semana: string; persona: string; rol: string; herr: string; planta: string; resultado: string; ok: boolean | null; hist: boolean; te?: number; plantas?: string[] }[] = [];
+        const filas: { fecha: string; semana: string; persona: string; rol: string; herr: string; planta: string; resultado: string; ok: boolean | null; hist: boolean; te?: number; plantas?: string[]; extra?: boolean }[] = [];
         const plantas = selPlanta ? [selPlanta] : plantasSel;
         cuposApp.forEach(c => {
             const sm = semanaDe(c.fecha);
@@ -504,7 +505,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             if (!enPlantas(c.plantas, plantas)) return;
             if (selPersona && norm(c.persona) !== norm(selPersona)) return;
             filas.push({ fecha: c.fecha, semana: `S${sm.semana}`, persona: c.persona, rol: c.rolP, herr: nombreHerramienta(c.herr), planta: c.plantas.join(', ') || SIN_PLANTA, plantas: c.plantas.length ? c.plantas : [SIN_PLANTA],
-                resultado: c.ejec ? 'Ejecutada' : 'No ejecutada', ok: !!c.ejec, hist: false });
+                resultado: c.extra ? 'Ejecutada (adicional)' : c.ejec ? 'Ejecutada' : 'No ejecutada', ok: !!c.ejec, hist: false, extra: !!c.extra });
         });
         historico.forEach(h => {
             if (h.nivel !== 'persona' || !h.persona) return;
@@ -529,17 +530,25 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         return filas.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.persona.localeCompare(b.persona) || a.herr.localeCompare(b.herr));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cuposApp, teApp, historico, sel, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
-    type Conteo = { exig: number; ejec: number; pcts?: number[] }
+    type Conteo = { exig: number; ejec: number; pcts?: number[]; extra?: number }
     const resumenDe = (clave: (f: typeof detalle[number]) => string | string[]) => {
-        const m = new Map<string, { exigidas: number; ejecutadas: number; hist: number[]; herr: Map<string, Conteo>; pers: Map<string, Conteo>; fechas: Set<string>; roles: Set<string>; plantas: Set<string> }>();
+        const m = new Map<string, { exigidas: number; ejecutadas: number; hist: number[]; adicionales: number; herr: Map<string, Conteo>; pers: Map<string, Conteo>; fechas: Set<string>; roles: Set<string>; plantas: Set<string> }>();
         detalle.forEach(f => { ([] as string[]).concat(clave(f)).forEach(k => {
             if (!k || k === '—') return;
-            if (!m.has(k)) m.set(k, { exigidas: 0, ejecutadas: 0, hist: [], herr: new Map(), pers: new Map(), fechas: new Set(), roles: new Set(), plantas: new Set() });
+            if (!m.has(k)) m.set(k, { exigidas: 0, ejecutadas: 0, hist: [], adicionales: 0, herr: new Map(), pers: new Map(), fechas: new Set(), roles: new Set(), plantas: new Set() });
             const x = m.get(k)!;
             if (f.rol && f.rol !== '—') x.roles.add(f.rol);
             if (f.hist) { x.hist.push(parseFloat(f.resultado)); return; }
             if (f.te != null) {
                 const h = x.herr.get(f.herr) || { exig: 0, ejec: 0, pcts: [] }; (h.pcts ||= []).push(f.te); x.herr.set(f.herr, h);
+                (f.plantas || []).forEach(p => x.plantas.add(p));
+                return;
+            }
+            if (f.extra) {
+                // Adicional: se ve en ejecutadas y fechas, pero no cambia lo exigido ni el cumplimiento
+                x.adicionales += 1; x.fechas.add(f.fecha);
+                const ha = x.herr.get(f.herr) || { exig: 0, ejec: 0 }; ha.extra = (ha.extra || 0) + 1; x.herr.set(f.herr, ha);
+                const pa = x.pers.get(f.persona) || { exig: 0, ejec: 0 }; pa.extra = (pa.extra || 0) + 1; x.pers.set(f.persona, pa);
                 (f.plantas || []).forEach(p => x.plantas.add(p));
                 return;
             }
@@ -556,7 +565,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             const pct = pctsTE.length ? promedio([...x.herr.values()].map(pctHerr))! : x.exigidas ? (x.ejecutadas / x.exigidas) * 100 : (promedio(x.hist) ?? 0);
             const personas = [...x.pers.entries()].map(([n, c]) => ({ n, ...c, cumple: c.exig > 0 && (c.ejec / c.exig) * 100 >= META_SP }))
             return {
-                nombre, exigidas: x.exigidas, ejecutadas: x.ejecutadas, pct, cumple: pct >= META_SP, soloExcel: !x.exigidas && !pctsTE.length,
+                nombre, exigidas: x.exigidas, ejecutadas: x.ejecutadas, adicionales: x.adicionales, pct, cumple: pct >= META_SP, soloExcel: !x.exigidas && !pctsTE.length,
                 herramientas: [...x.herr.entries()].map(([n, c]) => ({ n, ...c })).sort((a, b) => a.n.localeCompare(b.n)),
                 fechas: [...x.fechas].sort().reverse(),
                 personas, personasNoCumplen: personas.filter(q => !q.cumple).map(q => q.n).sort(),
@@ -624,7 +633,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
 
     // Barras horizontales de una categoría: clic = filtro cruzado; la elegida queda resaltada
     const barrasCategoria = (datos: any[], sel: string | null, onSel: (k: string | null) => void, anchoEje = 128) => (
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" debounce={80} style={{ overflow: 'hidden' }}>
             <BarChart data={datos} layout="vertical" margin={{ top: 4, right: 44, left: 4, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={v => `${v}%`} />
@@ -751,7 +760,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                     <div className="lg:col-span-3 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200">
                         <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5 truncate">Cumplimiento por Herramienta</h3>
                         {/* Alto mínimo por barra para que los nombres no se monten; si no caben, se desplaza */}
-                        <div className="h-[var(--sp-h)] w-full overflow-y-auto">
+                        <div className="h-[var(--sp-h)] w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
                             {loading ? cargador : !porHerramienta.length ? vacio('Sin datos por herramienta.') : (
                                 <div style={{ height: `max(100%, ${porHerramienta.length * 30 + 30}px)` }}>{barrasCategoria(porHerramienta, selHerr, setSelHerr, 112)}</div>
                             )}
@@ -759,7 +768,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                     </div>
                     <div className="lg:col-span-4 bg-white rounded-xl p-2.5 shadow-xs border border-slate-200">
                         <h3 className="text-xs sm:text-sm font-black text-slate-800 mb-1.5 truncate">Cumplimiento por Planta</h3>
-                        <div className="h-[var(--sp-h)] w-full overflow-y-auto">
+                        <div className="h-[var(--sp-h)] w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
                             {loading ? cargador : !porPlanta.length ? vacio('Sin datos por planta.') : (
                                 <div style={{ height: `max(100%, ${porPlanta.length * 20 + 30}px)` }}>{barrasCategoria(porPlanta, selPlanta, setSelPlanta, 92)}</div>
                             )}
@@ -775,7 +784,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                                 ))}
                             </div>
                         </div>
-                        <div className="h-[var(--sp-h)] w-full overflow-y-auto">
+                        <div className="h-[var(--sp-h)] w-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
                             {loading ? cargador : !porPersona.length ? vacio('Sin datos por persona.') : (
                                 <div style={{ height: Math.max(porPersona.length * 24 + 16, 180) }}>
                                     {barrasCategoria(porPersona, selPersona, setSelPersona, 170)}
@@ -825,7 +834,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                                                     <div className="flex flex-wrap gap-1">
                                                         {f.herramientas.map(h => (
                                                             <span key={h.n} className={`px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${(h.pcts?.length ? promedio(h.pcts)! : h.exig ? (h.ejec / h.exig) * 100 : 0) >= META_SP ? 'bg-emerald-50 text-emerald-700' : h.ejec || h.pcts?.length ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
-                                                                {h.n} {h.pcts?.length ? `${promedio(h.pcts)!.toFixed(1)} %` : `${h.ejec}/${h.exig}`}
+                                                                {h.n} {h.pcts?.length ? `${promedio(h.pcts)!.toFixed(1)} %` : `${h.ejec + (h.extra || 0)}/${h.exig}`}
                                                             </span>
                                                         ))}
                                                         {!f.herramientas.length && <span className="text-slate-400">—</span>}
@@ -836,7 +845,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                                                 {f.fechas.length ? <>{f.fechas.slice(0, 10).map(x => x.slice(8, 10) + '/' + x.slice(5, 7)).join(', ')}{f.fechas.length > 10 && <span className="text-slate-400"> +{f.fechas.length - 10} más</span>}</> : <span className="text-rose-600 font-bold">Ninguna</span>}
                                             </td>
                                             <td className="px-2 py-1.5 text-right">{f.exigidas || '—'}</td>
-                                            <td className="px-2 py-1.5 text-right text-emerald-700 font-bold">{f.exigidas ? f.ejecutadas : '—'}</td>
+                                            <td className="px-2 py-1.5 text-right text-emerald-700 font-bold" title={f.adicionales ? `${f.ejecutadas} de lo exigido + ${f.adicionales} adicional(es) (no suben el cumplimiento por encima de 100 %)` : undefined}>{f.exigidas || f.adicionales ? f.ejecutadas + f.adicionales : '—'}</td>
                                             <td className="px-2 py-1.5 text-right text-rose-700 font-bold">{f.exigidas ? f.exigidas - f.ejecutadas : '—'}</td>
                                             <td className="px-2 py-1.5 text-right font-black whitespace-nowrap">{f.pct.toFixed(1)} %</td>
                                             <td className="px-2 py-1.5 text-right">
@@ -857,7 +866,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                         <h3 className="text-xs sm:text-sm font-black text-slate-800">
                             Detalle de lo calificado{chips.length ? ` · ${chips.map(c => c.texto).join(' · ')}` : ' · periodo de los filtros'}
                             <span className="ml-2 text-[10px] font-bold text-slate-500">
-                                {detalle.filter(f => !f.hist && f.ok).length} de {detalle.filter(f => !f.hist).length} ejecutadas{detalle.some(f => f.hist) ? ` · ${detalle.filter(f => f.hist).length} semana(s) del Excel` : ''}
+                                {detalle.filter(f => !f.hist && f.ok && !f.extra && f.te == null).length} de {detalle.filter(f => !f.hist && !f.extra && f.te == null).length} ejecutadas{detalle.some(f => f.extra) ? ` · ${detalle.filter(f => f.extra).length} adicional(es)` : ''}{detalle.some(f => f.hist) ? ` · ${detalle.filter(f => f.hist).length} semana(s) del Excel` : ''}
                             </span>
                         </h3>
                         <input value={buscaDetalle} onChange={e => setBuscaDetalle(e.target.value)} placeholder="Buscar persona, herramienta, planta…"

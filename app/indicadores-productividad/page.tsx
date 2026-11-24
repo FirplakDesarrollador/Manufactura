@@ -397,7 +397,8 @@ export default function IndicadoresProductividadPage() {
             <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-12 z-40">
                 <CarruselPestanas className="max-w-[1800px] mx-auto">
                     {PESTANAS_TABLERO.map(p => {
-                        const activa = viewMode === p.id;
+                        // Hasta leer ?vista= de la dirección no se marca ninguna (si no, se veía un instante "Tablero de Control")
+                        const activa = urlLeida && viewMode === p.id;
                         const esCalidad = p.id === "calidad";
                         return (
                             <button
@@ -425,7 +426,7 @@ export default function IndicadoresProductividadPage() {
             </div>
 
             {/* Tercer nivel: pestañas de Calidad, pegado al segundo y con su misma altura */}
-            {viewMode === "calidad" && calidadMenuAbierto && (
+            {urlLeida && viewMode === "calidad" && calidadMenuAbierto && (
                 <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-[88px] z-30">
                     <CarruselPestanas className="max-w-[1800px] mx-auto">
                         {MAIN_SUBHEADER_TABS.map(t => (
@@ -448,6 +449,7 @@ export default function IndicadoresProductividadPage() {
 
             {/* Main Area */}
             <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" || viewMode === "rmold" || viewMode === "productividad" ?"max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
+                {!urlLeida ? <div className="min-h-[60vh]" /> : <>
                 {viewMode === "hora-a-hora" ? (
                     <div className="w-full animate-in fade-in duration-300">
                         <HoraAHoraPlantasView fecha={fechaISO} />
@@ -1062,6 +1064,7 @@ export default function IndicadoresProductividadPage() {
                         </div>
                     </div>
                 )}
+                </>}
             </main>
         </div>
     );

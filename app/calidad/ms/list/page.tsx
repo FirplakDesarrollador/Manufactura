@@ -248,7 +248,7 @@ export default function ReportedDefectsListPage() {
                         }
                     }
                     groupedMap[key].cantidad += 1
-                    groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
+                    groupedMap[key].productos.add(r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Producto')
                     if (r.Molde) {
                         groupedMap[key].moldes.add(r.Molde)
                     }
@@ -258,7 +258,7 @@ export default function ReportedDefectsListPage() {
                     groupedMap[key].detalles.push({
                         id: r.id,
                         producto_id: r.producto_id,
-                        referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                        referencia: r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Referencia',
                         hora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -307,7 +307,7 @@ export default function ReportedDefectsListPage() {
                         }
 
                         groupedMap[key].cantidad += 1
-                        groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
+                        groupedMap[key].productos.add(r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Producto')
                         if (r.Molde) {
                             groupedMap[key].moldes.add(r.Molde)
                         }
@@ -325,7 +325,7 @@ export default function ReportedDefectsListPage() {
                         groupedMap[key].detalles.push({
                             id: r.id,
                             producto_id: r.producto_id,
-                            referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                            referencia: r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Referencia',
                             hora: horaStr,
                             rawHora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('en-GB', {
                                 hour: '2-digit',
@@ -342,7 +342,7 @@ export default function ReportedDefectsListPage() {
                         if (r.fotoUrl) {
                             groupedMap[key].fotos.push({
                                 url: r.fotoUrl,
-                                referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                                referencia: r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Referencia',
                                 hora: horaStr
                             })
                         }
