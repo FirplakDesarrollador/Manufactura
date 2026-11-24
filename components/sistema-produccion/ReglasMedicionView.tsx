@@ -33,7 +33,9 @@ export default function ReglasMedicionView() {
     const [guardando, setGuardando] = useState(false);
     // Vigencia: los cambios aplican desde el lunes elegido; las semanas anteriores se siguen midiendo con la versión anterior
     const [versiones, setVersiones] = useState<{ vigente_desde: string; actualizado_por: string | null }[]>([]);
-    const [aplicaDesde, setAplicaDesde] = useState<'esta' | 'proxima'>('esta');
+    // Fecha elegida en el calendario (por defecto hoy); el cambio aplica desde el lunes de esa semana, porque el
+    // cumplimiento se mide por semana
+    const [aplicaDesde, setAplicaDesde] = useState<string>(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
     const [conFestivo, setConFestivo] = useState(false);
     // Personal activo de Talento Humano: nombre completo y planta
     const [personal, setPersonal] = useState<{ nombre: string; planta: string }[]>([]);
@@ -123,10 +125,11 @@ export default function ReglasMedicionView() {
     });
     const quitarPersona = (rol: RolSP, i: number) => setBorrador(b => b && ({ ...b, personas: { ...b.personas, [rol]: b.personas[rol].filter((_, k) => k !== i) } }));
 
-    // Lunes de la semana en curso o de la próxima (fecha local)
-    const lunesVigencia = (cual: 'esta' | 'proxima') => {
-        const d = new Date(); d.setHours(12, 0, 0, 0);
-        d.setDate(d.getDate() - ((d.getDay() || 7) - 1) + (cual === 'proxima' ? 7 : 0));
+    // Lunes de la semana de una fecha (AAAA-MM-DD)
+    const lunesVigencia = (fecha: string) => {
+        const [y, m, dd] = fecha.split('-').map(Number);
+        const d = new Date(y, (m || 1) - 1, dd || 1, 12);
+        d.setDate(d.getDate() - ((d.getDay() || 7) - 1));
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
     const fechaCorta = (iso: string) => iso.split('-').reverse().join('/');
@@ -239,13 +242,11 @@ export default function ReglasMedicionView() {
                     )}
                     {editando && <>
                         <button onClick={() => { setBorrador(null); setError(null); }} className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200"><X size={14} /> Cancelar</button>
-                        <label className="flex items-center gap-1 text-[11px] font-bold text-amber-900" title="Las semanas anteriores se siguen midiendo con las reglas que tenían; el cambio solo aplica desde este lunes">
+                        <label className="flex items-center gap-1 text-[11px] font-bold text-amber-900" title="Las semanas anteriores se siguen midiendo con las reglas que tenían. El cumplimiento es semanal: el cambio aplica desde el lunes de la semana de la fecha elegida">
                             Aplica desde
-                            <select value={aplicaDesde} onChange={e => setAplicaDesde(e.target.value as 'esta' | 'proxima')}
-                                className="h-8 px-2 rounded-lg border border-amber-300 bg-white text-[11px] font-bold outline-none">
-                                <option value="esta">Esta semana (lunes {fechaCorta(lunesVigencia('esta'))})</option>
-                                <option value="proxima">Próxima semana (lunes {fechaCorta(lunesVigencia('proxima'))})</option>
-                            </select>
+                            <input type="date" value={aplicaDesde} onChange={e => { if (e.target.value) setAplicaDesde(e.target.value); }}
+                                className="h-8 px-2 rounded-lg border border-amber-300 bg-white text-[11px] font-bold outline-none" />
+                            {lunesVigencia(aplicaDesde) !== aplicaDesde && <span className="text-[10px] font-semibold text-amber-800">(semana del lunes {fechaCorta(lunesVigencia(aplicaDesde))})</span>}
                         </label>
                         <button onClick={guardar} disabled={guardando} className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 disabled:opacity-50">
                             {guardando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
