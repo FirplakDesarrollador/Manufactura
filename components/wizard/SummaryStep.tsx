@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, AlertTriangle, User, Clock, CheckSquare, Trash2, ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { createExternalClient } from "@/lib/supabase/external";
+import { createExternalClient, isExternalConfigured } from "@/lib/supabase/external";
 
 export default function SummaryStep() {
     const { evaluacionActual } = useStore();
@@ -27,7 +27,7 @@ export default function SummaryStep() {
                 } catch { /* ignore */ }
 
                 // Fallback: external
-                if (!nombre) {
+                if (!nombre && isExternalConfigured()) {
                     try {
                         const ext = createExternalClient();
                         const { data: u2 } = await ext
