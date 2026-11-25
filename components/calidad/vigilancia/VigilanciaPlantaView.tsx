@@ -40,7 +40,6 @@ import {
     FibraDeVidrioIcon,
     MueblesIcon,
     CefiIcon,
-    RtmIcon,
     MoldesIcon,
     PaintRollerIcon,
     SprayGunIcon,
@@ -136,7 +135,6 @@ export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlant
             case 'fv': return <FibraDeVidrioIcon {...props} />;
             case 'muebles': return <MueblesIcon {...props} />;
             case 'cefi': return <CefiIcon {...props} />;
-            case 'rtm': return <RtmIcon {...props} />;
             case 'moldes': return <MoldesIcon {...props} />;
             default: return null;
         }

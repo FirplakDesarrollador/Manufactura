@@ -7,7 +7,6 @@ import {
     FibraDeVidrioIcon,
     MueblesIcon,
     CefiIcon,
-    RtmIcon,
     MoldesIcon
 } from './VigilanciaIcons';
 
@@ -30,8 +29,6 @@ export default function VigilanciaMainMenu({ onSelectPlanta }: VigilanciaMainMen
                 return <MueblesIcon {...iconProps} />;
             case 'cefi':
                 return <CefiIcon {...iconProps} />;
-            case 'rtm':
-                return <RtmIcon {...iconProps} />;
             case 'moldes':
                 return <MoldesIcon {...iconProps} />;
             default:

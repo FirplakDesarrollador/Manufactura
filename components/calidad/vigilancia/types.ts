@@ -1,6 +1,6 @@
 // Tipos y definiciones para el módulo Plan de Vigilancia (Calidad FIRPLAK)
 
-export type PlantaVigilanciaKey = 'ms' | 'fv' | 'muebles' | 'cefi' | 'rtm' | 'moldes';
+export type PlantaVigilanciaKey = 'ms' | 'fv' | 'muebles' | 'cefi' | 'moldes';
 
 export interface ProcesoVigilanciaInfo {
     id: string;
@@ -69,16 +69,6 @@ export const PLANTAS_VIGILANCIA: PlantaVigilanciaConfig[] = [
             { id: 'corte_cefi', nombre: 'Corte', tabla: 'pv_corte_cefi', descripcion: 'Velocidad, tableros, disco y dimensiones de ruta' },
             { id: 'enchape_cefi', nombre: 'Enchape', tabla: 'pv_enchape_cefi', descripcion: 'Espesor, velocidad, cantidad de cantos y adherencia' },
             { id: 'otros_cefi', nombre: 'Otros Parámetros', tabla: 'pv_otros_cefi', descripcion: 'Inspección tarugo, medidas, flexómetro y etiquetas' }
-        ]
-    },
-    {
-        key: 'rtm',
-        codigoOficial: 'RTM',
-        nombre: 'RTM',
-        subtitulo: 'Resin Transfer Moulding / Cuarzo',
-        descripcion: 'Vigilancia en proceso de inyección RTM, presiones de vacío y catalización controlada.',
-        procesos: [
-            { id: 'vaciado_rtm', nombre: 'Vaciado / Inyección', tabla: 'pv_vaciado_RTM', descripcion: 'Pulsos, presión de inyección, % catalizador y rangos de presión' }
         ]
     },
     {
