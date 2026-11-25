@@ -34,11 +34,22 @@ export interface ConteoItem {
     categoria: 'A' | 'B' | 'C'
     stockTeorico: number
     conteoFisico: number | null
+    costoUnitario?: number
+    precio?: number
+    valorTotal?: number
+    comprometido?: number
+    pedido?: number
+    disponible?: number
     unidad: string
     fechaConteo: string | null
     responsable: string | null
     estado: 'Pendiente' | 'Exacto' | 'Discrepancia'
     observacion?: string
+}
+
+const formatoCOP = (val?: number) => {
+    if (val == null || isNaN(val)) return '$ 0'
+    return `$ ${Math.round(val).toLocaleString('es-CO')}`
 }
 
 const ALMACENES_DISPONIBLES = [
@@ -227,7 +238,13 @@ export default function InventariosCiclicosPage() {
         const discrepancias = items.filter(i => i.estado === 'Discrepancia').length
         const pendientes = items.filter(i => i.estado === 'Pendiente').length
         const eri = contados > 0 ? ((exactos / contados) * 100).toFixed(1) : '0.0'
-        return { total, contados, exactos, discrepancias, pendientes, eri }
+        const valorInventario = items.reduce((acc, curr) => acc + (curr.valorTotal || 0), 0)
+        const valorDiscrepancias = items.reduce((acc, curr) => {
+            if (curr.conteoFisico === null) return acc
+            const diff = curr.conteoFisico - curr.stockTeorico
+            return acc + (diff * (curr.costoUnitario || curr.precio || 0))
+        }, 0)
+        return { total, contados, exactos, discrepancias, pendientes, eri, valorInventario, valorDiscrepancias }
     }, [items])
 
     const abrirConteoModal = (item: ConteoItem) => {
@@ -288,7 +305,7 @@ export default function InventariosCiclicosPage() {
             <main className="flex-1 max-w-[1700px] w-full mx-auto px-4 md:px-8 py-5 space-y-6">
                 
                 {/* 1. KPI CARDS */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
                     {/* Total Programados */}
                     <div className="bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-xs flex items-center justify-between">
                         <div>
@@ -296,14 +313,27 @@ export default function InventariosCiclicosPage() {
                             <div className="flex items-baseline gap-2">
                                 <span className="text-2xl font-black text-[#324354]">{metrics.total}</span>
                                 {origenDatosSAP && (
-                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                        SAP Service Layer
+                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">
+                                        SAP
                                     </span>
                                 )}
                             </div>
                         </div>
                         <div className="w-10 h-10 rounded-xl bg-[#324354]/5 flex items-center justify-center text-[#324354]">
                             <Boxes size={20} />
+                        </div>
+                    </div>
+
+                    {/* Valor Total Inventario */}
+                    <div className="bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-xs flex items-center justify-between">
+                        <div>
+                            <span className="text-[11px] font-bold text-[#7B8E90] uppercase tracking-wider block">Valor Stock SAP</span>
+                            <span className="text-lg md:text-xl font-black text-[#324354] whitespace-nowrap">
+                                {formatoCOP(metrics.valorInventario)}
+                            </span>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-[#59a96a]">
+                            <span className="text-base font-black">$</span>
                         </div>
                     </div>
 
@@ -335,7 +365,14 @@ export default function InventariosCiclicosPage() {
                     <div className="bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-xs flex items-center justify-between">
                         <div>
                             <span className="text-[11px] font-bold text-[#7B8E90] uppercase tracking-wider block">Discrepancias</span>
-                            <span className="text-2xl font-black text-[#d14747]">{metrics.discrepancias}</span>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-2xl font-black text-[#d14747]">{metrics.discrepancias}</span>
+                                {metrics.valorDiscrepancias !== 0 && (
+                                    <span className="text-[10px] font-bold text-[#d14747]">
+                                        ({formatoCOP(metrics.valorDiscrepancias)})
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-[#d14747]">
                             <AlertTriangle size={20} />
@@ -343,7 +380,7 @@ export default function InventariosCiclicosPage() {
                     </div>
 
                     {/* Pendientes de Conteo */}
-                    <div className="bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-xs flex items-center justify-between col-span-2 lg:col-span-1">
+                    <div className="bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-xs flex items-center justify-between">
                         <div>
                             <span className="text-[11px] font-bold text-[#7B8E90] uppercase tracking-wider block">Pendientes</span>
                             <span className="text-2xl font-black text-amber-600">{metrics.pendientes}</span>
@@ -499,11 +536,16 @@ export default function InventariosCiclicosPage() {
                                         <th className="py-3 px-3">Cat.</th>
                                         <th className="py-3 px-3">SKU</th>
                                         <th className="py-3 px-4">Descripción del Material</th>
-                                        <th className="py-3 px-3 text-center">Almacén</th>
-                                        <th className="py-3 px-3 text-center">Planta</th>
+                                        <th className="py-3 px-2 text-center">Almacén</th>
+                                        <th className="py-3 px-2 text-center">Planta</th>
                                         <th className="py-3 px-3 text-right">Stock Teórico</th>
+                                        <th className="py-3 px-2 text-right">Comp.</th>
+                                        <th className="py-3 px-2 text-right">Disp.</th>
+                                        <th className="py-3 px-3 text-right">Costo/Precio Unit.</th>
+                                        <th className="py-3 px-3 text-right">Valor Stock Total</th>
                                         <th className="py-3 px-3 text-right">Conteo Físico</th>
-                                        <th className="py-3 px-3 text-right">Diferencia</th>
+                                        <th className="py-3 px-3 text-right">Dif. Cant.</th>
+                                        <th className="py-3 px-3 text-right">Dif. Valor ($)</th>
                                         <th className="py-3 px-3 text-center">Estado</th>
                                         <th className="py-3 px-3 text-center">Acción</th>
                                     </tr>
@@ -511,7 +553,7 @@ export default function InventariosCiclicosPage() {
                                 <tbody className="divide-y divide-[#e2ded5]">
                                     {itemsFiltrados.length === 0 ? (
                                         <tr>
-                                            <td colSpan={10} className="py-12 px-4 text-center">
+                                            <td colSpan={15} className="py-12 px-4 text-center">
                                                 {!origenDatosSAP ? (
                                                     <div className="max-w-md mx-auto space-y-3">
                                                         <div className="w-12 h-12 mx-auto rounded-2xl bg-[#deb841]/20 text-[#324354] flex items-center justify-center">
@@ -521,7 +563,7 @@ export default function InventariosCiclicosPage() {
                                                             No hay información cargada
                                                         </h4>
                                                         <p className="text-xs text-[#7B8E90] leading-relaxed">
-                                                            Para ver los datos reales, abra los criterios de selección de SAP, elija los almacenes y filtros requeridos, y consulte el stock en vivo desde SAP Service Layer.
+                                                            Para ver los datos reales, abra los criterios de selección de SAP, elija los almacenes y filtros requeridos, y consulte el stock, costos y precios en vivo desde SAP Service Layer.
                                                         </p>
                                                         <button
                                                             onClick={() => setMostrarModalSAP(true)}
@@ -550,6 +592,8 @@ export default function InventariosCiclicosPage() {
                                         itemsFiltrados.map(item => {
                                             const tieneConteo = item.conteoFisico !== null
                                             const diff = tieneConteo ? (item.conteoFisico! - item.stockTeorico) : null
+                                            const unitCost = item.costoUnitario || item.precio || 0
+                                            const diffValor = diff !== null ? diff * unitCost : null
 
                                             return (
                                                 <tr key={item.id} className="hover:bg-[#F6F3EE]/40 transition-colors">
@@ -568,14 +612,26 @@ export default function InventariosCiclicosPage() {
                                                     <td className="py-3 px-4 font-semibold text-slate-800">
                                                         {item.descripcion}
                                                     </td>
-                                                    <td className="py-3 px-3 text-center font-bold text-[#7B8E90]">
+                                                    <td className="py-3 px-2 text-center font-bold text-[#7B8E90]">
                                                         {item.almacen}
                                                     </td>
-                                                    <td className="py-3 px-3 text-center font-bold text-slate-600">
+                                                    <td className="py-3 px-2 text-center font-bold text-slate-600">
                                                         {item.planta}
                                                     </td>
                                                     <td className="py-3 px-3 text-right font-black text-[#324354]">
                                                         {item.stockTeorico} <span className="text-[10px] text-slate-400 font-normal">{item.unidad}</span>
+                                                    </td>
+                                                    <td className="py-3 px-2 text-right font-bold text-slate-500">
+                                                        {item.comprometido || 0}
+                                                    </td>
+                                                    <td className="py-3 px-2 text-right font-bold text-slate-700">
+                                                        {item.disponible ?? item.stockTeorico}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-700 whitespace-nowrap">
+                                                        {formatoCOP(unitCost)}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-mono font-black text-[#324354] whitespace-nowrap">
+                                                        {formatoCOP(item.valorTotal || (item.stockTeorico * unitCost))}
                                                     </td>
                                                     <td className="py-3 px-3 text-right font-black">
                                                         {tieneConteo ? (
@@ -593,6 +649,19 @@ export default function InventariosCiclicosPage() {
                                                             ) : (
                                                                 <span className={diff > 0 ? 'text-amber-600' : 'text-[#d14747]'}>
                                                                     {diff > 0 ? `+${diff}` : diff}
+                                                                </span>
+                                                            )
+                                                        ) : (
+                                                            <span className="text-slate-300">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right font-mono font-bold whitespace-nowrap">
+                                                        {diffValor !== null ? (
+                                                            diffValor === 0 ? (
+                                                                <span className="text-[#59a96a]">$ 0</span>
+                                                            ) : (
+                                                                <span className={diffValor > 0 ? 'text-amber-600' : 'text-[#d14747]'}>
+                                                                    {diffValor > 0 ? `+${formatoCOP(diffValor)}` : `-${formatoCOP(Math.abs(diffValor))}`}
                                                                 </span>
                                                             )
                                                         ) : (
@@ -654,30 +723,50 @@ export default function InventariosCiclicosPage() {
                                         <th className="py-2.5 px-3 text-right">Teórico</th>
                                         <th className="py-2.5 px-3 text-right">Físico</th>
                                         <th className="py-2.5 px-3 text-right">Diferencia</th>
+                                        <th className="py-2.5 px-3 text-right">Costo Unit.</th>
+                                        <th className="py-2.5 px-3 text-right">Impacto Financiero</th>
                                         <th className="py-2.5 px-3">Responsable</th>
                                         <th className="py-2.5 px-3">Observación / Justificación</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#e2ded5]">
-                                    {items.filter(i => i.fechaConteo !== null).map(it => (
-                                        <tr key={it.id} className="hover:bg-[#F6F3EE]/40">
-                                            <td className="py-2.5 px-3 font-semibold text-slate-600">{it.fechaConteo}</td>
-                                            <td className="py-2.5 px-3 font-mono font-bold text-[#324354]">{it.sku}</td>
-                                            <td className="py-2.5 px-3 font-semibold text-slate-800">{it.descripcion}</td>
-                                            <td className="py-2.5 px-3 text-center font-bold text-[#7B8E90]">{it.almacen}</td>
-                                            <td className="py-2.5 px-3 text-right font-black">{it.stockTeorico}</td>
-                                            <td className="py-2.5 px-3 text-right font-black text-[#324354]">{it.conteoFisico}</td>
-                                            <td className="py-2.5 px-3 text-right font-black">
-                                                {it.conteoFisico! - it.stockTeorico === 0 ? (
-                                                    <span className="text-[#59a96a]">0</span>
-                                                ) : (
-                                                    <span className="text-[#d14747]">{it.conteoFisico! - it.stockTeorico}</span>
-                                                )}
-                                            </td>
-                                            <td className="py-2.5 px-3 text-slate-700">{it.responsable}</td>
-                                            <td className="py-2.5 px-3 text-slate-600 italic">{it.observacion || '-'}</td>
-                                        </tr>
-                                    ))}
+                                    {items.filter(i => i.fechaConteo !== null).map(it => {
+                                        const diff = it.conteoFisico! - it.stockTeorico
+                                        const unitCost = it.costoUnitario || it.precio || 0
+                                        const impacto = diff * unitCost
+
+                                        return (
+                                            <tr key={it.id} className="hover:bg-[#F6F3EE]/40">
+                                                <td className="py-2.5 px-3 font-semibold text-slate-600">{it.fechaConteo}</td>
+                                                <td className="py-2.5 px-3 font-mono font-bold text-[#324354]">{it.sku}</td>
+                                                <td className="py-2.5 px-3 font-semibold text-slate-800">{it.descripcion}</td>
+                                                <td className="py-2.5 px-3 text-center font-bold text-[#7B8E90]">{it.almacen}</td>
+                                                <td className="py-2.5 px-3 text-right font-black">{it.stockTeorico}</td>
+                                                <td className="py-2.5 px-3 text-right font-black text-[#324354]">{it.conteoFisico}</td>
+                                                <td className="py-2.5 px-3 text-right font-black">
+                                                    {diff === 0 ? (
+                                                        <span className="text-[#59a96a]">0</span>
+                                                    ) : (
+                                                        <span className="text-[#d14747]">{diff > 0 ? `+${diff}` : diff}</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-600">
+                                                    {formatoCOP(unitCost)}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right font-mono font-bold">
+                                                    {diff === 0 ? (
+                                                        <span className="text-[#59a96a]">$ 0</span>
+                                                    ) : (
+                                                        <span className={impacto > 0 ? 'text-amber-600' : 'text-[#d14747]'}>
+                                                            {impacto > 0 ? `+${formatoCOP(impacto)}` : `-${formatoCOP(Math.abs(impacto))}`}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-slate-700">{it.responsable}</td>
+                                                <td className="py-2.5 px-3 text-slate-600 italic">{it.observacion || '-'}</td>
+                                            </tr>
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -1035,11 +1124,25 @@ export default function InventariosCiclicosPage() {
                         </div>
 
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between p-3 bg-[#F6F3EE] rounded-xl text-xs">
-                                <span className="font-bold text-slate-600">Stock Teórico en Sistema:</span>
-                                <span className="font-black text-[#324354] text-sm">
-                                    {modalConteo.stockTeorico} {modalConteo.unidad}
-                                </span>
+                            <div className="grid grid-cols-2 gap-2 bg-[#F6F3EE] p-3 rounded-xl text-xs">
+                                <div>
+                                    <span className="text-[10px] text-slate-500 font-semibold block">Stock Teórico SAP:</span>
+                                    <span className="font-black text-[#324354] text-sm">
+                                        {modalConteo.stockTeorico} {modalConteo.unidad}
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] text-slate-500 font-semibold block">Costo/Precio Unit.:</span>
+                                    <span className="font-mono font-bold text-slate-700 text-xs">
+                                        {formatoCOP(modalConteo.costoUnitario || modalConteo.precio)}
+                                    </span>
+                                </div>
+                                <div className="col-span-2 pt-1 border-t border-[#e2ded5] flex justify-between items-center text-[11px]">
+                                    <span className="text-slate-500">Valor Total en Stock:</span>
+                                    <span className="font-mono font-black text-[#324354]">
+                                        {formatoCOP(modalConteo.valorTotal || (modalConteo.stockTeorico * (modalConteo.costoUnitario || modalConteo.precio || 0)))}
+                                    </span>
+                                </div>
                             </div>
 
                             <div className="space-y-1.5">
@@ -1059,15 +1162,29 @@ export default function InventariosCiclicosPage() {
                             </div>
 
                             {conteoInput !== '' && !isNaN(Number(conteoInput)) && (
-                                <div className={`p-3 rounded-xl flex items-center justify-between text-xs font-bold ${
+                                <div className={`p-3 rounded-xl space-y-1 text-xs font-bold ${
                                     Number(conteoInput) === modalConteo.stockTeorico
                                         ? 'bg-emerald-50 text-[#59a96a]'
                                         : 'bg-red-50 text-[#d14747]'
                                 }`}>
-                                    <span>Diferencia con Teórico:</span>
-                                    <span className="text-sm font-black">
-                                        {Number(conteoInput) - modalConteo.stockTeorico > 0 ? `+${Number(conteoInput) - modalConteo.stockTeorico}` : Number(conteoInput) - modalConteo.stockTeorico} {modalConteo.unidad}
-                                    </span>
+                                    <div className="flex items-center justify-between">
+                                        <span>Diferencia en Cantidad:</span>
+                                        <span className="text-sm font-black">
+                                            {Number(conteoInput) - modalConteo.stockTeorico > 0 ? `+${Number(conteoInput) - modalConteo.stockTeorico}` : Number(conteoInput) - modalConteo.stockTeorico} {modalConteo.unidad}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1 border-t border-black/5 text-[11px]">
+                                        <span>Impacto Financiero:</span>
+                                        <span className="font-mono font-black">
+                                            {(() => {
+                                                const diff = Number(conteoInput) - modalConteo.stockTeorico
+                                                const unitCost = modalConteo.costoUnitario || modalConteo.precio || 0
+                                                const diffVal = diff * unitCost
+                                                if (diff === 0) return '$ 0'
+                                                return diffVal > 0 ? `+${formatoCOP(diffVal)}` : `-${formatoCOP(Math.abs(diffVal))}`
+                                            })()}
+                                        </span>
+                                    </div>
                                 </div>
                             )}
 

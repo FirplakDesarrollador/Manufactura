@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         }
 
         const filterParam = filters.length > 0 ? `&$filter=${encodeURIComponent(filters.join(' and '))}` : '';
-        const selectParam = `$select=ItemCode,ItemName,ItemsGroupCode,SalesUnit,ItemWarehouseInfoCollection`;
+        const selectParam = `$select=ItemCode,ItemName,ItemsGroupCode,SalesUnit,ItemWarehouseInfoCollection,ItemPrices`;
         const topParam = `&$top=${Math.min(maxResults, 250)}`;
 
         const url = `${baseUrl}/Items?${selectParam}${filterParam}${topParam}`;
@@ -113,6 +113,16 @@ export async function POST(req: Request) {
                     continue;
                 }
 
+                // Buscar precio en lista de precios o costo en el almacén
+                const preciosLista = item.ItemPrices || [];
+                const precioValido = preciosLista.find((p: any) => Number(p.Price || 0) > 0)?.Price;
+                const costoUnitario = Number(wh.StandardAveragePrice || wh.ItemCost || precioValido || 0);
+                const precio = Number(precioValido || costoUnitario || 0);
+                const comprometido = Number(wh.Committed || 0);
+                const pedido = Number(wh.Ordered || 0);
+                const disponible = inStock - comprometido + pedido;
+                const valorTotal = inStock * costoUnitario;
+
                 // Determinar categoría ABC aproximada por código y stock
                 let categoria: 'A' | 'B' | 'C' = 'C';
                 const codeUpper = String(item.ItemCode).toUpperCase();
@@ -131,6 +141,12 @@ export async function POST(req: Request) {
                     categoria,
                     stockTeorico: inStock,
                     conteoFisico: null,
+                    costoUnitario,
+                    precio,
+                    valorTotal,
+                    comprometido,
+                    pedido,
+                    disponible,
                     unidad: item.SalesUnit || 'UN',
                     fechaConteo: null,
                     responsable: null,
