@@ -39,6 +39,8 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     indicadores_productividad: true,
     asistencia: true,
     mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador'],
+    // Pestañas del Gestor de Mantenimiento: sin ninguna marcada se ven todas (como antes); con alguna, solo esas
+    gestor_mantenimiento: ['planificador', 'mis_tareas', 'preventivo', 'ordenes_trabajo', 'indicadores', 'maquinas', 'configuracion'],
     esquema_personal: ['editar'],
     inventarios_ciclicos: true
 };
@@ -64,6 +66,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     indicadores_productividad: 'Tablero de Control',
     asistencia: 'Asistencia',
     mantenimiento: 'Mantenimiento (LILAC)',
+    gestor_mantenimiento: 'Gestor de Mantenimiento (pestañas)',
     esquema_personal: 'Esquema de Personal (además de jefes y coordinadores)',
     inventarios_ciclicos: 'Inventarios Cíclicos'
 };
@@ -77,7 +80,14 @@ const SUBMODULO_LABELS: Record<string, string> = {
     asistencia: 'Asistencia',
     configurar_defectos: 'Configurar Defectos',
     saldos_y_destrucciones: 'Saldos y Destrucciones',
-    ensayo: 'Ensayo'
+    ensayo: 'Ensayo',
+    planificador: 'Planificador',
+    mis_tareas: 'Mis Tareas',
+    preventivo: 'Preventivo (PMP)',
+    ordenes_trabajo: 'Órdenes de Trabajo',
+    indicadores: 'Indicadores',
+    maquinas: 'Máquinas y Equipos',
+    configuracion: 'Configuración (turnos y cuadrilla)'
 };
 
 export default function UsuariosConfiguracionPage() {

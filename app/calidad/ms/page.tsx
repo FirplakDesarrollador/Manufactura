@@ -281,7 +281,10 @@ export default function CalidadMsReportPage() {
         
         if (error) {
             console.error('Error saving report:', error)
-            alert('Error al guardar el reporte')
+            // Mensaje con la causa real (p. ej. una columna nueva que falta crear en la base)
+            const falta = /molde_manual|molde_escrito/.test(error.message || '') ? '\n\nFalta ejecutar rmold_molde_manual.sql en Supabase.'
+                : /linea|orden_fabricacion|entrega_cedi|fotos/.test(error.message || '') ? '\n\nFalta ejecutar calidad_fv.sql en Supabase.' : ''
+            alert(`Error al guardar el reporte: ${error.message}${falta}`)
         } else {
             setLoading(true)
             await fetchData()

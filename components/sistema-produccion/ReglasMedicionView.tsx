@@ -2,7 +2,7 @@
 
 import { HERRAMIENTAS_AUTO, HERRAMIENTAS_POR_PLANTA, plantaSP, reglasSinMedicion } from '@/lib/sistema-produccion/ejecuciones';
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, BarChart3, BookOpenCheck, Loader2, RefreshCw, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpenCheck, Eye, EyeOff, Loader2, RefreshCw, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PLANTAS_SP, cargarPlantasSP } from '@/lib/sistema-produccion/cumplimiento';
 import { actualizarTrabajoEstandarizado } from '@/lib/sistema-produccion/trabajoEstandarizado';
@@ -20,7 +20,7 @@ const norm = (x: string) => String(x || '').normalize('NFD').replace(/[\u0300-\u
 const limpio = (x: string) => String(x || '').replace(/\s+/g, ' ').trim();
 import {
     ESTADOS_REGLA, GARANTES_SP, NOMBRE_ROL, ORDEN_ESTADOS, REGLAS_INICIALES, ROLES_SP,
-    TRANSVERSAL, completarReglas, plantasDePersona, esGaranteSP, type EstadoRegla, type ReglasSP, type RolSP
+    TRANSVERSAL, completarReglas, personaOculta, plantasDePersona, esGaranteSP, type EstadoRegla, type ReglasSP, type RolSP
 } from '@/lib/sistema-produccion/reglas';
 
 // Reglas de Medición del Sistema de Producción: consulta para todos; los garantes la editan (modo edición ámbar).
@@ -123,6 +123,12 @@ export default function ReglasMedicionView() {
         const nuevas = act.includes(planta) ? act.filter(p => p !== planta) : [...act, planta];
         return { ...b, plantaPersona: { ...(b.plantaPersona || {}), [nombre]: PLANTAS_SP.map(p => p.value).filter(p => nuevas.includes(p)) } };
     });
+    // Ocultar / mostrar una persona: sigue en su rol, pero no se mide ni sale en el tablero (desde "Aplica desde")
+    const alternarOculta = (nombre: string) => setBorrador(b => {
+        if (!b) return b;
+        const ya = personaOculta(b, nombre);
+        return { ...b, ocultas: ya ? (b.ocultas || []).filter(o => norm(o) !== norm(nombre)) : [...(b.ocultas || []), nombre] };
+    });
     const quitarPersona = (rol: RolSP, i: number) => setBorrador(b => b && ({ ...b, personas: { ...b.personas, [rol]: b.personas[rol].filter((_, k) => k !== i) } }));
 
     // Lunes de la semana de una fecha (AAAA-MM-DD)
@@ -170,6 +176,7 @@ export default function ReglasMedicionView() {
             if (!fr || fr.periodo === 'mes' || h.roles[rol] !== 'aplica') return;
             const cant = conFestivo && fr.festivo != null ? fr.festivo : fr.semana;
             (r?.personas[rol] || []).forEach(n => {
+                if (personaOculta(r, n)) return;
                 const suyas = plantasDePersona(r, n);
                 const aplican = suyas.filter(p => h.plantas[p] !== 'no_aplica');
                 if (suyas.length && !aplican.length) return;
@@ -433,8 +440,10 @@ export default function ReglasMedicionView() {
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                             {(r.personas[rol] || []).map((n, k) => (
-                                <span key={`${n}-${k}`} className="flex items-center gap-1 text-[11px] font-semibold bg-[#F6F3EE] border border-[#e2ded5] text-[#324354] rounded-lg px-2 py-0.5">
-                                    {n}
+                                <span key={`${n}-${k}`} className={`flex items-center gap-1 text-[11px] font-semibold border rounded-lg px-2 py-0.5 ${personaOculta(r, n) ? 'bg-slate-100 border-dashed border-slate-300 text-slate-400' : 'bg-[#F6F3EE] border-[#e2ded5] text-[#324354]'}`}
+                                    title={personaOculta(r, n) ? 'Oculta: no se mide ni sale en el tablero' : undefined}>
+                                    {personaOculta(r, n) && <EyeOff size={11} />}
+                                    <span className={personaOculta(r, n) ? 'line-through' : ''}>{n}</span>
                                     {personal.length > 0 && !enPersonal.has(norm(n)) && (
                                         <span title="No está activo en la base de personal (Talento Humano): revise el nombre o retírelo" className="text-[#d14747]"><AlertTriangle size={11} /></span>
                                     )}
@@ -451,6 +460,10 @@ export default function ReglasMedicionView() {
                                             <option value="">+ Planta</option>
                                             {PLANTAS_SP.filter(p => !plantasDePersona(r, n).includes(p.value)).map(p => <option key={p.value} value={p.value}>{p.value}</option>)}
                                         </select>
+                                    )}
+                                    {editando && (
+                                        <button type="button" onClick={() => alternarOculta(n)} title={personaOculta(r, n) ? 'Mostrar: volver a medirla' : 'Ocultar: no medirla ni mostrarla en el tablero'}
+                                            className="text-[#7B8E90] hover:text-[#324354]">{personaOculta(r, n) ? <Eye size={11} /> : <EyeOff size={11} />}</button>
                                     )}
                                     {editando && <button onClick={() => quitarPersona(rol, k)} title="Quitar" className="text-[#7B8E90] hover:text-[#d14747]"><Trash2 size={11} /></button>}
                                 </span>

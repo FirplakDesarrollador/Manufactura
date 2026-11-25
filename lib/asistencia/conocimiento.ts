@@ -216,7 +216,7 @@ export const MODULOS: Modulo[] = [
                 nombre: 'Gestor de Mantenimiento', ruta: '/mantenimiento/gestion-mantenimiento', que: 'Órdenes de trabajo, preventivos y técnicos.',
                 pestanas: [
                     { nombre: 'Planificador', que: 'Calendario de trabajos con buscador, "+ Correctivo", "+ TPM" e indicadores.' },
-                    { nombre: 'Portal Técnicos', que: 'Trabajos asignados a cada técnico.' },
+                    { nombre: 'Mis Tareas', que: 'Tablero de tareas del técnico con sesión (correctivos, TPM y preventivos asignados).' },
                     { nombre: 'Preventivo (PMP)', que: 'Plan de mantenimiento preventivo; genera las órdenes por calendario.' },
                     { nombre: 'Órdenes de Trabajo', que: 'Todas las OT (correctivas, TPM, preventivas).' },
                     { nombre: 'Indicadores', que: 'Disponibilidad, tiempos y cumplimiento.' },

@@ -12,7 +12,6 @@ import {
   Search,
   Filter,
   ChevronDown,
-  MapPin,
   Check
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -143,13 +142,14 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
   }, [propTechnicians]);
 
   // Unique plants for filtering
+  // Plantas de un técnico: la especialidad guarda varias separadas por coma ("MS, FV, RTM")
+  const plantasDe = (t: TechnicianObj) => [...new Set((t.especialidad || t.planta || '').split(',').map(s => s.trim()).filter(Boolean)
+    .map(p => (obtenerCodigoPlanta(p) !== 'OTROS' ? obtenerCodigoPlanta(p) : p.toUpperCase())))];
   const availablePlants = useMemo(() => {
     const set = new Set<string>();
-    dbTechnicians.forEach(t => {
-      if (t.planta) set.add(t.planta.trim());
-      else if (t.especialidad) set.add(t.especialidad.trim());
-    });
+    dbTechnicians.forEach(t => plantasDe(t).forEach(p => set.add(p)));
     return Array.from(set).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbTechnicians]);
 
   // Filter technicians
@@ -163,10 +163,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
         (t.planta && normalizeStr(t.planta).includes(q)) ||
         (t.especialidad && normalizeStr(t.especialidad).includes(q));
 
-      const matchPlant =
-        plantaFilter === 'TODAS' ||
-        (t.planta && normalizeStr(t.planta) === normalizeStr(plantaFilter)) ||
-        (t.especialidad && normalizeStr(t.especialidad) === normalizeStr(plantaFilter));
+      const matchPlant = plantaFilter === 'TODAS' || plantasDe(t).includes(plantaFilter);
 
       return matchSearch && matchPlant;
     });
@@ -358,7 +355,6 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
   const renderTechCard = (tech: TechnicianObj, currentColumn: ModalityType) => {
     const isInactive = tech.modalidad_operativa === 'INACTIVO' || tech.activo === false;
     const currentMod: ModalityType = isInactive ? 'INACTIVO' : tech.modalidad_operativa || 'PR';
-    const plantaDisplay = tech.planta || tech.especialidad || 'General';
 
     return (
       <div
@@ -384,14 +380,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             >
               {tech.name}
             </span>
-
-            {/* Planta / Especialidad Tag */}
-            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium mt-0.5">
-              <span className="inline-flex items-center gap-0.5 text-gray-600 font-bold bg-gray-100/90 px-1.5 py-0.2 rounded text-[9.5px] border border-gray-200 truncate max-w-[180px]">
-                <MapPin className="w-2.5 h-2.5 text-gray-400 shrink-0" />
-                <span className="truncate">{plantaDisplay}</span>
-              </span>
-            </div>
+            {/* La planta / especialidad ya no se muestra aquí: las especialidades van en su propia sección (EspecialidadesTecnicos) */}
           </div>
 
           <button
@@ -532,8 +521,8 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             Todas ({dbTechnicians.length})
           </button>
           {availablePlants.map(p => {
-            const count = dbTechnicians.filter(t => t.planta === p || t.especialidad === p).length;
-            const code = obtenerCodigoPlanta(p) !== 'OTROS' ? obtenerCodigoPlanta(p) : p;
+            const count = dbTechnicians.filter(t => plantasDe(t).includes(p)).length;
+            const code = p;
             return (
               <button
                 key={p}

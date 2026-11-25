@@ -10,7 +10,7 @@
 // Ejecutar de más no pasa de 100 %. La semana en curso se exige en proporción a los días hábiles transcurridos.
 
 import { ALIAS_NOMENCLATURA, PLANTAS_SP, semanaDe } from './cumplimiento'
-import { ROLES_SP, plantasDePersona, type ReglasSP, type RolSP } from './reglas'
+import { ROLES_SP, personaOculta, plantasDePersona, type ReglasSP, type RolSP } from './reglas'
 import { festivosColombia, festivoEnDiaLaboral } from '@/lib/festivosColombia'
 import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants'
 
@@ -171,6 +171,7 @@ export function calcularCupos(ejecuciones: Ejecucion[], reglas: ReglasSP, desde:
         if (!(HERRAMIENTAS_AUTO as readonly string[]).includes(h.codigo)) continue
         const herr = h.codigo as HerrAuto
         for (const { nombre, rol } of personas) {
+            if (personaOculta(reglas, nombre)) continue   // oculta: no se le exige ni se muestra
             const fr = h.frecuencia?.[rol]
             if (h.roles[rol] !== 'aplica' || !fr || !(fr.semana > 0)) continue
             // Igual que "Revisiones esperadas" en las Reglas: solo cuenta en sus plantas donde la herramienta no está
