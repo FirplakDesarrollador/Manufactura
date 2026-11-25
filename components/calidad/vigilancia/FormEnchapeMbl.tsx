@@ -150,3 +150,4 @@ export default function FormEnchapeMbl({ onCancel, onSuccess }: FormEnchapeMblPr
         </div>
     );
 }
+

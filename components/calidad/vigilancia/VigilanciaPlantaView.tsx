@@ -27,6 +27,12 @@ import FormInspeccionMbl from './FormInspeccionMbl';
 import HistorialInspeccionMbl from './HistorialInspeccionMbl';
 import FormOtrosMbl from './FormOtrosMbl';
 import HistorialOtrosMbl from './HistorialOtrosMbl';
+import FormCorteCefi from './FormCorteCefi';
+import HistorialCorteCefi from './HistorialCorteCefi';
+import FormEnchapeCefi from './FormEnchapeCefi';
+import HistorialEnchapeCefi from './HistorialEnchapeCefi';
+import FormOtrosCefi from './FormOtrosCefi';
+import HistorialOtrosCefi from './HistorialOtrosCefi';
 import {
     MarmolSinteticoIcon,
     FibraDeVidrioIcon,
@@ -59,7 +65,8 @@ interface VigilanciaPlantaViewProps {
 const PROCESOS_CON_FORMULARIO = new Set([
     'pintura_ms', 'vaciado_ms', 'inspeccion_ms', 'otros_ms',
     'pintura_fv', 'vaciado_fv', 'inspeccion_fv',
-    'corte_mbl', 'enchape_mbl', 'taladros', 'inspeccion_mbl', 'otros_mbl'
+    'corte_mbl', 'enchape_mbl', 'taladros', 'inspeccion_mbl', 'otros_mbl',
+    'corte_cefi', 'enchape_cefi', 'otros_cefi'
 ]);
 
 export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlantaViewProps) {
@@ -394,6 +401,39 @@ export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlant
                     />
                 ) : (
                     <HistorialOtrosMbl
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'corte_cefi' ? (
+                activeTabMode === 'registro' ? (
+                    <FormCorteCefi
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Corte CEFI')}
+                    />
+                ) : (
+                    <HistorialCorteCefi
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'enchape_cefi' ? (
+                activeTabMode === 'registro' ? (
+                    <FormEnchapeCefi
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Enchape CEFI')}
+                    />
+                ) : (
+                    <HistorialEnchapeCefi
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'otros_cefi' ? (
+                activeTabMode === 'registro' ? (
+                    <FormOtrosCefi
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Otros CEFI')}
+                    />
+                ) : (
+                    <HistorialOtrosCefi
                         onNuevoRegistro={() => setActiveTabMode('registro')}
                     />
                 )

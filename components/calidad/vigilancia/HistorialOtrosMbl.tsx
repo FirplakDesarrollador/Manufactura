@@ -126,3 +126,4 @@ export default function HistorialOtrosMbl({ onNuevoRegistro }: HistorialOtrosMbl
         </div>
     );
 }
+

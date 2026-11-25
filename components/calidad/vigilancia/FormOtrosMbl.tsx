@@ -106,3 +106,4 @@ export default function FormOtrosMbl({ onCancel, onSuccess }: FormOtrosMblProps)
         </div>
     );
 }
+

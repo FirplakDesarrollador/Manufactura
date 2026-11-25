@@ -136,3 +136,4 @@ export default function HistorialCorteMbl({ onNuevoRegistro }: HistorialCorteMbl
         </div>
     );
 }
+

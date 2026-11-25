@@ -157,3 +157,4 @@ export default function FormCorteMbl({ onCancel, onSuccess }: FormCorteMblProps)
         </div>
     );
 }
+

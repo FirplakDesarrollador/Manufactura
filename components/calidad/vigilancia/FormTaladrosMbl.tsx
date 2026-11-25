@@ -121,3 +121,4 @@ export default function FormTaladrosMbl({ onCancel, onSuccess }: FormTaladrosMbl
         </div>
     );
 }
+

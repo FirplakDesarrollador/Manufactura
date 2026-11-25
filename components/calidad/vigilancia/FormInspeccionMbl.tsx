@@ -112,3 +112,4 @@ export default function FormInspeccionMbl({ onCancel, onSuccess }: FormInspeccio
         </div>
     );
 }
+

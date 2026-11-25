@@ -128,3 +128,4 @@ export default function HistorialInspeccionMbl({ onNuevoRegistro }: HistorialIns
         </div>
     );
 }
+
