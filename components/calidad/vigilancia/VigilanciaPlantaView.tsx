@@ -15,6 +15,18 @@ import FormPinturaFv from './FormPinturaFv';
 import HistorialPinturaFv from './HistorialPinturaFv';
 import FormVaciadoFv from './FormVaciadoFv';
 import HistorialVaciadoFv from './HistorialVaciadoFv';
+import FormInspeccionFv from './FormInspeccionFv';
+import HistorialInspeccionFv from './HistorialInspeccionFv';
+import FormCorteMbl from './FormCorteMbl';
+import HistorialCorteMbl from './HistorialCorteMbl';
+import FormEnchapeMbl from './FormEnchapeMbl';
+import HistorialEnchapeMbl from './HistorialEnchapeMbl';
+import FormTaladrosMbl from './FormTaladrosMbl';
+import HistorialTaladrosMbl from './HistorialTaladrosMbl';
+import FormInspeccionMbl from './FormInspeccionMbl';
+import HistorialInspeccionMbl from './HistorialInspeccionMbl';
+import FormOtrosMbl from './FormOtrosMbl';
+import HistorialOtrosMbl from './HistorialOtrosMbl';
 import {
     MarmolSinteticoIcon,
     FibraDeVidrioIcon,
@@ -44,7 +56,11 @@ interface VigilanciaPlantaViewProps {
     onBack: () => void;
 }
 
-const PROCESOS_CON_FORMULARIO = new Set(['pintura_ms', 'vaciado_ms', 'inspeccion_ms', 'otros_ms', 'pintura_fv', 'vaciado_fv']);
+const PROCESOS_CON_FORMULARIO = new Set([
+    'pintura_ms', 'vaciado_ms', 'inspeccion_ms', 'otros_ms',
+    'pintura_fv', 'vaciado_fv', 'inspeccion_fv',
+    'corte_mbl', 'enchape_mbl', 'taladros', 'inspeccion_mbl', 'otros_mbl'
+]);
 
 export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlantaViewProps) {
     const [selectedProceso, setSelectedProceso] = useState<ProcesoVigilanciaInfo>(planta.procesos[0]);
@@ -312,6 +328,72 @@ export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlant
                     />
                 ) : (
                     <HistorialVaciadoFv
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'inspeccion_fv' ? (
+                activeTabMode === 'registro' ? (
+                    <FormInspeccionFv
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Inspección FV')}
+                    />
+                ) : (
+                    <HistorialInspeccionFv
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'corte_mbl' ? (
+                activeTabMode === 'registro' ? (
+                    <FormCorteMbl
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Corte MBL')}
+                    />
+                ) : (
+                    <HistorialCorteMbl
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'enchape_mbl' ? (
+                activeTabMode === 'registro' ? (
+                    <FormEnchapeMbl
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Enchape MBL')}
+                    />
+                ) : (
+                    <HistorialEnchapeMbl
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'taladros' ? (
+                activeTabMode === 'registro' ? (
+                    <FormTaladrosMbl
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Taladros MBL')}
+                    />
+                ) : (
+                    <HistorialTaladrosMbl
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'inspeccion_mbl' ? (
+                activeTabMode === 'registro' ? (
+                    <FormInspeccionMbl
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Inspección MBL')}
+                    />
+                ) : (
+                    <HistorialInspeccionMbl
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'otros_mbl' ? (
+                activeTabMode === 'registro' ? (
+                    <FormOtrosMbl
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Otros MBL')}
+                    />
+                ) : (
+                    <HistorialOtrosMbl
                         onNuevoRegistro={() => setActiveTabMode('registro')}
                     />
                 )
