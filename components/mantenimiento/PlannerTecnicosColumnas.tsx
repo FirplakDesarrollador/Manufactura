@@ -65,6 +65,9 @@ export interface MaintenanceTask {
   fechaApertura?: string | null;
   fechaCierre?: string | null;
   activo?: boolean;
+  /** Orden de trabajo (PREV-xxxx) vigente del plan */
+  codigoOT?: string | null;
+  ordenId?: number | null;
 }
 
 export interface CorrectiveRecord {
@@ -100,6 +103,8 @@ interface PlannerTecnicosColumnasProps {
   onSaveCorrectivo?: (corrId: number | string, updates: Partial<CorrectiveRecord>) => Promise<boolean>;
   // Si se pasa, los correctivos/TPM abren el detalle completo de la página (el mismo de Órdenes de Trabajo)
   onOpenCorrectivoDetail?: (corr: CorrectiveRecord) => void;
+  // Si se pasa, los preventivos abren la ventana de ejecución de la página (la misma de Órdenes de Trabajo y Mis Tareas)
+  onOpenPreventivoDetail?: (task: MaintenanceTask) => void;
 }
 
 export type TaskTimeCategory = 'atrasadas' | 'hoy' | 'proximas';
@@ -114,6 +119,8 @@ export interface EnrichedTaskCardData {
   dateStatus: 'overdue' | 'today' | 'upcoming';
   code: string;
   cleanCode: string;
+  /** Orden de trabajo (PREV-xxxx) del preventivo */
+  codigoOT?: string | null;
   title: string;
   maquina?: string;
   planta?: string;
@@ -147,6 +154,7 @@ export default function PlannerTecnicosColumnas({
   onSaveTask,
   onSaveCorrectivo,
   onOpenCorrectivoDetail,
+  onOpenPreventivoDetail,
 }: PlannerTecnicosColumnasProps) {
   const [searchQuery, setSearchQuery] = useState('');
   // El portal del nivel 3 solo se monta en el navegador (document.body)
@@ -337,7 +345,7 @@ export default function PlannerTecnicosColumnas({
     tasks.forEach(t => {
       const isUnassigned = t.idtecs === 9999 || !technicians.some(tech => tech.id === t.idtecs);
       if (!isUnassigned) return;
-      if (!matchesSearch({ code: t.code || t.csvId, title: t.title, maquina: t.maquina, planta: t.planta })) return;
+      if (!matchesSearch({ code: `${t.code || t.csvId || ''} ${t.codigoOT || ''}`, title: t.title, maquina: t.maquina, planta: t.planta })) return;
 
       const { category, dateLabel, dateStatus, rawTimestamp } = categorizeTask(t);
       const codeStr = t.code || t.csvId || `MP-${t.id}`;
@@ -354,6 +362,7 @@ export default function PlannerTecnicosColumnas({
         dateStatus,
         code: codeStr,
         cleanCode,
+        codigoOT: t.codigoOT,
         title: t.title,
         maquina: t.maquina,
         planta: t.planta,
@@ -432,7 +441,7 @@ export default function PlannerTecnicosColumnas({
       // Preventives assigned to this tech
       tasks.forEach(t => {
         if (t.idtecs !== tech.id) return;
-        if (!matchesSearch({ code: t.code || t.csvId, title: t.title, maquina: t.maquina, planta: t.planta, tecnico: tech.name })) return;
+        if (!matchesSearch({ code: `${t.code || t.csvId || ''} ${t.codigoOT || ''}`, title: t.title, maquina: t.maquina, planta: t.planta, tecnico: tech.name })) return;
 
         const { category, dateLabel, dateStatus, rawTimestamp } = categorizeTask(t);
         const codeStr = t.code || t.csvId || `MP-${t.id}`;
@@ -449,6 +458,7 @@ export default function PlannerTecnicosColumnas({
           dateStatus,
           code: codeStr,
           cleanCode,
+          codigoOT: t.codigoOT,
           title: t.title,
           maquina: t.maquina,
           planta: t.planta,
@@ -560,6 +570,10 @@ export default function PlannerTecnicosColumnas({
   const handleOpenEdit = (tipo: 'preventivo' | 'correctivo', item: MaintenanceTask | CorrectiveRecord) => {
     if (tipo === 'correctivo' && onOpenCorrectivoDetail) {
       onOpenCorrectivoDetail(item as CorrectiveRecord);
+      return;
+    }
+    if (tipo === 'preventivo' && onOpenPreventivoDetail) {
+      onOpenPreventivoDetail(item as MaintenanceTask);
       return;
     }
     if (tipo === 'preventivo') {
@@ -1042,7 +1056,7 @@ export default function PlannerTecnicosColumnas({
                   </p>
                   <h3 className="text-white font-black text-sm font-mono tracking-tight">
                     {detailModalItem.tipo === 'preventivo'
-                      ? ((detailModalItem.item as MaintenanceTask).code || (detailModalItem.item as MaintenanceTask).csvId)
+                      ? `${(detailModalItem.item as MaintenanceTask).codigoOT ? `${(detailModalItem.item as MaintenanceTask).codigoOT} · ` : ''}${(detailModalItem.item as MaintenanceTask).code || (detailModalItem.item as MaintenanceTask).csvId}`
                       : (detailModalItem.item as CorrectiveRecord).codigo}
                   </h3>
                 </div>
@@ -1469,7 +1483,7 @@ function MaintenanceCard({
   onOpenDetail,
 }: MaintenanceCardProps) {
   
-  const { tipo, cleanCode, title, maquina, planta, durationHours, prioridad, currentTechId, dateLabel, dateStatus } = cardData;
+  const { tipo, cleanCode, codigoOT, title, maquina, planta, durationHours, prioridad, currentTechId, dateLabel, dateStatus } = cardData;
   const isCorrectivo = tipo === 'correctivo';
 
   // Date pill styling
@@ -1492,6 +1506,14 @@ function MaintenanceCard({
       {/* Top Line: Tag Badge, Execution Date/Deadline & Duration */}
       <div className="flex items-center justify-between gap-1">
         
+        {/* Primero el código único de la orden (PREV-xxxx); después el del plan */}
+        <div className="flex items-center gap-1 min-w-0">
+        {!isCorrectivo && codigoOT && (
+          <span className="px-1.5 py-0.5 rounded text-[8.5px] font-bold font-mono border tracking-tight leading-tight truncate max-w-[80px] bg-sky-50 text-sky-800 border-sky-200 shrink-0"
+            title={`Orden de trabajo ${codigoOT}`}>
+            {codigoOT}
+          </span>
+        )}
         {/* Code Tag Badge - sutil / discreto en gris */}
         <span
           className={`px-1.5 py-0.5 rounded text-[8.5px] font-medium font-mono border tracking-tight leading-tight truncate max-w-[95px] ${
@@ -1503,6 +1525,7 @@ function MaintenanceCard({
         >
           [{cleanCode}]
         </span>
+        </div>
 
         {/* Right Badges: Execution Date & Duration */}
         <div className="flex items-center gap-1 shrink-0">
