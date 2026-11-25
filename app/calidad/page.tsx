@@ -109,12 +109,30 @@ export default function CalidadPage() {
                             </button>
                         </div>
 
-                        {/* 2.1 Calidad FV (atajo a la app de Power Apps, pendiente de migrar) */}
+                        {/* 2.0 Calidad FV: aplicación propia (mismo módulo de Calidad MS) que reemplaza al atajo de Power Apps */}
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <button
+                                onClick={() => router.push('/calidad/fv')}
+                                className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] text-center leading-tight">
+                                    Calidad FV<br />
+                                    <span className="text-xs md:text-sm font-normal italic text-gray-400 mt-1 block">Nueva · en pruebas</span>
+                                </span>
+                            </button>
+                        </div>
+
+                        {/* 2.1 Calidad FV (atajo a la app de Power Apps, en transición a la aplicación propia) */}
                         <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
                             <button
                                 onClick={() => window.open(URL_CALIDAD_FV_POWERAPPS, '_blank', 'noopener,noreferrer')}
-                                title="Abre la aplicación Registro de Calidad FV (Power Apps) en otra pestaña"
-                                className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                                title="En transición: abre la aplicación Registro de Calidad FV (Power Apps) en otra pestaña mientras se construye Calidad FV en esta aplicación"
+                                className="relative w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-violet-50 rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border-2 border-violet-300 hover:border-violet-500 hover:shadow-[0_15px_30px_rgba(109,40,217,0.15)] hover:-translate-y-1 transition-all duration-300 group"
                             >
                                 <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
                                     <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,6 +143,7 @@ export default function CalidadPage() {
                                     Calidad FV<br />
                                     <span className="text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">Atajo · Power Apps</span>
                                 </span>
+                                <span className="absolute top-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] md:text-[10px] font-black uppercase tracking-wide text-violet-800 bg-violet-100 border border-violet-300 rounded-full px-2 py-0.5">En transición</span>
                             </button>
                         </div>
 

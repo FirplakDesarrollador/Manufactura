@@ -2,8 +2,9 @@
 // indicadores, configuración y criterios). Las pantallas son las mismas (app/calidad/ms/*); la ruta decide la planta:
 //   /calidad/ms/…     Mármol Sintético (MS)
 //   /calidad/rmold/…  Reparación de Moldes (RMOLD): la referencia es el tipo de molde (MS y FV) y el serial del molde
+//   /calidad/fv/…     Fibra de Vidrio (FV): además la línea (L1 / L2), el número de la orden y la entrega a CEDI
 // Las tablas de RMOLD son copia exacta de las de MS (calidad_rmold.sql), así el mismo código sirve para las dos.
-export type PlantaCalidadId = 'ms' | 'rmold'
+export type PlantaCalidadId = 'ms' | 'rmold' | 'fv'
 
 export interface PlantaCalidad {
     id: PlantaCalidadId
@@ -21,6 +22,9 @@ export interface PlantaCalidad {
     conSerial: boolean          // al registrar se escoge también el serial del molde
     moldeObligatorio: boolean   // todo registro exige el molde (RMOLD): "Referencia molde" activa y sin poder cambiarla
     inicio: string              // primer día con datos para los indicadores
+    conLinea?: boolean          // FV: al registrar se escoge la línea (L1 / L2) y se escribe el número de la orden
+    entregaCedi?: boolean       // FV: en el histórico se marca la pieza como entregada a CEDI
+    maxFotos?: number           // FV: varias fotos por pieza (trazabilidad del empaque); sin valor = una sola foto
     // Defectos que no hacen defectuosa la pieza (MS: Opaco y los de logística)
     defectosNoCuentan: string[]
 }
@@ -39,11 +43,20 @@ export const PLANTAS_CALIDAD: Record<PlantaCalidadId, PlantaCalidad> = {
         plantaCriterios: 'R moldes', carpetaFotos: 'rmold-defectos', placeholderReferencia: 'SELECCIONAR TIPO DE MOLDE',
         saldos: false, conSerial: true, moldeObligatorio: true, inicio: '2026-01-01',
         defectosNoCuentan: []
+    },
+    fv: {
+        id: 'fv', titulo: 'Calidad FV', nombre: 'Calidad FV', base: '/calidad/fv',
+        tReportes: 'fv_reporte_defectos', tDefectos: 'fv_defectos', tReferencias: 'fv_referencias', vDia: 'query_fv_reporte_defectos_dia',
+        plantaCriterios: 'Fv', carpetaFotos: 'fv-defectos', placeholderReferencia: 'SELECCIONAR REFERENCIA FV',
+        saldos: false, conSerial: false, moldeObligatorio: false, inicio: '2026-11-24',
+        conLinea: true, entregaCedi: true, maxFotos: 5,
+        defectosNoCuentan: []
     }
 }
 
 export function plantaCalidadDeRuta(ruta: string | null | undefined): PlantaCalidad {
-    return (ruta || '').startsWith('/calidad/rmold') ? PLANTAS_CALIDAD.rmold : PLANTAS_CALIDAD.ms
+    const r = ruta || ''
+    return r.startsWith('/calidad/rmold') ? PLANTAS_CALIDAD.rmold : r.startsWith('/calidad/fv') ? PLANTAS_CALIDAD.fv : PLANTAS_CALIDAD.ms
 }
 
 // ¿El defecto (nombre con o sin número "3. ") hace defectuosa la pieza en esta planta?

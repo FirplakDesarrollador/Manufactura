@@ -59,7 +59,7 @@ export default function IndicadoresCalidadMsPage() {
                 </div>
             </div>
 
-            <IndicadoresCalidadView soloMs={planta.id === 'ms'} soloRmold={planta.id === 'rmold'} />
+            <IndicadoresCalidadView soloMs={planta.id === 'ms'} soloRmold={planta.id === 'rmold'} soloFv={planta.id === 'fv'} />
         </div>
     )
 }

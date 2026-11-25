@@ -19,6 +19,7 @@ import {
   Wrench,
   Building2,
   Cpu,
+  CalendarDays,
   Layers,
   Check,
   FileSpreadsheet,
@@ -78,6 +79,8 @@ import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEdi
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
+import TurnosSemanales from '@/components/mantenimiento/TurnosSemanales';
+import EspecialidadesTecnicos from '@/components/mantenimiento/EspecialidadesTecnicos';
 import * as XLSX from 'xlsx';
 import { descargarHojaDeVidaEquipo } from '@/lib/mantenimiento/hojaDeVidaEquipo';
 import RelacionadosMaquina from '@/components/mantenimiento/RelacionadosMaquina';
@@ -286,7 +289,7 @@ interface CorrectiveRecord {
   fotos_solucion?: string[];
 }
 
-type TabType = 'planificador' | 'tecnico' | 'preventivo' | 'correctivo' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas';
+type TabType = 'planificador' | 'tecnico' | 'preventivo' | 'correctivo' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas' | 'turnos';
 
 const DAILY_CAPACITY_LIMIT = 7.2;
 
@@ -296,6 +299,11 @@ export default function GestionMantenimientoPage() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<TabType>('planificador');
   const [isSubHeaderOpen, setIsSubHeaderOpen] = useState(true);
+  // null = todas las pestañas; si el usuario tiene pestañas marcadas en sus permisos, solo esas
+  const [pestanasPermitidas, setPestanasPermitidas] = useState<TabType[] | null>(null);
+  useEffect(() => {
+    if (pestanasPermitidas && pestanasPermitidas.length && !pestanasPermitidas.includes(activeTab)) setActiveTab(pestanasPermitidas[0]);
+  }, [pestanasPermitidas, activeTab]);
 
   // Core Data State
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -993,6 +1001,18 @@ export default function GestionMantenimientoPage() {
           return;
         }
         setUserEmail(session.user.email || '');
+        // Pestañas permitidas (Configuración → Usuarios → Gestor de Mantenimiento). Sin ninguna marcada: todas.
+        const { data: u } = await supabase.from('usuarios').select('rol, permisos').ilike('correo', session.user.email || '').maybeSingle();
+        const rol = String(u?.rol || '').toLowerCase();
+        const gm = (u?.permisos as Record<string, unknown> | null)?.gestor_mantenimiento;
+        const MAPA: Record<string, TabType[]> = {
+          planificador: ['planificador'], mis_tareas: ['tecnico'], preventivo: ['preventivo'], ordenes_trabajo: ['historial', 'correctivo'],
+          indicadores: ['indicadores'], maquinas: ['maquinas'], configuracion: ['configuracion'],
+        };
+        const marcadas = gm && typeof gm === 'object' ? Object.entries(gm as Record<string, boolean>).filter(([, v]) => v).map(([k]) => k) : [];
+        if (rol !== 'admin' && rol !== 'desarrollador' && marcadas.length) {
+          setPestanasPermitidas(marcadas.flatMap(k => MAPA[k] || []));
+        }
       } catch (err) {
         console.error('Auth verification failed:', err);
       } finally {
@@ -2005,9 +2025,9 @@ export default function GestionMantenimientoPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const rawParam = (params.get('tab') || '').toLowerCase();
-      const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas'];
+      const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas', 'turnos'];
       if (rawParam && validTabs.includes(rawParam as TabType)) {
-        setActiveTab(rawParam === 'correctivo' ? 'historial' : (rawParam as TabType));
+        setActiveTab(rawParam === 'correctivo' ? 'historial' : rawParam === 'turnos' ? 'configuracion' : (rawParam as TabType));
       }
     }
   }, []);
@@ -5756,14 +5776,28 @@ export default function GestionMantenimientoPage() {
   };
 
   // Portal Technician Object
+  // Técnico del usuario con sesión: el correo nombre.apellido@firplak.com contra el nombre del técnico
+  // (cada parte del correo debe ser el comienzo de una palabra del nombre; solo si hay un único técnico así)
+  const techDelUsuario = useMemo(() => {
+    const n = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const partes = n(userEmail.split('@')[0] || '').split(/[._-]+/).filter(p => p.length >= 2);
+    if (partes.length < 2) return null;
+    const cand = technicians.filter(t => t.id !== 9999).filter(t => {
+      const pal = n(t.name).split(/\s+/);
+      return partes.every(p => pal.some(w => w.startsWith(p)));
+    });
+    return cand.length === 1 ? cand[0] : null;
+  }, [technicians, userEmail]);
+
   const currentPortalTech = useMemo(() => {
+    if (techDelUsuario) return techDelUsuario;
     return technicians.find(t => t.id === activeTechId) || null;
-  }, [technicians, activeTechId]);
+  }, [technicians, activeTechId, techDelUsuario]);
 
   const portalTechTasks = useMemo(() => {
-    if (!activeTechId) return [];
-    return tasks.filter(t => t.idtecs === activeTechId);
-  }, [tasks, activeTechId]);
+    if (!currentPortalTech) return [];
+    return tasks.filter(t => t.idtecs === currentPortalTech.id);
+  }, [tasks, currentPortalTech]);
 
   const portalTechCorrectivos = useMemo(() => {
     if (!currentPortalTech) return [];
@@ -6077,15 +6111,15 @@ export default function GestionMantenimientoPage() {
   }, [portalTechTasks, portalTechCorrectivos, plannerColumns, currentPortalTech]);
 
   // SubHeader Navigation Items matching FIRPLAK Pattern
-  const subNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
+  const subNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = ([
     { id: 'planificador', label: 'Planificador', icon: <Layers size={14} /> },
-    { id: 'tecnico', label: 'Portal Técnicos', icon: <User size={14} /> },
+    { id: 'tecnico', label: 'Mis Tareas', icon: <User size={14} /> },
     { id: 'preventivo', label: 'Preventivo (PMP)', icon: <FileSpreadsheet size={14} /> },
     { id: 'historial', label: 'Órdenes de Trabajo', icon: <History size={14} /> },
     { id: 'indicadores', label: 'Indicadores', icon: <BarChart3 size={14} /> },
     { id: 'maquinas', label: 'Máquinas y Equipos', icon: <Cpu size={14} /> },
     { id: 'configuracion', label: 'Configuración', icon: <Settings size={14} /> },
-  ];
+  ] as { id: TabType; label: string; icon: React.ReactNode }[]).filter(i => !pestanasPermitidas || pestanasPermitidas.includes(i.id));
 
   if (loading) {
     return (
@@ -6202,43 +6236,21 @@ export default function GestionMantenimientoPage() {
           <div className={`flex flex-col gap-3 w-full ${!currentPortalTech ? 'max-w-4xl mx-auto' : 'w-full'} animate-in fade-in duration-300`}>
             
             {!currentPortalTech ? (
-              /* Step 1: Login by Cédula or ID */
-              <div className="bg-white rounded-3xl p-8 sm:p-12 border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.06)] text-center flex flex-col items-center gap-6">
-                <div className="w-16 h-16 rounded-full bg-[#324354]/10 text-[#324354] flex items-center justify-center">
-                  <User className="w-8 h-8" />
+              /* Usuario que no es técnico (jefe, planificador): elige de quién ver el tablero.
+                 Los técnicos entran directo a su tablero por su usuario (techDelUsuario). */
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.06)] text-center flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[#324354]/10 text-[#324354] flex items-center justify-center">
+                  <User className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-[#324354]">Portal de Consulta del Técnico</h2>
-                  <p className="text-sm text-gray-500 mt-1">Ingresa tu número de Cédula o ID de técnico para ver y reportar tus mantenimientos asignados hoy.</p>
+                  <h2 className="text-xl font-bold text-[#324354]">Mis Tareas</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {technicians.length ? <>Tu usuario ({userEmail}) no corresponde a ningún técnico. Elige el técnico cuyo tablero quieres ver.</> : 'Cargando técnicos…'}
+                  </p>
                 </div>
 
-                <form onSubmit={handlePortalLogin} className="w-full max-w-md flex flex-col gap-4">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={portalDocSearch}
-                      onChange={(e) => setPortalDocSearch(e.target.value)}
-                      placeholder="Ej. 1010232658 o ID: 1"
-                      className="w-full px-4 py-3 bg-[#F6F3EE] rounded-2xl border border-gray-300 text-center font-bold text-lg text-[#324354] focus:outline-none focus:border-[#324354]"
-                    />
-                  </div>
-                  {portalError && (
-                    <div className="text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                      {portalError}
-                    </div>
-                  )}
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-[#324354] text-white font-bold rounded-2xl shadow-md hover:bg-[#324354]/90 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>Ingresar a mis Mantenimientos</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-
-                {/* Quick select from active techs */}
-                <div className="pt-4 border-t border-gray-100 w-full">
-                  <div className="text-xs text-gray-400 font-semibold mb-3">O selecciona tu perfil directo de la jornada:</div>
+                <div className="pt-3 border-t border-gray-100 w-full">
+                  <div className="text-xs text-gray-400 font-semibold mb-3">Técnicos:</div>
                   <div className="flex flex-wrap gap-2 justify-center">
                     {technicians.filter(t => t.id !== 9999).map(t => (
                       <button
@@ -6363,17 +6375,17 @@ export default function GestionMantenimientoPage() {
                       </span>
                     </div>
 
-                    {/* Exit/Logout Button */}
-                    <button
+                    {/* Volver a la lista (solo quien no es técnico: el técnico ve siempre su propio tablero) */}
+                    {!techDelUsuario && <button
                       onClick={() => {
                         setActiveTechId(null);
                         sessionStorage.removeItem('techflow_active_tech_id');
                       }}
                       className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all cursor-pointer shrink-0"
-                      title="Salir del portal de técnico"
+                      title="Ver otro técnico"
                     >
                       <LogOut className="w-4 h-4" />
-                    </button>
+                    </button>}
 
                   </div>
 
@@ -8155,6 +8167,13 @@ export default function GestionMantenimientoPage() {
         {/* ========================================================================= */}
         {/* VIEW 7: CONFIGURACIÓN */}
         {/* ========================================================================= */}
+        {/* Configuración: primero los turnos de la semana (actual y próxima), después la cuadrilla y lo demás */}
+        {activeTab === 'configuracion' && (
+          <div className="w-full mb-4 animate-in fade-in duration-300">
+            <TurnosSemanales technicians={technicians} userEmail={userEmail} onTechsUpdated={fetchData} />
+          </div>
+        )}
+
         {activeTab === 'configuracion' && (
           <div className="max-w-[1600px] mx-auto w-full flex flex-col gap-7 animate-in fade-in duration-300">
             
@@ -8162,6 +8181,9 @@ export default function GestionMantenimientoPage() {
             {/* SECCIÓN 1: PLANIFICACIÓN DE CUADRILLA, HORARIOS Y TURNOS (FUSIÓN TOTAL)   */}
             {/* ========================================================================= */}
             <MatrizHorariosTurnos technicians={technicians} onTechsUpdated={fetchData} />
+
+            {/* Especialidades de cada técnico (varias), aparte de la cuadrilla */}
+            <EspecialidadesTecnicos technicians={technicians} plantas={plantasNomenclatura} onTechsUpdated={fetchData} />
 
             {/* ========================================================================= */}
             {/* SECCIÓN 2: TIPO DE INTERVENCIÓN */}

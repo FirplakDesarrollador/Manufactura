@@ -1,7 +1,7 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BookOpenCheck, Eraser, Loader2, X } from 'lucide-react';
 import {
     ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, LabelList, ReferenceLine
@@ -13,7 +13,7 @@ import {
     HistoricoSP, META_SP, PLANTAS_SP, cargarPlantasSP, codigoPlantaSP,
     aliasPersonaSP, colorSemaforo, hoyIso, nombreHerramienta, nombrePlanta, promedio, semanaDe
 } from '@/lib/sistema-produccion/cumplimiento';
-import { REGLAS_INICIALES, completarReglas, nombreEnReglas, type ReglasSP, type RolSP } from '@/lib/sistema-produccion/reglas';
+import { REGLAS_INICIALES, completarReglas, nombreEnReglas, personaVisibleSP, type ReglasSP, type RolSP } from '@/lib/sistema-produccion/reglas';
 import { calcularCuposVersiones, reglasVigentes, type Ejecucion, type VersionReglas } from '@/lib/sistema-produccion/ejecuciones';
 import { actualizarTrabajoEstandarizado, type TESemana } from '@/lib/sistema-produccion/trabajoEstandarizado';
 import { resolveNombreCompleto } from '@/lib/ficha-rcc/constants';
@@ -163,6 +163,8 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
     // Historial de ejecución de cada herramienta y reglas de medición (frecuencias por rol)
     const [crudo, setCrudo] = useState<{ hh: any[]; opt: any[]; opts: any[]; bit: any[]; plantas: any[]; usuarios: any[] }>({ hh: [], opt: [], opts: [], bit: [], plantas: [], usuarios: [] });
     const [reglas, setReglas] = useState<ReglasSP>(completarReglas(REGLAS_INICIALES));
+    // Solo salen las personas de las Reglas de Medición actuales que no estén ocultas (el Excel trae otras personas)
+    const oculta = useCallback((nombre: string) => !personaVisibleSP(nombre, reglas), [reglas]);
     const [historico, setHistorico] = useState<HistoricoSP[]>([]);
     const [empleados, setEmpleados] = useState<Empleado[]>([]);
     const [asistencias, setAsistencias] = useState<AsistenciaRRC[]>([]);
@@ -227,7 +229,8 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             if (vr.error) errs.push(`Versiones de las reglas: ${/sp_reglas_versiones|relation|schema cache/i.test(vr.error.message) ? 'falta ejecutar sp_reglas_versiones.sql; se usan las reglas actuales para todas las semanas' : vr.error.message}`);
             else setVersiones(((vr.data || []) as { vigente_desde: string; datos: ReglasSP }[]).map(x => ({ desde: x.vigente_desde, reglas: completarReglas(x.datos) })));
             setCrudo({ hh: hh.data || [], opt: op.data || [], opts: r.data || [], bit: bt.data || [], plantas: pl.data || [], usuarios: us.data || [] });
-            setHistorico(((h.data as HistoricoSP[]) || []).map(x => ({ ...x, planta: x.planta ? codigoPlantaSP(x.planta) : x.planta, persona: x.persona ? nombreEnReglas(aliasPersonaSP(x.persona), reglasCargadas) : x.persona, cumplimiento: Number(x.cumplimiento) })));
+            // Filas por persona del Excel: solo las personas de las reglas (no ocultas)
+            setHistorico(((h.data as HistoricoSP[]) || []).filter(x => !(x.nivel === 'persona' && x.persona && !personaVisibleSP(aliasPersonaSP(x.persona), reglasCargadas))).map(x => ({ ...x, planta: x.planta ? codigoPlantaSP(x.planta) : x.planta, persona: x.persona ? nombreEnReglas(aliasPersonaSP(x.persona), reglasCargadas) : x.persona, cumplimiento: Number(x.cumplimiento) })));
             setEmpleados((e.data as Empleado[]) || []);
             setAsistencias((a.data as AsistenciaRRC[]) || []);
             // Persona de la RRC → planta, según su proceso
@@ -464,8 +467,9 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         historico.forEach(h => { if (h.nivel === 'persona' && h.persona) m.set(norm(h.persona), { nombre: titulo(h.persona), rol: (h.rol as Rol) || 'Otro' }); });
         cuposApp.forEach(c => { const k = norm(c.persona); if (!m.has(k)) m.set(k, { nombre: c.persona, rol: c.rolP }); });
         rrcApp.forEach(x => { const k = norm(x.persona); if (!m.has(k)) m.set(k, { nombre: x.persona, rol: x.rolP }); });
-        return [...m.values()];
-    }, [historico, cuposApp, rrcApp]);
+        // Ocultas en las reglas actuales: no salen en la gráfica ni en el resumen por persona
+        return [...m.values()].filter(p => !oculta(p.nombre));
+    }, [historico, cuposApp, rrcApp, oculta]);
     const porPersona = useMemo(() => personas
         .filter(p => rol === 'todos' || p.rol === rol)
         .map(p => ({ key: p.nombre, nombre: p.nombre, rol: p.rol, ...categoria({ ...cruce('persona'), persona: p.nombre }) }))
@@ -504,6 +508,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
             if (selHerr && c.herr !== selHerr) return;
             if (!enPlantas(c.plantas, plantas)) return;
             if (selPersona && norm(c.persona) !== norm(selPersona)) return;
+            if (oculta(c.persona)) return;
             filas.push({ fecha: c.fecha, semana: `S${sm.semana}`, persona: c.persona, rol: c.rolP, herr: nombreHerramienta(c.herr), planta: c.plantas.join(', ') || SIN_PLANTA, plantas: c.plantas.length ? c.plantas : [SIN_PLANTA],
                 resultado: c.extra ? 'Ejecutada (adicional)' : c.ejec ? 'Ejecutada' : 'No ejecutada', ok: !!c.ejec, hist: false, extra: !!c.extra });
         });
@@ -529,7 +534,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
         });
         return filas.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.persona.localeCompare(b.persona) || a.herr.localeCompare(b.herr));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cuposApp, teApp, historico, sel, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
+    }, [cuposApp, teApp, historico, oculta, sel, selHerr, selPlanta, selPersona, plantasSel, anios, meses, semanasSel, diasSel]);
     type Conteo = { exig: number; ejec: number; pcts?: number[]; extra?: number }
     const resumenDe = (clave: (f: typeof detalle[number]) => string | string[]) => {
         const m = new Map<string, { exigidas: number; ejecutadas: number; hist: number[]; adicionales: number; herr: Map<string, Conteo>; pers: Map<string, Conteo>; fechas: Set<string>; roles: Set<string>; plantas: Set<string> }>();

@@ -32,6 +32,18 @@ export default function CalidadMsReportPage() {
     const [nombreManual, setNombreManual] = useState('')
     const [serialEscrito, setSerialEscrito] = useState('')
     const [claveSelect, setClaveSelect] = useState(0)
+    // FV: línea (L1 / L2) y número de la orden de fabricación (si existe en FV, trae la referencia)
+    const [linea, setLinea] = useState('')
+    const [ordenFab, setOrdenFab] = useState('')
+    const [ifiLineas, setIfiLineas] = useState<{ linea: string; ifi: number; total: number }[]>([])
+    const buscarOrdenFv = async (of: string) => {
+        const t = of.trim()
+        if (!planta.conLinea || !t) return
+        const { data } = await supabase.from('ordenes_fabricacion_fv').select('producto_sku').eq('orden_fabricacion', t).limit(1).maybeSingle()
+        const sku = (data as { producto_sku?: string } | null)?.producto_sku
+        const prod = sku ? products.find(p => (p as { sku?: string }).sku === sku) : null
+        if (prod) { setSelectedProduct(prod.id.toString()); setClaveSelect(k => k + 1) }
+    }
     const limpiarManual = () => { setMoldeManual(false); setSerialManual(false); setNombreManual(''); setSerialEscrito(''); setClaveSelect(k => k + 1) }
     const [user, setUser] = useState<User | null>(null)
 
@@ -74,6 +86,17 @@ export default function CalidadMsReportPage() {
     const [selectedDefects, setSelectedDefects] = useState<Record<number, boolean>>({})
 
     const [photoFile, setPhotoFile] = useState<File | null>(null)
+    // FV: varias fotos por pieza (hasta planta.maxFotos) en una ventana antes de guardar
+    const [fotosVarias, setFotosVarias] = useState<File[]>([])
+    const [ventanaFotos, setVentanaFotos] = useState(false)
+    const moldeRefFotos = useRef<string | undefined>(undefined)
+    const camaraVariasRef = useRef<HTMLInputElement>(null)
+    const adjuntarVariasRef = useRef<HTMLInputElement>(null)
+    const agregarFotos = (lista: FileList | null) => {
+        if (!lista) return
+        const max = planta.maxFotos || 1
+        setFotosVarias(prev => [...prev, ...Array.from(lista)].slice(0, max))
+    }
     const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -120,6 +143,8 @@ export default function CalidadMsReportPage() {
             setHasSaldosPermission(!!localUser.permisos.calidad.saldos_y_destrucciones)
         }
 
+        // FV: productos de las OF nuevas a la lista de referencias (la vista de OF no admite disparadores)
+        if (planta.conLinea) { try { await supabase.rpc('fv_referencias_sincronizar') } catch { /* si falla, quedan las referencias que ya había */ } }
         const [productsRes, defectsRes, reportsRes] = await Promise.all([
             supabase.from(planta.tReferencias).select('*').order('Referencia'),
             supabase.from(planta.tDefectos).select('*').order('id'),
@@ -145,6 +170,16 @@ export default function CalidadMsReportPage() {
             // Saldos y destrucciones del día (mismo criterio de la pantalla de Saldos)
             const saldos = reportsRes.data.filter(r => /saldo|destrucci/i.test(String(r.defectos_lista || ''))).length
             setStats({ buenos, defectuosos, total, ifi, saldos })
+            if (planta.conLinea) {
+                const ids = reportsRes.data.map(r => r.id).filter(Boolean)
+                const { data: lineas } = ids.length ? await supabase.from(planta.tReportes).select('id, linea').in('id', ids) : { data: [] }
+                const lineaDe = new Map(((lineas || []) as { id: number; linea: string | null }[]).map(x => [x.id, x.linea || '']))
+                setIfiLineas(['L1', 'L2'].map(l => {
+                    const rs = reportsRes.data.filter(r => lineaDe.get(Number(r.id)) === l)
+                    const malas = rs.filter(r => String(r.defectos_lista || '').split(',').map(x => x.trim()).filter(Boolean).some(d => !isIgnoredDefect(d))).length
+                    return { linea: l, total: rs.length, ifi: rs.length ? ((rs.length - malas) / rs.length) * 100 : 0 }
+                }))
+            }
         }
 
         setLoading(false)
@@ -185,7 +220,7 @@ export default function CalidadMsReportPage() {
         }))
     }
 
-    const executeSave = async (fileToUpload: File | null = photoFile, moldeRef?: string) => {
+    const executeSave = async (fileToUpload: File | null = photoFile, moldeRef?: string, variasFotos: File[] = []) => {
         if (!selectedProduct && !moldeManual) return
         
         const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
@@ -213,6 +248,15 @@ export default function CalidadMsReportPage() {
             const { data } = supabase.storage.from('fichas-media').getPublicUrl(fileName)
             fotoUrl = data.publicUrl
         }
+        // FV: todas las fotos (la primera también queda como foto principal)
+        const fotosUrls: string[] = []
+        for (const [i, f] of variasFotos.entries()) {
+            const nombre = `${planta.carpetaFotos}/${Date.now()}-${i + 1}-${f.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+            const { error: eF } = await supabase.storage.from('fichas-media').upload(nombre, f)
+            if (eF) { console.error('Error uploading photo:', eF); alert(`Error al subir la foto ${i + 1}`); setIsUploading(false); return }
+            fotosUrls.push(supabase.storage.from('fichas-media').getPublicUrl(nombre).data.publicUrl)
+        }
+        if (fotosUrls.length) fotoUrl = fotosUrls[0]
 
         const escrito = planta.conSerial && (moldeManual || serialManual)
         const reportData = {
@@ -221,6 +265,9 @@ export default function CalidadMsReportPage() {
             defecto: selectedDefectNames,
             created_at: new Date().toISOString(),
             ...(fotoUrl ? { fotoUrl } : {}),
+            ...(fotosUrls.length ? { fotos: fotosUrls } : {}),
+            // FV: línea y número de la orden
+            ...(planta.conLinea ? { linea, orden_fabricacion: ordenFab.trim() || null } : {}),
             ...(moldeRef ? { Molde: moldeRef } : {}),
             // RMOLD: serial del molde revisado (opcional)
             ...(planta.conSerial && selectedMolde && !escrito ? { Molde: moldesTipo.find(m => String(m.id) === selectedMolde)?.serial ?? moldeRef, molde_id: parseInt(selectedMolde) } : {}),
@@ -234,7 +281,10 @@ export default function CalidadMsReportPage() {
         
         if (error) {
             console.error('Error saving report:', error)
-            alert('Error al guardar el reporte')
+            // Mensaje con la causa real (p. ej. una columna nueva que falta crear en la base)
+            const falta = /molde_manual|molde_escrito/.test(error.message || '') ? '\n\nFalta ejecutar rmold_molde_manual.sql en Supabase.'
+                : /linea|orden_fabricacion|entrega_cedi|fotos/.test(error.message || '') ? '\n\nFalta ejecutar calidad_fv.sql en Supabase.' : ''
+            alert(`Error al guardar el reporte: ${error.message}${falta}`)
         } else {
             setLoading(true)
             await fetchData()
@@ -243,7 +293,10 @@ export default function CalidadMsReportPage() {
             setSelectedMolde('')
             setMoldesTipo([])
             setPhotoFile(null)
+            setFotosVarias([])
+            setVentanaFotos(false)
             limpiarManual()
+            setOrdenFab('')
         }
     }
 
@@ -258,6 +311,10 @@ export default function CalidadMsReportPage() {
         }
         if (!selectedProduct && !moldeManual) {
             alert('Por favor selecciona un producto')
+            return
+        }
+        if (planta.conLinea && !linea) {
+            alert('Seleccione la línea (L1 o L2).')
             return
         }
         // Molde escrito a mano: ya se tiene el molde, no se pide la referencia
@@ -290,6 +347,13 @@ export default function CalidadMsReportPage() {
         const selectedDefectsList = defects.filter(d => selectedDefects[d.id])
         const requiresPhoto = selectedDefectsList.some(d => d.Requiere_Foto)
         
+        if (requiresPhoto && planta.maxFotos) {
+            // FV: ventana para tomar o adjuntar varias fotos antes de guardar
+            moldeRefFotos.current = moldeRef
+            setFotosVarias([])
+            setVentanaFotos(true)
+            return
+        }
         if (requiresPhoto && !photoFile) {
             // Trigger photo capture automatically instead of alerting
             moldeRefForUpload.current = moldeRef
@@ -407,6 +471,17 @@ export default function CalidadMsReportPage() {
                             />
                         </div>
                         )}
+                        {planta.conLinea && (<>
+                            <select value={linea} onChange={e => setLinea(e.target.value)} title="Línea (obligatoria)"
+                                className={`h-7 w-[70px] shrink-0 bg-white border rounded px-1.5 text-[#254153] font-bold text-[11px] outline-none ${linea ? 'border-gray-300' : 'border-amber-400'}`}>
+                                <option value="">Línea…</option>
+                                <option value="L1">L1</option>
+                                <option value="L2">L2</option>
+                            </select>
+                            <input value={ordenFab} onChange={e => setOrdenFab(e.target.value)} onBlur={e => void buscarOrdenFv(e.target.value)}
+                                placeholder="N.º orden" inputMode="numeric" title="Número de la orden de fabricación (si existe en FV, se escoge sola la referencia)"
+                                className="h-7 w-[84px] shrink-0 bg-white border border-gray-300 rounded px-2 text-[#254153] font-bold text-[11px] outline-none" />
+                        </>)}
                         {planta.conSerial && (moldeManual || serialManual ? (
                             <div className="flex items-center gap-1 shrink-0">
                                 <input value={serialEscrito} onChange={e => setSerialEscrito(e.target.value)} placeholder="Serial (escrito)" autoFocus={serialManual}
@@ -496,6 +571,7 @@ export default function CalidadMsReportPage() {
                         )}
                         <div className="flex items-center">
                             <span className="text-sm 2xl:text-base font-bold text-[#36A284]">IFI: {stats.ifi.toFixed(1)}%</span>
+                            {planta.conLinea && ifiLineas.map(x => <span key={x.linea} className="text-[11px] font-bold text-[#254153] whitespace-nowrap" title={`${x.total} pieza(s) de la línea ${x.linea} hoy`}>{x.linea}: {x.total ? `${x.ifi.toFixed(1)}%` : '—'}</span>)}
                         </div>
                         <div className="flex items-center">
                             <span className="text-sm 2xl:text-base font-bold text-gray-800">Total: {stats.total}</span>
@@ -554,6 +630,53 @@ export default function CalidadMsReportPage() {
                 defects={defects}
                 onSave={handleSaveSettings}
             />
+
+            {/* FV: varias fotos de la pieza (trazabilidad del empaque) */}
+            {ventanaFotos && (
+                <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-5 overflow-y-auto">
+                    <div className="bg-white rounded-2xl border-2 border-[#324354] shadow-2xl w-full max-w-2xl p-4 sm:p-5">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <h3 className="text-lg font-black text-[#324354]">Fotos de la pieza</h3>
+                            <span className="text-xs font-black text-slate-500">{fotosVarias.length} / {planta.maxFotos}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mb-3">Tome al menos una foto (hasta {planta.maxFotos}). Son la trazabilidad del empaque.</p>
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                            {fotosVarias.map((f, i) => (
+                                <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-300 bg-slate-100">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={URL.createObjectURL(f)} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                                    <span className="absolute top-1 left-1 text-[9px] font-black bg-white/90 text-[#324354] rounded px-1">{i === 0 ? '★ 1' : i + 1}</span>
+                                    <button type="button" onClick={() => setFotosVarias(p => p.filter((_, k) => k !== i))} title="Quitar foto"
+                                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-white/90 text-[#d14747] text-xs font-black leading-none">×</button>
+                                </div>
+                            ))}
+                            {fotosVarias.length < (planta.maxFotos || 1) && (
+                                <button type="button" onClick={() => camaraVariasRef.current?.click()}
+                                    className="aspect-square rounded-lg border-2 border-dashed border-amber-400 bg-amber-50 text-amber-800 text-[11px] font-black flex flex-col items-center justify-center gap-1 hover:bg-amber-100">
+                                    <span className="text-xl leading-none">📷</span> Tomar foto
+                                </button>
+                            )}
+                        </div>
+                        <input ref={camaraVariasRef} type="file" accept="image/*" capture="environment" className="hidden"
+                            onChange={e => { agregarFotos(e.target.files); e.target.value = '' }} />
+                        <input ref={adjuntarVariasRef} type="file" accept="image/*" multiple className="hidden"
+                            onChange={e => { agregarFotos(e.target.files); e.target.value = '' }} />
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#e2ded5]">
+                            <button type="button" onClick={() => adjuntarVariasRef.current?.click()} disabled={fotosVarias.length >= (planta.maxFotos || 1)}
+                                className="h-9 px-3 rounded-lg bg-[#324354] text-white text-xs font-bold disabled:opacity-40">Adjuntar</button>
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => { setVentanaFotos(false); setFotosVarias([]) }}
+                                    className="h-9 px-3 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs font-bold">Cancelar</button>
+                                <button type="button" disabled={!fotosVarias.length || isUploading}
+                                    onClick={() => { const fs2 = fotosVarias; void executeSave(null, moldeRefFotos.current, fs2) }}
+                                    className="h-9 px-4 rounded-lg bg-amber-500 text-white text-xs font-black disabled:opacity-40">
+                                    {isUploading ? 'Guardando…' : `Guardar con ${fotosVarias.length} foto(s)`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Custom Modal for Molde Reference */}
             {isMoldeModalOpen && (
