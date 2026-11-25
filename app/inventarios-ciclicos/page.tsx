@@ -180,6 +180,10 @@ export default function InventariosCiclicosPage() {
 
     // Consulta hacia la API SAP Service Layer
     const ejecutarConsultaSAP = async () => {
+        if (sapAlmacenesSeleccionados.length === 0) {
+            toast.warning('Por favor selecciona al menos un almacén en la lista.')
+            return
+        }
         setConsultandoSAP(true)
         try {
             const response = await fetch('/api/sap/auditoria-stock', {
@@ -867,7 +871,7 @@ export default function InventariosCiclicosPage() {
                                         <span className="w-16 text-slate-600 font-semibold">Código Desde</span>
                                         <input
                                             type="text"
-                                            placeholder="CMPD01..."
+                                            placeholder="Opcional (Ej: CMPD01)"
                                             value={sapCodigoDesde}
                                             onChange={e => setSapCodigoDesde(e.target.value)}
                                             className="flex-1 px-2.5 py-1 bg-[#F6F3EE] border border-[#c4beaf] rounded text-xs font-mono"
@@ -877,7 +881,7 @@ export default function InventariosCiclicosPage() {
                                         <span className="w-16 text-slate-600 font-semibold">Hasta</span>
                                         <input
                                             type="text"
-                                            placeholder="ZZZZ..."
+                                            placeholder="Opcional (Ej: ZZZZ)"
                                             value={sapCodigoHasta}
                                             onChange={e => setSapCodigoHasta(e.target.value)}
                                             className="flex-1 px-2.5 py-1 bg-[#F6F3EE] border border-[#c4beaf] rounded text-xs font-mono"

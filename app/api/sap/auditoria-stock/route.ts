@@ -25,6 +25,30 @@ const PLANTAS_POR_BODEGA: Record<string, string> = {
     'REP-01': 'MTTO',
 };
 
+const SQL_CODE = 'fir_auditoria_stock';
+const SQL_QUERY_TEXT = `SELECT T0.[ItemCode] AS [item_code], T1.[ItemName] AS [item_name], T0.[WhsCode] AS [whs_code], T0.[OnHand] AS [in_stock], T0.[IsCommited] AS [committed], T0.[OnOrder] AS [ordered], T0.[AvgPrice] AS [costo_unitario], T1.[ItmsGrpCod] AS [grupo_codigo], T1.[SalUnitMsr] AS [unidad] FROM [OITW] T0 INNER JOIN [OITM] T1 ON T0.[ItemCode] = T1.[ItemCode] WHERE T0.[OnHand] > 0`;
+
+async function asegurarQueryStock(baseUrl: string, cookieHeader: string) {
+    try {
+        const checkRes = await fetch(`${baseUrl}/SQLQueries('${SQL_CODE}')`, {
+            headers: { 'Cookie': cookieHeader }
+        });
+        if (checkRes.status === 404) {
+            await fetch(`${baseUrl}/SQLQueries`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Cookie': cookieHeader },
+                body: JSON.stringify({
+                    SqlCode: SQL_CODE,
+                    SqlName: 'Auditoria de Stock Firplak',
+                    SqlText: SQL_QUERY_TEXT
+                })
+            });
+        }
+    } catch (e) {
+        console.warn('Advertencia asegurando SQLQuery fir_auditoria_stock:', e);
+    }
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -33,127 +57,125 @@ export async function POST(req: Request) {
             codigoHasta,
             grupoArticulos,
             almacenes = [],
-            ocultarStockCero = true,
-            maxResults = 100
+            ocultarStockCero = true
         } = body;
 
         // Iniciar sesión en SAP Service Layer
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         const loginData = await loginToSAP();
         const baseUrl = process.env.SAP_API_URL?.replace('/Login', '') || 'https://200.7.96.194:50000/b1s/v1';
+        const cookieHeader = loginData.cookieHeader;
 
-        // Construir filtros OData para /Items
-        const filters: string[] = [];
+        // Garantizar que la consulta SQL rápida existe en SAP
+        await asegurarQueryStock(baseUrl, cookieHeader);
 
-        if (codigoDesde && codigoHasta) {
-            filters.push(`ItemCode ge '${codigoDesde.trim().replace(/'/g, "''")}' and ItemCode le '${codigoHasta.trim().replace(/'/g, "''")}'`);
-        } else if (codigoDesde) {
-            filters.push(`ItemCode ge '${codigoDesde.trim().replace(/'/g, "''")}'`);
-        } else if (codigoHasta) {
-            filters.push(`ItemCode le '${codigoHasta.trim().replace(/'/g, "''")}'`);
-        }
+        // Consultar stock directamente desde SQLQueries de Service Layer
+        let nextUrl: string | null = `${baseUrl}/SQLQueries('${SQL_CODE}')/List`;
+        const rawStockRows: any[] = [];
+        const maxPages = 6; // hasta 6.000 registros de stock activo
+        let pageCount = 0;
 
-        if (grupoArticulos && grupoArticulos !== 'TODOS' && grupoArticulos !== 'Todos') {
-            const numGrupo = Number(grupoArticulos);
-            if (!isNaN(numGrupo)) {
-                filters.push(`ItemsGroupCode eq ${numGrupo}`);
+        while (nextUrl && pageCount < maxPages) {
+            pageCount++;
+            const sapResponse = await fetch(nextUrl, {
+                method: 'GET',
+                headers: {
+                    'Cookie': cookieHeader,
+                    'Prefer': 'odata.maxpagesize=1000'
+                },
+                cache: 'no-store'
+            });
+
+            if (!sapResponse.ok) {
+                const errText = await sapResponse.text();
+                console.error(`Error en SQLQueries(${SQL_CODE})/List página ${pageCount}:`, sapResponse.status, errText);
+                break;
             }
+
+            const data = await sapResponse.json();
+            if (Array.isArray(data.value)) {
+                rawStockRows.push(...data.value);
+            }
+
+            const next = data['@odata.nextLink'];
+            if (!next) break;
+            nextUrl = next.startsWith('http') ? next : `${baseUrl}/${String(next).replace(/^\//, '')}`;
         }
 
-        const filterParam = filters.length > 0 ? `&$filter=${encodeURIComponent(filters.join(' and '))}` : '';
-        const selectParam = `$select=ItemCode,ItemName,ItemsGroupCode,SalesUnit,ItemWarehouseInfoCollection,ItemPrices`;
-        const topParam = `&$top=${Math.min(maxResults, 250)}`;
-
-        const url = `${baseUrl}/Items?${selectParam}${filterParam}${topParam}`;
-
-        const sapResponse = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Cookie': loginData.cookieHeader,
-                'Content-Type': 'application/json',
-                'Prefer': 'odata.maxpagesize=250'
-            },
-            cache: 'no-store'
-        });
-
-        if (!sapResponse.ok) {
-            const errText = await sapResponse.text();
-            console.error('Error al consultar SAP Service Layer (/Items):', sapResponse.status, errText);
-            return NextResponse.json({
-                error: `SAP Service Layer respondió con error ${sapResponse.status}`,
-                details: errText
-            }, { status: sapResponse.status });
-        }
-
-        const data = await sapResponse.json();
-        const sapItems = Array.isArray(data.value) ? data.value : [];
-
-        // Almacenes seleccionados normalizados (si está vacío, no se filtra por almacén específico)
+        // Filtros en memoria precisos
         const almacenesSet = new Set(
-            (almacenes || []).map((w: string) => String(w).trim().toUpperCase())
+            (almacenes || []).map((w: string) => String(w).trim().toUpperCase()).filter(Boolean)
         );
+
+        const codDesdeTrim = (codigoDesde || '').trim().toUpperCase();
+        const codHastaTrim = (codigoHasta || '').trim().toUpperCase();
+        const grupoNum = grupoArticulos && grupoArticulos !== 'TODOS' && grupoArticulos !== 'Todos' ? Number(grupoArticulos) : null;
 
         const resultados: any[] = [];
 
-        for (const item of sapItems) {
-            const whCollection = item.ItemWarehouseInfoCollection || [];
-            
-            for (const wh of whCollection) {
-                const whCode = String(wh.WarehouseCode || '').trim().toUpperCase();
-                
-                // Si el usuario especificó almacenes en el formulario, verificar coincidencia
-                if (almacenesSet.size > 0 && !almacenesSet.has(whCode)) {
-                    continue;
-                }
+        for (const row of rawStockRows) {
+            const whCode = String(row.whs_code || '').trim().toUpperCase();
+            const itemCode = String(row.item_code || '').trim().toUpperCase();
+            const inStock = Number(row.in_stock || 0);
 
-                const inStock = Number(wh.InStock || 0);
-
-                // Ocultar artículos con una cantidad acumulada equivalente a cero
-                if (ocultarStockCero && inStock <= 0) {
-                    continue;
-                }
-
-                // Buscar precio en lista de precios o costo en el almacén
-                const preciosLista = item.ItemPrices || [];
-                const precioValido = preciosLista.find((p: any) => Number(p.Price || 0) > 0)?.Price;
-                const costoUnitario = Number(wh.StandardAveragePrice || wh.ItemCost || precioValido || 0);
-                const precio = Number(precioValido || costoUnitario || 0);
-                const comprometido = Number(wh.Committed || 0);
-                const pedido = Number(wh.Ordered || 0);
-                const disponible = inStock - comprometido + pedido;
-                const valorTotal = inStock * costoUnitario;
-
-                // Determinar categoría ABC aproximada por código y stock
-                let categoria: 'A' | 'B' | 'C' = 'C';
-                const codeUpper = String(item.ItemCode).toUpperCase();
-                if (codeUpper.startsWith('CMPD01') || codeUpper.startsWith('PGEL') || codeUpper.startsWith('CMPD09') || inStock > 500) {
-                    categoria = 'A';
-                } else if (codeUpper.startsWith('CMPD') || inStock > 100) {
-                    categoria = 'B';
-                }
-
-                resultados.push({
-                    id: `${item.ItemCode}__${whCode}`,
-                    sku: item.ItemCode,
-                    descripcion: item.ItemName || 'Sin descripción',
-                    almacen: whCode,
-                    planta: PLANTAS_POR_BODEGA[whCode] || 'MS',
-                    categoria,
-                    stockTeorico: inStock,
-                    conteoFisico: null,
-                    costoUnitario,
-                    precio,
-                    valorTotal,
-                    comprometido,
-                    pedido,
-                    disponible,
-                    unidad: item.SalesUnit || 'UN',
-                    fechaConteo: null,
-                    responsable: null,
-                    estado: 'Pendiente',
-                    observacion: ''
-                });
+            // Filtro por almacén
+            if (almacenesSet.size > 0 && !almacenesSet.has(whCode)) {
+                continue;
             }
+
+            // Filtro ocultar stock cero
+            if (ocultarStockCero && inStock <= 0) {
+                continue;
+            }
+
+            // Filtro rango de códigos
+            if (codDesdeTrim && itemCode < codDesdeTrim) {
+                continue;
+            }
+            if (codHastaTrim && itemCode > codHastaTrim) {
+                continue;
+            }
+
+            // Filtro grupo de artículos
+            if (grupoNum !== null && Number(row.grupo_codigo) !== grupoNum) {
+                continue;
+            }
+
+            const committed = Number(row.committed || 0);
+            const ordered = Number(row.ordered || 0);
+            const available = inStock - committed + ordered;
+            const costoUnitario = Number(row.costo_unitario || 0);
+            const valorTotal = inStock * costoUnitario;
+
+            // Determinar categoría ABC
+            let categoria: 'A' | 'B' | 'C' = 'C';
+            if (itemCode.startsWith('CMPD01') || itemCode.startsWith('PGEL') || itemCode.startsWith('CMPD09') || inStock > 500) {
+                categoria = 'A';
+            } else if (itemCode.startsWith('CMPD') || inStock > 100) {
+                categoria = 'B';
+            }
+
+            resultados.push({
+                id: `${row.item_code}__${whCode}`,
+                sku: row.item_code,
+                descripcion: row.item_name || 'Sin descripción',
+                almacen: whCode,
+                planta: PLANTAS_POR_BODEGA[whCode] || 'MS',
+                categoria,
+                stockTeorico: inStock,
+                conteoFisico: null,
+                costoUnitario,
+                precio: costoUnitario,
+                valorTotal,
+                comprometido: committed,
+                pedido: ordered,
+                disponible: available,
+                unidad: row.unidad || 'UN',
+                fechaConteo: null,
+                responsable: null,
+                estado: 'Pendiente',
+                observacion: ''
+            });
         }
 
         return NextResponse.json({
