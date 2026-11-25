@@ -12,19 +12,20 @@ import {
     Clock, 
     Calendar, 
     Filter, 
-    ArrowUpDown, 
     Download, 
     RefreshCw, 
-    Plus, 
-    FileSpreadsheet,
-    Building2,
-    Warehouse,
-    Check,
-    X
+    Check, 
+    X,
+    Database,
+    ChevronDown,
+    ChevronUp,
+    SlidersHorizontal,
+    ArrowRight,
+    Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface ConteoItem {
+export interface ConteoItem {
     id: string
     sku: string
     descripcion: string
@@ -40,25 +41,39 @@ interface ConteoItem {
     observacion?: string
 }
 
-const ALMACENES = [
-    { id: 'TODOS', nombre: 'Todos los almacenes' },
-    { id: 'MP-01', nombre: 'MP-01 · Almacén Central de Materias Primas' },
-    { id: 'MP-04', nombre: 'MP-04 · Planta Mármol Sintético' },
-    { id: 'MP-03', nombre: 'MP-03 · Planta Fibra de Vidrio' },
-    { id: 'MP-02', nombre: 'MP-02 · Planta Muebles' },
-    { id: 'PT-01', nombre: 'PT-01 · Almacén Producto Terminado' },
-    { id: 'REP-01', nombre: 'REP-01 · Almacén Repuestos y Mtto' }
+const ALMACENES_DISPONIBLES = [
+    { codigo: 'MP-01', nombre: 'Materias Primas', localidad: 'Principal' },
+    { codigo: 'MP-02', nombre: 'Importaciones - Mercancía', localidad: 'Principal' },
+    { codigo: 'MP-03', nombre: 'Planta Fibra de Vidrio', localidad: 'Planta FV' },
+    { codigo: 'MP-04', nombre: 'Producción Muebles', localidad: 'Planta MBL' },
+    { codigo: 'MP-05', nombre: 'Planta RTM', localidad: 'Planta FV' },
+    { codigo: 'MP-06', nombre: 'Moldes', localidad: 'Planta MS' },
+    { codigo: 'MP-07', nombre: 'Servicios', localidad: 'Planta MBL' },
+    { codigo: 'MP-08', nombre: 'Devoluciones de Materia Prima', localidad: 'Principal' },
+    { codigo: 'MP-09', nombre: 'I+D+I', localidad: 'Investigación' },
+    { codigo: 'MP-10', nombre: 'Planta Mármol Sintético', localidad: 'Planta MS' },
+    { codigo: 'MP-11', nombre: 'Materias Primas CEFI', localidad: 'Planta CEFI' },
+    { codigo: 'MP-12', nombre: 'Producción Muebles CEFI', localidad: 'Planta CEFI' },
+    { codigo: 'PT-01', nombre: 'Producto Terminado Decorado', localidad: 'Logística' },
+    { codigo: 'PT-02', nombre: 'Producto Terminado', localidad: 'Logística' },
+    { codigo: 'PT-03', nombre: 'Devoluciones en sitio', localidad: 'Logística' },
+    { codigo: 'PT-06', nombre: 'Saldos', localidad: 'Logística' },
+    { codigo: 'PT-10', nombre: 'Sala Disponible FPK Medellín', localidad: 'Comercial' },
+    { codigo: 'PT-11', nombre: 'Sala Disponible FPK Bogotá', localidad: 'Comercial' },
+    { codigo: 'REP-01', nombre: 'Repuestos y Mantenimiento', localidad: 'Mtto' },
 ]
 
-const PLANTAS = [
-    { id: 'TODAS', nombre: 'Todas las plantas' },
-    { id: 'MS', nombre: 'Mármol Sintético (MS)' },
-    { id: 'FV', nombre: 'Fibra de Vidrio (FV)' },
-    { id: 'MBL', nombre: 'Muebles (MBL)' },
-    { id: 'CEFI', nombre: 'CEFI' }
+const GRUPOS_ARTICULOS = [
+    { id: 'TODOS', nombre: 'Todos' },
+    { id: '100', nombre: 'Materias Primas' },
+    { id: '101', nombre: 'Material de Empaque' },
+    { id: '102', nombre: 'Repuestos y Mantenimiento' },
+    { id: '103', nombre: 'Producto Semielaborado' },
+    { id: '104', nombre: 'Producto Terminado' },
+    { id: '105', nombre: 'Insumos Generales' }
 ]
 
-// Muestra inicial de datos de inventario cíclico operativo
+// Muestra inicial de datos
 const ITEMS_BASE: ConteoItem[] = [
     {
         id: '1',
@@ -168,19 +183,37 @@ export default function InventariosCiclicosPage() {
     const [userEmail, setUserEmail] = useState<string>('')
     const [loading, setLoading] = useState(true)
 
-    // Datos y filtros
+    // Datos y filtros generales
     const [items, setItems] = useState<ConteoItem[]>(ITEMS_BASE)
     const [busqueda, setBusqueda] = useState('')
     const [filtroAlmacen, setFiltroAlmacen] = useState('TODOS')
     const [filtroPlanta, setFiltroPlanta] = useState('TODAS')
     const [filtroEstado, setFiltroEstado] = useState<'TODOS' | 'Pendiente' | 'Exacto' | 'Discrepancia'>('TODOS')
-    const [filtroCategoria, setFiltroCategoria] = useState<'TODAS' | 'A' | 'B' | 'C'>('TODAS')
     const [pestañaActiva, setPestañaActiva] = useState<'conteo' | 'historial' | 'programacion'>('conteo')
 
     // Modal de registro rápido de conteo
     const [modalConteo, setModalConteo] = useState<ConteoItem | null>(null)
     const [conteoInput, setConteoInput] = useState<number | ''>('')
     const [observacionInput, setObservacionInput] = useState('')
+
+    // ====== FORMULARIO SAP: Criterios de Selección ======
+    const [mostrarModalSAP, setMostrarModalSAP] = useState(false)
+    const [consultandoSAP, setConsultandoSAP] = useState(false)
+    const [sapFechaDesde, setSapFechaDesde] = useState('2026-03-03')
+    const [sapFechaHasta, setSapFechaHasta] = useState('2026-11-25')
+    const [sapCodigoDesde, setSapCodigoDesde] = useState('')
+    const [sapCodigoHasta, setSapCodigoHasta] = useState('')
+    const [sapGrupoArticulos, setSapGrupoArticulos] = useState('TODOS')
+    const [sapCuentasMayor, setSapCuentasMayor] = useState(false)
+    const [sapAlmacenesSeleccionados, setSapAlmacenesSeleccionados] = useState<string[]>([
+        'MP-06', 'MP-07', 'MP-08', 'MP-09', 'MP-10', 'MP-11'
+    ])
+    const [sapVisualizar, setSapVisualizar] = useState<'articulos' | 'cuentas'>('articulos')
+    const [sapGrupoPorAlmacen, setSapGrupoPorAlmacen] = useState(true)
+    const [sapVisualizarSinTransacciones, setSapVisualizarSinTransacciones] = useState(false)
+    const [sapOcultarStockCero, setSapOcultarStockCero] = useState(true)
+    const [sapOcultarSerieLote, setSapOcultarSerieLote] = useState(false)
+    const [origenDatosSAP, setOrigenDatosSAP] = useState(false)
 
     // Verificar sesión y permisos
     useEffect(() => {
@@ -193,7 +226,6 @@ export default function InventariosCiclicosPage() {
             }
             setUserEmail(user.email || '')
 
-            // Validar permiso de inventarios cíclicos
             const emailLower = (user.email || '').toLowerCase()
             if (emailLower === 'analista2.desarrollo@firplak.com') {
                 setLoading(false)
@@ -220,6 +252,62 @@ export default function InventariosCiclicosPage() {
         checkAuth()
     }, [router])
 
+    // Toggle de almacén en formulario SAP
+    const toggleAlmacenSAP = (codigo: string) => {
+        setSapAlmacenesSeleccionados(prev => 
+            prev.includes(codigo) 
+                ? prev.filter(c => c !== codigo)
+                : [...prev, codigo]
+        )
+    }
+
+    const seleccionarTodosAlmacenes = (todos: boolean) => {
+        if (todos) {
+            setSapAlmacenesSeleccionados(ALMACENES_DISPONIBLES.map(a => a.codigo))
+        } else {
+            setSapAlmacenesSeleccionados([])
+        }
+    }
+
+    // Consulta hacia la API SAP Service Layer
+    const ejecutarConsultaSAP = async () => {
+        setConsultandoSAP(true)
+        try {
+            const response = await fetch('/api/sap/auditoria-stock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    codigoDesde: sapCodigoDesde.trim() || undefined,
+                    codigoHasta: sapCodigoHasta.trim() || undefined,
+                    grupoArticulos: sapGrupoArticulos,
+                    almacenes: sapAlmacenesSeleccionados,
+                    ocultarStockCero: sapOcultarStockCero,
+                    maxResults: 150
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al consultar SAP Service Layer')
+            }
+
+            if (data.items && data.items.length > 0) {
+                setItems(data.items)
+                setOrigenDatosSAP(true)
+                setMostrarModalSAP(false)
+                toast.success(`SAP Service Layer: Se cargaron ${data.items.length} artículos según los criterios seleccionados.`)
+            } else {
+                toast.warning('SAP Service Layer no retornó artículos con los filtros aplicados (verifique stock o rango de códigos).')
+            }
+        } catch (error: any) {
+            console.error('Error al ejecutar auditoría SAP:', error)
+            toast.error(error.message || 'Error de conexión con SAP Service Layer')
+        } finally {
+            setConsultandoSAP(false)
+        }
+    }
+
     // Filtrar items
     const itemsFiltrados = useMemo(() => {
         return items.filter(item => {
@@ -229,10 +317,9 @@ export default function InventariosCiclicosPage() {
             const matchAlmacen = filtroAlmacen === 'TODOS' || item.almacen === filtroAlmacen
             const matchPlanta = filtroPlanta === 'TODAS' || item.planta === filtroPlanta
             const matchEstado = filtroEstado === 'TODOS' || item.estado === filtroEstado
-            const matchCat = filtroCategoria === 'TODAS' || item.categoria === filtroCategoria
-            return matchBusqueda && matchAlmacen && matchPlanta && matchEstado && matchCat
+            return matchBusqueda && matchAlmacen && matchPlanta && matchEstado
         })
-    }, [items, busqueda, filtroAlmacen, filtroPlanta, filtroEstado, filtroCategoria])
+    }, [items, busqueda, filtroAlmacen, filtroPlanta, filtroEstado])
 
     // KPIs del ciclo
     const metrics = useMemo(() => {
@@ -293,7 +380,7 @@ export default function InventariosCiclicosPage() {
             {/* Header Firplak */}
             <Header
                 title="Inventarios Cíclicos"
-                subtitle="Control y Conteo Cíclico en Planta"
+                subtitle="Control y Conteo Cíclico en Planta · SAP Service Layer"
                 backUrl="/home"
                 userEmail={userEmail}
                 showLogout={true}
@@ -308,7 +395,14 @@ export default function InventariosCiclicosPage() {
                     <div className="bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-xs flex items-center justify-between">
                         <div>
                             <span className="text-[11px] font-bold text-[#7B8E90] uppercase tracking-wider block">Items del Ciclo</span>
-                            <span className="text-2xl font-black text-[#324354]">{metrics.total}</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-black text-[#324354]">{metrics.total}</span>
+                                {origenDatosSAP && (
+                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                        SAP Service Layer
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="w-10 h-10 rounded-xl bg-[#324354]/5 flex items-center justify-center text-[#324354]">
                             <Boxes size={20} />
@@ -362,7 +456,7 @@ export default function InventariosCiclicosPage() {
                     </div>
                 </div>
 
-                {/* 2. BARRA DE CONTROLES Y FILTROS */}
+                {/* 2. BARRA DE CONTROLES, PESTAÑAS Y DISPARADOR SAP */}
                 <div className="bg-white p-4 rounded-2xl border border-[#e2ded5] shadow-xs space-y-3">
                     <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
                         {/* Selector de Pestañas */}
@@ -399,8 +493,21 @@ export default function InventariosCiclicosPage() {
                             </button>
                         </div>
 
-                        {/* Botón de exportar */}
+                        {/* Botones de acción: Criterios SAP + Exportar Excel */}
                         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                            <button
+                                onClick={() => setMostrarModalSAP(true)}
+                                className="px-4 py-2 bg-[#deb841] hover:bg-[#c9a532] text-[#324354] rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-xs active:scale-95"
+                            >
+                                <Database size={15} />
+                                <span>Criterios de Selección (Auditoría SAP)</span>
+                                {sapAlmacenesSeleccionados.length > 0 && (
+                                    <span className="bg-[#324354] text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                        {sapAlmacenesSeleccionados.length} alm.
+                                    </span>
+                                )}
+                            </button>
+
                             <button
                                 onClick={() => toast.info('Exportando reporte de conteo cíclico...')}
                                 className="px-3.5 py-2 bg-[#F6F3EE] hover:bg-[#e2ded5] text-[#324354] rounded-xl text-xs font-bold transition-colors flex items-center gap-2 border border-[#e2ded5]"
@@ -411,7 +518,7 @@ export default function InventariosCiclicosPage() {
                         </div>
                     </div>
 
-                    {/* Filtros específicos */}
+                    {/* Filtros rápidos en pantalla */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-[#e2ded5]/60">
                         {/* Buscador */}
                         <div className="relative">
@@ -431,8 +538,11 @@ export default function InventariosCiclicosPage() {
                             onChange={e => setFiltroAlmacen(e.target.value)}
                             className="w-full px-3 py-2 bg-[#F6F3EE]/60 border border-[#e2ded5] rounded-xl text-xs font-bold text-[#324354] focus:outline-none focus:border-[#324354]"
                         >
-                            {ALMACENES.map(a => (
-                                <option key={a.id} value={a.id}>{a.nombre}</option>
+                            <option value="TODOS">Todos los almacenes</option>
+                            {ALMACENES_DISPONIBLES.map(a => (
+                                <option key={a.codigo} value={a.codigo}>
+                                    {a.codigo} · {a.nombre}
+                                </option>
                             ))}
                         </select>
 
@@ -442,9 +552,13 @@ export default function InventariosCiclicosPage() {
                             onChange={e => setFiltroPlanta(e.target.value)}
                             className="w-full px-3 py-2 bg-[#F6F3EE]/60 border border-[#e2ded5] rounded-xl text-xs font-bold text-[#324354] focus:outline-none focus:border-[#324354]"
                         >
-                            {PLANTAS.map(p => (
-                                <option key={p.id} value={p.id}>{p.nombre}</option>
-                            ))}
+                            <option value="TODAS">Todas las plantas</option>
+                            <option value="MS">Mármol Sintético (MS)</option>
+                            <option value="FV">Fibra de Vidrio (FV)</option>
+                            <option value="MBL">Muebles (MBL)</option>
+                            <option value="CEFI">CEFI</option>
+                            <option value="MOLD">Moldes</option>
+                            <option value="PT">Producto Terminado</option>
                         </select>
 
                         {/* Filtro Estado */}
@@ -472,6 +586,11 @@ export default function InventariosCiclicosPage() {
                                 <span className="text-xs bg-[#324354]/5 text-[#324354] font-bold px-2 py-0.5 rounded-full">
                                     {itemsFiltrados.length} items
                                 </span>
+                                {origenDatosSAP && (
+                                    <span className="text-xs bg-emerald-100 text-[#59a96a] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                        <Check size={12} /> Sincronizado con SAP Service Layer
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -672,6 +791,296 @@ export default function InventariosCiclicosPage() {
                 )}
             </main>
 
+            {/* MODAL SAP: INFORME DE AUDITORÍA DE STOCK: CRITERIOS DE SELECCIÓN */}
+            {mostrarModalSAP && (
+                <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 md:p-6 overflow-y-auto">
+                    <div className="bg-[#f0ece4] rounded-2xl border-2 border-[#324354] shadow-2xl max-w-2xl w-full my-auto overflow-hidden animate-in fade-in zoom-in duration-150">
+                        {/* Barra de título estilo SAP Business One */}
+                        <div className="bg-gradient-to-r from-[#324354] to-[#25323f] text-white px-4 py-2.5 flex items-center justify-between select-none">
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded bg-[#deb841] text-[#324354] flex items-center justify-center font-black text-[10px] shadow-xs">
+                                    SAP
+                                </div>
+                                <span className="text-xs md:text-sm font-bold tracking-wide">
+                                    Informe de auditoría de stock: Criterios de selección
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setMostrarModalSAP(false)}
+                                className="p-1 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Cuerpo del formulario SAP */}
+                        <div className="p-4 md:p-5 space-y-4 text-xs text-[#000000]">
+                            {/* Fecha de contabilización */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center bg-white p-2.5 rounded-xl border border-[#d5d0c6]">
+                                <span className="font-bold text-slate-700">Fecha de contabiliz.</span>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] text-slate-500">Desde</span>
+                                    <input
+                                        type="date"
+                                        value={sapFechaDesde}
+                                        onChange={e => setSapFechaDesde(e.target.value)}
+                                        className="w-full px-2 py-1 bg-[#F6F3EE] border border-[#c4beaf] rounded text-xs font-mono font-medium"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] text-slate-500">Hasta</span>
+                                    <input
+                                        type="date"
+                                        value={sapFechaHasta}
+                                        onChange={e => setSapFechaHasta(e.target.value)}
+                                        className="w-full px-2 py-1 bg-[#F6F3EE] border border-[#c4beaf] rounded text-xs font-mono font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Artículos */}
+                            <div className="bg-white p-3 rounded-xl border border-[#d5d0c6] space-y-2.5">
+                                <span className="font-bold text-slate-800 uppercase text-[11px] block border-b border-slate-100 pb-1">
+                                    Artículos
+                                </span>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-16 text-slate-600 font-semibold">Código Desde</span>
+                                        <input
+                                            type="text"
+                                            placeholder="CMPD01..."
+                                            value={sapCodigoDesde}
+                                            onChange={e => setSapCodigoDesde(e.target.value)}
+                                            className="flex-1 px-2.5 py-1 bg-[#F6F3EE] border border-[#c4beaf] rounded text-xs font-mono"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-16 text-slate-600 font-semibold">Hasta</span>
+                                        <input
+                                            type="text"
+                                            placeholder="ZZZZ..."
+                                            value={sapCodigoHasta}
+                                            onChange={e => setSapCodigoHasta(e.target.value)}
+                                            className="flex-1 px-2.5 py-1 bg-[#F6F3EE] border border-[#c4beaf] rounded text-xs font-mono"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-28 text-slate-600 font-semibold">Grupo de artículos</span>
+                                        <select
+                                            value={sapGrupoArticulos}
+                                            onChange={e => setSapGrupoArticulos(e.target.value)}
+                                            className="flex-1 px-2 py-1 bg-[#F6F3EE] border border-[#c4beaf] rounded text-xs font-medium"
+                                        >
+                                            {GRUPOS_ARTICULOS.map(g => (
+                                                <option key={g.id} value={g.id}>{g.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2 justify-end">
+                                        <button 
+                                            type="button"
+                                            onClick={() => toast.info('Propiedades ignoradas por defecto')}
+                                            className="px-3 py-1 bg-[#e7e3da] hover:bg-[#d8d3c8] text-slate-700 rounded border border-[#c4beaf] text-[11px] font-bold"
+                                        >
+                                            Propiedades
+                                        </button>
+                                        <span className="text-[11px] text-slate-500 italic">Ignorar</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-1">
+                                    <input
+                                        type="checkbox"
+                                        id="sapCuentasMayor"
+                                        checked={sapCuentasMayor}
+                                        onChange={e => setSapCuentasMayor(e.target.checked)}
+                                        className="rounded border-[#c4beaf] text-[#324354] focus:ring-0"
+                                    />
+                                    <label htmlFor="sapCuentasMayor" className="text-slate-700 font-medium cursor-pointer">
+                                        Cuentas de mayor
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Almacenes */}
+                            <div className="bg-white p-3 rounded-xl border border-[#d5d0c6] space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-bold text-slate-800 uppercase text-[11px]">
+                                        Almacenes ({sapAlmacenesSeleccionados.length} seleccionados)
+                                    </span>
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => seleccionarTodosAlmacenes(true)}
+                                            className="px-2.5 py-0.5 bg-[#deb841]/20 hover:bg-[#deb841]/40 text-[#324354] rounded text-[10px] font-bold"
+                                        >
+                                            Desplegar / Todos
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => seleccionarTodosAlmacenes(false)}
+                                            className="px-2.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-bold"
+                                        >
+                                            Comprimir / Ninguno
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="max-h-48 overflow-y-auto border border-[#c4beaf] rounded-lg">
+                                    <table className="w-full text-left text-[11px] border-collapse">
+                                        <thead className="bg-[#e7e3da] text-slate-700 sticky top-0 font-bold border-b border-[#c4beaf]">
+                                            <tr>
+                                                <th className="p-1.5 w-8 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={sapAlmacenesSeleccionados.length === ALMACENES_DISPONIBLES.length}
+                                                        onChange={e => seleccionarTodosAlmacenes(e.target.checked)}
+                                                        className="rounded text-[#324354]"
+                                                    />
+                                                </th>
+                                                <th className="p-1.5">Localidad</th>
+                                                <th className="p-1.5">Código de almacén</th>
+                                                <th className="p-1.5">Nombre del almacén</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {ALMACENES_DISPONIBLES.map(wh => {
+                                                const checked = sapAlmacenesSeleccionados.includes(wh.codigo)
+                                                return (
+                                                    <tr 
+                                                        key={wh.codigo} 
+                                                        onClick={() => toggleAlmacenSAP(wh.codigo)}
+                                                        className={`cursor-pointer hover:bg-amber-50/60 ${checked ? 'bg-[#F6F3EE]' : ''}`}
+                                                    >
+                                                        <td className="p-1.5 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={() => {}}
+                                                                className="rounded text-[#324354]"
+                                                            />
+                                                        </td>
+                                                        <td className="p-1.5 text-slate-500 font-medium">{wh.localidad}</td>
+                                                        <td className="p-1.5 font-bold font-mono text-[#324354]">
+                                                            <span className="inline-flex items-center gap-1">
+                                                                <span className="text-[#deb841] text-xs">➡</span>
+                                                                {wh.codigo}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-1.5 text-slate-700 font-semibold">{wh.nombre}</td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Visualizar */}
+                            <div className="bg-white p-3 rounded-xl border border-[#d5d0c6] space-y-2">
+                                <span className="font-bold text-slate-800 text-[11px] block">Visualizar</span>
+                                <div className="flex gap-6">
+                                    <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                                        <input
+                                            type="radio"
+                                            name="visualizar"
+                                            checked={sapVisualizar === 'articulos'}
+                                            onChange={() => setSapVisualizar('articulos')}
+                                            className="text-[#324354]"
+                                        />
+                                        Por artículos
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                                        <input
+                                            type="radio"
+                                            name="visualizar"
+                                            checked={sapVisualizar === 'cuentas'}
+                                            onChange={() => setSapVisualizar('cuentas')}
+                                            className="text-[#324354]"
+                                        />
+                                        Resumir por cuentas
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Opciones adicionales */}
+                            <div className="bg-white p-3 rounded-xl border border-[#d5d0c6] space-y-1.5">
+                                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                    <input
+                                        type="checkbox"
+                                        checked={sapGrupoPorAlmacen}
+                                        onChange={e => setSapGrupoPorAlmacen(e.target.checked)}
+                                        className="rounded text-[#324354]"
+                                    />
+                                    Grupo por almacenes
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                    <input
+                                        type="checkbox"
+                                        checked={sapVisualizarSinTransacciones}
+                                        onChange={e => setSapVisualizarSinTransacciones(e.target.checked)}
+                                        className="rounded text-[#324354]"
+                                    />
+                                    Visualizar SI para artículos/cuentas sin transacciones
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                    <input
+                                        type="checkbox"
+                                        checked={sapOcultarStockCero}
+                                        onChange={e => setSapOcultarStockCero(e.target.checked)}
+                                        className="rounded text-[#324354]"
+                                    />
+                                    Ocultar artículos con una cantidad acumulada equivalente a cero
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                    <input
+                                        type="checkbox"
+                                        checked={sapOcultarSerieLote}
+                                        onChange={e => setSapOcultarSerieLote(e.target.checked)}
+                                        className="rounded text-[#324354]"
+                                    />
+                                    Ocultar transacciones de serie/lote si el método de valoración no es serie/lote
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Botones de acción inferiores */}
+                        <div className="bg-[#e7e3da] px-5 py-3 border-t border-[#c4beaf] flex items-center justify-end gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => setMostrarModalSAP(false)}
+                                disabled={consultandoSAP}
+                                className="px-5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-[#c4beaf] text-xs transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={ejecutarConsultaSAP}
+                                disabled={consultandoSAP}
+                                className="px-6 py-2 bg-[#324354] hover:bg-[#25323f] text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 flex items-center gap-2"
+                            >
+                                {consultandoSAP ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin text-[#deb841]" />
+                                        <span>Consultando SAP Service Layer...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check size={16} className="text-[#deb841]" />
+                                        <span>OK (Consultar Auditoría)</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL PARA CAPTURAR CONTEO FÍSICO */}
             {modalConteo && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
@@ -769,4 +1178,3 @@ export default function InventariosCiclicosPage() {
         </div>
     )
 }
-
