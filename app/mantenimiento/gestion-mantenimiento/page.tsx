@@ -1967,7 +1967,9 @@ export default function GestionMantenimientoPage() {
           console.warn('Aviso verificando generación automática de preventivos:', genErr);
         }
         return Promise.all([
-          supabase.from('mantenimiento_planes_preventivos').select('*').eq('activo', true).order('id', { ascending: true }),
+          // Todos los planes (también los inactivos, para verlos y reactivarlos en Preventivo PMP);
+          // los inactivos no se generan ni salen en el Planificador ni en Mis Tareas
+          supabase.from('mantenimiento_planes_preventivos').select('*').order('id', { ascending: true }),
           supabase.from('mantenimiento_ordenes').select('*').order('created_at', { ascending: false }),
         ]);
       })();
@@ -2251,7 +2253,8 @@ export default function GestionMantenimientoPage() {
       const matchingOrden = ordenesRaw.find(o => o.id_plan_preventivo === id) || ordenesRaw.find(o => !o.id_plan_preventivo && o.titulo === title);
 
       const wasAdelantada = matchingOrden ? !!matchingOrden.adelantada : (matchingLocal ? !!matchingLocal.adelantada : false);
-      const isDueFinal = isValidFrequency || wasAdelantada;
+      // Plan inactivo: nunca queda pendiente ni suma carga
+      const isDueFinal = p.activo !== false && (isValidFrequency || wasAdelantada);
       const finalCandidate = (matchingOrden && matchingOrden.id_tecnico) 
         ? matchingOrden.id_tecnico 
         : ((matchingLocal && matchingLocal.idtecs && matchingLocal.idtecs !== 9999) ? matchingLocal.idtecs : bestCandidate);
@@ -3140,7 +3143,9 @@ export default function GestionMantenimientoPage() {
         frecuencia_dias: editingTask.frecuencia,
         ref_frecuencia: clampedRef,
         id_tecnicos_autorizados: [],
-        detalle_instrucciones: editingTask.detalle
+        detalle_instrucciones: editingTask.detalle,
+        // Inactivo: el generador de preventivos solo toma planes activos (no se crean más órdenes)
+        activo: editingTask.activo !== false
       };
 
       const { error } = await supabase
@@ -3150,9 +3155,11 @@ export default function GestionMantenimientoPage() {
 
       if (error) {
         console.error('Error actualizando PMP en Supabase:', error);
+        alert(`No se guardó el plan ${editingTask.code || ''} en la base de datos: ${error.message}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Excepción actualizando PMP en Supabase:', err);
+      alert(`No se guardó el plan ${editingTask.code || ''} en la base de datos: ${err?.message || err}`);
     }
 
     setEditingTask(null);
@@ -3183,12 +3190,17 @@ export default function GestionMantenimientoPage() {
     persistState(updatedTasks, technicians);
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('mantenimiento_planes_preventivos')
         .update({ activo: newActive })
         .eq('id', taskId);
-    } catch (err) {
+      if (error) throw error;
+    } catch (err: any) {
       console.warn('Error actualizando estado activo en Supabase:', err);
+      // No se guardó: vuelve a como estaba para no mostrar un estado falso
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, activo: !newActive } : t));
+      setViewingTask(v => v && v.id === taskId ? { ...v, activo: !newActive } : v);
+      alert(`No se guardó el estado del plan en la base de datos: ${err?.message || err}`);
     }
   };
 
@@ -4880,7 +4892,7 @@ export default function GestionMantenimientoPage() {
   }, [tasks, selectedTechId]);
 
   const waitingTasks = useMemo(() => {
-    return tasks.filter(t => t.idtecs === 9999);
+    return tasks.filter(t => t.idtecs === 9999 && t.activo !== false);
   }, [tasks]);
 
   const activeTasks = useMemo(() => {
@@ -5925,8 +5937,10 @@ export default function GestionMantenimientoPage() {
 
   const portalTechTasks = useMemo(() => {
     if (!currentPortalTech) return [];
-    return tasks.filter(t => t.idtecs === currentPortalTech.id);
+    return tasks.filter(t => t.idtecs === currentPortalTech.id && t.activo !== false);
   }, [tasks, currentPortalTech]);
+  // Planes activos (los inactivos no salen en el Planificador)
+  const tasksActivas = useMemo(() => tasks.filter(t => t.activo !== false), [tasks]);
 
   const portalTechCorrectivos = useMemo(() => {
     if (!currentPortalTech) return [];
@@ -6338,7 +6352,7 @@ export default function GestionMantenimientoPage() {
           <div className="flex flex-col gap-2 animate-in fade-in duration-300">
             <PlannerTecnicosColumnas
               technicians={technicians}
-              tasks={tasks}
+              tasks={tasksActivas}
               correctiveRecords={correctiveRecords}
               isSubHeaderOpen={isSubHeaderOpen}
               onUpdateTaskTech={(taskId, newTechId) => handleAssignTask(taskId, newTechId)}
@@ -10212,6 +10226,22 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
+              {/* Estado del plan: Inactivo = no se vuelven a generar órdenes de este mantenimiento */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Estado del Plan</label>
+                <select
+                  value={editingTask.activo === false ? 'inactivo' : 'activo'}
+                  onChange={(e) => setEditingTask(prev => prev ? { ...prev, activo: e.target.value === 'activo' } : null)}
+                  className={`w-full px-3 py-2 rounded-xl border text-sm font-bold ${editingTask.activo === false ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-emerald-50 border-emerald-300 text-emerald-800'}`}
+                >
+                  <option value="activo">● Activo</option>
+                  <option value="inactivo">○ Inactivo</option>
+                </select>
+                {editingTask.activo === false && (
+                  <p className="text-[11px] text-slate-500 mt-1">Inactivo: no se generan más órdenes de este mantenimiento. Las órdenes ya creadas se conservan.</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Frecuencia Base (Días)</label>
@@ -11776,13 +11806,14 @@ export default function GestionMantenimientoPage() {
       {/* Modal: View Maintenance Task Details (Ficha Técnica Completa) */}
       {viewingTask && (
         <div 
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 pt-16 sm:pt-20 pb-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-[10000] flex items-stretch justify-center p-2 sm:p-3 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setViewingTask(null);
           }}
         >
-          <div 
-            className="bg-white rounded-3xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] flex flex-col gap-4 relative my-auto overflow-hidden"
+          {/* Casi a pantalla completa (margen pequeño); en pantallas anchas, 2 columnas con scroll propio */}
+          <div
+            className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 w-full max-w-[1800px] h-full shadow-2xl border border-[#e2ded5] flex flex-col gap-3 sm:gap-4 relative overflow-hidden"
             onMouseDown={(e) => e.stopPropagation()}
             onMouseUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -11839,9 +11870,9 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Scrollable Body Content */}
-            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4">
-              {/* Technical Instructions Box */}
-              <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:overflow-hidden lg:pr-0">
+              {/* Technical Instructions Box (columna izquierda en pantallas anchas) */}
+              <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5 lg:min-h-0 lg:overflow-y-auto">
                 <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[#7B8E90]" />
                   <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
@@ -11857,8 +11888,10 @@ export default function GestionMantenimientoPage() {
                 )}
               </div>
 
+              {/* Columna derecha: parámetros, plantas y órdenes */}
+              <div className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
               {/* Parameters Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 2xl:grid-cols-4 gap-3 text-xs">
                 <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
                   <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquinas y Equipos</span>
                   <div className="flex flex-wrap items-center gap-1.5 leading-snug">
@@ -11993,7 +12026,7 @@ export default function GestionMantenimientoPage() {
                         Aún no se han generado órdenes de trabajo ejecutadas para este plan preventivo.
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-72 lg:max-h-none overflow-y-auto">
                         {orders.map((ord, idx) => {
                           const category = ord.category || getHistoryRecordCategory(ord);
                           const codigoDisplay = ord.codigoDisplay || getHistoryRecordCode(ord, idx);
@@ -12071,6 +12104,7 @@ export default function GestionMantenimientoPage() {
                   </button>
                 </div>
               )}
+              </div>
             </div>
 
             {/* Modal Actions - Fixed at Bottom */}
