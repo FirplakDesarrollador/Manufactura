@@ -372,7 +372,7 @@ export default function PlannerTecnicosColumnas({
     });
 
     // Correctives
-    correctiveRecords.forEach(c => {
+    correctiveRecords.forEach((c, cIdx) => {
       if (c.estado === 'Resuelta') return;
       const isUnassigned = !c.tecnico_asignado || c.tecnico_asignado === 'Sin asignar' || c.tecnico_asignado === 'Por asignar';
       if (!isUnassigned) return;
@@ -383,7 +383,8 @@ export default function PlannerTecnicosColumnas({
       const cleanCode = codeStr.replace(/^\[+|\]+$/g, '').trim();
 
       unassignedItems.push({
-        uniqueKey: `corr-${c.id}`,
+        // Un correctivo y una tarjeta TPM pueden compartir id (vienen de tablas distintas): la llave lleva código y posición
+        uniqueKey: `corr-${c.codigo || ''}-${c.id}-${cIdx}`,
         tipo: 'correctivo',
         item: c,
         category,
@@ -468,7 +469,7 @@ export default function PlannerTecnicosColumnas({
       });
 
       // Correctives assigned to this tech
-      correctiveRecords.forEach(c => {
+      correctiveRecords.forEach((c, cIdx) => {
         if (c.estado === 'Resuelta') return;
         if (!c.tecnico_asignado) return;
         const matchesName =
@@ -483,7 +484,7 @@ export default function PlannerTecnicosColumnas({
         const cleanCode = codeStr.replace(/^\[+|\]+$/g, '').trim();
 
         techItems.push({
-          uniqueKey: `corr-${c.id}`,
+          uniqueKey: `corr-${c.codigo || ''}-${c.id}-${cIdx}`,
           tipo: 'correctivo',
           item: c,
           category,
@@ -538,18 +539,13 @@ export default function PlannerTecnicosColumnas({
       };
     });
 
-    // Sort: Active technicians first (by most atrasadas descending, then totalCount desc), Inactive at the very end
+    // Orden: técnicos activos por abecedario (de izquierda a derecha); los inactivos al final, también por abecedario.
+    // "Pendientes por Asignar" va aparte y siempre de primero.
     return mapped.sort((a, b) => {
       if (a.isInactive !== b.isInactive) {
         return a.isInactive ? 1 : -1;
       }
-      if (b.atrasadas.length !== a.atrasadas.length) {
-        return b.atrasadas.length - a.atrasadas.length;
-      }
-      if (b.totalCount !== a.totalCount) {
-        return b.totalCount - a.totalCount;
-      }
-      return a.tech.name.localeCompare(b.tech.name);
+      return a.tech.name.localeCompare(b.tech.name, 'es', { sensitivity: 'base' });
     });
   }, [allValidTechs, tasks, correctiveRecords, searchQuery]);
 
