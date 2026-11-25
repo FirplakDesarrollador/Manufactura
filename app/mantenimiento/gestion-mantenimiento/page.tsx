@@ -77,6 +77,7 @@ import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSeman
 import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosColumnas';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
+import MaquinasMultiples, { partesMaquina } from '@/components/mantenimiento/MaquinasMultiples';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
 import TurnosSemanales from '@/components/mantenimiento/TurnosSemanales';
@@ -301,6 +302,8 @@ export default function GestionMantenimientoPage() {
   const [isSubHeaderOpen, setIsSubHeaderOpen] = useState(true);
   // null = todas las pestañas; si el usuario tiene pestañas marcadas en sus permisos, solo esas
   const [pestanasPermitidas, setPestanasPermitidas] = useState<TabType[] | null>(null);
+  // % del turno de hoy en producción por técnico (Turnos + Horario de plantas) para el reparto real de los NPPR
+  const [pctProduccionHoy, setPctProduccionHoy] = useState<Record<number, number | null>>({});
   useEffect(() => {
     if (pestanasPermitidas && pestanasPermitidas.length && !pestanasPermitidas.includes(activeTab)) setActiveTab(pestanasPermitidas[0]);
   }, [pestanasPermitidas, activeTab]);
@@ -680,12 +683,10 @@ export default function GestionMantenimientoPage() {
         }
       }
 
-      // 3. Exact machine name or alternate name match
-      if (pMaq && (pMaq === name || (alt && pMaq === alt))) return true;
-
-      // 4. Exact prefix/suffix or full sub-name match when pMaq is specific (prevent short generic word match like "taladro")
-      if (pMaq && pMaq.length >= 8 && name.length >= 8) {
-        if (pMaq.includes(name) || (pMaq.startsWith(name) || name.startsWith(pMaq))) return true;
+      // 3 y 4. Nombre exacto (o alterno) o sub-nombre específico, con CADA equipo del plan (puede tener varios: "A | B")
+      for (const parte of partesMaquina(p.maquina).map(normalize)) {
+        if (parte === name || (alt && parte === alt)) return true;
+        if (parte.length >= 8 && name.length >= 8 && (parte.includes(name) || parte.startsWith(name) || name.startsWith(parte))) return true;
       }
 
       return false;
@@ -800,12 +801,11 @@ export default function GestionMantenimientoPage() {
         if (recAf && recAf.includes(af)) return true;
       }
 
-      // 4. Exact or sub-name match
-      const recMaqNorm = normalize(rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '');
-      if (recMaqNorm && (recMaqNorm === name || (alt && recMaqNorm === alt))) return true;
-
-      if (recMaqNorm && recMaqNorm.length >= 8 && name.length >= 8) {
-        if (recMaqNorm.includes(name) || name.includes(recMaqNorm)) return true;
+      // 4. Nombre exacto o sub-nombre, con CADA equipo del registro (un preventivo puede ser de varios: "A | B";
+      //    así la ejecución queda en la hoja de vida de todos)
+      for (const recMaqNorm of partesMaquina(rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '').map(normalize)) {
+        if (recMaqNorm === name || (alt && recMaqNorm === alt)) return true;
+        if (recMaqNorm.length >= 8 && name.length >= 8 && (recMaqNorm.includes(name) || name.includes(recMaqNorm))) return true;
       }
 
       return false;
@@ -1928,6 +1928,33 @@ export default function GestionMantenimientoPage() {
         .select('*')
         .order('id', { ascending: true });
 
+      // Técnicos en pantalla de una vez (Mis Tareas los necesita para reconocer al usuario); el resto de la carga
+      // (máquinas, preventivos, órdenes) los vuelve a calcular con la capacidad y las tareas al terminar
+      if (tecnicosData && tecnicosData.length) {
+        setTechnicians(prev => (prev.length ? prev : tecnicosData.map((t: any) => {
+          const pList = parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
+          return {
+            id: t.id, name: t.nombre, capacity: parseFloat(t.capacidad_horas) || systemSettings.baseCapacity || DAILY_CAPACITY_LIMIT,
+            turno: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'), documento: t.documento || '',
+            planta: pList.join(', '), plantas: pList, especialidad: pList.join(', '),
+            authorizedTitles: (t.titulos_autorizados || []).map(normalize), overloadMarginPercent: 10, activo: t.activo !== false,
+          } as Technician;
+        })));
+      }
+
+      // 4 y 5 (preventivos del día, planes y órdenes) van al mismo tiempo que el catálogo de máquinas
+      const planesYOrdenes = (async () => {
+        try {
+          await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
+        } catch (genErr) {
+          console.warn('Aviso verificando generación automática de preventivos:', genErr);
+        }
+        return Promise.all([
+          supabase.from('mantenimiento_planes_preventivos').select('*').eq('activo', true).order('id', { ascending: true }),
+          supabase.from('mantenimiento_ordenes').select('*').order('created_at', { ascending: false }),
+        ]);
+      })();
+
       // 3. Catálogo Oficial de Máquinas y Equipos
       let allMaquinas: any[] = [];
       let fromMaq = 0;
@@ -1976,25 +2003,8 @@ export default function GestionMantenimientoPage() {
 
       setMaquinasCatalogo(allMaquinas);
 
-      // Verificación y generación automática de preventivos del día
-      try {
-        await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
-      } catch (genErr) {
-        console.warn('Aviso verificando generación automática de preventivos:', genErr);
-      }
-
-      // 4. Planes Preventivos Maestros (PMP) desde Supabase
-      const { data: preventivosData, error: prevErr } = await supabase
-        .from('mantenimiento_planes_preventivos')
-        .select('*')
-        .eq('activo', true)
-        .order('id', { ascending: true });
-
-      // 5. Órdenes / Estados del día desde Supabase
-      const { data: ordenesData } = await supabase
-        .from('mantenimiento_ordenes')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // 4. Planes Preventivos Maestros (PMP) y 5. Órdenes del día (ya pedidos en paralelo arriba)
+      const [{ data: preventivosData, error: prevErr }, { data: ordenesData }] = await planesYOrdenes;
 
       if (tecnicosData && preventivosData) {
         processSupabaseData(preventivosData, tecnicosData, ordenesData || [], allMaquinas);
@@ -2117,9 +2127,14 @@ export default function GestionMantenimientoPage() {
 
       // Cross-match with official catalog for machine info
       const matchResult = matchPlanWithMaquina(p, machinesList);
-      const codigoMaquina = matchResult.codigo || null;
+      // Plan de varios equipos ("A | B"): se conservan todos y sus códigos (cada uno lo ve en su hoja de vida)
+      const variosEquipos = partesMaquina(maquina).length > 1;
+      const codigosVarios = variosEquipos
+        ? partesMaquina(maquina).map(n => matchPlanWithMaquina({ ...p, maquina: n, titulo: '', codigo: '', codigo_maquina: null }, machinesList).codigo).filter(Boolean).join(' | ')
+        : '';
+      const codigoMaquina = variosEquipos ? (codigosVarios || p.codigo_maquina || null) : (matchResult.codigo || null);
       const idMaquina = matchResult.matched?.id || null;
-      const finalMaquinaName = matchResult.nombre || maquina;
+      const finalMaquinaName = variosEquipos ? maquina : (matchResult.nombre || maquina);
 
       // Resolve assigned Planta(s) and Especialidad for this PMP
       let taskPlantas: string[] = [];
@@ -8170,7 +8185,7 @@ export default function GestionMantenimientoPage() {
         {/* Configuración: primero los turnos de la semana (actual y próxima), después la cuadrilla y lo demás */}
         {activeTab === 'configuracion' && (
           <div className="w-full mb-4 animate-in fade-in duration-300">
-            <TurnosSemanales technicians={technicians} userEmail={userEmail} onTechsUpdated={fetchData} />
+            <TurnosSemanales technicians={technicians} userEmail={userEmail} onTechsUpdated={fetchData} onDistribucion={setPctProduccionHoy} />
           </div>
         )}
 
@@ -8180,7 +8195,7 @@ export default function GestionMantenimientoPage() {
             {/* ========================================================================= */}
             {/* SECCIÓN 1: PLANIFICACIÓN DE CUADRILLA, HORARIOS Y TURNOS (FUSIÓN TOTAL)   */}
             {/* ========================================================================= */}
-            <MatrizHorariosTurnos technicians={technicians} onTechsUpdated={fetchData} />
+            <MatrizHorariosTurnos technicians={technicians} onTechsUpdated={fetchData} pctProduccion={pctProduccionHoy} />
 
             {/* Especialidades de cada técnico (varias), aparte de la cuadrilla */}
             <EspecialidadesTecnicos technicians={technicians} plantas={plantasNomenclatura} onTechsUpdated={fetchData} />
@@ -9741,32 +9756,19 @@ export default function GestionMantenimientoPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos</label>
-                <input
-                  list="maquinas-catalogo-options"
-                  type="text"
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos <span className="text-[10px] text-gray-400 font-normal normal-case">(uno o varios: la ejecución queda en la hoja de vida de cada uno)</span></label>
+                <MaquinasMultiples
                   value={newTaskForm.maquina}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const matched = maquinasCatalogo.find(m => 
-                      `${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`.toLowerCase() === val.toLowerCase() ||
-                      m.nombre_equipo?.toLowerCase() === val.toLowerCase() ||
-                      (m.codigo_equipo && m.codigo_equipo.toLowerCase() === val.toLowerCase())
-                    );
-                    if (matched) {
-                      const matchedPlanta = obtenerCodigoPlanta(matched.planta || 'MS', plantasNomenclatura);
-                      setNewTaskForm(prev => ({
-                        ...prev,
-                        maquina: matched.nombre_equipo,
-                        planta: matchedPlanta,
-                        plantas: [matchedPlanta]
-                      }));
-                    } else {
-                      setNewTaskForm(prev => ({ ...prev, maquina: val }));
-                    }
+                  catalogo={maquinasCatalogo}
+                  onChange={(valor, reconocidas) => {
+                    // Las plantas salen de los equipos reconocidos (sin repetir)
+                    const plantasM = [...new Set(reconocidas.map(m => obtenerCodigoPlanta(m.planta || 'MS', plantasNomenclatura)))];
+                    setNewTaskForm(prev => ({
+                      ...prev,
+                      maquina: valor,
+                      ...(plantasM.length ? { planta: plantasM.join(', '), plantas: plantasM } : {})
+                    }));
                   }}
-                  placeholder="Buscar o seleccionar equipo..."
-                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
@@ -9951,38 +9953,26 @@ export default function GestionMantenimientoPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos</label>
-                <input
-                  list="maquinas-catalogo-options"
-                  type="text"
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos <span className="text-[10px] text-gray-400 font-normal normal-case">(uno o varios: la ejecución queda en la hoja de vida de cada uno)</span></label>
+                <MaquinasMultiples
                   value={editingTask.maquina || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const matched = maquinasCatalogo.find(m => 
-                      `${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`.toLowerCase() === val.toLowerCase() ||
-                      m.nombre_equipo?.toLowerCase() === val.toLowerCase() ||
-                      (m.codigo_equipo && m.codigo_equipo.toLowerCase() === val.toLowerCase())
-                    );
-                    if (matched) {
-                      const matchedPlanta = obtenerCodigoPlanta(matched.planta || 'MS', plantasNomenclatura);
-                      setEditingTask(prev => {
-                        if (!prev) return null;
-                        const currPlantas = prev.plantas && prev.plantas.length > 0 ? prev.plantas : [matchedPlanta];
-                        return {
-                          ...prev,
-                          maquina: matched.nombre_equipo,
-                          codigoMaquina: matched.codigo_equipo || null,
-                          idMaquina: matched.id || null,
-                          planta: currPlantas.join(', '),
-                          plantas: currPlantas
-                        };
-                      });
-                    } else {
-                      setEditingTask(prev => prev ? { ...prev, maquina: val } : null);
-                    }
+                  catalogo={maquinasCatalogo}
+                  onChange={(valor, reconocidas) => {
+                    const plantasM = [...new Set(reconocidas.map(m => obtenerCodigoPlanta(m.planta || 'MS', plantasNomenclatura)))];
+                    setEditingTask(prev => {
+                      if (!prev) return null;
+                      const currPlantas = prev.plantas && prev.plantas.length > 0 ? prev.plantas : plantasM;
+                      return {
+                        ...prev,
+                        maquina: valor,
+                        // Códigos de todos los equipos (la hoja de vida los busca por código); el id, el del primero
+                        codigoMaquina: reconocidas.map(m => m.codigo_equipo).filter(Boolean).join(' | ') || null,
+                        idMaquina: (reconocidas[0]?.id as number) || null,
+                        planta: currPlantas.join(', '),
+                        plantas: currPlantas
+                      };
+                    });
                   }}
-                  placeholder="Buscar o seleccionar equipo..."
-                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
