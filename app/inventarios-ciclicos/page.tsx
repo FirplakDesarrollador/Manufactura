@@ -73,118 +73,16 @@ const GRUPOS_ARTICULOS = [
     { id: '105', nombre: 'Insumos Generales' }
 ]
 
-// Muestra inicial de datos
-const ITEMS_BASE: ConteoItem[] = [
-    {
-        id: '1',
-        sku: 'CMPD01-0019-000-0000',
-        descripcion: 'RESINA FV 4891 VIRGEN',
-        almacen: 'MP-03',
-        planta: 'FV',
-        categoria: 'A',
-        stockTeorico: 450,
-        conteoFisico: 450,
-        unidad: 'KG',
-        fechaConteo: '2026-11-16',
-        responsable: 'Carlos Andrés Gómez',
-        estado: 'Exacto',
-        observacion: 'Conteo sin novedad'
-    },
-    {
-        id: '2',
-        sku: 'PGEL01-0001-000-0100',
-        descripcion: 'GELCOAT BLANCO 100 (FIBRA DE VIDRIO)',
-        almacen: 'MP-03',
-        planta: 'FV',
-        categoria: 'A',
-        stockTeorico: 180,
-        conteoFisico: 172,
-        unidad: 'KG',
-        fechaConteo: '2026-11-16',
-        responsable: 'Carlos Andrés Gómez',
-        estado: 'Discrepancia',
-        observacion: 'Merma en tubería de aplicación'
-    },
-    {
-        id: '3',
-        sku: 'CMPD01-0048-000-0000',
-        descripcion: 'PEROXIDO NOROX 925H',
-        almacen: 'MP-04',
-        planta: 'MS',
-        categoria: 'B',
-        stockTeorico: 85,
-        conteoFisico: null,
-        unidad: 'KG',
-        fechaConteo: null,
-        responsable: null,
-        estado: 'Pendiente'
-    },
-    {
-        id: '4',
-        sku: 'CMPD04-0079-000-0000',
-        descripcion: 'MOTOBOMBA 1 HP 110V 60HZ HIDROMASAJE',
-        almacen: 'MP-01',
-        planta: 'FV',
-        categoria: 'A',
-        stockTeorico: 24,
-        conteoFisico: 24,
-        unidad: 'UN',
-        fechaConteo: '2026-11-15',
-        responsable: 'Lina María Osorio',
-        estado: 'Exacto'
-    },
-    {
-        id: '5',
-        sku: 'CMPD09-0120-000-0000',
-        descripcion: 'TABLERO MDP 15MM BLANCO 1.83X2.44',
-        almacen: 'MP-02',
-        planta: 'MBL',
-        categoria: 'A',
-        stockTeorico: 62,
-        conteoFisico: 59,
-        unidad: 'HOJA',
-        fechaConteo: '2026-11-16',
-        responsable: 'Jhon Alexander Zapata',
-        estado: 'Discrepancia',
-        observacion: '3 hojas en reproceso de corte'
-    },
-    {
-        id: '6',
-        sku: 'CEMP02-0075-000-0000',
-        descripcion: 'CALCOMANIA MANGUERA SUCCION BAÑERA',
-        almacen: 'MP-01',
-        planta: 'FV',
-        categoria: 'C',
-        stockTeorico: 1200,
-        conteoFisico: null,
-        unidad: 'UN',
-        fechaConteo: null,
-        responsable: null,
-        estado: 'Pendiente'
-    },
-    {
-        id: '7',
-        sku: 'COMP02-0018-000-0000',
-        descripcion: 'TORNILLO 1/4IN X 2 1/2IN GALVANIZADO',
-        almacen: 'MP-01',
-        planta: 'FV',
-        categoria: 'C',
-        stockTeorico: 3500,
-        conteoFisico: null,
-        unidad: 'UN',
-        fechaConteo: null,
-        responsable: null,
-        estado: 'Pendiente'
-    }
-]
+// Página de Inventarios Cíclicos con integración SAP Service Layer
+
 
 export default function InventariosCiclicosPage() {
     const router = useRouter()
     const [userEmail, setUserEmail] = useState<string>('')
     const [loading, setLoading] = useState(true)
 
-    // Datos y filtros generales
-    const [items, setItems] = useState<ConteoItem[]>(ITEMS_BASE)
+    // Datos y filtros generales (inicia vacío hasta que se ejecute la consulta real en SAP Service Layer)
+    const [items, setItems] = useState<ConteoItem[]>([])
     const [busqueda, setBusqueda] = useState('')
     const [filtroAlmacen, setFiltroAlmacen] = useState('TODOS')
     const [filtroPlanta, setFiltroPlanta] = useState('TODAS')
@@ -328,7 +226,7 @@ export default function InventariosCiclicosPage() {
         const exactos = items.filter(i => i.estado === 'Exacto').length
         const discrepancias = items.filter(i => i.estado === 'Discrepancia').length
         const pendientes = items.filter(i => i.estado === 'Pendiente').length
-        const eri = contados > 0 ? ((exactos / contados) * 100).toFixed(1) : '100.0'
+        const eri = contados > 0 ? ((exactos / contados) * 100).toFixed(1) : '0.0'
         return { total, contados, exactos, discrepancias, pendientes, eri }
     }, [items])
 
@@ -613,8 +511,39 @@ export default function InventariosCiclicosPage() {
                                 <tbody className="divide-y divide-[#e2ded5]">
                                     {itemsFiltrados.length === 0 ? (
                                         <tr>
-                                            <td colSpan={10} className="py-8 text-center text-slate-400 font-semibold">
-                                                No se encontraron items con los filtros aplicados.
+                                            <td colSpan={10} className="py-12 px-4 text-center">
+                                                {!origenDatosSAP ? (
+                                                    <div className="max-w-md mx-auto space-y-3">
+                                                        <div className="w-12 h-12 mx-auto rounded-2xl bg-[#deb841]/20 text-[#324354] flex items-center justify-center">
+                                                            <Database size={24} />
+                                                        </div>
+                                                        <h4 className="text-sm font-black text-[#324354]">
+                                                            No hay información cargada
+                                                        </h4>
+                                                        <p className="text-xs text-[#7B8E90] leading-relaxed">
+                                                            Para ver los datos reales, abra los criterios de selección de SAP, elija los almacenes y filtros requeridos, y consulte el stock en vivo desde SAP Service Layer.
+                                                        </p>
+                                                        <button
+                                                            onClick={() => setMostrarModalSAP(true)}
+                                                            className="inline-flex items-center gap-2 px-4 py-2 bg-[#deb841] hover:bg-[#c9a532] text-[#324354] rounded-xl text-xs font-black shadow-xs transition-all active:scale-95"
+                                                        >
+                                                            <SlidersHorizontal size={15} />
+                                                            <span>Configurar Criterios y Consultar SAP</span>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="max-w-md mx-auto space-y-2">
+                                                        <p className="text-xs text-slate-500 font-semibold">
+                                                            No se encontraron artículos en SAP con los filtros aplicados.
+                                                        </p>
+                                                        <button
+                                                            onClick={() => setMostrarModalSAP(true)}
+                                                            className="text-xs text-blue-600 font-bold hover:underline"
+                                                        >
+                                                            Modificar Criterios de Selección SAP
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ) : (
