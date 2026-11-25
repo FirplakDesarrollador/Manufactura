@@ -27,7 +27,7 @@ const DEFECTO_PLANTA: Record<string, HorarioDia[]> = {
   MBL: L_V_S(h('06:00', '20:40'), h('06:00', '20:40')),
   CEFI: L_V_S(h('06:00', '20:40'), h('06:00', '20:40')),
 };
-const NOMBRE_MOD: Record<Modalidad, string> = { PR: 'PR · Producción', NP: 'NP · No producción', PRNP: 'NPPR · Mitad y mitad', INACTIVO: 'Inactivo' };
+const NOMBRE_MOD: Record<Modalidad, string> = { PR: 'PR · Producción', NP: 'NP · No producción', PRNP: 'NPPR · Producción - No producción', INACTIVO: 'Inactivo' };
 const CORTO_MOD: Record<Modalidad, string> = { PR: 'PR', NP: 'NP', PRNP: 'NPPR', INACTIVO: 'Inactivo' };
 const COLOR_MOD: Record<Modalidad, string> = {
   PR: 'bg-emerald-50 text-emerald-700 border-emerald-200', NP: 'bg-sky-50 text-sky-700 border-sky-200',
@@ -63,7 +63,11 @@ const domingoDe = (d: Date) => { const x = new Date(d.getFullYear(), d.getMonth(
 const masDias = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
-export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated }: { technicians: Tecnico[]; userEmail?: string; onTechsUpdated?: () => void }) {
+export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated, onDistribucion }: {
+  technicians: Tecnico[]; userEmail?: string; onTechsUpdated?: () => void;
+  /** % del turno de hoy en producción por técnico, para que la cuadrilla muestre el reparto real */
+  onDistribucion?: (pct: Record<number, number | null>) => void;
+}) {
   const [etapa, setEtapa] = useState<'actual' | 'proxima'>('actual');
   const [filas, setFilas] = useState<Record<string, Fila[]>>({});
   const [cargando, setCargando] = useState(true);
@@ -129,11 +133,12 @@ export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated
     const deSemana = filas[claveSemana] || [];
     const ids = new Set(deSemana.map(f => f.tecnico_id));
     // Activos y los que tienen turnos en alguna de las dos semanas (en descanso hoy quedan Inactivos, pero siguen en la tabla)
-    const conTurnos = new Set(Object.values(filas).flat().map(f => f.tecnico_id));
+    // Solo cuentan filas con algún turno puesto (una fila vacía no hace aparecer a un técnico inactivo)
+    const conTurnos = new Set(Object.values(filas).flat().filter(f => f.dias.some(Boolean)).map(f => f.tecnico_id));
     const activos = technicians.filter(t => t.id !== 9999 && (t.turno !== 'INACTIVO' || conTurnos.has(t.id)));
     const todos: { id: number; nombre: string }[] = [
       ...activos.map(t => ({ id: t.id, nombre: t.name })),
-      ...deSemana.filter(f => !activos.some(t => t.id === f.tecnico_id)).map(f => ({ id: f.tecnico_id, nombre: f.tecnico_nombre })),
+      ...deSemana.filter(f => f.dias.some(Boolean) && !activos.some(t => t.id === f.tecnico_id)).map(f => ({ id: f.tecnico_id, nombre: f.tecnico_nombre })),
     ];
     // Primero los que tienen turnos, en el orden del primer turno de la semana; luego el resto por nombre
     const primero = (id: number) => {
@@ -238,6 +243,8 @@ export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated
     if (!hp.some(d => d[hoyIdx] != null)) return { listo: false, res };
     const sig = plantas.map(p => diasDeSemana(iso(semanas.proxima), p));
     (filas[semanaHoy] || []).forEach(f => {
+      // Los quitados de la tabla de turnos no se mueven (p. ej. siempre PR)
+      if (ocultos.has(f.tecnico_id)) return;
       const cod = f.dias[hoyIdx];
       // Solo las plantas del técnico (su especialidad, p. ej. "MS, FV, RTM"); sin ninguna con horario → todas
       const tec = technicians.find(t => t.id === f.tecnico_id);
@@ -248,7 +255,12 @@ export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated
       if (r) res[f.tecnico_id] = { ...r, plantas: idx.length ? idx.map(k => plantas[k]) : null };
     });
     return { listo: true, res };
-  }, [horario, filas, semanaHoy, hoyIdx, semanas, diasDeSemana, technicians]);
+  }, [horario, filas, semanaHoy, hoyIdx, semanas, diasDeSemana, technicians, ocultos]);
+
+  // La cuadrilla muestra el reparto real de los NPPR con estos %
+  useEffect(() => {
+    onDistribucion?.(Object.fromEntries(Object.entries(ubicacion.res).map(([id, r]) => [Number(id), r.pct])));
+  }, [ubicacion, onDistribucion]);
 
   // Si la cuadrilla no coincide con lo calculado, se actualiza el técnico (modalidad y activo) y se recarga
   useEffect(() => {
@@ -269,10 +281,19 @@ export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated
         if (e) fallas.push(`${technicians.find(t => t.id === c.id)?.name || c.id}: ${e.message}`);
       }
       setAvisoReubicacion(fallas.length ? `No se pudo reubicar a: ${fallas.join('; ')}` : `Cuadrilla reubicada para hoy (${cambios.length} técnico(s)).`);
+      // Solo se recuerda el intento si falló; si salió bien, un cambio a mano posterior se vuelve a corregir
+      if (!fallas.length) ultimoIntento.current = '';
       onTechsUpdated?.();
       setReubicando(false);
     })();
   }, [ubicacion, technicians, reubicando, onTechsUpdated]);
+
+  // % que se muestra: PR → % del turno en producción; NP → % en no producción; NPPR → los dos
+  const textoPct = (m: Modalidad, pct: number | null) => {
+    if (pct == null) return '';
+    const pr = Math.round(pct * 100);
+    return m === 'PR' ? ` (${pr} %)` : m === 'NP' ? ` (${100 - pr} %)` : ` (${pr} % PR · ${100 - pr} % NP)`;
+  };
 
   const fechas = DIAS.map((_, i) => masDias(domingo, i));
   const sabado = fechas[6];
@@ -527,14 +548,14 @@ export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated
       {/* Resultado de hoy */}
       {etapa === 'actual' && (
         <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-[11px] relative">
-          <span className="font-black text-[#324354] mr-1">Ubicación de hoy ({DIAS[hoyIdx].toLowerCase()}):</span>
+          <span className="font-black text-[#324354] mr-1">Distribución de hoy ({DIAS[hoyIdx].toLowerCase()}):</span>
           {!ubicacion.listo ? (
             <span className="font-semibold text-amber-700">Ponga el horario de hoy de al menos una planta para que la cuadrilla se ubique sola.</span>
           ) : (
             <>
               {Object.entries(ubicacion.res).sort((a, b) => a[1].modalidad.localeCompare(b[1].modalidad)).map(([id, r]) => (
                 <span key={id} className={`px-2 py-0.5 rounded-md border font-bold ${COLOR_MOD[r.modalidad]}`} title={`${NOMBRE_MOD[r.modalidad]} · comparado con ${r.plantas?.join(", ") || "todas las plantas"}`}>
-                  {(technicians.find(t => t.id === Number(id))?.name || String(id)).split(' ').slice(0, 2).join(' ')}: {CORTO_MOD[r.modalidad]}{r.pct != null ? ` (${Math.round(r.pct * 100)} %)` : ''}
+                  {(technicians.find(t => t.id === Number(id))?.name || String(id)).split(' ').slice(0, 2).join(' ')}: {CORTO_MOD[r.modalidad]}{textoPct(r.modalidad, r.pct)}
                 </span>
               ))}
               {reubicando && <Loader2 size={13} className="animate-spin text-slate-400" />}

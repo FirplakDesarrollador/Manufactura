@@ -3,11 +3,18 @@
 // Especialidad de los técnicos de mantenimiento = las plantas que atiende cada uno (varias), aparte de la cuadrilla.
 // Se guarda en mantenimiento_tecnicos.especialidad como códigos separados por coma ("MS, CEFI"), el mismo formato que
 // usa el Planificador para asignar las tareas por planta (parseTechPlantas).
+// Solo técnicos activos y las plantas principales (las mismas del Sistema de Producción); una planta oculta que el
+// técnico ya tenga se sigue mostrando para poder quitarla.
 
-import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Loader2, Wrench } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Wrench } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { obtenerCodigoPlanta, type NomenclaturaPlanta } from '@/lib/nomenclaturaPlantas';
+import { PLANTAS_OCULTAS_SP } from '@/lib/sistema-produccion/cumplimiento';
+
+// Plantas que no salen aquí: las ocultas del Sistema de Producción, menos Proveedor Externo (EX) y Obras Civiles (OC),
+// que sí son especialidades de mantenimiento
+const OCULTAS = PLANTAS_OCULTAS_SP.filter(c => c !== 'EX' && c !== 'OC');
 
 type Tecnico = { id: number; name: string; turno?: string; especialidad?: string; planta?: string };
 
@@ -15,32 +22,40 @@ export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUp
   technicians: Tecnico[]; plantas: NomenclaturaPlanta[]; onTechsUpdated?: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState<number | null>(null);
-  // Cambios ya guardados mientras se recargan los técnicos
+  // Cambios hechos aquí (se ven al instante; se guardan por detrás)
   const [local, setLocal] = useState<Record<number, string[]>>({});
+  const recarga = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (recarga.current) clearTimeout(recarga.current); }, []);
 
-  const activas = useMemo(() => plantas.filter(p => p.activo !== false), [plantas]);
+  const principales = useMemo(() => plantas.filter(p => p.activo !== false && !OCULTAS.includes(p.codigo)), [plantas]);
   const codigosDe = (t: Tecnico): string[] => {
     if (local[t.id]) return local[t.id];
     const raw = (t.especialidad || t.planta || '').split(',').map(s => s.trim()).filter(Boolean);
     return [...new Set(raw.map(r => obtenerCodigoPlanta(r, plantas) || r))];
   };
 
-  const lista = useMemo(() => technicians.filter(t => t.id !== 9999).sort((a, b) =>
-    (a.turno === 'INACTIVO' ? 1 : 0) - (b.turno === 'INACTIVO' ? 1 : 0) || a.name.localeCompare(b.name)), [technicians]);
+  // Solo técnicos activos
+  const lista = useMemo(() => technicians.filter(t => t.id !== 9999 && t.turno !== 'INACTIVO').sort((a, b) => a.name.localeCompare(b.name)), [technicians]);
 
-  const alternar = async (t: Tecnico, codigo: string) => {
+  const alternar = (t: Tecnico, codigo: string) => {
     const act = codigosDe(t);
     const nuevas = act.includes(codigo) ? act.filter(c => c !== codigo) : [...act, codigo];
     if (!nuevas.length) { setError(`${t.name} debe tener al menos una planta.`); return; }
-    // Mismo orden de la Nomenclatura
-    const ordenadas = [...activas.map(p => p.codigo).filter(c => nuevas.includes(c)), ...nuevas.filter(c => !activas.some(p => p.codigo === c))];
-    setGuardando(t.id); setError(null);
-    const { error: e } = await supabase.from('mantenimiento_tecnicos').update({ especialidad: ordenadas.join(', ') }).eq('id', t.id);
-    setGuardando(null);
-    if (e) { setError(`No se guardó la especialidad de ${t.name}: ${e.message}`); return; }
-    setLocal(prev => ({ ...prev, [t.id]: ordenadas }));
-    onTechsUpdated?.();
+    const orden = plantas.map(p => p.codigo);
+    const ordenadas = [...orden.filter(c => nuevas.includes(c)), ...nuevas.filter(c => !orden.includes(c))];
+    setError(null);
+    setLocal(prev => ({ ...prev, [t.id]: ordenadas }));   // se marca de una vez
+    void (async () => {
+      const { error: e } = await supabase.from('mantenimiento_tecnicos').update({ especialidad: ordenadas.join(', ') }).eq('id', t.id);
+      if (e) {
+        setLocal(prev => ({ ...prev, [t.id]: act }));      // vuelve a como estaba
+        setError(`No se guardó la especialidad de ${t.name}: ${e.message}`);
+        return;
+      }
+      // El Gestor se recarga una sola vez, 3 s después del último cambio (recargarlo en cada clic es lento)
+      if (recarga.current) clearTimeout(recarga.current);
+      recarga.current = setTimeout(() => onTechsUpdated?.(), 3000);
+    })();
   };
 
   return (
@@ -49,7 +64,7 @@ export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUp
         <Wrench className="w-5 h-5 text-[#324354] shrink-0" />
         <div>
           <h2 className="text-base sm:text-lg font-black text-[#324354] leading-tight">Especialidad de los Técnicos (plantas)</h2>
-          <p className="text-[11px] text-slate-500">Toque una planta para marcarla o quitarla; cada técnico puede atender varias. El Planificador le asigna las tareas de esas plantas.</p>
+          <p className="text-[11px] text-slate-500">Toque una planta para marcarla o quitarla; cada técnico puede atender varias. El Planificador le asigna las tareas de esas plantas. Solo técnicos activos.</p>
         </div>
       </div>
 
@@ -62,26 +77,25 @@ export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUp
       <div className="divide-y divide-slate-100">
         {lista.map(t => {
           const suyas = codigosDe(t);
-          const desconocidas = suyas.filter(c => !activas.some(p => p.codigo === c));
+          // Plantas principales + las ocultas o desconocidas que el técnico ya tiene (para poder quitarlas)
+          const extra = suyas.filter(c => !principales.some(p => p.codigo === c));
           return (
-            <div key={t.id} className={`flex flex-col lg:flex-row lg:items-center gap-1.5 lg:gap-3 py-2 ${t.turno === 'INACTIVO' ? 'opacity-60' : ''}`}>
-              <div className="lg:w-[260px] shrink-0 flex items-center gap-1.5 min-w-0">
-                <span className="text-xs font-black text-[#324354] truncate" title={t.name}>{t.name}</span>
-                {guardando === t.id && <Loader2 size={12} className="animate-spin text-slate-400 shrink-0" />}
+            <div key={t.id} className="flex flex-col lg:flex-row lg:items-center gap-1.5 lg:gap-3 py-2">
+              <div className="lg:w-[260px] shrink-0 min-w-0">
+                <span className="text-xs font-black text-[#324354] truncate block" title={t.name}>{t.name}</span>
               </div>
               <div className="flex flex-wrap items-center gap-1">
-                {activas.map(p => {
+                {principales.map(p => {
                   const on = suyas.includes(p.codigo);
                   return (
-                    <button key={p.codigo} type="button" onClick={() => void alternar(t, p.codigo)} disabled={guardando === t.id} title={p.nombre_oficial}
-                      className={`h-6 px-2 rounded-md border text-[10px] font-bold transition-colors ${on ? 'bg-[#324354] border-[#324354] text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-[#324354] hover:text-[#324354]'}`}>
+                    <button key={p.codigo} type="button" onClick={() => alternar(t, p.codigo)} title={p.nombre_oficial}
+                      className={`h-6 px-2 rounded-md border text-[10px] font-bold ${on ? 'bg-[#324354] border-[#324354] text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-[#324354] hover:text-[#324354]'}`}>
                       {p.codigo}
                     </button>
                   );
                 })}
-                {/* Valores guardados que no son una planta de la Nomenclatura (se pueden quitar tocándolos) */}
-                {desconocidas.map(c => (
-                  <button key={c} type="button" onClick={() => void alternar(t, c)} title="No es una planta activa de la Nomenclatura: toque para quitarla"
+                {extra.map(c => (
+                  <button key={c} type="button" onClick={() => alternar(t, c)} title="Planta que no está entre las principales: toque para quitarla"
                     className="h-6 px-2 rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[10px] font-bold">{c} ×</button>
                 ))}
               </div>
