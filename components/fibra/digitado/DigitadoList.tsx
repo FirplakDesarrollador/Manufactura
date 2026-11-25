@@ -6,6 +6,7 @@ import RegistroDigitadoCard from './RegistroDigitadoCard'
 import { Truck, Info, Package, ArrowLeft } from 'lucide-react'
 import { getRegistrosTrazabilidadPorOrden } from '@/lib/supabase/queries/fibra'
 import { registrarDigitadoMasivo } from '@/lib/supabase/queries/fibra_digitado'
+import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
 import OrdenCard from '@/components/pintura/OrdenCard'
 import { toast } from 'sonner'
 
@@ -44,13 +45,13 @@ export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, o
 
     const filteredRegistros = registros.filter(r => {
         if (activeTab === 'Pulido') {
-            return ['Desgelcada', 'Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque'].includes(r.estado || '')
+            return ['Desgelcada', 'Herrajes', 'Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque'].includes(r.estado || '')
         }
         return r.estado === 'Transito' || r.estado === 'Digitado'
     })
 
     const handleRegistroMasivo = async () => {
-        const piezasDisponibles = filteredRegistros.filter(r => ['Desgelcada', 'Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque'].includes(r.estado || ''))
+        const piezasDisponibles = filteredRegistros.filter(r => ['Desgelcada', 'Herrajes', 'Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque'].includes(r.estado || ''))
         if (piezasDisponibles.length === 0) return
 
         const selectCount = Math.min(cantidadLote, piezasDisponibles.length)
@@ -61,6 +62,7 @@ export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, o
         setBulkLoading(true)
         try {
             await registrarDigitadoMasivo(idsToUpdate, userEmail)
+            revisarEntrega(order.orden_fabricacion)   // en segundo plano: componentes para la entrega
             toast.success(`${selectCount} piezas movidas a Tránsito`)
             await loadRegistros()
             onRefresh()
@@ -108,7 +110,7 @@ export default function DigitadoList({ order, userEmail, onRefresh, allMoldes, o
                         className={`flex-1 py-2.5 flex items-center justify-center gap-2 font-black uppercase text-xs transition-all ${activeTab === 'Pulido' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                         <Package size={16} />
-                        Pulido ({registros.filter(r => ['Desgelcada', 'Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque'].includes(r.estado || '')).length})
+                        Pulido ({registros.filter(r => ['Desgelcada', 'Herrajes', 'Pulido', 'Ensayo', 'Guacales', 'Acabado', 'Empaque'].includes(r.estado || '')).length})
                     </button>
                     <button
                         onClick={() => setActiveTab('Transito')}

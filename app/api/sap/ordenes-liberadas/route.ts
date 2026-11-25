@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { fechasSemaforoPorOf } from '@/lib/sap/fechasSemaforo';
+import { fetchSAP, SAP_BASE_URL } from '@/lib/sap';
+import { familiasDeArticulos, esFamiliaSuperficies } from '@/lib/sap/familiasItems';
+import { barrerOfCerradasSap } from '@/lib/fibra/cierreSap';
 
 async function fetchSapQueryPages(baseUrl: string, sessionId: string, queryName: string): Promise<any[]> {
     const headers = {
@@ -21,6 +25,11 @@ async function fetchSapQueryPages(baseUrl: string, sessionId: string, queryName:
 
     return rows
 }
+
+// Carga automática (vercel.json): lunes a viernes a las 12:00 m. y 4:00 p. m. hora Colombia (17:00 y 21:00 UTC).
+// Es la misma carga del botón "Cargar Órdenes" / "Actualizar SAP".
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET() {
     try {
@@ -54,7 +63,7 @@ export async function GET() {
 
         const cloudflareBaseUrl = process.env.SEMAFORO_API_URL 
             ? process.env.SEMAFORO_API_URL.replace(/\/semaforo\/?$/, '')
-            : "https://toner-villages-acoustic-colony.trycloudflare.com";
+            : "https://telecommunications-effectively-configured-experience.trycloudflare.com";
         const cloudflareApiKey = process.env.SEMAFORO_API_KEY || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3R5cGUiOiJ1c2VyIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNjQyNzY3Njg3LCJleHBpcmVkX3VwIjoxNjQyNzY4NzAxfQ.6eYkakHhU6IvM_Nqd7c6hdAhY79iDoG2RUp9Hi9-2us';
 
         let fibraExtraMap = new Map<string, any>();
@@ -205,7 +214,8 @@ export async function GET() {
                 usuario: item.U_name || item.U_NAME || item.usuario || 'Sistema SAP',
 
                 orden_fabricacion: String(docNum),
-                numero_pedido: item.numero_pedido || String(docNum),
+                // Orden de venta: la trae el endpoint de Fibra de Sistemas (la consulta general no la tiene). Nunca el Nº de la OF
+                numero_pedido: String(extraFibra?.numero_pedido || item.numero_pedido || item.OriginNum || "").split("-")[0].trim(), // solo la OV (sin "-004-004")
                 producto_sku: item.ItemCode || item.producto_sku || '',
                 producto_descripcion: prodDesc,
                 color: item.color || '',
@@ -224,11 +234,24 @@ export async function GET() {
             };
         });
 
+        // Superficies (RTM / Inyección): se reconocen por la familia del artículo en SAP (U_Familia RTM o RTMM) y no
+        // entran a MS ni a FV (el prefijo no sirve: VCOC también es de MS y PPRD de FV). Sin familia conocida no se mueven.
+        let familiasSku = new Map<string, string>();
+        try {
+            familiasSku = await familiasDeArticulos([
+                ...mappedRows.map(r => r.producto_sku),
+                ...marmolRawRows.map((r: any) => r.producto_sku || r.ItemCode)
+            ]);
+        } catch (e) {
+            console.warn('[ordenes-liberadas] no se pudo consultar la familia de los artículos:', e);
+        }
+        const esRtm = (sku: string | undefined | null) => esFamiliaSuperficies(familiasSku.get(String(sku || '').trim()));
+
         // 4. Preparar los registros EXCLUSIVOS de Mármol Sintético para la tabla 'ordenes_fabricacion'
         let msUpsertBatch: any[] = [];
 
         if (marmolRawRows.length > 0) {
-            msUpsertBatch = marmolRawRows.map(item => {
+            msUpsertBatch = marmolRawRows.filter((item: any) => !esRtm(item.producto_sku || item.ItemCode)).map(item => {
                 const rawDesc = (item.producto_descripcion || item.ItemName || '').trim();
                 // Se conserva la descripción completa de SAP (incluye sufijos como "(CAJA CERRADA)")
                 const cleanDesc = rawDesc;
@@ -267,7 +290,7 @@ export async function GET() {
             });
         } else {
             msUpsertBatch = mappedRows
-                .filter(r => !isNonMarmolSku(r.producto_sku, r.producto_descripcion))
+                .filter(r => !isNonMarmolSku(r.producto_sku, r.producto_descripcion) && !esRtm(r.producto_sku))
                 .map(r => {
                     const rawDesc = (r.producto_descripcion || r.itemName || '').trim();
                     // Se conserva la descripción completa de SAP (incluye sufijos como "(CAJA CERRADA)")
@@ -389,21 +412,59 @@ export async function GET() {
             return false;
         };
 
-        const fibraRows = mappedRows.filter(r => isFibraSku(r.producto_sku, r.producto_descripcion));
+        const fibraRows = mappedRows.filter(r => isFibraSku(r.producto_sku, r.producto_descripcion) && !esRtm(r.producto_sku));
+
+        // Pedido vinculado (orden de venta) de las OF de Fibra: la consulta directa de SAP no lo trae (solo el respaldo de
+        // Cloudflare), así que se completa con el "Pedido vinculado" de la OF en SAP (ProductionOrderOriginNumber),
+        // de a 20 OF por consulta y una consulta a la vez. Si SAP no responde, el pedido queda como venía.
+        const sinPedido = fibraRows.filter(r => !String(r.numero_pedido || '').trim() && /^\d+$/.test(String(r.orden_fabricacion)));
+        for (let i = 0; i < sinPedido.length; i += 20) {
+            const lote = sinPedido.slice(i, i + 20);
+            try {
+                const filtro = lote.map(r => `DocumentNumber eq ${r.orden_fabricacion}`).join(' or ');
+                const res = await fetchSAP(`${SAP_BASE_URL}/ProductionOrders?$select=DocumentNumber,ProductionOrderOriginNumber&$filter=${encodeURIComponent(filtro)}`,
+                    { method: 'GET', headers: { Prefer: 'odata.maxpagesize=50' } });
+                if (!res.ok) { console.warn(`[ordenes-liberadas] SAP no entregó el pedido vinculado (${res.status})`); continue; }
+                const pedidos = new Map<string, string>(((await res.json()).value || [])
+                    .filter((o: any) => o.ProductionOrderOriginNumber)
+                    .map((o: any) => [String(o.DocumentNumber), String(o.ProductionOrderOriginNumber)]));
+                for (const r of lote) { const p = pedidos.get(String(r.orden_fabricacion)); if (p) r.numero_pedido = p; }
+            } catch (e) {
+                console.warn('[ordenes-liberadas] Error trayendo el pedido vinculado de SAP:', e);
+            }
+        }
         let totalFibraUpserted = 0;
+        let avisoFechasSemaforo: string | null = null;
 
         if (fibraRows.length > 0) {
             const { data: nonPendingFibra } = await supabase
                 .from('ordenes_fabricacion_fibra')
-                .select('orden_fabricacion')
+                .select('orden_fabricacion, modificado_por')
                 .eq('pendiente', false);
 
-            const nonPendingFibraSet = new Set((nonPendingFibra || []).map(r => String(r.orden_fabricacion)));
+            // Las cerradas a mano (o canceladas) no se reactivan. Las que cerró el cierre automático porque no vinieron
+            // en una carga de SAP sí: si SAP las vuelve a traer liberadas, siguen abiertas (caso OF 2264019, 17/11/2026).
+            const CIERRE_AUTO = 'Sistema SAP (Cierre automático)';
+            const nonPendingFibraSet = new Set((nonPendingFibra || []).filter(r => r.modificado_por !== CIERRE_AUTO).map(r => String(r.orden_fabricacion)));
+            const reactivarFibra = new Set((nonPendingFibra || []).filter(r => r.modificado_por === CIERRE_AUTO).map(r => String(r.orden_fabricacion)));
+
+            // 4.1 Las 4 fechas del Semáforo (T, Real Liberación, W y AF) viajan en el mismo upsert de la orden
+            // (un upsert aparte solo con las fechas viola el NOT NULL de cantidad y no guardaba nada).
+            // Si el Semáforo no responde, las órdenes se cargan igual y las fechas guardadas no se tocan.
+            let fechas: Awaited<ReturnType<typeof fechasSemaforoPorOf>> | null = null;
+            try {
+                fechas = await fechasSemaforoPorOf();
+            } catch (errSem: any) {
+                avisoFechasSemaforo = `No se actualizaron las fechas del Semáforo (se conservan las anteriores): ${errSem?.message || errSem}`;
+            }
+            const ahoraFechas = new Date().toISOString();
+            const sinFecha = { fecha_entrega_lote: null, fecha_real_liberacion: null, fecha_ideal_entrega_produccion: null, fecha_prometida_entrega: null };
+
             const cleanFibraBatch = fibraRows
                 .filter(item => !nonPendingFibraSet.has(String(item.orden_fabricacion)))
                 .map(r => ({
                     orden_fabricacion: String(r.orden_fabricacion),
-                    numero_pedido: String(r.numero_pedido || r.orden_fabricacion),
+                    numero_pedido: String(r.numero_pedido || ""),
                     producto_sku: r.producto_sku,
                     cantidad: r.cantidad,
                     fecha_entrega_estimada: r.fecha_entrega_estimada,
@@ -417,22 +478,48 @@ export async function GET() {
                     molde_descripcion: r.molde_descripcion,
                     kilos_gelcoat: r.kilos_gelcoat,
                     componentes: r.componentes || null,
-                    modificado_por: 'Sistema SAP'
+                    // Unidades ya completadas (recibidas) en SAP: cuentan como CEDI aunque no se registraran en planta
+                    cantidad_completada_sap: Number(r.cantCompletada) || 0,
+                    modificado_por: 'Sistema SAP',
+                    ...(reactivarFibra.has(String(r.orden_fabricacion)) ? { fecha_entrega_real: null } : {}),
+                    ...(fechas ? {
+                        ...(fechas.get(String(r.orden_fabricacion).trim()) ?? sinFecha),
+                        fechas_semaforo_actualizadas: ahoraFechas
+                    } : {})
                 }));
 
             const BATCH_SIZE = 50;
+            let sinColumnaCompletada = false;
             for (let i = 0; i < cleanFibraBatch.length; i += BATCH_SIZE) {
-                const batch = cleanFibraBatch.slice(i, i + BATCH_SIZE);
-                const { error: errFibra } = await supabase
+                let batch: Record<string, unknown>[] = cleanFibraBatch.slice(i, i + BATCH_SIZE);
+                if (sinColumnaCompletada) batch = batch.map(({ cantidad_completada_sap, ...resto }) => resto);
+                let { error: errFibra } = await supabase
                     .from('ordenes_fabricacion_fibra')
                     .upsert(batch, { onConflict: 'orden_fabricacion' });
+                // Sin la columna cantidad_completada_sap (falta fibra_completada_sap.sql): se guardan las órdenes sin ella
+                if (errFibra && /cantidad_completada_sap/i.test(errFibra.message)) {
+                    sinColumnaCompletada = true;
+                    batch = batch.map(({ cantidad_completada_sap, ...resto }) => resto);
+                    ({ error: errFibra } = await supabase.from('ordenes_fabricacion_fibra').upsert(batch, { onConflict: 'orden_fabricacion' }));
+                }
                 if (errFibra) {
                     console.error('Error upserting ordenes_fabricacion_fibra:', errFibra);
+                    if (fechas && !avisoFechasSemaforo) {
+                        avisoFechasSemaforo = /column .*(fecha_entrega_lote|fecha_real_liberacion|fecha_ideal_entrega_produccion|fecha_prometida_entrega|fechas_semaforo_actualizadas).* does not exist|Could not find the '(fecha|fechas_semaforo)/i.test(errFibra.message)
+                            ? 'Faltan las columnas de fechas del Semáforo: ejecute fibra_fechas_semaforo.sql en Supabase.'
+                            : `No se pudieron guardar las órdenes de Fibra con sus fechas: ${errFibra.message}`;
+                    }
                 } else {
                     totalFibraUpserted += batch.length;
                 }
             }
             console.log(`Upserted ${cleanFibraBatch.length} Fibra orders to ordenes_fabricacion_fibra.`);
+
+            if (fechas && !avisoFechasSemaforo) {
+                const sinDatos = cleanFibraBatch.filter(r => !fechas!.has(String(r.orden_fabricacion).trim())).length;
+                if (sinDatos > 0) avisoFechasSemaforo = `${sinDatos} OF de Fibra no están en el Semáforo: quedaron sin sus 4 fechas.`;
+            }
+            if (avisoFechasSemaforo) console.warn('Fechas Semáforo:', avisoFechasSemaforo)
         }
 
         let totalFibraCerradas = 0
@@ -451,9 +538,31 @@ export async function GET() {
             if (fibraAbiertasErr) {
                 console.error('Error listando órdenes de fibra abiertas:', fibraAbiertasErr)
             } else {
-                const porCerrar = (fibraAbiertas || [])
+                const ausentes = (fibraAbiertas || [])
                     .map(o => String(o.orden_fabricacion))
                     .filter(of => of && !sapAbiertas.has(of))
+
+                // No basta con que la OF no venga en la consulta (una carga incompleta cerraba OF liberadas): se confirma
+                // en SAP que ya no está Liberada. Si SAP no responde, no se cierra nada (nunca un cierre sin confirmar).
+                const porCerrar: string[] = []
+                for (let i = 0; i < ausentes.length; i += 20) {
+                    const lote = ausentes.slice(i, i + 20)
+                    const numericas = lote.filter(of => /^[0-9]+$/.test(of))
+                    if (numericas.length === 0) continue
+                    try {
+                        const filtro = numericas.map(of => `DocumentNumber eq ${of}`).join(' or ')
+                        const res = await fetchSAP(`${SAP_BASE_URL}/ProductionOrders?$select=DocumentNumber,ProductionOrderStatus&$filter=${encodeURIComponent(filtro)}`,
+                            { method: 'GET', headers: { Prefer: 'odata.maxpagesize=50' } })
+                        if (!res.ok) { console.warn(`[ordenes-liberadas] SAP no confirmó el estado de ${numericas.length} OF de fibra (${res.status}): no se cierran`); continue }
+                        const estado = new Map<string, string>(((await res.json()).value || []).map((o: any) => [String(o.DocumentNumber), String(o.ProductionOrderStatus)]))
+                        for (const of of numericas) {
+                            const e = estado.get(of)
+                            if (e && e !== 'boposReleased') porCerrar.push(of)
+                        }
+                    } catch (e) {
+                        console.warn('[ordenes-liberadas] Error confirmando en SAP el cierre de OF de fibra:', e)
+                    }
+                }
 
                 for (let i = 0; i < porCerrar.length; i += 100) {
                     const lote = porCerrar.slice(i, i + 100)
@@ -479,14 +588,91 @@ export async function GET() {
             }
         }
 
+        // 5. Superficies (RTM): órdenes liberadas de la familia RTM/RTMM → ordenes_fabricacion_rtm
+        let totalRtm = 0
+        let totalRtmCerradas = 0
+        let avisoRtm: string | null = null
+        const rtmRows = mappedRows.filter(r => esRtm(r.producto_sku))
+        try {
+            const { data: rtmNoPend, error: errRtm } = await supabase.from('ordenes_fabricacion_rtm').select('orden_fabricacion, modificado_por').eq('pendiente', false)
+            if (errRtm) throw new Error(/ordenes_fabricacion_rtm|relation|schema cache/i.test(errRtm.message) ? 'Faltan las tablas de Superficies: ejecute superficies_rtm.sql en Supabase.' : errRtm.message)
+            // Cerradas a mano no se reactivan; las del cierre automático sí, si SAP las vuelve a traer liberadas
+            const CIERRE_AUTO_RTM = 'Sistema SAP (Cierre automático)'
+            const cerradasMano = new Set((rtmNoPend || []).filter(r => r.modificado_por !== CIERRE_AUTO_RTM).map(r => String(r.orden_fabricacion)))
+            const reactivar = new Set((rtmNoPend || []).filter(r => r.modificado_por === CIERRE_AUTO_RTM).map(r => String(r.orden_fabricacion)))
+            let fechasRtm: Awaited<ReturnType<typeof fechasSemaforoPorOf>> | null = null
+            if (rtmRows.length) { try { fechasRtm = await fechasSemaforoPorOf() } catch { fechasRtm = null } }
+            const vacio = (v: any) => (v === '' || v === undefined ? null : v)
+            const lote = rtmRows.filter(r => !cerradasMano.has(String(r.orden_fabricacion))).map(r => ({
+                orden_fabricacion: String(r.orden_fabricacion),
+                numero_pedido: String(r.numero_pedido || ''),
+                producto_sku: r.producto_sku,
+                producto_descripcion: r.producto_descripcion,
+                familia: familiasSku.get(String(r.producto_sku || '').trim()) || null,
+                cantidad: Number(r.cantidad) || 1,
+                cantidad_completada_sap: Number(r.cantCompletada) || 0,
+                cliente: r.cliente,
+                comentario: r.comentario,
+                fecha_entrega_estimada: vacio(r.fecha_entrega_estimada),
+                fecha_ideal_produccion: vacio(r.fecha_ideal_produccion),
+                pendiente: true,
+                modificado_por: 'Sistema SAP',
+                updated_at: new Date().toISOString(),
+                ...(reactivar.has(String(r.orden_fabricacion)) ? { fecha_entrega_real: null } : {}),
+                ...(fechasRtm ? { ...(fechasRtm.get(String(r.orden_fabricacion).trim()) ?? {}), fechas_semaforo_actualizadas: new Date().toISOString() } : {})
+            }))
+            for (let i = 0; i < lote.length; i += 100) {
+                const { error } = await supabase.from('ordenes_fabricacion_rtm').upsert(lote.slice(i, i + 100), { onConflict: 'orden_fabricacion' })
+                if (error) throw new Error(`No se pudieron guardar las órdenes de Superficies: ${error.message}`)
+                totalRtm += Math.min(100, lote.length - i)
+            }
+            // Cierre: las pendientes que ya no vienen liberadas se cierran solo si SAP confirma que no están Liberadas
+            if (fetchedFromSap && rawRows.length > 0) {
+                const abiertasSap = new Set(rawRows.map((item: any) => String(item.DocNum || item.orden_fabricacion || '').trim()).filter(Boolean))
+                const { data: pend } = await supabase.from('ordenes_fabricacion_rtm').select('orden_fabricacion').eq('pendiente', true)
+                const ausentes = (pend || []).map(o => String(o.orden_fabricacion)).filter(of => /^[0-9]+$/.test(of) && !abiertasSap.has(of))
+                for (let i = 0; i < ausentes.length; i += 20) {
+                    const lote20 = ausentes.slice(i, i + 20)
+                    try {
+                        const filtro = lote20.map(of => `DocumentNumber eq ${of}`).join(' or ')
+                        const res = await fetchSAP(`${SAP_BASE_URL}/ProductionOrders?$select=DocumentNumber,ProductionOrderStatus&$filter=${encodeURIComponent(filtro)}`,
+                            { method: 'GET', headers: { Prefer: 'odata.maxpagesize=50' } })
+                        if (!res.ok) continue
+                        const estado = new Map<string, string>(((await res.json()).value || []).map((o: any) => [String(o.DocumentNumber), String(o.ProductionOrderStatus)]))
+                        const cerrar = lote20.filter(of => { const e = estado.get(of); return !!e && e !== 'boposReleased' })
+                        if (cerrar.length) {
+                            const { error } = await supabase.from('ordenes_fabricacion_rtm')
+                                .update({ pendiente: false, fecha_entrega_real: new Date().toISOString(), modificado_por: CIERRE_AUTO_RTM })
+                                .in('orden_fabricacion', cerrar)
+                            if (!error) totalRtmCerradas += cerrar.length
+                        }
+                    } catch (e) {
+                        console.warn('[ordenes-liberadas] Error confirmando el cierre de OF de Superficies:', e)
+                    }
+                }
+            }
+        } catch (e: any) {
+            avisoRtm = e?.message || String(e)
+            console.warn('[ordenes-liberadas] Superficies:', avisoRtm)
+        }
+
+        // Las piezas de las OF que SAP cerró salen del proceso (a CEDI, con el motivo en su trazabilidad)
+        let piezasFvCerradasSap: number | string = 0
+        try { piezasFvCerradasSap = (await barrerOfCerradasSap()).length } catch (e: any) { piezasFvCerradasSap = e?.message || String(e) }
+
         return NextResponse.json({
             success: true,
             error: false,
+            piezasFvCerradasSap,
+            totalSuperficies: totalRtm,
+            totalSuperficiesCerradas: totalRtmCerradas,
+            avisoSuperficies: avisoRtm,
             message: `200 - Se consultaron ${mappedRows.length} órdenes de fabricación liberadas directamente desde SAP Service Layer.`,
             total: mappedRows.length,
             totalMarmol: msUpsertBatch.length,
             totalFibra: totalFibraUpserted,
             totalFibraCerradas,
+            avisoFechasSemaforo,
             data: mappedRows,
             response: mappedRows
         }, { status: 200 });

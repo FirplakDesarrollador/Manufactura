@@ -1,5 +1,6 @@
 'use client'
 
+import { ordenarPorFechaT } from '@/lib/fibra/ordenT'
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
@@ -21,6 +22,7 @@ export const ETAPAS: Etapa[] = [
     { key: 'pintura', label: 'Pintura' },
     { key: 'desgelcada', label: 'Desgelcada' },
     { key: 'vaciado', label: 'Vaciado' },
+    { key: 'herrajes', label: 'Herrajes' },
     { key: 'estanteria', label: 'Estantería' },
     { key: 'pulido', label: 'Pulido' },
     { key: 'acabado', label: 'Acabado' },
@@ -77,7 +79,7 @@ export default function BuscadorOrdenesFibraModule() {
             getAllMoldes()
         ])
         if (error) setError(`No se pudieron cargar las órdenes: ${error.message}`)
-        else setOrdenes(data || [])
+        else setOrdenes(await ordenarPorFechaT(data || []))  // más atrasado primero por la T del Semáforo
         setTrazabilidad(trazaHoy)
         setMoldes(moldesData)
         setCargando(false)
@@ -231,7 +233,8 @@ export default function BuscadorOrdenesFibraModule() {
                 </div>
             </div>
 
-            {detalleOf != null && <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)} />}
+            {detalleOf != null && <DetalleOrdenSapModal ordenFabricacion={detalleOf} onClose={() => setDetalleOf(null)}
+                piso={{ label: 'Trazabilidad', contenido: <OrderProcessesPanel orden={{ orden_fabricacion: detalleOf } as any} registros={[]} /> }} />}
         </div>
     )
 }

@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Filter, Pencil, Settings } from 'lucide-react'
+import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Filter, Pencil, Settings, Download } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SaldosDefectsSettingsModal, DefectoSaldoDestruccion } from '@/components/calidad/SaldosDefectsSettingsModal'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
+import { esGaranteSP } from '@/lib/sistema-produccion/reglas'
 import Header from '@/components/opt-sistemica/Header'
 import { CalidadMsNavButtons } from '@/components/calidad/CalidadMsNavButtons'
 import { v4 as uuidv4 } from 'uuid'
@@ -147,7 +148,12 @@ export default function SaldosYDestruccionesPage() {
                 localId: localUser?.id
             })
 
-            if (localUser?.permisos?.calidad) {
+            if (esGaranteSP(authData.user.email)) {
+                // Garantes: siempre pueden abrir la configuración de defectos
+                setHasEditPermission(!!localUser?.permisos?.calidad?.editar)
+                setHasDeletePermission(!!localUser?.permisos?.calidad?.eliminar)
+                setHasSettingsPermission(true)
+            } else if (localUser?.permisos?.calidad) {
                 setHasEditPermission(!!localUser.permisos.calidad.editar)
                 setHasDeletePermission(!!localUser.permisos.calidad.eliminar)
                 setHasSettingsPermission(!!localUser.permisos.calidad.configurar_defectos || localUser.permisos.calidad.configuracion === 'editar' || !!localUser.permisos.calidad.editar)
@@ -211,11 +217,38 @@ export default function SaldosYDestruccionesPage() {
         fetchData()
     }, [fetchData])
 
-    const handleSaveSettings = async (updatedDefects: DefectoSaldoDestruccion[]) => {
+    const handleSaveSettings = async (updatedDefectsIn: DefectoSaldoDestruccion[]) => {
+        let updatedDefects = updatedDefectsIn
+        // Garantes: defectos nuevos (id negativo) y cambios de nombre. Un error aquí se muestra y no se cierra la ventana.
+        const nuevos = updatedDefects.filter(d => d.id < 0)
+        const renombrados = updatedDefects.filter(d => {
+            const antes = defectOptions.find(o => o.id === d.id)
+            return d.id > 0 && antes && antes.defecto !== d.defecto
+        })
+        if ((nuevos.length || renombrados.length) && !esGaranteSP(user?.email)) {
+            alert('Solo Hector José Chinchilla Trigos, Maria Isabel Escobar Laurens y Ederson Estiven Londoño Alvarez pueden cambiar nombres o agregar defectos.')
+            return
+        }
+        const mensajeError = (m: string) => /row-level security|policy|permission/i.test(m)
+            ? 'La base no permite el cambio: ejecute ms_lista_saldos_destrucciones_garantes.sql en Supabase.'
+            : m
+        for (const d of renombrados) {
+            const { error } = await supabase.from('ms_lista_saldos_destrucciones').update({ defecto: d.defecto }).eq('id', d.id).select('id').single()
+            if (error) { alert(`No se pudo cambiar el nombre de "${d.defecto}": ${mensajeError(error.message)}`); return }
+        }
+        if (nuevos.length) {
+            const { data, error } = await supabase
+                .from('ms_lista_saldos_destrucciones')
+                .insert(nuevos.map(d => ({ defecto: d.defecto, saldo_o_destruccion: d.saldo_o_destruccion, Requiere_Foto: !!d.Requiere_Foto, Requiere_Referencia_Molde: !!d.Requiere_Referencia_Molde })))
+                .select('*')
+            if (error || !data) { alert(`No se pudieron agregar los defectos nuevos: ${mensajeError(error?.message || 'sin respuesta')}`); return }
+            const idReal = new Map(nuevos.map((d, i) => [d.id, data[i]?.id as number]))
+            updatedDefects = updatedDefects.map(d => (d.id < 0 ? { ...d, id: idReal.get(d.id) ?? d.id } : d))
+        }
         try {
             // Attempt to update Supabase table
             try {
-                const updatePromises = updatedDefects.map(d => 
+                const updatePromises = updatedDefects.filter(d => d.id > 0).map(d =>
                     supabase
                         .from('ms_lista_saldos_destrucciones')
                         .update({
@@ -428,6 +461,60 @@ export default function SaldosYDestruccionesPage() {
         return productName.includes(searchLower) || defectName.includes(searchLower) || molde.includes(searchLower)
     })
 
+    // Descarga a Excel lo que está en pantalla (rango de fechas + búsqueda), con todos los datos de cada registro
+    const [exportando, setExportando] = useState(false)
+    const exportarExcel = async () => {
+        if (!displayedReports.length) return
+        setExportando(true)
+        try {
+            const XLSX = await import('xlsx')
+            const fechaCo = (iso: string) => new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z')
+            const partes = (iso: string) => {
+                const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+                    .formatToParts(fechaCo(iso)).map(x => [x.type, x.value]))
+                return { fecha: `${p.day}/${p.month}/${p.year}`, hora: `${p.hour === '24' ? '00' : p.hour}:${p.minute}` }
+            }
+            // Columnas propias de la tabla; cualquier otro campo del registro se agrega al final tal como viene de la base
+            const conocidas = new Set(['id', 'created_at', 'create_by', 'defecto', 'producto', 'producto_id', 'usuario', 'fotoUrl', 'Molde', 'molde'])
+            const extras = [...new Set(displayedReports.flatMap(r => Object.keys(r).filter(k => !conocidas.has(k))))]
+            const filas = displayedReports.map(r => {
+                const defects = Array.isArray(r.defecto) ? r.defecto : (r.defecto ? [r.defecto] : [])
+                const defectName = defects.map((d: any) => typeof d === 'string' ? d : (d.defecto || d.Defecto || d.nombre || d.Nombre || '')).join(', ')
+                const { fecha, hora } = partes(r.created_at)
+                const fila: Record<string, string | number> = {
+                    'ID': r.id,
+                    'Fecha': fecha,
+                    'Hora': hora,
+                    'Tipo': defectName.includes('Destrucción') ? 'Destrucción' : 'Saldo',
+                    'Referencia': r.producto?.Referencia || '',
+                    'Defecto causante': defectName.split(' - ')[1] || defectName,
+                    'Defecto (completo)': defectName,
+                    'Molde': r.Molde || r.molde || '',
+                    'Registrado por': usersMap[r.create_by] || '',
+                    'Foto': r.fotoUrl || '',
+                }
+                const crudo = r as unknown as Record<string, unknown>
+                extras.forEach(k => {
+                    const v = crudo[k]
+                    fila[k] = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : (v as string | number)
+                })
+                return fila
+            })
+            const ws = XLSX.utils.json_to_sheet(filas)
+            ws['!cols'] = Object.keys(filas[0]).map(k => ({ wch: Math.min(60, Math.max(k.length, ...filas.map(f => String(f[k] ?? '').length)) + 2) }))
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, 'Saldos y destrucciones')
+            const desde = startDate <= endDate ? startDate : endDate
+            const hasta = startDate <= endDate ? endDate : startDate
+            XLSX.writeFile(wb, `saldos-destrucciones-MS_${desde}_a_${hasta}.xlsx`)
+        } catch (e) {
+            console.error('Error exportando a Excel:', e)
+            alert('No se pudo generar el Excel.')
+        } finally {
+            setExportando(false)
+        }
+    }
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
             {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
@@ -490,6 +577,16 @@ export default function SaldosYDestruccionesPage() {
                             <span className="text-[9px] font-bold text-gray-300 uppercase">Total:</span>
                             <span>{displayedReports.length}</span>
                         </div>
+
+                        <button
+                            onClick={exportarExcel}
+                            disabled={!displayedReports.length || exportando}
+                            title="Descargar en Excel los registros que se ven (rango de fechas y búsqueda), con todos sus datos"
+                            className="h-7 bg-white border border-[#254153] text-[#254153] hover:bg-[#F6F3EE] px-2.5 rounded font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{exportando ? 'Generando…' : 'Excel'}</span>
+                        </button>
 
                         <button
                             onClick={() => {
@@ -907,6 +1004,7 @@ export default function SaldosYDestruccionesPage() {
                 onClose={() => setIsSettingsOpen(false)}
                 defects={defectOptions}
                 onSave={handleSaveSettings}
+                puedeEditarDefectos={esGaranteSP(user?.email)}
             />
 
             {/* POPUP DE CONFIRMACIÓN DE ELIMINACIÓN */}

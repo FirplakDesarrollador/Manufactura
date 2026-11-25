@@ -1,5 +1,6 @@
 'use client'
 
+import { moldeDeOtraReferencia } from '@/lib/fibra/moldesOrden'
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
 import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
@@ -98,8 +99,18 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             let codeMatch = sku.match(/PMOL\d*-(\d+)/i) || (selectedOrden.molde_sku ? selectedOrden.molde_sku.match(/PMOL\d*-(\d+)/i) : null)
             const targetCode = codeMatch ? codeMatch[1].replace(/^0+/, '') : ''
 
-            // Filter locally from allMoldes
-            const available = allMoldes
+            // 1) Moldes del tipo de molde de la orden (orden.molde_id = tipos_moldes.id, o el mismo SKU de molde).
+            //    Si el tipo tiene moldes, SOLO esos: la comparación por palabras traía moldes de otras referencias
+            //    (ej. "MOLDE LAVARROPAS" para cualquier lavarropas).
+            const tipoOrden = Number((selectedOrden as any).molde_id) || null
+            const skuMolde = (selectedOrden.molde_sku || '').trim().toLowerCase()
+            // Sin los moldes cuyo nombre es de otra referencia (asignados por error al tipo)
+            const delTipo = allMoldes.filter(m => !moldeDeOtraReferencia(m) && (
+                (tipoOrden != null && Number((m as any).tipo_molde_id) === tipoOrden) ||
+                (!!skuMolde && (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase() === skuMolde)))
+
+            // 2) Respaldo (referencias sin tipo de molde asignado): SKU, prefijo del serial y palabras de la descripción
+            const available = (delTipo.length > 0 ? delTipo.filter(m => m.estado === 'Disponible') : allMoldes
                 .filter(m => {
                     if (m.estado !== 'Disponible') return false
 
@@ -140,7 +151,7 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                     }
 
                     return false
-                })
+                }))
                 .sort((a, b) => a.vueltas_actuales - b.vueltas_actuales)
 
             setMoldesDisponibles(available)
@@ -261,13 +272,20 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         setSelectedDate('')
     }
 
-    const checkMantenimiento = (molde: Molde) => {
-        const threshold = molde.vueltas_mto_atipicas > 0 
-            ? molde.vueltas_mto_atipicas - 1
-            : molde.vueltas_mto - 1;
+    const getLimiteMolde = (molde: any): number => {
+        const atip = Number(molde?.vueltas_mtto_atipicas ?? molde?.vueltas_mto_atipicas ?? 0);
+        if (atip > 0) return atip;
+        const reg = Number(molde?.vueltas_mtto ?? molde?.vueltas_mto ?? 0);
+        if (reg > 0) return reg;
+        return Number(molde?.vueltas_totales ?? 0);
+    };
 
-        if (molde.vueltas_actuales >= threshold) {
-            const isNew = molde.vueltas_mto_atipicas === 1;
+    const checkMantenimiento = (molde: Molde) => {
+        const limite = getLimiteMolde(molde);
+        const threshold = limite > 0 ? limite - 1 : 0;
+
+        if (threshold > 0 && molde.vueltas_actuales >= threshold) {
+            const isNew = ((molde as any).vueltas_mtto_atipicas ?? molde.vueltas_mto_atipicas) === 1;
             const title = isNew ? '🆕 Molde nuevo 🆕' : '⚠️ Molde para desmanchar ⚠️';
             const message = isNew 
                 ? `El ${molde.molde_descripcion} # ${molde.serial} Se debe encerar en el puesto`
@@ -463,42 +481,101 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                 >
                                     <span className={selectedMolde ? 'text-gray-900' : 'text-gray-400'}>
                                         {selectedMolde 
-                                            ? `${selectedMolde.serial} (${selectedMolde.vueltas_actuales}v)` 
+                                            ? `${selectedMolde.serial} · ${selectedMolde.vueltas_actuales} ${selectedMolde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}` 
                                             : !selectedOrden ? '← Seleccione orden' : 'Elija el molde'}
                                     </span>
                                     <Search size={18} className="text-gray-400" />
                                 </div>
 
                                 {isMoldDropdownOpen && (
-                                    <div className="absolute bottom-full mb-2 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+                                    <div className="absolute bottom-full mb-2 w-full min-w-[320px] bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                                         <div className="p-2 border-b border-gray-100 bg-gray-50">
                                             <input
                                                 type="text"
                                                 autoFocus
-                                                placeholder="Buscar molde..."
+                                                placeholder="Buscar molde por serial..."
                                                 value={moldSearchText}
                                                 onChange={(e) => setMoldSearchText(e.target.value)}
-                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
                                             />
                                         </div>
-                                        <div className="max-h-[200px] overflow-y-auto">
+                                        {/* Encabezado con columna explícita de Vueltas */}
+                                        <div className="grid grid-cols-[1fr_auto] gap-2 px-4 py-2 bg-gray-100/80 border-b border-gray-200 text-[11px] font-black uppercase text-gray-500 tracking-wider">
+                                            <span>Molde / Serial</span>
+                                            <span className="text-right">Vueltas del Molde</span>
+                                        </div>
+                                        <div className="max-h-[220px] overflow-y-auto divide-y divide-gray-50">
                                             {moldesDisponibles
                                                 .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
-                                                .map((molde) => (
-                                                    <div
-                                                        key={molde.id}
-                                                        onClick={() => {
-                                                            setSelectedMolde(molde)
-                                                            checkMantenimiento(molde)
-                                                            setIsMoldDropdownOpen(false)
-                                                            setMoldSearchText('')
-                                                        }}
-                                                        className="px-4 py-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
-                                                    >
-                                                        <span className="text-sm font-bold">{molde.serial}</span>
-                                                        <span className="text-xs text-cyan-600 font-bold">{molde.vueltas_actuales}v</span>
+                                                .length === 0 ? (
+                                                    <div className="px-4 py-6 text-center text-xs text-gray-400 font-medium">
+                                                        No se encontraron moldes disponibles
                                                     </div>
-                                                ))}
+                                                ) : (
+                                                    moldesDisponibles
+                                                        .filter(m => m.serial.toLowerCase().includes(moldSearchText.toLowerCase()))
+                                                        .map((molde) => {
+                                                            const limite = getLimiteMolde(molde);
+
+                                                            // Semaforización de vueltas:
+                                                            // - Rojo: se pasó de las vueltas de mantenimiento (vueltas_actuales >= limite)
+                                                            // - Amarillo: ya está cerca al mantenimiento (faltan <= 2 vueltas o >= 85% del límite)
+                                                            // - Azul: está bien usar el molde
+                                                            const pasadoMtto = limite > 0 && molde.vueltas_actuales >= limite;
+                                                            const cercaMtto = limite > 0 && !pasadoMtto && (
+                                                                molde.vueltas_actuales >= (limite - 2) || (molde.vueltas_actuales / limite) >= 0.85
+                                                            );
+
+                                                            const badgeColor = pasadoMtto
+                                                                ? 'bg-red-100 text-red-800 border-red-300'
+                                                                : cercaMtto
+                                                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                                : 'bg-blue-100 text-blue-800 border-blue-300';
+
+                                                            return (
+                                                                <div
+                                                                    key={molde.id}
+                                                                    onClick={() => {
+                                                                        setSelectedMolde(molde)
+                                                                        checkMantenimiento(molde)
+                                                                        setIsMoldDropdownOpen(false)
+                                                                        setMoldSearchText('')
+                                                                    }}
+                                                                    className="px-4 py-2.5 hover:bg-cyan-50 cursor-pointer grid grid-cols-[1fr_auto] gap-3 items-center transition-colors group"
+                                                                >
+                                                                    <div className="min-w-0 flex flex-col">
+                                                                        <span className="text-sm font-bold text-gray-900 group-hover:text-cyan-700 truncate">
+                                                                            {molde.serial}
+                                                                        </span>
+                                                                        {molde.molde_descripcion && (
+                                                                            <span className="text-[10px] text-gray-400 truncate leading-tight">
+                                                                                {molde.molde_descripcion}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex flex-col items-end shrink-0">
+                                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-black border ${badgeColor}`}>
+                                                                            <span>{molde.vueltas_actuales}</span>
+                                                                            <span className="font-semibold text-[10px]">
+                                                                                {molde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}
+                                                                            </span>
+                                                                        </span>
+                                                                        <span className="text-[9px] font-semibold mt-0.5 flex items-center gap-1">
+                                                                            {limite > 0 && (
+                                                                                <span className="text-gray-400">límite: {limite}</span>
+                                                                            )}
+                                                                            {pasadoMtto && (
+                                                                                <span className="text-red-600 font-bold">(Vencido)</span>
+                                                                            )}
+                                                                            {cercaMtto && (
+                                                                                <span className="text-amber-600 font-bold">(Próximo)</span>
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })
+                                                )}
                                         </div>
                                     </div>
                                 )}
@@ -508,11 +585,30 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                                         {debugInfo}
                                     </div>
                                 )}
-                                {selectedMolde && (
-                                    <div className="text-[10px] text-gray-500 px-1 mt-1 italic">
-                                        Vueltas: {selectedMolde.vueltas_actuales} / {selectedMolde.vueltas_mto_atipicas > 0 ? selectedMolde.vueltas_mto_atipicas : selectedMolde.vueltas_mto}
-                                    </div>
-                                )}
+                                {selectedMolde && (() => {
+                                    const lim = getLimiteMolde(selectedMolde);
+                                    const pas = lim > 0 && selectedMolde.vueltas_actuales >= lim;
+                                    const cer = lim > 0 && !pas && (
+                                        selectedMolde.vueltas_actuales >= (lim - 2) || (selectedMolde.vueltas_actuales / lim) >= 0.85
+                                    );
+                                    const colorStyle = pas 
+                                        ? 'bg-red-50 text-red-800 border-red-200' 
+                                        : cer 
+                                        ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                        : 'bg-blue-50 text-blue-800 border-blue-200';
+                                    const estadoTexto = pas 
+                                        ? '🚨 Pasado de mantenimiento' 
+                                        : cer 
+                                        ? '⚠️ Cerca de mantenimiento' 
+                                        : '✓ Bien para usar';
+
+                                    return (
+                                        <div className={`text-[11px] font-bold px-2.5 py-1 mt-1.5 rounded-lg border flex items-center justify-between ${colorStyle}`}>
+                                            <span>Vueltas: {selectedMolde.vueltas_actuales} / {lim > 0 ? lim : 'Sin límite'}</span>
+                                            <span>{estadoTexto}</span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

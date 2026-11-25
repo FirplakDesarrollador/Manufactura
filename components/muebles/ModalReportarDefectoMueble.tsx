@@ -100,19 +100,6 @@ export default function ModalReportarDefectoMueble({
 
     // Submission
     const [submitting, setSubmitting] = useState<boolean>(false)
-    const [elapsedTime, setElapsedTime] = useState<string>('0m 00s')
-
-    useEffect(() => {
-        if (!isOpen) return
-        const start = Date.now()
-        const interval = setInterval(() => {
-            const diff = Date.now() - start
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-            const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-            setElapsedTime(`${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`)
-        }, 1000)
-        return () => clearInterval(interval)
-    }, [isOpen])
 
     // Machine options
     const taladroOptions = plantaMuebles === 'Muebles' 
@@ -342,10 +329,6 @@ export default function ModalReportarDefectoMueble({
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-xs font-mono font-bold text-amber-300">
-                            <Clock size={14} className="animate-pulse" />
-                            <span>{elapsedTime}</span>
-                        </div>
                         <button 
                             onClick={onClose} 
                             className="p-1.5 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors"

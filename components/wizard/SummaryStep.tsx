@@ -95,6 +95,12 @@ export default function SummaryStep() {
                                 <dt className="text-slate-500 font-semibold mb-1 uppercase text-xs tracking-wider">Puesto</dt>
                                 <dd className="font-bold text-slate-800 text-base">{evaluacionActual.puesto}</dd>
                             </div>
+                            {evaluacionActual.tipoProducto && (
+                                <div>
+                                    <dt className="text-slate-500 font-semibold mb-1 uppercase text-xs tracking-wider">Bañera</dt>
+                                    <dd className="font-bold text-slate-800 text-base">{evaluacionActual.tipoProducto}{evaluacionActual.descripcionProducto ? ` · ${evaluacionActual.descripcionProducto}` : ""}</dd>
+                                </div>
+                            )}
                             <div>
                                 <dt className="text-slate-500 font-semibold mb-1 uppercase text-xs tracking-wider">Hora Hora realizado por</dt>
                                 <dd className="font-bold text-slate-800 text-base">{evaluacionActual.realizadoPor || currentUser || evaluacionActual.supervisor || "—"}</dd>

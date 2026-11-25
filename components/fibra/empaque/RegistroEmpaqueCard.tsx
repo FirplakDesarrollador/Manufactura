@@ -3,7 +3,9 @@
 import React from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarEmpaque } from '@/lib/supabase/queries/fibra_empaque'
+import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
+import EstadoEntregaOf from '../EstadoEntregaOf'
 import AccionesPiezaFibra from '../AccionesPiezaFibra'
 import { PackageCheck } from 'lucide-react'
 
@@ -21,12 +23,14 @@ export default function RegistroEmpaqueCard({ registro, orden, moldes, usuarioEm
         <AccionesPiezaFibra
             principal={{
                 id: 'Empaque', label: 'Registrar Guacal', icon: PackageCheck, title: 'Registrar la pieza en guacal',
-                accion: () => registrarEmpaque(registro.registrer || '', usuarioEmail)
+                // Al pasar a guacal se revisan en segundo plano los componentes para la entrega
+                accion: async () => { const r = await registrarEmpaque(registro.registrer || '', usuarioEmail); revisarEntrega(registro.orden_fabricacion); return r }
             }}
             onHecho={onRefresh}
             mensajeError="Hubo un error al registrar el guacal."
         />
     )
 
-    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-emerald-50/40" />
+    return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-emerald-50/40"
+        extra={<EstadoEntregaOf of={registro.orden_fabricacion} />} />
 }

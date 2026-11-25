@@ -23,7 +23,8 @@ export interface CriterioCalidad {
 export const PLANTAS_CRITERIOS: { codigo: string; sigla: string; nombre: string; titulo: string }[] = [
     { codigo: 'Ms', sigla: 'MS', nombre: 'Mármol Sintético', titulo: 'Criterios de Aceptación y Rechazo de Mármol Sintético (MS)' },
     { codigo: 'Fv', sigla: 'FV', nombre: 'Fibra de Vidrio', titulo: 'Criterios de Aceptación y Rechazo de Fibra de Vidrio (FV)' },
-    { codigo: 'R moldes', sigla: 'RM', nombre: 'Revisión de Moldes', titulo: 'Criterios de Aceptación y Rechazo de Revisión de Moldes' },
+    // Reparación de Moldes (RMOLD): usa el catálogo del registro diario de Calidad RMOLD (rmold_defectos)
+    { codigo: 'R moldes', sigla: 'RMOLD', nombre: 'Reparación de Moldes', titulo: 'Criterios de Aceptación y Rechazo de Reparación de Moldes (RMOLD)' },
     { codigo: 'Qznt', sigla: 'QZ', nombre: 'Quarzstone', titulo: 'Criterios de Aceptación y Rechazo de Quarzstone (QZ)' },
     // Muebles y CEFI comparten los mismos criterios (planta 'Mbles/Cefi' en la base)
     { codigo: 'Mbles/Cefi', sigla: 'MBL-CEFI', nombre: 'Muebles y CEFI', titulo: 'Criterios de Aceptación y Rechazo de Muebles y CEFI (MBL-CEFI)' }

@@ -34,8 +34,13 @@ const TIEMPO_RECOMENDADO_SEG: Record<string, number> = {
     MBL: 25.26,    // 0,421 min
     CEFI: 25.26,   // 0,421 min
     RMOLD: 1320,   // 22 min
+<<<<<<< HEAD
 };
 const fmtMin = (seg: number) => (seg / 60).toLocaleString("es-CO", { maximumFractionDigits: 3 });
+=======
+}
+const fmtMin = (seg: number) => (seg / 60).toLocaleString("es-CO", { maximumFractionDigits: 3 })
+>>>>>>> origin/main
 
 // FV: el tiempo de ciclo depende del tipo de bañera
 const TIPOS_BANERA_FV: { tipo: string; seg: number; ejemplo: string }[] = [

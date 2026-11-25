@@ -7,6 +7,7 @@ import { supabaseTalentoHumano } from '@/lib/supabase_talento_humano';
 import Header from '@/components/opt-sistemica/Header';
 import SubHeader from '@/components/opt-sistemica/SubHeader';
 import SearchableSelect from '@/components/mtto-autonomo/SearchableSelect';
+import SelectorPlantaSP from '@/components/opt-sistemica/SelectorPlantaSP';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Clock, User, Target } from 'lucide-react';
 
 interface Planificacion {
@@ -17,6 +18,7 @@ interface Planificacion {
   observado_nombre: string;
   modulo_tipo: string;
   estado: string;
+  planta?: string | null;
 }
 
 const MODULOS = [
@@ -157,6 +159,7 @@ export default function AgendamientoPage() {
   const [responsable, setResponsable] = useState('');
   const [observado, setObservado] = useState('');
   const [modulo, setModulo] = useState('GI');
+  const [planta, setPlanta] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successEvent, setSuccessEvent] = useState<any>(null);
 
@@ -199,6 +202,10 @@ export default function AgendamientoPage() {
 
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!planta) {
+      setError('Selecciona la planta o área de la OPT: se usa para el cumplimiento por planta.');
+      return;
+    }
     setSaving(true);
 
     const selectedEmp = empleados.find(emp => emp.nombreCompleto === responsable);
@@ -225,6 +232,7 @@ export default function AgendamientoPage() {
       responsable_email: targetResponsableEmail,
       observado_nombre: observado,
       modulo_tipo: modulo,
+      planta,
       created_by: session.user.id
     });
 
@@ -244,6 +252,7 @@ export default function AgendamientoPage() {
     setFecha('');
     setResponsable('');
     setObservado('');
+    setPlanta('');
   };
 
   const getOutlookLink = (ev: any) => {
@@ -514,6 +523,9 @@ export default function AgendamientoPage() {
                   <select className="input-field" value={modulo} onChange={e => setModulo(e.target.value)}>
                     {MODULOS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
+                  <div style={{ marginTop: '-16px' }}>
+                    <SelectorPlantaSP value={planta} onChange={setPlanta} />
+                  </div>
                   {error && (
                     <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
                       ⚠️ {error}

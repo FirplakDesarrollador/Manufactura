@@ -64,6 +64,7 @@ function SignatureCanvas({ defaultValue, onSave }: { defaultValue?: string; onSa
     const lastPos = useRef<{ x: number; y: number } | null>(null);
     const [hasSignature, setHasSignature] = useState(!!defaultValue);
     const hasInitialized = useRef(false);
+    const trazado = useRef(!!defaultValue);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -122,17 +123,20 @@ function SignatureCanvas({ defaultValue, onSave }: { defaultValue?: string; onSa
         ctx.stroke();
 
         lastPos.current = currentPos;
+        trazado.current = true;
         setHasSignature(true);
     }, []);
 
+    // Guarda la firma al soltar; con ref (no con el estado) para no perder el primer trazo
     const endDraw = useCallback(() => {
+        const estabaDibujando = isDrawing.current;
         isDrawing.current = false;
         lastPos.current = null;
         const canvas = canvasRef.current;
-        if (canvas && hasSignature) {
+        if (canvas && estabaDibujando && trazado.current) {
             onSave(canvas.toDataURL("image/png"));
         }
-    }, [hasSignature, onSave]);
+    }, [onSave]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -162,6 +166,7 @@ function SignatureCanvas({ defaultValue, onSave }: { defaultValue?: string; onSa
         const ctx = canvas?.getContext("2d");
         if (!canvas || !ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        trazado.current = false;
         setHasSignature(false);
         onSave("");
     };

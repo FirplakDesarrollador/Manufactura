@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import CoberturaPuestas from './CoberturaPuestas';
 
 type PuestaAPunto = {
   id: string | number;
@@ -26,41 +27,43 @@ export default function VerPuestasClient({ planta, datosDb, actionLabel = "Ver",
   const [expandedProcess, setExpandedProcess] = useState<string | null>(null); // Cerrados por defecto
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Pueden eliminar los administradores y desarrolladores
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const email = localStorage.getItem('userEmail');
-      if (email === 'jakeline.chaverra@firplak.com') {
-        setIsAdmin(true);
-      }
-    }
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email || (typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null);
+      if (!email) return;
+      if (email === 'jakeline.chaverra@firplak.com') { setIsAdmin(true); return; }
+      const { data } = await supabase.from('usuarios').select('rol').ilike('correo', email.trim().toLowerCase()).maybeSingle();
+      if (data?.rol === 'admin' || data?.rol === 'desarrollador') setIsAdmin(true);
+    })();
   }, []);
 
-  const handleDelete = async (id: string | number, e: React.MouseEvent) => {
+  // Eliminar = marcar la puesta a punto como "Eliminada" (no se borra nada de la base de datos).
+  // Doble verificación: confirmar y luego escribir el código de la puesta a punto.
+  const handleDelete = async (item: PuestaAPunto, nombre: string, codigo: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!window.confirm('¿Está seguro de que desea eliminar esta Puesta a Punto? Esta acción no se puede deshacer.')) {
+    if (!window.confirm(`¿Eliminar la puesta a punto "${nombre}" (${codigo})?\n\nDejará de aparecer en la planta, pero su información queda guardada.`)) return;
+    const escrito = window.prompt(`Segunda verificación: escriba el código ${codigo} para confirmar la eliminación.`);
+    if (escrito == null) return;
+    if (escrito.trim().toUpperCase() !== String(codigo).trim().toUpperCase()) {
+      alert('El código no coincide. No se eliminó la puesta a punto.');
       return;
     }
 
     try {
-      // 1. Eliminar detalles
-      const { error: err1 } = await supabase
-        .from('puestas_a_punto_detalle')
-        .delete()
-        .eq('id_puesta_a_punto', id);
-
-      if (err1) throw err1;
-
-      // 2. Eliminar encabezado
-      const { error: err2 } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
         .from('puestas_a_punto_encabezado')
-        .delete()
-        .eq('id_puesta_a_punto', id);
+        .update({ estado_puesta_a_punto: 'Eliminada', actualizado_en: new Date().toISOString(), 'Modificado por': user?.email || null })
+        .eq('id_puesta_a_punto', item.id_puesta_a_punto || item.id)
+        .select('id_puesta_a_punto');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('No se actualizó el registro. Revise los permisos.');
 
-      if (err2) throw err2;
-
-      alert('✅ Registro eliminado correctamente');
+      alert('✅ Puesta a punto eliminada');
       router.refresh(); // Recargar datos de la página
     } catch (err: any) {
       console.error(err);
@@ -70,8 +73,12 @@ export default function VerPuestasClient({ planta, datosDb, actionLabel = "Ver",
 
   // Agrupar los datos reales por proceso
   // Si la BD viene vacía, usamos un mock de "Pulido" según pidió el usuario
-  const listToGroup = datosDb && datosDb.length > 0 
-    ? datosDb 
+  // Solo las puestas a punto de esta planta (columna planta: "Marmol sintetico", "Fibra de vidrio"...)
+  const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const deLaPlanta = (datosDb || []).filter(d => sinTildes(String(d.planta ?? d.Planta ?? '')) === sinTildes(planta)
+    && sinTildes(String(d.estado_puesta_a_punto ?? '')) !== 'eliminada');
+  const listToGroup = datosDb && datosDb.length > 0
+    ? deLaPlanta
     : [
         { id: '1', nombre: 'Puesta a punto Initial', descripcion: 'Configuración estándar', proceso: 'Pulido' }
       ];
@@ -153,6 +160,9 @@ export default function VerPuestasClient({ planta, datosDb, actionLabel = "Ver",
       </div>
 
       <div style={{ height: '1px', backgroundColor: '#E2E8F0', margin: '0.5rem 0 1.5rem 0' }}></div>
+
+      {/* Conteo de puestas a punto frente a las HDT vigentes de la planta */}
+      {actionBaseRoute === 'ver' && <CoberturaPuestas planta={planta} />}
 
       {/* Lista de Procesos */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -256,10 +266,10 @@ export default function VerPuestasClient({ planta, datosDb, actionLabel = "Ver",
                                </div>
                              )}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                                {actionBaseRoute === 'modificar' && isAdmin && (
-                                  <button 
-                                    onClick={(e) => handleDelete(item.id_puesta_a_punto || item.id, e)}
-                                    title="Eliminar registro"
+                                {(actionBaseRoute === 'modificar' || actionBaseRoute === 'ver') && isAdmin && (
+                                  <button
+                                    onClick={(e) => handleDelete(item, name, String(code), e)}
+                                    title="Eliminar puesta a punto"
                                     style={{ 
                                       backgroundColor: '#FDF0F0', 
                                       color: '#D13438', 

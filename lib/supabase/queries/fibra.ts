@@ -1,18 +1,45 @@
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
+import { conCompletadaSap } from '@/lib/fibra/completadaSap'
 
 export async function getOrdenesFabricacion(): Promise<OrdenFabricacion[]> {
-    const { data, error } = await supabase
-        .from('ordenes_fabricacion_fv')
-        .select('*')
-        .order('fecha_ideal_produccion', { ascending: true })
+    const [fvRes, fibRes] = await Promise.all([
+        supabase.from('ordenes_fabricacion_fv').select('*'),
+        supabase
+            .from('ordenes_fabricacion_fibra')
+            .select('orden_fabricacion, fecha_entrega_lote, fecha_real_liberacion, fecha_ideal_entrega_produccion, fecha_prometida_entrega, fechas_semaforo_actualizadas')
+            .eq('pendiente', true)
+    ])
 
-    if (error) {
-        console.error('Error fetching ordenes fabricacion:', error)
+    if (fvRes.error) {
+        console.error('Error fetching ordenes fabricacion:', fvRes.error)
         return []
     }
 
-    return data || []
+    const mapaFechas = new Map((fibRes.data || []).map(r => [String(r.orden_fabricacion).trim(), r]))
+
+    const combinadas: OrdenFabricacion[] = (fvRes.data || []).map((o: any) => {
+        const fechas = mapaFechas.get(String(o.orden_fabricacion).trim())
+        return {
+            ...o,
+            fecha_entrega_lote: fechas?.fecha_entrega_lote || o.fecha_entrega_lote || null,
+            fecha_real_liberacion: fechas?.fecha_real_liberacion || o.fecha_real_liberacion || null,
+            fecha_ideal_entrega_produccion: fechas?.fecha_ideal_entrega_produccion || o.fecha_ideal_entrega_produccion || null,
+            fecha_prometida_entrega: fechas?.fecha_prometida_entrega || o.fecha_prometida_entrega || null,
+            fechas_semaforo_actualizadas: fechas?.fechas_semaforo_actualizadas || null
+        }
+    })
+
+    // Siempre ordenar de lo más atrasado a lo más reciente por Fecha Entrega Lote (columna T del Semáforo)
+    return (await conCompletadaSap(combinadas)).sort((a, b) => {
+        const rawA = a.fecha_entrega_lote || a.fecha_ideal_produccion || a.fecha_entrega_estimada
+        const rawB = b.fecha_entrega_lote || b.fecha_ideal_produccion || b.fecha_entrega_estimada
+        const timeA = rawA ? new Date(rawA).getTime() : Infinity
+        const timeB = rawB ? new Date(rawB).getTime() : Infinity
+        const valA = isNaN(timeA) ? Infinity : timeA
+        const valB = isNaN(timeB) ? Infinity : timeB
+        return valA - valB
+    })
 }
 
 export async function getRegistrosTrazabilidad(): Promise<RegistroTrazabilidad[]> {
@@ -120,18 +147,22 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
 }
 
 export async function getAllMoldes(): Promise<Molde[]> {
-    const { data, error } = await supabase
-        .from('query_moldes')
-        .select('*')
-        .neq('estado', 'Destruido')
+    // El nombre propio de cada molde (moldes.nombre_articulo) no viene en la vista: sirve para descartar moldes
+    // asignados por error a otro tipo de molde
+    const [{ data, error }, crudos] = await Promise.all([
+        supabase.from('query_moldes').select('*').neq('estado', 'Destruido'),
+        supabase.from('moldes').select('id, nombre_articulo').neq('estado', 'Destruido')
+    ])
 
     if (error) {
         console.error('Error fetching all moldes:', error)
         return []
     }
+    const nombre = new Map((crudos.data || []).map((r: any) => [r.id, r.nombre_articulo as string | null]))
 
     return (data || []).map((m: any) => ({
         ...m,
+        nombre_articulo: m.nombre_articulo ?? nombre.get(m.id) ?? null,
         molde_sku: m.molde_sku || m.tipo_molde_sku || '',
         molde_descripcion: m.molde_descripcion || m.nombre_articulo || ''
     }))
@@ -239,7 +270,7 @@ export async function registrarPintura(pinturaData: {
         throw new Error(`No se encontró el usuario. Correo: ${pinturaData.usuario_email}.`)
     }
 
-    // 5. Verificar que el molde no esté en proceso
+    // 5. Verificar proceso del molde (en Fibra no es restrictivo; se permite continuar)
     const { data: trazaReciente, error: trazaError } = await supabase
         .from('trazabilidad_fv')
         .select('estado')
@@ -249,7 +280,7 @@ export async function registrarPintura(pinturaData: {
         .maybeSingle()
 
     if (!trazaError && trazaReciente && (trazaReciente.estado === 'Pintura' || trazaReciente.estado === 'Vaciado')) {
-        throw new Error(`Acción no permitida: El molde ${molde.serial} ya está en proceso de ${trazaReciente.estado}.`)
+        console.warn(`Aviso Fibra: El molde ${molde.serial} tiene registro previo en ${trazaReciente.estado}, pero se permite continuar según configuración operativa.`)
     }
 
     // 6. Actualizar molde

@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Info, Loader2, Plus, Settings2, Trash2, X } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, BarChart3, CheckCircle2, Info, Loader2, Plus, Settings2, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
     CAUSAS_PARO_BASE, FAMILIAS_PARO, META_NS, META_PRODUCTIVIDAD, MINUTOS_POR_MOLDE, MetaPersonas, NOMBRE_FAMILIA, ParoRmold, RegistroRmold,
-    TIEMPO_OPERACION_MIN, calcularDia, cargarRmold, guardarCierreRmold, guardarMetasPersonas, metaParaPersonas
+    META_RMOLD_DEFECTO, PERSONAS_PROGRAMADAS_RMOLD, TURNO_RMOLD, calcularDia, turnoRmoldPara, cargarRmold, guardarCierreRmold, guardarMetasPersonas,
+    metaParaPersonas, minutosEntre
 } from '@/lib/informe-turno/rmold';
 
 const hoyBogota = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
@@ -16,8 +18,14 @@ const dec = (n: number, d = 1) => n.toLocaleString('es-CO', { minimumFractionDig
 // Semáforo de indicadores con meta: verde ≥ meta, amarillo hasta 10 puntos por debajo, rojo
 const semaforo = (v: number | null, meta: number) => (v == null ? 'text-slate-400' : v >= meta ? 'text-[#3b8f50]' : v >= meta - 10 ? 'text-[#b8961f]' : 'text-[#d14747]');
 
-type Campos = Record<'ms' | 'fv' | 'rtm' | 'brillados' | 'desmanchados' | 'esperados' | 'entregados' | 'personas' | 'meta', string>;
-const VACIO: Campos = { ms: '', fv: '', rtm: '', brillados: '', desmanchados: '', esperados: '', entregados: '', personas: '', meta: '' };
+// personas = personas programadas del turno; las presentes (FTE) = programadas − ausentes
+type Campos = Record<'ms' | 'fv' | 'rtm' | 'brillados' | 'desmanchados' | 'contramoldes' | 'esperados' | 'entregados' | 'personas' | 'ausentes' | 'meta'
+    | 'horaInicio' | 'horaFin' | 'inicioFinTurno' | 'alimentacion1' | 'alimentacion2', string>;
+const VACIO: Campos = {
+    ms: '', fv: '', rtm: '', brillados: '', desmanchados: '', contramoldes: '', esperados: '', entregados: '', personas: '', ausentes: '', meta: '',
+    horaInicio: TURNO_RMOLD.horaInicio, horaFin: TURNO_RMOLD.horaFin, inicioFinTurno: String(TURNO_RMOLD.inicioFinTurno),
+    alimentacion1: String(TURNO_RMOLD.alimentacion1), alimentacion2: String(TURNO_RMOLD.alimentacion2)
+};
 const txt = (v: number | null | undefined) => (v == null ? '' : String(v));
 const valor = (s: string) => (s.trim() === '' ? 0 : Math.max(0, Number(s.replace(',', '.')) || 0));
 const valorONulo = (s: string) => (s.trim() === '' ? null : Math.max(0, Number(s.replace(',', '.')) || 0));
@@ -57,22 +65,36 @@ export default function FormularioRmold() {
     const ultimo = useMemo(() => [...registros].filter(r => r.fecha < fecha).sort((a, b) => b.fecha.localeCompare(a.fecha))[0] || null, [registros, fecha]);
 
     // Al cambiar la fecha (o al terminar de cargar): si ya hay cierre se carga para editar; si no, formulario nuevo
-    // con las personas del último cierre y la meta de la tabla
+    // con 6 personas programadas, meta 24 y el turno por defecto (6:00 a 15:12 → 484 min)
     useEffect(() => {
         if (cargando) return;
         if (existente) {
+            const ausentes = existente.ausentes || 0;
+            // Días anteriores sin el detalle del turno: 6:00–15:12 y todo el descuento en "inicio y fin de turno" para conservar su tiempo
+            const sinDetalle = existente.hora_inicio == null;
+            const turnoBase = minutosEntre(TURNO_RMOLD.horaInicio, TURNO_RMOLD.horaFin) || 552;
             setC({
                 ms: txt(existente.moldes_ms), fv: txt(existente.moldes_fv), rtm: txt(existente.moldes_rtm),
-                brillados: txt(existente.moldes_brillados), desmanchados: txt(existente.moldes_desmanchados),
+                brillados: txt(existente.moldes_brillados), desmanchados: txt(existente.moldes_desmanchados), contramoldes: txt(existente.contramoldes_reparados),
                 esperados: txt(existente.moldes_esperados), entregados: txt(existente.moldes_entregados),
-                personas: txt(existente.personas), meta: txt(existente.meta)
+                personas: txt((existente.personas || 0) + ausentes), ausentes: txt(ausentes), meta: txt(existente.meta),
+                horaInicio: existente.hora_inicio || TURNO_RMOLD.horaInicio,
+                horaFin: existente.hora_fin || TURNO_RMOLD.horaFin,
+                inicioFinTurno: sinDetalle ? txt(Math.max(0, turnoBase - (existente.tiempo_operacion_min || turnoBase))) : txt(existente.min_inicio_fin_turno ?? 0),
+                alimentacion1: sinDetalle ? '0' : txt(existente.min_alimentacion_1 ?? 0),
+                alimentacion2: sinDetalle ? '0' : txt(existente.min_alimentacion_2 ?? 0)
             });
             setMetaManual(true);
             setObservaciones(existente.observaciones || '');
             setParosForm(paros.filter(p => p.fecha === fecha).map(p => ({ familia: p.familia, causa: p.causa, minutos: txt(p.minutos), observacion: p.observacion || '', tipo: p.tipo })));
         } else {
-            const personas = ultimo?.personas ? String(ultimo.personas) : '';
-            setC({ ...VACIO, personas, meta: txt(metaParaPersonas(metas, Number(personas))) });
+            // Lunes a viernes 6:00–15:12 (484 min); sábado 6:00–13:20 con una sola alimentación (400 min)
+            const t = turnoRmoldPara(fecha);
+            setC({
+                ...VACIO, personas: String(PERSONAS_PROGRAMADAS_RMOLD), ausentes: '0', meta: String(META_RMOLD_DEFECTO),
+                horaInicio: t.horaInicio, horaFin: t.horaFin, inicioFinTurno: String(t.inicioFinTurno),
+                alimentacion1: String(t.alimentacion1), alimentacion2: String(t.alimentacion2)
+            });
             setMetaManual(false);
             setObservaciones('');
             setParosForm([]);
@@ -82,12 +104,24 @@ export default function FormularioRmold() {
 
     useEffect(() => { setMensaje(null); }, [fecha]);
 
-    const metaSugerida = metaParaPersonas(metas, valor(c.personas));
+    // Presentes (FTE) = programadas − ausentes; presentismo = presentes ÷ programadas
+    const presentesDe = (x: Campos) => Math.max(0, valor(x.personas) - valor(x.ausentes));
+    const presentes = presentesDe(c);
+    const presentismo = valor(c.personas) > 0 ? (presentes / valor(c.personas)) * 100 : null;
+    // Tiempo disponible del turno = (fin − inicio) − inicio/fin de turno − alimentación 1 − alimentación 2
+    const minutosTurno = minutosEntre(c.horaInicio, c.horaFin);
+    const descuentos = valor(c.inicioFinTurno) + valor(c.alimentacion1) + valor(c.alimentacion2);
+    const tiempoDisponible = minutosTurno == null ? null : Math.max(0, minutosTurno - descuentos);
+
+    const metaSugerida = metaParaPersonas(metas, presentes);
     const cambiar = (k: keyof Campos, v: string) => {
         setC(prev => {
             const nuevo = { ...prev, [k]: v };
-            // La meta sigue a las personas mientras no se haya escrito a mano
-            if (k === 'personas' && !metaManual) nuevo.meta = txt(metaParaPersonas(metas, valor(v)));
+            // La meta sigue a las personas presentes mientras no se haya escrito a mano
+            if ((k === 'personas' || k === 'ausentes') && !metaManual) {
+                const sugerida = metaParaPersonas(metas, presentesDe(nuevo));
+                if (sugerida != null) nuevo.meta = txt(sugerida);
+            }
             return nuevo;
         });
         if (k === 'meta') setMetaManual(true);
@@ -96,16 +130,39 @@ export default function FormularioRmold() {
     const calculo = calcularDia({
         moldes_ms: valor(c.ms), moldes_fv: valor(c.fv), moldes_rtm: valor(c.rtm), moldes_brillados: valor(c.brillados), moldes_desmanchados: valor(c.desmanchados),
         moldes_esperados: valorONulo(c.esperados), moldes_entregados: valorONulo(c.entregados), nivel_servicio: null,
-        personas: valor(c.personas), meta: valor(c.meta)
+        personas: presentes, meta: valor(c.meta)
     });
     const minutosRegistrados = parosForm.reduce((a, p) => a + valor(p.minutos), 0);
     const porExplicar = Math.max(0, calculo.parosReflejados) - minutosRegistrados;
 
     const causasConocidas = useMemo(() => [...new Set([...CAUSAS_PARO_BASE, ...paros.map(p => p.causa)])].sort(), [paros]);
+    // Paros sugeridos: las causas más frecuentes de la base (último año; si hay pocas, toda la historia) con su familia más usada.
+    // Se agregan sin minutos: el tiempo lo escribe quien cierra el día.
+    const sugeridos = useMemo(() => {
+        const desde = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+        const recientes = paros.filter(p => p.fecha >= desde);
+        const base = recientes.length >= 10 ? recientes : paros;
+        const porCausa = new Map<string, { n: number; familias: Map<string, number> }>();
+        base.forEach(p => {
+            const causa = p.causa.trim().toUpperCase();
+            if (!causa) return;
+            const x = porCausa.get(causa) || { n: 0, familias: new Map() };
+            x.n++;
+            if (p.familia !== 'SIN CLASIFICAR') x.familias.set(p.familia, (x.familias.get(p.familia) || 0) + 1);
+            porCausa.set(causa, x);
+        });
+        return [...porCausa.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 10).map(([causa, x]) => ({
+            causa, veces: x.n,
+            familia: [...x.familias.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || FAMILIAS_PARO[0]
+        }));
+    }, [paros]);
+    const yaAgregada = (causa: string) => parosForm.some(p => p.causa.trim().toUpperCase() === causa);
 
     const faltantes = [
         !fecha && 'fecha',
-        !(valor(c.personas) > 0) && 'personas',
+        !(valor(c.personas) > 0) && 'personas programadas',
+        valor(c.personas) > 0 && !(presentes > 0) && 'ausentes menor que las personas programadas',
+        !(tiempoDisponible != null && tiempoDisponible > 0) && 'horario del turno',
         !(valor(c.meta) > 0) && 'meta',
         c.esperados.trim() === '' && 'moldes esperados',
         c.entregados.trim() === '' && 'moldes entregados',
@@ -124,11 +181,14 @@ export default function FormularioRmold() {
                 fecha,
                 moldes_ms: valor(c.ms), moldes_fv: valor(c.fv), moldes_rtm: valor(c.rtm),
                 moldes_brillados: valor(c.brillados), moldes_desmanchados: valor(c.desmanchados),
+                contramoldes_reparados: valorONulo(c.contramoldes),
                 moldes_esperados: valorONulo(c.esperados), moldes_entregados: valorONulo(c.entregados),
                 // Con esperados y entregados el NS se calcula; el valor digitado del histórico ya no aplica
                 nivel_servicio: null,
-                personas: valor(c.personas), meta: valor(c.meta),
-                tiempo_operacion_min: existente?.tiempo_operacion_min || TIEMPO_OPERACION_MIN,
+                personas: presentes, ausentes: valor(c.ausentes), meta: valor(c.meta),
+                tiempo_operacion_min: tiempoDisponible || 0,
+                hora_inicio: c.horaInicio || null, hora_fin: c.horaFin || null,
+                min_inicio_fin_turno: valor(c.inicioFinTurno), min_alimentacion_1: valor(c.alimentacion1), min_alimentacion_2: valor(c.alimentacion2),
                 observaciones: observaciones.trim() || null
             }, parosForm.map(p => ({
                 fecha, familia: p.familia, causa: p.causa.trim().toUpperCase(), minutos: valor(p.minutos), observacion: p.observacion.trim() || null, tipo: p.tipo
@@ -145,7 +205,7 @@ export default function FormularioRmold() {
     const recientes = useMemo(() => [...registros].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 12), [registros]);
     const numero = (k: keyof Campos, label: string, ayuda?: string) => (
         <div>
-            <label className={etiqueta} title={ayuda}>{label}</label>
+            <label className={`${etiqueta} truncate`} title={ayuda || label}>{label}</label>
             <input type="number" inputMode="decimal" min={0} step="any" value={c[k]} onChange={e => cambiar(k, e.target.value)} placeholder="0" className={campo} />
         </div>
     );
@@ -160,7 +220,13 @@ export default function FormularioRmold() {
             <section className={`lg:col-span-8 bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border ${existente ? 'border-amber-400 ring-4 ring-amber-100' : 'border-[#e2ded5]'} space-y-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
                     <div>
-                        <span className="text-xs font-black uppercase bg-[#324354]/10 text-[#324354] px-2.5 py-1 rounded-md">RMOLD · Reparación de Moldes</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-black uppercase bg-[#324354]/10 text-[#324354] px-2.5 py-1 rounded-md">RMOLD · Reparación de Moldes</span>
+                            <Link href="/indicadores-productividad?vista=rmold" title="Ver las gráficas de Reparación de Moldes en el Tablero de Control"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#324354] hover:bg-[#254153] text-white text-xs font-bold shadow-sm">
+                                <BarChart3 size={14} /> Ver gráficas
+                            </Link>
+                        </div>
                         <h2 className="text-lg font-black text-[#324354] mt-1.5">Cierre del día</h2>
                         <p className="text-xs text-slate-500 capitalize">{fechaLarga(fecha)}</p>
                     </div>
@@ -184,14 +250,23 @@ export default function FormularioRmold() {
                 {/* 1. Moldes reparados */}
                 <div>
                     <h3 className="text-sm font-black text-[#324354] mb-2">1. Moldes reparados</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {/* Ya no hay moldes RTM: la casilla solo aparece al abrir un día viejo que tenga RTM */}
+                    <div className={`grid grid-cols-2 ${valor(c.rtm) > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-2.5`}>
                         {numero('ms', 'Mármol (MS)')}
                         {numero('fv', 'Fibra (FV)')}
-                        {numero('rtm', 'RTM')}
+                        {valor(c.rtm) > 0 && numero('rtm', 'RTM')}
                         {numero('brillados', 'Brillados', 'Cada molde brillado cuenta como ½ molde reparado')}
                         {numero('desmanchados', 'Desmanchados', 'Cada molde desmanchado cuenta como ⅓ de molde reparado')}
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">Total = MS + FV + RTM + Brillados ÷ 2 + Desmanchados ÷ 3</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Total = MS + FV + Brillados ÷ 2 + Desmanchados ÷ 3{valor(c.rtm) > 0 ? ' + RTM' : ''}</p>
+                    {/* Contramoldes: dato aparte para estadística, no suma al total de moldes reparados */}
+                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end">
+                        {numero('contramoldes', 'Contramoldes reparados (C.M.)', 'Contramoldes reparados en el día: no suman al total de moldes reparados')}
+                        <p className="col-span-1 sm:col-span-3 flex items-start gap-1.5 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+                            <Info size={14} className="shrink-0 mt-px" />
+                            Los contramoldes no suman al total de moldes reparados ni a la productividad del día; se registran para llevar su estadística.
+                        </p>
+                    </div>
                 </div>
 
                 {/* 2. Nivel de servicio */}
@@ -203,16 +278,49 @@ export default function FormularioRmold() {
                     </div>
                 </div>
 
-                {/* 3. Personal y meta */}
+                {/* 3. Tiempo laborado del turno */}
+                <div>
+                    <h3 className="text-sm font-black text-[#324354] mb-2">3. Tiempo laborado total turno</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                        <div>
+                            <label className={etiqueta}>Hora inicio</label>
+                            <input type="time" value={c.horaInicio} onChange={e => cambiar('horaInicio', e.target.value)} className={campo} />
+                        </div>
+                        <div>
+                            <label className={etiqueta}>Hora fin</label>
+                            <input type="time" value={c.horaFin} onChange={e => cambiar('horaFin', e.target.value)} className={campo} />
+                        </div>
+                        {numero('inicioFinTurno', '5 min y cierre turno', 'Minutos de los 5 min de inicio y del cierre de turno que se descuentan')}
+                        {numero('alimentacion1', 'Alimentación 1 (min)')}
+                        {numero('alimentacion2', 'Alimentación 2 (min)')}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1.5">
+                        {minutosTurno == null ? 'Escriba la hora de inicio y de fin.' : <>
+                            Turno {minutosTurno} min − {dec(descuentos, 0)} min de descuentos = <b className="text-[#324354]">Tiempo disponible turno {tiempoDisponible == null ? '—' : dec(tiempoDisponible, 0)} min</b>
+                        </>}
+                    </p>
+                </div>
+
+                {/* 4. Personal y meta */}
                 <div>
                     <h3 className="text-sm font-black text-[#324354] mb-2 flex items-center gap-2">
-                        3. Personal y meta
+                        4. Personal y meta
                         <button type="button" onClick={() => setConfigurando(true)} className="ml-1 px-2 py-0.5 rounded-lg border border-slate-300 text-[11px] font-bold text-slate-600 hover:bg-slate-100 flex items-center gap-1">
                             <Settings2 className="w-3.5 h-3.5" /> Configurar meta
                         </button>
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                        {numero('personas', 'Personas (FTE)')}
+                        {numero('personas', 'Personas programadas', 'Personas del equipo para el turno')}
+                        {numero('ausentes', 'Ausentismo (personas)', 'Personas que faltaron: EPS, incapacidad, préstamo a otra planta, etc.')}
+                        <div>
+                            <label className={etiqueta}>Presentes · presentismo</label>
+                            <div className={`${campo} bg-slate-50 flex items-baseline justify-between`} title="Presentes = programadas − ausentes; presentismo = presentes ÷ programadas">
+                                <span>{dec(presentes, presentes % 1 ? 1 : 0)}</span>
+                                <span className={`text-xs font-black ${presentismo == null ? 'text-slate-400' : presentismo >= 100 ? 'text-[#3b8f50]' : presentismo >= 90 ? 'text-[#b8961f]' : 'text-[#d14747]'}`}>
+                                    {presentismo == null ? '—' : `${dec(presentismo, 0)} %`}
+                                </span>
+                            </div>
+                        </div>
                         <div>
                             <label className={etiqueta}>Meta (moldes/día)</label>
                             <input type="number" inputMode="decimal" min={0} step="any" value={c.meta} onChange={e => cambiar('meta', e.target.value)} placeholder="0" className={campo} />
@@ -225,10 +333,10 @@ export default function FormularioRmold() {
                     </div>
                 </div>
 
-                {/* 4. Paros */}
+                {/* 5. Paros */}
                 <div>
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <h3 className="text-sm font-black text-[#324354]">4. Paros</h3>
+                        <h3 className="text-sm font-black text-[#324354]">5. Paros</h3>
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${porExplicar > 0.5 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}
                             title={`Paros reflejados = (Meta − Total) × ${MINUTOS_POR_MOLDE} min`}>
                             Reflejados {dec(Math.max(0, calculo.parosReflejados), 0)} min · registrados {dec(minutosRegistrados, 0)} min
@@ -236,6 +344,23 @@ export default function FormularioRmold() {
                         </span>
                     </div>
                     <datalist id="causas-rmold">{causasConocidas.map(x => <option key={x} value={x} />)}</datalist>
+                    {sugeridos.length > 0 && (
+                        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 mr-0.5">Paros frecuentes:</span>
+                            {sugeridos.map(x => {
+                                const usado = yaAgregada(x.causa);
+                                return (
+                                    <button key={x.causa} type="button" disabled={usado}
+                                        onClick={() => setParosForm(prev => [...prev, { ...paroNuevo(), causa: x.causa, familia: x.familia }])}
+                                        title={`${NOMBRE_FAMILIA[x.familia] || x.familia} · registrado ${x.veces} vez/veces. Se agrega sin minutos.`}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-700 hover:border-[#324354] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-default">
+                                        <Plus className="w-3 h-3" />
+                                        <span className="capitalize">{x.causa.toLowerCase()}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                     <div className="space-y-2">
                         {parosForm.map((p, i) => {
                             const set = (k: keyof ParoForm, v: string) => setParosForm(prev => prev.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
@@ -277,9 +402,9 @@ export default function FormularioRmold() {
                     </div>
                 </div>
 
-                {/* 5. Observaciones */}
+                {/* 6. Observaciones */}
                 <div>
-                    <h3 className="text-sm font-black text-[#324354] mb-2">5. Observaciones <span className="text-[10px] font-bold text-slate-400">(opcional)</span></h3>
+                    <h3 className="text-sm font-black text-[#324354] mb-2">6. Observaciones <span className="text-[10px] font-bold text-slate-400">(opcional)</span></h3>
                     <textarea value={observaciones} onChange={e => setObservaciones(e.target.value)} rows={2} className={`${campo} font-medium`} placeholder="Novedades del turno" />
                 </div>
 
@@ -297,8 +422,9 @@ export default function FormularioRmold() {
             </section>
 
             {/* Resultado en vivo y últimos cierres */}
-            <aside className="lg:col-span-4 space-y-3">
-                <section className="bg-[#324354] text-white rounded-2xl p-4 shadow-sm space-y-3 lg:sticky lg:top-[100px]">
+            {/* Toda la columna queda fija al desplazarse; la tabla de últimos cierres se desplaza por dentro (antes pasaba por debajo del resultado) */}
+            <aside className="lg:col-span-4 flex flex-col gap-3 lg:sticky lg:top-[100px] lg:self-start lg:max-h-[calc(100dvh-112px)]">
+                <section className="bg-[#324354] text-white rounded-2xl p-4 shadow-sm space-y-3 shrink-0">
                     <h3 className="text-[10px] font-black uppercase tracking-wider text-white/70">Resultado del día</h3>
                     <div className="grid grid-cols-2 gap-2">
                         {[
@@ -307,7 +433,9 @@ export default function FormularioRmold() {
                             { t: 'Piezas / persona', v: calculo.pzsPersona == null ? '—' : dec(calculo.pzsPersona), d: `meta ${dec(calculo.metaPzsPersona)}` },
                             { t: 'Productividad / persona', v: calculo.productividadPersona == null ? '—' : `${dec(calculo.productividadPersona)} %`, d: 'meta 100 %', cls: semaforo(calculo.productividadPersona, 100) },
                             { t: 'Nivel de servicio', v: calculo.ns == null ? '—' : `${dec(calculo.ns)} %`, d: `meta ${META_NS} %`, cls: semaforo(calculo.ns, META_NS) },
-                            { t: 'Paros reflejados', v: `${dec(calculo.parosReflejados, 0)} min`, d: calculo.parosReflejados < 0 ? 'sobre la meta' : `${MINUTOS_POR_MOLDE} min por molde` }
+                            { t: 'Paros reflejados', v: `${dec(calculo.parosReflejados, 0)} min`, d: calculo.total >= valor(c.meta) && valor(c.meta) > 0 ? 'meta cumplida' : `${MINUTOS_POR_MOLDE} min por molde` },
+                            { t: 'Presentismo', v: presentismo == null ? '—' : `${dec(presentismo, 0)} %`, d: `${dec(presentes, presentes % 1 ? 1 : 0)} de ${dec(valor(c.personas), 0)} personas · ${dec(valor(c.ausentes), 0)} ausente(s)` },
+                            { t: 'Tiempo disponible', v: tiempoDisponible == null ? '—' : `${dec(tiempoDisponible, 0)} min`, d: minutosTurno == null ? 'sin horario' : `turno ${minutosTurno} − ${dec(descuentos, 0)} min` }
                         ].map(k => (
                             <div key={k.t} className="bg-white rounded-xl px-2.5 py-1.5">
                                 <span className="text-[9px] font-black uppercase text-slate-500 block truncate">{k.t}</span>
@@ -319,10 +447,11 @@ export default function FormularioRmold() {
                     <p className="text-[10px] text-white/60 flex items-start gap-1"><Info className="w-3 h-3 shrink-0 mt-px" /> Mismas fórmulas del Excel Productividad Moldes. Los indicadores se ven en Tablero de Control → RMOLD.</p>
                 </section>
 
-                <section className="bg-white rounded-2xl p-3 shadow-sm border border-[#e2ded5]">
-                    <h3 className="text-xs font-black text-[#324354] mb-1.5">Últimos cierres</h3>
+                <section className="bg-white rounded-2xl p-3 shadow-sm border border-[#e2ded5] lg:min-h-0 lg:flex lg:flex-col">
+                    <h3 className="text-xs font-black text-[#324354] mb-1.5 shrink-0">Últimos cierres</h3>
+                    <div className="lg:min-h-0 lg:overflow-y-auto">
                     <table className="w-full text-[11px]">
-                        <thead className="text-[9px] uppercase text-slate-500 border-b border-slate-200">
+                        <thead className="text-[9px] uppercase text-slate-500 border-b border-slate-200 sticky top-0 bg-white">
                             <tr><th className="text-left py-1">Fecha</th><th className="text-right">Moldes</th><th className="text-right">Prod.</th><th className="text-right">NS</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -340,6 +469,7 @@ export default function FormularioRmold() {
                         </tbody>
                     </table>
                     {!recientes.length && <p className="text-xs text-slate-400 text-center py-4">Aún no hay cierres registrados.</p>}
+                    </div>
                 </section>
             </aside>
 

@@ -149,7 +149,7 @@ function mapSapItem(sapItem: any, f: Faltantes, extra: { grupo: string | null; f
         taxSubject: sapItem.VatLiable === 'tYES',
 
         // Inventario y Unidades
-        defaultWarehouse: esInventario ? f.requerido(sapItem.DefaultWarehouse, 'Almacén por defecto') : sapItem.DefaultWarehouse || '',
+        defaultWarehouse: sapItem.DefaultWarehouse || '', // opcional: no se muestra y muchos componentes no lo tienen en SAP
         salesUnit: sapItem.SalesUnit || '',
         purchaseUnit: sapItem.PurchaseUnit || '',
         inventoryUOM: esInventario ? f.requerido(sapItem.InventoryUOM, 'Unidad de medida de inventario') : sapItem.InventoryUOM || '',

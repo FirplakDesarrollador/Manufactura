@@ -1,27 +1,20 @@
 'use client';
 
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, Edit, Plus, BarChart3, Trash2 } from 'lucide-react';
+import { Eye, Plus, BarChart3, Trash2 } from 'lucide-react';
 import { Suspense } from 'react';
 
 function SubHeaderContent() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const action = searchParams.get('action');
 
   const menuItems = [
     {
-      label: 'Ver HDTs',
+      // Ver y editar en un solo botón: la HDT abre en lectura y quien tiene permiso usa "Editar" dentro de ella
+      label: 'Ver / Editar HDT',
       href: '/hdt/plants?action=view',
-      isActive: pathname.includes('/hdt/plants') && action === 'view',
+      isActive: ['/hdt/plants', '/hdt/list', '/hdt/view', '/hdt/edit'].some(r => pathname.includes(r)),
       icon: <Eye size={16} />
-    },
-    {
-      label: 'Editar HDT',
-      href: '/hdt/plants?action=edit',
-      isActive: pathname.includes('/hdt/plants') && action === 'edit',
-      icon: <Edit size={16} />
     },
     {
       label: 'Crear HDT',

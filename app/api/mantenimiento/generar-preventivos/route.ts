@@ -74,6 +74,27 @@ export async function POST(req: Request) {
 
     const activeTechs = tecnicosData || [];
 
+    // 3b. Catálogo de máquinas: la planta de la OT es la de la MÁQUINA (no la que tenga escrita el plan)
+    let maquinas: { id: number; codigo_equipo: string | null; nombre_equipo: string | null; planta: string | null }[] = [];
+    try {
+      maquinas = await fetchAllRows(() => supabase.from('mantenimiento_maquinas_equipos').select('id, codigo_equipo, nombre_equipo, planta').order('id', { ascending: true }));
+    } catch (e) {
+      console.error('No se pudo leer mantenimiento_maquinas_equipos; se usa la planta del plan:', e);
+    }
+    const norm = (s: any) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+    const porId = new Map(maquinas.map(m => [m.id, m]));
+    const porNombre = new Map(maquinas.filter(m => m.nombre_equipo).map(m => [norm(m.nombre_equipo), m]));
+    const porCodigo = new Map(maquinas.filter(m => m.codigo_equipo && String(m.codigo_equipo).trim().length >= 3).map(m => [String(m.codigo_equipo).trim().toUpperCase(), m]));
+    const plantaDeMaquina = (p: any): string | null => {
+      const nombre = String(p.maquina || '');
+      if (nombre.includes('|')) return null;   // plan de varios equipos: se deja la del plan
+      const m = (p.id_maquina && porId.get(Number(p.id_maquina)))
+        || (p.codigo_maquina && porCodigo.get(String(p.codigo_maquina).trim().toUpperCase()))
+        || porNombre.get(norm(nombre));
+      const pl = m?.planta ? String(m.planta).trim() : '';
+      return pl && pl.length <= 8 ? pl : null;
+    };
+
     // 4. Determinar el consecutivo máximo actual para PREV-
     const prevCodes = await fetchAllRows<{ codigo: string | null }>(
       () => supabase
@@ -123,7 +144,7 @@ export async function POST(req: Request) {
       // y el contador se reinicia para iniciar el siguiente ciclo
       if (isDue) {
         const codigoOT = `PREV-${nextCodeNum++}`;
-        const pPlanta = (p.planta || 'MS').trim();
+        const pPlanta = (plantaDeMaquina(p) || p.planta || 'MS').trim();
 
         // Buscar técnico candidato compatible por planta
         const matchingTech = activeTechs.find(t => {

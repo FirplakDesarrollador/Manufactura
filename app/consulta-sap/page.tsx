@@ -524,6 +524,9 @@ export default function ConsultaSAPPage() {
     // Estado para ordenamiento de tabla Componentes
     const [compSortCol, setCompSortCol] = useState<keyof ComponentItem | null>(null)
     const [compSortDir, setCompSortDir] = useState<'asc' | 'desc'>('asc')
+    // Orden de la Lista de Materiales (Consulta por Producto): clic en el encabezado, igual que en Consulta Órdenes
+    const [bomSortCol, setBomSortCol] = useState<string | null>(null)
+    const [bomSortDir, setBomSortDir] = useState<'asc' | 'desc'>('asc')
 
     // Anchos redimensionables para tabla Componentes
     const [compColWidths, setCompColWidths] = useState<Record<string, number>>({
@@ -663,6 +666,26 @@ export default function ConsultaSAPPage() {
             setOrderEstadoSap('error');
             toast.error("Error de conexión con SAP", { id: loadingId });
         }
+    }
+
+    // Incrustada en el detalle de la orden (?embed=1): sin banner ni pestañas. ?of=NNN consulta esa orden al abrir.
+    const [embebida, setEmbebida] = useState(false)
+    useEffect(() => {
+        const p = new URLSearchParams(window.location.search)
+        setEmbebida(p.get('embed') === '1')
+        const of = (p.get('of') || '').trim()
+        if (/^\d+$/.test(of)) { setSearchQuery(of); fetchOrderFromSAP(of) }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Doble clic en el Nº o la descripción de un componente (o clic en su flecha): abre Consulta por Producto con ese artículo
+    const abrirArticulo = (codigo: string) => {
+        const c = (codigo || '').trim()
+        if (!c) return
+        setItemCodeInput(c)
+        setItemInnerTab('inventario')
+        setSubHeaderTab('consulta-producto')
+        handleItemSearch('code', c)
     }
 
     const handleSearch = (e?: React.FormEvent) => {
@@ -930,7 +953,11 @@ export default function ConsultaSAPPage() {
 
             const toastId = toast.loading("Generando archivo 'Prioridades Diarias de Plantas'...");
             const { descargarPrioridadesPlantas } = await import('@/lib/prioridadesPlantas');
-            const totalFilas = await descargarPrioridadesPlantas(dataToExport);
+            // Hoja FV: proceso actual de cada unidad según el control de piso de la app (si falla, el error queda en la hoja)
+            const { procesosActualesFv } = await import('@/lib/fibra/procesoActual');
+            const procesosFv = await procesosActualesFv().catch((e: any) => ({ error: e?.message || String(e) }));
+            if (!(procesosFv instanceof Map)) toast.error(`No se pudo leer el proceso actual de Fibra: ${procesosFv.error}`);
+            const totalFilas = await descargarPrioridadesPlantas(dataToExport, procesosFv);
             toast.success(`Archivo 'Prioridades Diarias de Plantas' generado exitosamente (${totalFilas.toLocaleString('es-CO')} registros procesados en pestañas de planta)`, { id: toastId });
         } catch (err: any) {
             console.error("Error al generar Prioridades Diarias:", err);
@@ -1137,6 +1164,29 @@ export default function ConsultaSAPPage() {
         toast.success("Archivo Excel de Entregas Producción descargado exitosamente");
     };
 
+    const handleBomSort = (col: string) => {
+        if (bomSortCol === col) setBomSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+        else { setBomSortCol(col); setBomSortDir('asc') }
+    };
+    // Números con formato de SAP ("11.03", "$ 1.234,50") se comparan como número; lo demás como texto
+    const numeroBom = (v: unknown): number | null => {
+        if (typeof v === 'number') return v
+        const t = String(v ?? '').replace(/[^0-9.,-]/g, '')
+        if (!t || !/[0-9]/.test(t)) return null
+        const n = Number(t.includes(',') ? t.split('.').join('').replace(',', '.') : t)
+        return isNaN(n) ? null : n
+    };
+    const ordenarBom = <T,>(filas: T[]): T[] => {
+        if (!bomSortCol) return filas
+        const signo = bomSortDir === 'asc' ? 1 : -1
+        return [...filas].sort((a, b) => {
+            const va = (a as Record<string, unknown>)[bomSortCol], vb = (b as Record<string, unknown>)[bomSortCol]
+            const na = numeroBom(va), nb = numeroBom(vb)
+            if (na != null && nb != null) return (na - nb) * signo
+            return String(va ?? '').localeCompare(String(vb ?? ''), 'es', { numeric: true }) * signo
+        })
+    };
+
     const renderSortIcon = (currentCol: string, activeCol: string | null, dir: 'asc' | 'desc') => {
         if (activeCol !== currentCol) return <span className="text-gray-400 opacity-30 ml-1 text-[10px]">↕</span>;
         return <span className="text-amber-600 font-bold ml-1 text-[10px]">{dir === 'asc' ? '▲' : '▼'}</span>;
@@ -1174,17 +1224,17 @@ export default function ConsultaSAPPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000] pb-12 select-none">
-            <Header
+        <div className={`${embebida ? 'min-h-0' : 'min-h-screen pb-1'} bg-[#F6F3EE] flex flex-col font-sans text-[#000000] select-none`}>
+            {!embebida && <Header
                 title="Consulta SAP"
                 subtitle="Módulo de Consulta"
                 userEmail={user?.email}
                 showLogout={true}
                 onLogout={handleLogout}
-            />
+            />}
 
             {/* SUBHEADER BAR FIXED WITH TABS */}
-            <div className="bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center sticky top-0">
+            <div className={`${embebida ? 'hidden' : ''} bg-white border-b border-[#e2ded5] px-3 shadow-2xs relative z-30 w-full font-sans py-1.5 xl:py-0 xl:h-10 flex items-center sticky top-0`}>
                 <div className="max-w-7xl mx-auto flex flex-row w-full flex-nowrap gap-2 justify-center overflow-x-auto scrollbar-hide py-0.5">
                     {/* 1. Consulta Ordenes */}
                     <button
@@ -1265,6 +1315,15 @@ export default function ConsultaSAPPage() {
                     </button>
                 </div>
             </div>
+
+            {embebida && subHeaderTab !== 'consulta-ordenes' && (
+                <div className="px-2 pt-1.5">
+                    <button type="button" onClick={() => setSubHeaderTab('consulta-ordenes')}
+                        className="flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold text-[11px] bg-[#324354] text-white hover:bg-[#254153]">
+                        ← Volver a la orden de fabricación
+                    </button>
+                </div>
+            )}
 
             {/* MAIN CONTENT AREA */}
             {subHeaderTab === 'consulta-ordenes' ? (
@@ -1449,19 +1508,6 @@ export default function ConsultaSAPPage() {
 
                                 {/* RIGHT COLUMN FIELDS */}
                                 <div className="space-y-0 shrink-0">
-                                    {/* Botón Imprimir colocado exactamente en la ubicación indicada */}
-                                    <div className="flex items-center justify-end mb-1">
-                                        <button 
-                                            type="button"
-                                            onClick={() => window.print()}
-                                            className="bg-[#324354] hover:bg-[#253342] active:scale-95 text-white px-3 py-0.5 text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs rounded-none border border-[#1c2733] cursor-pointer"
-                                            title="Imprimir Orden de Fabricación SAP"
-                                        >
-                                            <Printer size={12} />
-                                            <span>Imprimir</span>
-                                        </button>
-                                    </div>
-
                                     {/* Nº OF-Produ */}
                                     <div className="flex items-center justify-end h-5">
                                         <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Nº OF-Produ</span>
@@ -1569,20 +1615,16 @@ export default function ConsultaSAPPage() {
                                         />
                                     </div>
 
-                                    {/* Centro de Costos */}
+                                    {/* Centro de Costos y Proyecto en el mismo renglón (ahorra alto) */}
                                     <div className="flex items-center justify-end h-5">
-                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Centro de Costos</span>
-                                        <input 
-                                            type="text" 
-                                            value={activeOrder.centroCostos} 
-                                            readOnly 
-                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[140px] text-right rounded-none focus:outline-none select-text" 
+                                        <span className="text-[10px] text-gray-800 text-right mr-1.5 select-none">Centro de Costos</span>
+                                        <input
+                                            type="text"
+                                            value={activeOrder.centroCostos}
+                                            readOnly
+                                            className="bg-white border border-[#b2b2b2] px-1 py-0 text-[10.5px] h-[19px] text-black w-[90px] text-right rounded-none focus:outline-none select-text mr-3"
                                         />
-                                    </div>
-
-                                    {/* Proyecto */}
-                                    <div className="flex items-center justify-end h-5">
-                                        <span className="w-[130px] text-[10px] text-gray-800 text-right mr-1.5 select-none">Proyecto</span>
+                                        <span className="text-[10px] text-gray-800 text-right mr-1.5 select-none">Proyecto</span>
                                         <input 
                                             type="text" 
                                             value={activeOrder.proyecto} 
@@ -1593,8 +1635,8 @@ export default function ConsultaSAPPage() {
                                 </div>
                             </div>
 
-                            {/* TABS COMPONENTES / RESUMEN / ANEXOS */}
-                            <div className="mt-2 flex flex-col">
+                            {/* TABS COMPONENTES / RESUMEN / ANEXOS (en pantalla ancha suben junto a la columna derecha) */}
+                            <div className="mt-1 lg:-mt-4 flex flex-col">
                                 <div className="flex border-b border-[#a3a3a3] gap-1 pl-1">
                                     <button 
                                         onClick={() => setTabActive('componentes')}
@@ -1629,10 +1671,10 @@ export default function ConsultaSAPPage() {
                                 </div>
 
                                 {/* TAB CONTENT CONTAINER WITH RESIZABLE COLUMNS */}
-                                <div className="bg-white border-x border-b border-[#a3a3a3] shadow-inner min-h-[280px] overflow-hidden">
+                                <div className={`bg-white border-x border-b border-[#a3a3a3] shadow-inner overflow-hidden ${embebida ? 'min-h-[max(280px,calc(100dvh-290px))]' : 'min-h-[max(280px,calc(100dvh-375px))]'}`}>
                                     
                                     {tabActive === 'componentes' && (
-                                        <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
+                                        <div className={`overflow-x-auto overflow-y-auto ${embebida ? 'max-h-[max(280px,calc(100dvh-290px))]' : 'max-h-[max(280px,calc(100dvh-375px))]'}`}>
                                             <table className="border-collapse text-[11px] font-sans table-fixed w-max">
                                                 <thead className="sticky top-0 bg-[#eceae6] border-b border-[#c2c0bb] shadow-sm select-none z-10">
                                                     <tr className="text-gray-700 font-semibold">
@@ -1832,13 +1874,15 @@ export default function ConsultaSAPPage() {
                                                             <td style={{ width: `${compColWidths.tipo}px` }} className="px-1.5 py-0.5 border-r border-[#e5e5e5] text-center text-gray-700 overflow-hidden truncate">
                                                                 {item.tipo}
                                                             </td>
-                                                            <td style={{ width: `${compColWidths.no}px` }} className="px-1.5 py-0.5 border-r border-[#e5e5e5] font-mono text-black whitespace-nowrap overflow-hidden">
+                                                            <td style={{ width: `${compColWidths.no}px` }} className="px-1.5 py-0.5 border-r border-[#e5e5e5] font-mono text-black whitespace-nowrap overflow-hidden cursor-pointer"
+                                                                onDoubleClick={() => abrirArticulo(item.no)} title="Doble clic: ver inventario del artículo">
                                                                 <span className="flex items-center">
-                                                                    <SapLinkArrow />
+                                                                    <span onClick={() => abrirArticulo(item.no)} className="cursor-pointer" title="Ver inventario del artículo"><SapLinkArrow /></span>
                                                                     <span className="truncate">{item.no}</span>
                                                                 </span>
                                                             </td>
-                                                            <td style={{ width: `${compColWidths.descripcion}px` }} className="px-2 py-0.5 border-r border-[#e5e5e5] text-black font-medium truncate overflow-hidden" title={item.descripcion}>
+                                                            <td style={{ width: `${compColWidths.descripcion}px` }} className="px-2 py-0.5 border-r border-[#e5e5e5] text-black font-medium truncate overflow-hidden cursor-pointer"
+                                                                onDoubleClick={() => abrirArticulo(item.no)} title={`${item.descripcion} · doble clic: ver inventario`}>
                                                                 {item.descripcion}
                                                             </td>
                                                             <td style={{ width: `${compColWidths.cantBase}px` }} className="px-1.5 py-0.5 border-r border-[#e5e5e5] text-right text-gray-800 font-mono overflow-hidden truncate">
@@ -2339,14 +2383,14 @@ export default function ConsultaSAPPage() {
                                 
                                 <div className="flex flex-wrap lg:flex-nowrap gap-x-8 gap-y-3 justify-between items-start">
                                     {/* LEFT COLUMN FIELDS - WIDENED TO REACH THE RIGHT AREA */}
-                                    <div className="space-y-1.5 shrink-0 max-w-4xl w-full">
+                                    <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-6 gap-y-1.5 w-full">
                                         
                                          {/* NÚMERO DE ARTÍCULO (COMPACT SKU FIELD) */}
-                                        <div className="flex items-center">
-                                            <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none flex items-center">
+                                        <div className="flex items-center shrink-0">
+                                            <span className="shrink-0 mr-2 text-[11px] font-bold text-gray-900 select-none flex items-center whitespace-nowrap">
                                                 Número de artículo <SapLinkArrow />
                                             </span>
-                                            <div className="flex items-center gap-1 w-full max-w-md">
+                                            <div className="flex items-center gap-1 w-[290px]">
                                                 <input
                                                     type="text"
                                                     value={itemCodeInput}
@@ -2368,8 +2412,8 @@ export default function ConsultaSAPPage() {
                                         </div>
 
                                         {/* DESCRIPCIÓN (WIDE SEARCHABLE FIELD) */}
-                                        <div className="flex items-center">
-                                            <span className="w-[140px] shrink-0 text-[11px] font-bold text-gray-900 select-none">Descripción</span>
+                                        <div className="flex items-center flex-1 min-w-[300px]">
+                                            <span className="shrink-0 mr-2 text-[11px] font-bold text-gray-900 select-none">Descripción</span>
                                             <div className="flex items-center gap-1 flex-1">
                                                 <input
                                                     type="text"
@@ -2570,27 +2614,27 @@ export default function ConsultaSAPPage() {
                                                 <table className="w-full border-collapse text-[11px] font-sans table-auto whitespace-nowrap select-text">
                                                     <thead className="sticky top-0 bg-[#eceae6] border-b border-[#c2c0bb] shadow-sm select-none z-10">
                                                         <tr className="text-gray-800 font-semibold">
-                                                            <th className="px-1.5 py-1 border-r border-[#c2c0bb] text-center w-8">#</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Tipo</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Nº</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Descripción</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Cantidad</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Nombre de unidad de medida</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Almacén</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Método emisión</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left">Lista de precios</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Costo estándar de producción total</th>
-                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Precio unitario</th>
-                                                <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right">Total</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left">Comentarios</th>
-                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center">Cta.WIP</th>
+                                                            <th className="px-1.5 py-1 border-r border-[#c2c0bb] text-center w-8 cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('id')} title="Ordenar por #">#{renderSortIcon('id', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('tipo')} title="Ordenar por Tipo">Tipo{renderSortIcon('tipo', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('no')} title="Ordenar por Nº">Nº{renderSortIcon('no', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('descripcion')} title="Ordenar por Descripción">Descripción{renderSortIcon('descripcion', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('cantidad')} title="Ordenar por Cantidad">Cantidad{renderSortIcon('cantidad', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('uom')} title="Ordenar por Nombre de unidad de medida">Nombre de unidad de medida{renderSortIcon('uom', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('almacen')} title="Ordenar por Almacén">Almacén{renderSortIcon('almacen', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('metodoEmision')} title="Ordenar por Método emisión">Método emisión{renderSortIcon('metodoEmision', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('costoEst')} title="Ordenar por Costo estándar de producción">Costo estándar de producción{renderSortIcon('costoEst', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('listaPrecios')} title="Ordenar por Lista de precios">Lista de precios{renderSortIcon('listaPrecios', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('costoEstTotal')} title="Ordenar por Costo estándar de producción total">Costo estándar de producción total{renderSortIcon('costoEstTotal', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('precioUnitario')} title="Ordenar por Precio unitario">Precio unitario{renderSortIcon('precioUnitario', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2.5 py-1 border-r border-[#c2c0bb] text-right cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('total')} title="Ordenar por Total">Total{renderSortIcon('total', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-left cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('comentarios')} title="Ordenar por Comentarios">Comentarios{renderSortIcon('comentarios', bomSortCol, bomSortDir)}</th>
+                                                            <th className="px-2 py-1 border-r border-[#c2c0bb] text-center cursor-pointer hover:bg-[#dcd9d3]" onClick={() => handleBomSort('ctaWip')} title="Ordenar por Cta.WIP">Cta.WIP{renderSortIcon('ctaWip', bomSortCol, bomSortDir)}</th>
                                                             <th className="px-2 py-1 text-center">Secuen...</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-[#e0ddd5] select-text">
                                                         {activeItem.bomComponents && activeItem.bomComponents.length > 0 ? (
-                                                            activeItem.bomComponents.map((row, idx) => (
+                                                            ordenarBom(activeItem.bomComponents).map((row, idx) => (
                                                                 <tr key={idx} className="h-5 hover:bg-[#fff9e6] select-text cursor-text">
                                                                     <td className="px-1.5 py-0.5 border-r border-[#e0ddd5] text-center text-gray-600 select-text">{row.id}</td>
                                                                     <td className="px-2 py-0.5 border-r border-[#e0ddd5] text-gray-800 select-text">{row.tipo}</td>

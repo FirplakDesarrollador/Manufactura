@@ -1,5 +1,7 @@
 'use client'
 
+import { usePlantaCalidad, defectoCuenta } from '@/lib/calidad/plantaCalidad'
+import { permisosCalidadRmold } from '@/lib/calidad/permisos'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -21,6 +23,7 @@ import {
 
 export default function ReportedDefectsListPage() {
     const router = useRouter()
+    const planta = usePlantaCalidad()
     const [loading, setLoading] = useState(true)
     const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<ReportDefectItem[]>([])
@@ -140,16 +143,16 @@ export default function ReportedDefectsListPage() {
 
         const [reportsRes, productsRes, defectosRes] = await Promise.all([
             supabase
-                .from('ms_reporte_defectos')
+                .from(planta.tReportes)
                 .select(`
                     *,
-                    producto:productos_defectos_ms (Referencia)
+                    producto:${planta.tReferencias} (Referencia)
                 `)
                 .gte('created_at', queryStart)
                 .lte('created_at', queryEnd)
                 .order('created_at', { ascending: false }),
-            supabase.from('productos_defectos_ms').select('*').order('Referencia'),
-            supabase.from('ms_defectos').select('*').order('id')
+            supabase.from(planta.tReferencias).select('*').order('Referencia'),
+            supabase.from(planta.tDefectos).select('*').order('id')
         ])
 
         if (defectosRes.data) setDefectosCatalog(defectosRes.data)
@@ -173,7 +176,7 @@ export default function ReportedDefectsListPage() {
             }
 
             // --- DEBUG START ---
-            const { data: diaData } = await supabase.from('query_ms_reporte_defectos_dia').select('id')
+            const { data: diaData } = await supabase.from(planta.vDia).select('id')
             if (diaData) {
                 const diaIds = new Set(diaData.map(d => d.id))
                 const missing = typedData.filter(r => !diaIds.has(r.id))
@@ -182,15 +185,7 @@ export default function ReportedDefectsListPage() {
             // --- DEBUG END ---
 
             // Excluded defects logic based on query_ms_ifi_dia and user request
-            const isIgnoredDefect = (defectName: string) => {
-                const cleanName = defectName.replace(/^\s*\d+\.\s*/, '').trim().toLowerCase()
-                return [
-                    'saldos/destrucciones',
-                    'opaco',
-                    'error en pedido referencia',
-                    'quebrados logistica'
-                ].includes(cleanName)
-            }
+            const isIgnoredDefect = (defectName: string) => !defectoCuenta(planta, defectName)
 
             // Calculate total pieces stats (each record = 1 piece inspected)
             const filteredByDate = typedData.filter(r =>
@@ -253,7 +248,7 @@ export default function ReportedDefectsListPage() {
                         }
                     }
                     groupedMap[key].cantidad += 1
-                    groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
+                    groupedMap[key].productos.add(r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Producto')
                     if (r.Molde) {
                         groupedMap[key].moldes.add(r.Molde)
                     }
@@ -263,7 +258,7 @@ export default function ReportedDefectsListPage() {
                     groupedMap[key].detalles.push({
                         id: r.id,
                         producto_id: r.producto_id,
-                        referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                        referencia: r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Referencia',
                         hora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('es-CO', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -312,7 +307,7 @@ export default function ReportedDefectsListPage() {
                         }
 
                         groupedMap[key].cantidad += 1
-                        groupedMap[key].productos.add(r.producto?.Referencia || r.producto_id?.toString() || 'Sin Producto')
+                        groupedMap[key].productos.add(r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Producto')
                         if (r.Molde) {
                             groupedMap[key].moldes.add(r.Molde)
                         }
@@ -330,7 +325,7 @@ export default function ReportedDefectsListPage() {
                         groupedMap[key].detalles.push({
                             id: r.id,
                             producto_id: r.producto_id,
-                            referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                            referencia: r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Referencia',
                             hora: horaStr,
                             rawHora: new Date(r.created_at.endsWith('Z') || r.created_at.includes('+') ? r.created_at : r.created_at + 'Z').toLocaleTimeString('en-GB', {
                                 hour: '2-digit',
@@ -347,7 +342,7 @@ export default function ReportedDefectsListPage() {
                         if (r.fotoUrl) {
                             groupedMap[key].fotos.push({
                                 url: r.fotoUrl,
-                                referencia: r.producto?.Referencia || r.producto_id?.toString() || 'Sin Referencia',
+                                referencia: r.producto?.Referencia || ((r as any).molde_manual ? `${(r as any).molde_manual} (escrito)` : '') || r.producto_id?.toString() || 'Sin Referencia',
                                 hora: horaStr
                             })
                         }
@@ -379,10 +374,19 @@ export default function ReportedDefectsListPage() {
                 setUserEmail(authData.user.email)
                 const { data: userData } = await supabase
                     .from('usuarios')
-                    .select('permisos')
+                    .select('permisos, correo, nombre, rol')
                     .eq('correo', authData.user.email)
                     .single()
-                
+
+                // RMOLD: permisos de Calidad MS + usuario de Reparación de Moldes
+                if (planta.id === 'rmold') {
+                    const p = permisosCalidadRmold(userData)
+                    if (!p.reportes) { router.push('/home'); return }
+                    setHasEditPermission(p.editarRegistros)
+                    setHasDeletePermission(p.eliminarRegistros)
+                    return
+                }
+
                 if (!userData?.permisos?.calidad?.ms) {
                     router.push('/home')
                     return
@@ -404,7 +408,7 @@ export default function ReportedDefectsListPage() {
     const handleDelete = async (id: number) => {
         if (!confirm('¿Estás seguro de eliminar el registro completo de esta pieza (incluyendo todos sus defectos)?')) return
         setLoading(true)
-        const { error } = await supabase.from('ms_reporte_defectos').delete().eq('id', id)
+        const { error } = await supabase.from(planta.tReportes).delete().eq('id', id)
         if (error) {
             alert('Error al eliminar: ' + error.message)
             setLoading(false)
@@ -422,7 +426,7 @@ export default function ReportedDefectsListPage() {
         let newFotoUrl = editRecord.currentFotoUrl
 
         if (editPhotoFile) {
-            const fileName = `ms-defectos/${Date.now()}-${editPhotoFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+            const fileName = `${planta.carpetaFotos}/${Date.now()}-${editPhotoFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
             const { error: uploadError } = await supabase.storage
                 .from('fichas-media')
                 .upload(fileName, editPhotoFile)
@@ -453,7 +457,7 @@ export default function ReportedDefectsListPage() {
         }
         updateData.Molde = editMoldeInputValue.trim() || null
 
-        const { error } = await supabase.from('ms_reporte_defectos').update(updateData).eq('id', editRecord.id)
+        const { error } = await supabase.from(planta.tReportes).update(updateData).eq('id', editRecord.id)
         
         setIsUploadingPhoto(false)
         if (error) {
@@ -502,7 +506,7 @@ export default function ReportedDefectsListPage() {
         let newFotoUrl = undefined
 
         if (editForm.photoFile) {
-            const fileName = `ms-defectos/${Date.now()}-${editForm.photoFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
+            const fileName = `${planta.carpetaFotos}/${Date.now()}-${editForm.photoFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`
             const { error: uploadError } = await supabase.storage
                 .from('fichas-media')
                 .upload(fileName, editForm.photoFile)
@@ -527,7 +531,7 @@ export default function ReportedDefectsListPage() {
         }
         
         const { error } = await supabase
-            .from('ms_reporte_defectos')
+            .from(planta.tReportes)
             .update(updateData)
             .eq('id', id)
 
@@ -548,7 +552,7 @@ export default function ReportedDefectsListPage() {
         if (!confirm('¿Estás seguro de eliminar este reporte permanentemente?')) return
         
         const { error } = await supabase
-            .from('ms_reporte_defectos')
+            .from(planta.tReportes)
             .delete()
             .eq('id', id)
 
@@ -573,7 +577,7 @@ export default function ReportedDefectsListPage() {
         <div className="min-h-screen bg-white flex flex-col font-sans">
             {/* Header unificado estilo FIRPLAK con altura compacta h-14 */}
             <Header
-                title="Calidad MS"
+                title={planta.titulo}
                 subtitle=""
                 compact={true}
                 userEmail={userEmail}

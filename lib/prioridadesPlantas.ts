@@ -99,6 +99,7 @@ const COLUMNS: ColumnDef[] = [
 ];
 
 const DATE_KEYS = new Set<ColKey>([
+    "fechaEntregaLote",
     "fechaRecomendadaLiberacion",
     "fechaRealLiberacion",
     "fechaRecomendadaEntrega",
@@ -283,12 +284,18 @@ function escribirHojaDatos(
 
 // ================= Hoja por planta =================
 
+// FV se ordena por Fecha Entrega Lote (columna T del ORIGINAL); las demás plantas por F.Ideal Entrega Prod.
+function columnaOrdenPlanta(plantaNombre: string): ColKey {
+    return plantaNombre === "FV" ? "fechaEntregaLote" : "fechaIdealEntregaProduccion";
+}
+
 function filasPlanta(data: SemaforoRow[], plantaNombre: string): SemaforoRow[] {
+    const colOrden = columnaOrdenPlanta(plantaNombre);
     return data
         .filter((r) => esLiberado(r.estado) && esPlanta(r.planta, plantaNombre))
         .sort((a, b) => {
-            const fa = parseFecha(a.fechaIdealEntregaProduccion);
-            const fb = parseFecha(b.fechaIdealEntregaProduccion);
+            const fa = parseFecha(a[colOrden] as string);
+            const fb = parseFecha(b[colOrden] as string);
             if (!fa && !fb) return 0;
             if (!fa) return 1;
             if (!fb) return -1;
@@ -296,20 +303,33 @@ function filasPlanta(data: SemaforoRow[], plantaNombre: string): SemaforoRow[] {
         });
 }
 
-function escribirHojaPlanta(ws: ExcelJS.Worksheet, data: SemaforoRow[], plantaNombre: string, hoy: Date) {
+// Proceso actual de cada unidad por número de OF (lib/fibra/procesoActual.ts), o el error si no se pudo leer la app
+export type ProcesosFv = Map<string, string[]> | { error: string };
+
+function escribirHojaPlanta(ws: ExcelJS.Worksheet, data: SemaforoRow[], plantaNombre: string, hoy: Date, procesos?: ProcesosFv) {
     ws.views = [{ showGridLines: false, state: "frozen", ySplit: 1 }];
+    const rows = filasPlanta(data, plantaNombre);
+
+    // Una columna por unidad de la OF: Proceso 1, Proceso 2… (tantas como la OF con más unidades)
+    const procesosDe = (row: SemaforoRow): string[] => {
+        if (!procesos) return [];
+        if (!(procesos instanceof Map)) return [`ERROR: ${procesos.error}`];
+        return procesos.get(String(row.nroOp ?? "").trim()) ?? ["NO ESTÁ EN LA APP"];
+    };
+    const nProcesos = procesos ? Math.max(1, ...rows.map((r) => procesosDe(r).length)) : 0;
 
     const cols = [...VISIBLE_PLANTA_KEYS];
+    // FV: Fecha Entrega Lote (columna T) después de Cant. Pendiente, como primera fecha porque ordena la hoja
+    if (plantaNombre === "FV") cols.splice(cols.indexOf("cantPendiente") + 1, 0, "fechaEntregaLote");
     const headers = cols.map((k) => COLUMNS.find((c) => c.key === k)!.header);
     headers.push("PRIORIDAD");
+    for (let i = 1; i <= nProcesos; i++) headers.push(`Proceso ${i}`);
 
     const headerRow = ws.addRow(headers);
     headerRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
         cell.font = { bold: true, color: { argb: COLOR.headerFont } };
     });
-
-    const rows = filasPlanta(data, plantaNombre);
 
     rows.forEach((row) => {
         const prioridad = calcularPrioridad(row, hoy);
@@ -318,15 +338,27 @@ function escribirHojaPlanta(ws: ExcelJS.Worksheet, data: SemaforoRow[], plantaNo
                 return parseFecha(row[k] as string) ?? (row[k] ?? "");
             }
             if (k === "cantPendiente") return parseNum(row.cantPendiente);
+            // Nro OP como número (no texto) para que Excel no marque "número almacenado como texto"
+            if (k === "nroOp" && /^\d+$/.test(String(row.nroOp ?? "").trim())) return Number(String(row.nroOp).trim());
             return row[k] ?? "";
         });
         values.push(prioridad);
+        const procesosFila = procesosDe(row);
+        for (let i = 0; i < nProcesos; i++) values.push(procesosFila[i] ?? "");
 
         const r = ws.addRow(values);
+        // Sin dato de la app: en rojo, nunca en blanco
+        if (procesosFila[0]?.startsWith("ERROR") || procesosFila[0] === "NO ESTÁ EN LA APP") {
+            r.getCell(cols.length + 2).font = { bold: true, color: { argb: "FFC00000" } };
+        }
         cols.forEach((k, idx) => {
             const cell = r.getCell(idx + 1);
             if (DATE_KEYS.has(k) && cell.value instanceof Date) cell.numFmt = "dd/mm/yyyy";
             if (k === "cantPendiente") cell.numFmt = "#,##0";
+            if (k === "nroOp") {
+                cell.numFmt = "0";
+                cell.alignment = { horizontal: "left" };
+            }
         });
 
         const sodimac = esSodimac(row.cliente);
@@ -356,12 +388,13 @@ function escribirHojaPlanta(ws: ExcelJS.Worksheet, data: SemaforoRow[], plantaNo
 
     cols.forEach((k, idx) => {
         const col = ws.getColumn(idx + 1);
-        col.width = k === "descripcion" ? 55 : k === "cliente" ? 28 : k === "cantPendiente" ? 10 : 14;
+        col.width = k === "descripcion" ? 55 : k === "cliente" ? 28 : k === "nroOp" ? 10 : k === "planta" || k === "cantPendiente" ? 5 : 14;
     });
     ws.getColumn(cols.length + 1).width = 13;
+    for (let i = 1; i <= nProcesos; i++) ws.getColumn(cols.length + 1 + i).width = 18;
 
     if (rows.length > 0) {
-        ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: rows.length + 1, column: cols.length + 1 } };
+        ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: rows.length + 1, column: cols.length + 1 + nProcesos } };
 
         const prioridadColLetter = ws.getColumn(cols.length + 1).letter;
         ws.dataValidations.add(`${prioridadColLetter}2:${prioridadColLetter}${rows.length + 1}`, {
@@ -427,6 +460,13 @@ function calcPlanificado(data: SemaforoRow[], planta: string, ini: Date, fin: Da
         .reduce((acc, r) => acc + parseNum(r.cantPendiente), 0);
 }
 
+// Todo lo liberado pendiente a la fecha (equivalente a PLANIFICADO TOTAL, pero de lo liberado)
+function calcLiberadoTotal(data: SemaforoRow[], planta: string): number {
+    return data
+        .filter((r) => esPlanta(r.planta, planta) && esLiberado(r.estado))
+        .reduce((acc, r) => acc + parseNum(r.cantPendiente), 0);
+}
+
 function calcPlanificadoTotal(data: SemaforoRow[], planta: string): number {
     return data
         .filter((r) => esPlanta(r.planta, planta) && esPlanificado(r.estado))
@@ -476,6 +516,12 @@ function calcPlanificadoConvFV(data: SemaforoRow[], ini: Date, fin: Date): numbe
         .reduce((acc, r) => acc + parseNum(r.cantPendiente) * multiplicadorFV(r.familia), 0);
 }
 
+function calcLiberadoTotalConvFV(data: SemaforoRow[]): number {
+    return data
+        .filter((r) => esPlanta(r.planta, "FV") && esLiberado(r.estado))
+        .reduce((acc, r) => acc + parseNum(r.cantPendiente) * multiplicadorFV(r.familia), 0);
+}
+
 function calcPlanificadoTotalConvFV(data: SemaforoRow[]): number {
     return data
         .filter((r) => esPlanta(r.planta, "FV") && esPlanificado(r.estado))
@@ -505,7 +551,7 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
     const iniM2 = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 1);
     const finM2 = new Date(hoy.getFullYear(), hoy.getMonth() + 3, 0);
 
-    ws.mergeCells("A1:I1");
+    ws.mergeCells("A1:K1");
     const title = ws.getCell("A1");
     title.value = `RESUMEN DIARIO DE PRODUCCION  -  ${fmtFecha(hoy)}`;
     title.font = { bold: true, size: 13, color: { argb: COLOR.tituloFont } };
@@ -517,8 +563,10 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
 
     const headers = [
         "PLANTA",
-        `ATRASADAS\nF.Prometida Entrega\n(AF)`,
-        `ATRASADAS\nF.Ideal Entrega Prod.\n(W)`,
+        `ATRASADAS\nFecha Entrega Lote\n(Columna T)`,
+        `ATRASADAS\nF.Prometida Entrega\n(Columna AF)`,
+        `ATRASADAS\nF.Ideal Entrega Prod.\n(Columna W / NS)`,
+        `LIBERADO\nTOTAL`,
         `PENDIENTE\nPROXIMO DIA HABIL\n${fmtFecha(sigHab)}`,
         `PLANIFICADO\nPENDIENTE\nMESES ANTERIORES`,
         `PLANIFICADO\nMES EN CURSO\n${MESES[hoy.getMonth()]}`,
@@ -534,7 +582,7 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
         cell.font = { bold: true, color: { argb: COLOR.seccionFont } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.seccionBg } };
     });
-    headerRow.height = 52;
+    headerRow.height = 56;
 
     let fila = 4;
     const escribirFila = (nombre: string, vals: number[]) => {
@@ -542,18 +590,20 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
         r.getCell(1).value = nombre;
         vals.forEach((v, idx) => (r.getCell(idx + 2).value = v));
         const zebra = fila % 2 === 0 ? COLOR.zebraPar : COLOR.zebraImpar;
-        for (let c = 1; c <= 9; c++) {
+        for (let c = 1; c <= 11; c++) {
             const cell = r.getCell(c);
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: zebra } };
             cell.alignment = { horizontal: c === 1 ? "left" : "center", vertical: "middle" };
         }
         r.height = 20;
-        // Coloreado condicional (columnas B, C, D, E cuando > 0)
+        // Coloreado condicional cuando > 0: atrasos a cliente (T y AF) en rojo, W en naranja,
+        // próximo día hábil en amarillo y planificado de meses anteriores en naranja
         const condCols: { col: number; bg: string; font: string }[] = [
             { col: 2, bg: COLOR.atrasadoBg, font: COLOR.atrasadoFont },
-            { col: 3, bg: COLOR.atrasadoWBg, font: COLOR.atrasadoWFont },
-            { col: 4, bg: COLOR.hoyBg, font: COLOR.hoyFont },
-            { col: 5, bg: COLOR.atrasadoWBg, font: COLOR.atrasadoWFont },
+            { col: 3, bg: COLOR.atrasadoBg, font: COLOR.atrasadoFont },
+            { col: 4, bg: COLOR.atrasadoWBg, font: COLOR.atrasadoWFont },
+            { col: 6, bg: COLOR.hoyBg, font: COLOR.hoyFont },
+            { col: 7, bg: COLOR.atrasadoWBg, font: COLOR.atrasadoWFont },
         ];
         condCols.forEach(({ col, bg, font }) => {
             const val = r.getCell(col).value;
@@ -569,8 +619,10 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
 
     PLANTAS.forEach((p) => {
         escribirFila(p, [
+            calcAtrasado(data, p, "fechaEntregaLote", hoy),
             calcAtrasado(data, p, "fechaPrometidaEntregaItem", hoy),
             calcAtrasado(data, p, "fechaIdealEntregaProduccion", hoy),
+            calcLiberadoTotal(data, p),
             calcSigHabil(data, p, sigHab),
             calcPlanificadoMesesAnteriores(data, p, finMesAnt),
             calcPlanificado(data, p, iniM0, finM0),
@@ -581,8 +633,10 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
 
         if (p === "FV") {
             escribirFila("FV (CONVERSION)", [
+                calcAtrasadoConvFV(data, "fechaEntregaLote", hoy),
                 calcAtrasadoConvFV(data, "fechaPrometidaEntregaItem", hoy),
                 calcAtrasadoConvFV(data, "fechaIdealEntregaProduccion", hoy),
+                calcLiberadoTotalConvFV(data),
                 calcSigHabilConvFV(data, sigHab),
                 calcPlanificadoMesesAnterioresConvFV(data, finMesAnt),
                 calcPlanificadoConvFV(data, iniM0, finM0),
@@ -593,7 +647,7 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
         }
     });
 
-    for (let c = 1; c <= 9; c++) {
+    for (let c = 1; c <= 11; c++) {
         for (let r = 3; r < fila; r++) {
             ws.getCell(r, c).border = {
                 top: { style: "thin", color: { argb: "FFB4B4B4" } },
@@ -605,7 +659,7 @@ function escribirHojaResumen(ws: ExcelJS.Worksheet, data: SemaforoRow[], hoy: Da
     }
 
     ws.getColumn(1).width = 18;
-    for (let c = 2; c <= 9; c++) ws.getColumn(c).width = 15;
+    for (let c = 2; c <= 11; c++) ws.getColumn(c).width = 15;
 
     fila += 1;
     const leyendaTitulo = ws.getCell(fila, 1);
@@ -711,7 +765,7 @@ function escribirHojaConcentracionMS(ws: ExcelJS.Worksheet, spec: TablaDinamicaS
 
 // ================= Punto de entrada =================
 
-export async function generarPrioridadesPlantasBuffer(data: SemaforoRow[]): Promise<ArrayBuffer> {
+export async function generarPrioridadesPlantasBuffer(data: SemaforoRow[], procesosFv?: ProcesosFv): Promise<ArrayBuffer> {
     const hoy = startOfDay(new Date());
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Manufactura FIRPLAK";
@@ -724,7 +778,7 @@ export async function generarPrioridadesPlantasBuffer(data: SemaforoRow[]): Prom
     const ordenPlantasHojas = ["MS", "FV", "INYECCION", "MBL", "CEFI"];
     ordenPlantasHojas.forEach((p) => {
         const ws = workbook.addWorksheet(p);
-        escribirHojaPlanta(ws, data, p, hoy);
+        escribirHojaPlanta(ws, data, p, hoy, p === "FV" ? procesosFv : undefined);
     });
 
     const wsSemaforo = workbook.addWorksheet("SEMAFORO");
@@ -743,13 +797,9 @@ export async function generarPrioridadesPlantasBuffer(data: SemaforoRow[]): Prom
     return agregarTablaDinamica(await workbook.xlsx.writeBuffer(), specConc);
 }
 
-export async function descargarPrioridadesPlantas(data: SemaforoRow[]): Promise<number> {
-    const buffer = await generarPrioridadesPlantasBuffer(data);
+function descargarArchivo(buffer: ArrayBuffer, nombre: string) {
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
-    const hoy = startOfDay(new Date());
-    const nombre = `Prioridades_Diarias_Plantas_${String(hoy.getDate()).padStart(2, "0")}${String(hoy.getMonth() + 1).padStart(2, "0")}${hoy.getFullYear()}.xlsx`;
-
     const a = document.createElement("a");
     a.href = url;
     a.download = nombre;
@@ -757,6 +807,25 @@ export async function descargarPrioridadesPlantas(data: SemaforoRow[]): Promise<
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+const ddmmaaaa = (d: Date) => `${String(d.getDate()).padStart(2, "0")}${String(d.getMonth() + 1).padStart(2, "0")}${d.getFullYear()}`;
+
+// Arqueo FV: la hoja FV de Prioridades (datos del Semáforo de SAP) con el proceso actual de cada unidad
+export async function descargarArqueoFv(data: SemaforoRow[], procesos: ProcesosFv): Promise<number> {
+    const ahora = new Date();
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Manufactura FIRPLAK";
+    workbook.created = ahora;
+    escribirHojaPlanta(workbook.addWorksheet("ARQUEO FV"), data, "FV", startOfDay(ahora), procesos);
+    const hora = `${String(ahora.getHours()).padStart(2, "0")}${String(ahora.getMinutes()).padStart(2, "0")}`;
+    descargarArchivo(await workbook.xlsx.writeBuffer() as ArrayBuffer, `Arqueo_FV_${ddmmaaaa(ahora)}_${hora}.xlsx`);
+    return filasPlanta(data, "FV").length;
+}
+
+export async function descargarPrioridadesPlantas(data: SemaforoRow[], procesosFv?: ProcesosFv): Promise<number> {
+    const buffer = await generarPrioridadesPlantasBuffer(data, procesosFv);
+    descargarArchivo(buffer, `Prioridades_Diarias_Plantas_${ddmmaaaa(startOfDay(new Date()))}.xlsx`);
 
     return filasPlanta(data, "MS").length +
         filasPlanta(data, "FV").length +

@@ -20,11 +20,23 @@ export default function MaquinaFicha({ idMaquina, nombre, variant = 'screen' }: 
     if (!idMaquina && !nombre.trim()) return;
     let active = true;
     const query = supabase.from('mantenimiento_maquinas_equipos').select('codigo_equipo, nombre_equipo, fotos');
-    // Sin id_maquina se busca por nombre exacto; solo se usa si hay una única coincidencia
-    const req = idMaquina
-      ? query.eq('id', idMaquina).limit(1)
-      : query.ilike('nombre_equipo', nombre.trim().replace(/[%_\\]/g, '\\$&')).limit(2);
-    req.then(({ data }) => { if (active && data && data.length === 1) setFicha(data[0] as Ficha); });
+    if (idMaquina) {
+      query.eq('id', idMaquina).limit(1).then(({ data }) => { if (active && data?.length) setFicha(data[0] as Ficha); });
+    } else {
+      // Sin id_maquina se busca por nombre (sin importar tildes ni mayúsculas). Si hay varias máquinas
+      // con el mismo nombre (ej: varias "Pulidora 4 1/2") se muestra la foto de una de ellas, pero el
+      // código solo cuando la máquina es única.
+      const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const buscado = sinTildes(nombre);
+      const primera = (buscado.split(' ')[0] || '').replace(/[%_\\]/g, '\\$&');
+      query.ilike('nombre_equipo', `%${primera}%`).limit(500).then(({ data }) => {
+        if (!active || !data) return;
+        const iguales = (data as Ficha[]).filter(m => sinTildes(m.nombre_equipo) === buscado);
+        if (!iguales.length) return;
+        const conFoto = iguales.find(m => primeraFoto(m.fotos)) || iguales[0]!;
+        setFicha({ ...conFoto, codigo_equipo: iguales.length === 1 ? conFoto.codigo_equipo : null });
+      });
+    }
     return () => { active = false; };
   }, [idMaquina, nombre]);
 

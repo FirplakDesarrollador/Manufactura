@@ -10,6 +10,7 @@ export interface OrdenFabricacion {
     sku?: string
     // Summary fields
     vaciado?: number
+    herrajes?: number  // piezas con Instalación Herrajes registrada (esperan Pulido)
     pulido?: number
     saldo?: number
     empaque?: number
@@ -35,6 +36,13 @@ export interface OrdenFabricacion {
     molde_sku?: string
     molde_descripcion?: string
     fecha_ideal_produccion?: string
+    fecha_entrega_lote?: string | null
+    fecha_real_liberacion?: string | null
+    fecha_ideal_entrega_produccion?: string | null
+    fecha_prometida_entrega?: string | null
+    fechas_semaforo_actualizadas?: string | null
+    cantidad_completada_sap?: number | null  // FV: unidades completadas (recibidas) en SAP
+
 }
 
 export interface Molde {
@@ -46,8 +54,10 @@ export interface Molde {
     vueltas_totales: number
     vueltas_actuales: number
     vueltas_acumuladas?: number
-    vueltas_mto: number
-    vueltas_mto_atipicas: number
+    vueltas_mto?: number
+    vueltas_mto_atipicas?: number
+    vueltas_mtto?: number
+    vueltas_mtto_atipicas?: number
     linea: string
 }
 
@@ -67,6 +77,9 @@ export interface RegistroTrazabilidad {
     contramolde: boolean
     contramolde_fecha?: string
     vaciado_fecha?: string
+    herrajes_fecha?: string
+    herrajes_user_id?: number
+    herrajes_user_name?: string
     fecha_vaciado?: string
     acabado_fecha?: string
     desmolde_fecha?: string
@@ -75,6 +88,7 @@ export interface RegistroTrazabilidad {
     digitado_fecha?: string
     transito_fecha?: string
     cedi_fecha?: string
+    of_pendiente?: boolean   // false = la OF ya se cerró (en SAP o en la app)
     estado?: string
     numero_pedido?: string
     producto_sku?: string

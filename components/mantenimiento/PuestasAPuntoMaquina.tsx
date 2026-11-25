@@ -57,7 +57,7 @@ export default function PuestasAPuntoMaquina({ maquina }: { maquina: { id?: numb
           .from('puestas_a_punto_encabezado')
           .select('id_puesta_a_punto, consecutivo, nombre_puesta_a_punto, proceso, planta, version_formato, estado_puesta_a_punto')
           .in('id_puesta_a_punto', ids);
-        result = (encs || []).map(e => ({ ...e, actividades: conteo.get(e.id_puesta_a_punto) || 0 }));
+        result = (encs || []).filter(e => e.estado_puesta_a_punto !== 'Eliminada').map(e => ({ ...e, actividades: conteo.get(e.id_puesta_a_punto) || 0 }));
       }
       if (active) { setPuestas(result); setLoading(false); }
     }

@@ -5,9 +5,11 @@ import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
 import { useEffect, useState, useCallback } from 'react'
 import PinturaFibraModule from '@/components/fibra/PinturaFibraModule'
-import DashboardFibraModule from '@/components/fibra/dashboard/DashboardFibraModule'
+import IndicadoresFibraModule from '@/components/fibra/indicadores/IndicadoresFibraModule'
+import IconoMolde from '@/components/fibra/IconoMolde'
 import VaciadoFibraModule from '@/components/fibra/vaciado/VaciadoFibraModule'
 import PulidoFibraModule from '@/components/fibra/pulido/PulidoFibraModule'
+import HerrajesFibraModule from '@/components/fibra/herrajes/HerrajesFibraModule'
 import EnsayoFibraModule from '@/components/fibra/ensayo/EnsayoFibraModule'
 import ReparacionFibraModule from '@/components/fibra/reparacion/ReparacionFibraModule'
 import EmpaqueFibraModule from '@/components/fibra/empaque/EmpaqueFibraModule'
@@ -16,6 +18,10 @@ import CediFibraModule from '@/components/fibra/cedi/CediFibraModule'
 import ParametrosFibraModule from '@/components/fibra/parametros/ParametrosFibraModule'
 import AdministracionFibraModule from '@/components/fibra/administracion/AdministracionFibraModule'
 import MapaProcesosFibraModule from '@/components/fibra/mapa/MapaProcesosFibraModule'
+import TrasladosFibraModule from '@/components/fibra/traslados/TrasladosFibraModule'
+import PlanosFibraModule from '@/components/fibra/planos/PlanosFibraModule'
+import MoldesFibraModule from '@/components/fibra/moldes/MoldesFibraModule'
+import { esKitReparacion } from '@/lib/fibra/kitReparacion'
 
 
 
@@ -46,12 +52,58 @@ interface User {
     }
 }
 
+// Número rojo tipo notificación (igual al de Traslados): OF con novedades de lista de materiales en ese proceso
+function AvisoNovedades({ n, abierto }: { n?: number; abierto: boolean }) {
+    if (!n) return null
+    return (
+        <b title={`${n} OF con faltantes o sin traslado en este proceso`}
+            className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${abierto ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+            {n > 99 ? '99+' : n}
+        </b>
+    )
+}
+
 export default function FibraPage() {
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
     const [sidebarOpen, setSidebarOpen] = useState(true)
     const [activeModule, setActiveModule] = useState<string>('')
+    // Aviso de Traslados: OF con novedades (sin traslado, con faltantes o solicitado sin trasladar) en la última revisión
+    const [novedadesTraslados, setNovedadesTraslados] = useState(0)
+    // Mismo aviso por proceso: OF con novedades que tienen piezas en Herrajes, Pulido, Ensayo, Reparación, Guacales o Digitado
+    const [novedadesProceso, setNovedadesProceso] = useState<Record<string, number>>({})
+    useEffect(() => {
+        const contar = async () => {
+            const { data, error } = await supabase.from('traslados_of_fv').select('orden_fabricacion')
+                .in('estado', ['sin_traslado', 'faltante', 'solicitado'])
+            if (error) return
+            const ofs = [...new Set((data || []).map(r => String(r.orden_fabricacion)))]
+            setNovedadesTraslados(ofs.length)
+            if (!ofs.length) { setNovedadesProceso({}); return }
+            const { data: piezas, error: errP } = await supabase.from('query_trazabilidad_fv')
+                .select('orden_fabricacion, estado, producto_descripcion')
+                .in('orden_fabricacion', ofs)
+                .in('estado', ['Vaciado', 'Herrajes', 'Pulido', 'Ensayo', 'Reparacion', 'Reparacion_larga', 'Guacales', 'Acabado', 'Empaque'])
+            if (errP) return
+            // Cada estado de pieza va al módulo que la muestra (igual que las consultas de cada módulo)
+            const porModulo: Record<string, Set<string>> = {}
+            for (const p of piezas || []) {
+                const kit = esKitReparacion(p.producto_descripcion)
+                const modulo = p.estado === 'Vaciado' ? (kit ? 'pulido' : 'herrajes')
+                    : p.estado === 'Herrajes' || p.estado === 'Pulido' ? 'pulido'
+                    : p.estado === 'Ensayo' ? 'ensayo'
+                    : p.estado === 'Reparacion' || p.estado === 'Reparacion_larga' ? 'reparacion'
+                    : p.estado === 'Guacales' || p.estado === 'Acabado' ? 'empaque'
+                    : 'digitado'
+                ;(porModulo[modulo] ||= new Set()).add(String(p.orden_fabricacion))
+            }
+            setNovedadesProceso(Object.fromEntries(Object.entries(porModulo).map(([m, s]) => [m, s.size])))
+        }
+        contar()
+        const t = setInterval(contar, 5 * 60000)
+        return () => clearInterval(t)
+    }, [])
 
     const getUserData = useCallback(async () => {
         setLoading(true)
@@ -85,6 +137,8 @@ export default function FibraPage() {
         const modulos = combinedUser.permisos?.modulos;
         const fibraPerms = (combinedUser.permisos as any)?.fibra;
         const checkPerm = (m: string) => {
+            // Herrajes: permiso propio o el de Vaciado / Pulido (los mismos operarios)
+            if (m === 'herrajes') return ['herrajes', 'vaciado', 'pulido'].some(k => modulos?.[k] === true || fibraPerms?.[k] === true)
             if (m === 'ensayo') {
                 return modulos?.ensayo === true || fibraPerms?.ensayo === true || modulos?.acabado === true || fibraPerms?.acabado === true
             }
@@ -93,7 +147,7 @@ export default function FibraPage() {
 
         if (modulos || fibraPerms) {
             if (!checkPerm('pintura')) {
-                const priorityModules = ['pintura', 'vaciado', 'pulido', 'ensayo', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
+                const priorityModules = ['pintura', 'vaciado', 'herrajes', 'pulido', 'ensayo', 'reparacion', 'empaque', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'];
                 const firstAllowed = priorityModules.find(m => checkPerm(m));
                 if (firstAllowed) {
                     setActiveModule(firstAllowed);
@@ -137,6 +191,7 @@ export default function FibraPage() {
     const hasPermission = (moduleName: string) => {
         const fibra = (user.permisos as any)?.fibra
         const modulos = user.permisos?.modulos
+        if (moduleName === 'herrajes') return ['herrajes', 'vaciado', 'pulido'].some(k => modulos?.[k] === true || fibra?.[k] === true)
         if (moduleName === 'ensayo') {
             return modulos?.ensayo === true || fibra?.ensayo === true || modulos?.acabado === true || fibra?.acabado === true
         }
@@ -202,49 +257,80 @@ export default function FibraPage() {
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11ZM5 2l5 5M2 13h15M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z" />
+                                    {/* Vaciado: rodillo aireador de fibra de vidrio (rodillo con ranuras, alambre doblado y mango) */}
+                                    <rect x="2.5" y="3" width="13" height="5.5" rx="2.75" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeWidth={1.5} d="M6 3.5v4.5M9 3.5v4.5M12 3.5v4.5" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.5 5.75H19v5.75l-6 2.5V16" />
+                                    <path strokeLinecap="round" strokeWidth={3.5} d="M13 16.5v4.5" />
                                 </svg>
                                 <span>Vaciado</span>
+                            </button>
+                        )}
+
+                        {hasPermission('herrajes') && (
+                            <button
+                                onClick={() => setActiveModule('herrajes')}
+                                title={sidebarOpen ? undefined : `Herrajes${novedadesProceso.herrajes ? ` · ${novedadesProceso.herrajes} OF con novedades` : ''}`}
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'herrajes'
+                                    ? 'bg-[#254153] text-white'
+                                    : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                    }`}
+                            >
+                                {/* Instalación Herrajes: matriz (bastidor) metálica con travesaños y pernos */}
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <rect x="3" y="4" width="18" height="16" rx="1.5" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4v16M15 4v16M3 12h18" />
+                                    <path strokeLinecap="round" strokeWidth={3} d="M9 12h.01M15 12h.01" />
+                                </svg>
+                                <span>Herrajes</span>
+                                <AvisoNovedades n={novedadesProceso.herrajes} abierto={sidebarOpen} />
                             </button>
                         )}
 
                         {hasPermission('pulido') && (
                             <button
                                 onClick={() => setActiveModule('pulido')}
-                                title={sidebarOpen ? undefined : 'Pulido'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'pulido'
+                                title={sidebarOpen ? undefined : `Pulido${novedadesProceso.pulido ? ` · ${novedadesProceso.pulido} OF con novedades` : ''}`}
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'pulido'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 3v3.5M21 12h-3.5M12 21v-3.5M3 12h3.5M18.4 5.6l-2.5 2.5M18.4 18.4l-2.5-2.5M5.6 18.4l2.5-2.5M5.6 5.6l2.5 2.5" />
+                                    {/* Pulidora: cuerpo, cabezal, disco y mango lateral */}
+                                    <rect x="2" y="8" width="11" height="5" rx="2.5" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9h3.5v3H13M8 13v5M5 10.5h3" />
+                                    <ellipse cx="19.5" cy="10.5" rx="1.5" ry="6" strokeWidth={2} />
                                 </svg>
                                 <span>Pulido</span>
+                                <AvisoNovedades n={novedadesProceso.pulido} abierto={sidebarOpen} />
                             </button>
                         )}
 
                         {hasPermission('ensayo') && (
                             <button
                                 onClick={() => setActiveModule('ensayo')}
-                                title={sidebarOpen ? undefined : 'Ensayo'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'ensayo'
+                                title={sidebarOpen ? undefined : `Ensayo${novedadesProceso.ensayo ? ` · ${novedadesProceso.ensayo} OF con novedades` : ''}`}
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'ensayo'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                    {/* Ensayo: bañera de hidromasaje completa, con grifería y burbujas de los chorros */}
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.5 11.5h19v2.5a5 5 0 0 1-5 5h-9a5 5 0 0 1-5-5zM7 19l-1 2M17 19l1 2M5 11.5V5.5a2 2 0 0 1 3.6-1.2" />
+                                    <path strokeLinecap="round" strokeWidth={2.5} d="M11 8.5h.01M14.5 7h.01M18 8.5h.01" />
                                 </svg>
                                 <span>Ensayo</span>
+                                <AvisoNovedades n={novedadesProceso.ensayo} abierto={sidebarOpen} />
                             </button>
                         )}
 
                         {hasPermission('reparacion') && (
                             <button
                                 onClick={() => setActiveModule('reparacion')}
-                                title={sidebarOpen ? undefined : 'Reparación'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'reparacion'
+                                title={sidebarOpen ? undefined : `Reparación${novedadesProceso.reparacion ? ` · ${novedadesProceso.reparacion} OF con novedades` : ''}`}
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'reparacion'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
@@ -253,14 +339,15 @@ export default function FibraPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                                 </svg>
                                 <span>Reparación</span>
+                                <AvisoNovedades n={novedadesProceso.reparacion} abierto={sidebarOpen} />
                             </button>
                         )}
 
                         {hasPermission('empaque') && (
                             <button
                                 onClick={() => setActiveModule('empaque')}
-                                title={sidebarOpen ? undefined : 'Guacales'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'empaque'
+                                title={sidebarOpen ? undefined : `Guacales${novedadesProceso.empaque ? ` · ${novedadesProceso.empaque} OF con novedades` : ''}`}
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'empaque'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
@@ -269,14 +356,15 @@ export default function FibraPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18v14H3zM3 9.5h18M3 14.5h18M7 5v14M17 5v14" />
                                 </svg>
                                 <span>Guacales</span>
+                                <AvisoNovedades n={novedadesProceso.empaque} abierto={sidebarOpen} />
                             </button>
                         )}
 
                         {hasPermission('digitado') && (
                             <button
                                 onClick={() => setActiveModule('digitado')}
-                                title={sidebarOpen ? undefined : 'Digitado'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'digitado'
+                                title={sidebarOpen ? undefined : `Digitado${novedadesProceso.digitado ? ` · ${novedadesProceso.digitado} OF con novedades` : ''}`}
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'digitado'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
@@ -285,6 +373,7 @@ export default function FibraPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM6 9h.01M10 9h.01M14 9h.01M18 9h.01M8 12.5h.01M12 12.5h.01M16 12.5h.01M7 16h10" />
                                 </svg>
                                 <span>Digitado</span>
+                                <AvisoNovedades n={novedadesProceso.digitado} abierto={sidebarOpen} />
                             </button>
                         )}
 
@@ -313,8 +402,9 @@ export default function FibraPage() {
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
+                                {/* Indicadores: gráfica subiendo con flecha (antes era una casa) */}
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 15l4-4 3 3 6-6m0 0h-4m4 0v4" />
                                 </svg>
                                 <span>Dashboard</span>
                             </button>
@@ -346,12 +436,65 @@ export default function FibraPage() {
                                     }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    {/* Escudo con visto bueno: control y supervisión */}
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4" />
+                                    {/* Persona con engranaje: administrador */}
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 21a8 8 0 0 1 10.43-7.62M10 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10z" />
+                                    <circle cx="18" cy="18" r="3" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 13.5v1.5M18 21v1.5M21.9 15.75l-1.3.75M15.4 19.5l-1.3.75M14.1 15.75l1.3.75M20.6 19.5l1.3.75" />
                                 </svg>
                                 <span>Administración</span>
                             </button>
                         )}
+
+                        {/* Planos: los ve cualquier usuario de la planta; cargarlos pide el permiso fibra.planos */}
+                        <button
+                            onClick={() => setActiveModule('planos')}
+                            title={sidebarOpen ? undefined : 'Planos'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'planos'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5M8 9h2" />
+                            </svg>
+                            <span>Planos</span>
+                        </button>
+
+                        {/* Moldes: consulta para cualquier usuario de la planta; liberar pide el permiso de Administración */}
+                        <button
+                            onClick={() => setActiveModule('moldes')}
+                            title={sidebarOpen ? undefined : 'Moldes'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'moldes'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <IconoMolde />
+                            <span>Moldes</span>
+                        </button>
+
+                        {/* Traslados: OF liberadas vs. sus traslados en SAP (solo consulta, sin permiso propio) */}
+                        <button
+                            onClick={() => setActiveModule('traslados')}
+                            title={sidebarOpen ? undefined : `Traslados${novedadesTraslados ? ` · ${novedadesTraslados} OF con novedades` : ''}`}
+                            className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'traslados'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {/* Flechas de ida y vuelta: traslado entre almacenes */}
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h12m0 0l-4-4m4 4l-4 4M17 17H5m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            <span>Traslados</span>
+                            {/* Número rojo tipo notificación: OF con faltantes o sin traslado (se ve también con el menú recogido) */}
+                            {novedadesTraslados > 0 && (
+                                <b title={`${novedadesTraslados} OF con faltantes o sin traslado`}
+                                    className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${sidebarOpen ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+                                    {novedadesTraslados > 99 ? '99+' : novedadesTraslados}
+                                </b>
+                            )}
+                        </button>
 
                         {/* Mapa de procesos: solo consulta, sin permiso propio */}
                         <button
@@ -363,7 +506,8 @@ export default function FibraPage() {
                                 }`}
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                             <span>Mapa de procesos</span>
                         </button>
@@ -373,12 +517,20 @@ export default function FibraPage() {
                 {/* Main Content */}
                 <main className="flex-1 min-w-0 h-[calc(100vh-3rem)] bg-white overflow-hidden relative">
                     <div className="h-full overflow-y-auto">
-                        {activeModule === 'mapa' ? (
+                        {activeModule === 'traslados' ? (
+                            <TrasladosFibraModule />
+                        ) : activeModule === 'mapa' ? (
                             <MapaProcesosFibraModule />
+                        ) : activeModule === 'moldes' ? (
+                            <MoldesFibraModule puedeLiberar={hasPermission('administracion')} />
+                        ) : activeModule === 'planos' ? (
+                            <PlanosFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'pintura' && hasPermission('pintura') ? (
                             <PinturaFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'vaciado' && hasPermission('vaciado') ? (
                             <VaciadoFibraModule userEmail={user?.email || ''} />
+                        ) : activeModule === 'herrajes' && hasPermission('herrajes') ? (
+                            <HerrajesFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'pulido' && hasPermission('pulido') ? (
                             <PulidoFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'ensayo' && hasPermission('ensayo') ? (
@@ -392,7 +544,7 @@ export default function FibraPage() {
                         ) : activeModule === 'cedi' && hasPermission('cedi') ? (
                             <CediFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'dashboard' && hasPermission('dashboard') ? (
-                            <DashboardFibraModule />
+                            <IndicadoresFibraModule />
                         ) : activeModule === 'parametros' && hasPermission('parametros') ? (
                             <ParametrosFibraModule userEmail={user?.email || ''} />
                         ) : activeModule === 'administracion' && hasPermission('administracion') ? (

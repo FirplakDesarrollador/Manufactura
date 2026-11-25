@@ -55,3 +55,6 @@ gestor-tareas-tecnicos 1/
 # Datos provisionales exportados de Excel de Calidad (con costos): solo locales, no se suben
 /public/datos-locales/
 /datos-locales/
+
+# Esquema de personal: cargas con ids de Talento Humano (solo locales)
+esquema_personal_*_datos.sql

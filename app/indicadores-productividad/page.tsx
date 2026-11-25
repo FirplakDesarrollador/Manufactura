@@ -9,6 +9,9 @@ import { supabase } from "@/lib/supabase";
 import IndicadoresCalidadView, { MAIN_SUBHEADER_TABS, type MainTabKey } from "@/components/calidad/IndicadoresCalidadView";
 import HoraAHoraPlantasView from "@/components/indicadores/HoraAHoraPlantasView";
 import RmoldDashboard from "@/components/indicadores/RmoldDashboard";
+import CumplimientoSPDashboard from "@/components/sistema-produccion/CumplimientoSPDashboard";
+import ProductividadView from "@/components/productividad/ProductividadView";
+import { indicadoresRmoldDia, type IndicadoresRmoldDia } from "@/lib/informe-turno/rmoldTablero";
 
 // Plant keys supported
 type PlantKey = "MS" | "FV" | "QZ" | "MBL" | "CEFI" | "RMOLD";
@@ -170,8 +173,8 @@ const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode
     { id: "nivel-servicio", label: "Nivel de Servicio", icon: <BarChart3 size={14} /> },
     { id: "productividad", label: "Productividad", icon: <TrendingUp size={14} /> },
     { id: "calidad", label: "Calidad", icon: <ShieldCheck size={14} /> },
-    { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={14} /> },
     { id: "sistema-produccion", label: "Sistema de Producción", icon: <Building2 size={14} /> },
+    { id: "mantenimiento", label: "Mantenimiento", icon: <Wrench size={14} /> },
     { id: "rmold", label: "RMOLD", icon: <Hammer size={14} /> },
     { id: "variacion", label: "Variación", icon: <Activity size={14} /> },
     { id: "ausentismo", label: "Ausentismo", icon: <UserX size={14} /> }
@@ -180,7 +183,6 @@ const PESTANAS_TABLERO: { id: VistaTablero; label: string; icon: React.ReactNode
 // Pestañas nuevas que aún no tienen tablero
 const VISTAS_EN_CONSTRUCCION: Partial<Record<VistaTablero, string>> = {
     mantenimiento: "Indicadores de mantenimiento (preventivo, correctivo, TPM y disponibilidad de máquinas).",
-    "sistema-produccion": "Indicadores del Sistema de Producción (5S, auditorías y bitácora).",
     variacion: "Variación de los indicadores frente a la meta y al periodo anterior."
 };
 
@@ -242,6 +244,8 @@ export default function IndicadoresProductividadPage() {
     const [fechaISO, setFechaISO] = useState<string>(getPreviousBusinessDayISO());
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
     const [loadingNS, setLoadingNS] = useState<boolean>(false);
+    // RMOLD: qué datos del día faltan (sin cierre o sin inspecciones de calidad): se avisa, nunca se inventan
+    const [avisoRmold, setAvisoRmold] = useState<string | null>(null);
 
     // Unified Plant Data State: stores initial/automatic values and user edits
     const [plantData, setPlantData] = useState<Record<PlantKey, PlantMetrics>>(INITIAL_PLANT_DATA);
@@ -253,11 +257,13 @@ export default function IndicadoresProductividadPage() {
             // Calidad MS se lee de tablas con RLS: la API necesita el token de la sesión
             const { data: sessionData } = await supabase.auth.getSession();
             const accessToken = sessionData?.session?.access_token;
-            const [resNS, resCalidad] = await Promise.all([
+            const [resNS, resCalidad, rmoldDia] = await Promise.all([
                 fetch(`/api/indicadores/nivel-servicio?fecha=${targetFecha}`),
                 fetch(`/api/indicadores/calidad?fecha=${targetFecha}`, {
                     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
-                })
+                }),
+                // RMOLD en automático: cierre del día (productividad, nivel de servicio, personas) y Calidad RMOLD
+                indicadoresRmoldDia(supabase, targetFecha).catch(() => ({ cierre: null, calidad: null } as IndicadoresRmoldDia))
             ]);
 
             const jsonNS = resNS.ok ? await resNS.json() : null;
@@ -298,8 +304,27 @@ export default function IndicadoresProductividadPage() {
                     }
                 }
 
+                // RMOLD: cierre del día y Calidad RMOLD (se aplican al final; sin dato quedan en 0 y se avisa)
+                const c = rmoldDia.cierre;
+                const q = rmoldDia.calidad;
+                updated.RMOLD = {
+                    ...updated.RMOLD,
+                    productividadPzReal: c ? c.moldes : 0,
+                    productividadPzMeta: c && c.meta > 0 ? c.meta : updated.RMOLD.productividadPzMeta,
+                    nivelServicioReal: c?.nivelServicio ?? 0,
+                    totalPersonas: c ? c.personas + c.ausentes : 0,
+                    ausentismos: c ? c.ausentes : 0,
+                    calidadReal: q ? q.calidad : 0,
+                };
                 return updated;
             });
+            {
+                const faltan: string[] = [];
+                if (!rmoldDia.cierre) faltan.push('cierre diario de RMOLD (productividad, nivel de servicio y presentismo)');
+                else if (rmoldDia.cierre.nivelServicio == null) faltan.push('moldes esperados/entregados del cierre (nivel de servicio)');
+                if (!rmoldDia.calidad) faltan.push('inspecciones de Calidad RMOLD (calidad)');
+                setAvisoRmold(faltan.length ? `Sin dato el ${targetFecha.split('-').reverse().join('/')}: ${faltan.join('; ')}. Esos recuadros quedan en 0.` : null);
+            }
 
             const now = new Date();
             const horaStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -372,7 +397,8 @@ export default function IndicadoresProductividadPage() {
             <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-12 z-40">
                 <CarruselPestanas className="max-w-[1800px] mx-auto">
                     {PESTANAS_TABLERO.map(p => {
-                        const activa = viewMode === p.id;
+                        // Hasta leer ?vista= de la dirección no se marca ninguna (si no, se veía un instante "Tablero de Control")
+                        const activa = urlLeida && viewMode === p.id;
                         const esCalidad = p.id === "calidad";
                         return (
                             <button
@@ -400,7 +426,7 @@ export default function IndicadoresProductividadPage() {
             </div>
 
             {/* Tercer nivel: pestañas de Calidad, pegado al segundo y con su misma altura */}
-            {viewMode === "calidad" && calidadMenuAbierto && (
+            {urlLeida && viewMode === "calidad" && calidadMenuAbierto && (
                 <div className="w-full bg-white border-b border-[#e2ded5] px-4 shadow-2xs h-10 flex items-center sticky top-[88px] z-30">
                     <CarruselPestanas className="max-w-[1800px] mx-auto">
                         {MAIN_SUBHEADER_TABS.map(t => (
@@ -422,7 +448,8 @@ export default function IndicadoresProductividadPage() {
             )}
 
             {/* Main Area */}
-            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" || viewMode === "rmold" ? "max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
+            <main className={`flex-1 w-full mx-auto ${viewMode === "calidad" || viewMode === "hora-a-hora" || viewMode === "rmold" || viewMode === "productividad" ?"max-w-[1900px] p-2 sm:p-4 pb-6" : "max-w-7xl p-3 sm:p-4 pb-6"}`}>
+                {!urlLeida ? <div className="min-h-[60vh]" /> : <>
                 {viewMode === "hora-a-hora" ? (
                     <div className="w-full animate-in fade-in duration-300">
                         <HoraAHoraPlantasView fecha={fechaISO} />
@@ -452,16 +479,9 @@ export default function IndicadoresProductividadPage() {
                         ></iframe>
                     </div>
                 ) : viewMode === "productividad" ? (
-                    <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
-                        <iframe
-                            title="Power BI Nivel de Productividad"
-                            width="100%"
-                            height="100%"
-                            src={POWERBI_URLS.productividad}
-                            frameBorder="0"
-                            allowFullScreen={true}
-                            className="w-full h-full border-none"
-                        ></iframe>
+                    // Productividad de las plantas desde Supabase (reemplaza el Power BI "Nivel de Productividad")
+                    <div className="w-full animate-in fade-in duration-300">
+                        <ProductividadView />
                     </div>
                 ) : viewMode === "ausentismo" ? (
                     <div className="w-full h-[750px] bg-white rounded-3xl shadow-sm border border-[#e2ded5] overflow-hidden">
@@ -480,6 +500,12 @@ export default function IndicadoresProductividadPage() {
                         <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">En construcción</span>
                         <h2 className="text-lg font-black text-[#324354]">{PESTANAS_TABLERO.find(p => p.id === viewMode)?.label}</h2>
                         <p className="text-sm text-slate-500 max-w-md">{VISTAS_EN_CONSTRUCCION[viewMode]}</p>
+                    </div>
+                ) : viewMode === "sistema-produccion" ? (
+                    // Mismo tablero de Estadísticas de Producción (un solo componente: lo que cambie en uno se ve en el otro)
+                    <div className="w-full animate-in fade-in duration-300">
+                        {/* Recuadro completo de 820 px de pantalla (1 px CSS ≈ 1,5 px de pantalla: 820 ÷ 1,5 ≈ 547 px CSS) */}
+                        <CumplimientoSPDashboard altoPx={547} />
                     </div>
                 ) : viewMode === "rmold" ? (
                     <div className="w-full animate-in fade-in duration-300">
@@ -561,6 +587,13 @@ export default function IndicadoresProductividadPage() {
                                 )}
                             </div>
                         </div>
+
+                        {selectedPlant === "RMOLD" && (
+                            <p className="text-[11px] font-bold text-slate-500 -mt-2">
+                                RMOLD en automático: productividad, nivel de servicio y presentismo del <b>cierre diario de RMOLD</b>; calidad de <b>Calidad RMOLD</b>.
+                                {avisoRmold && <span className="block mt-1 text-rose-700">{avisoRmold}</span>}
+                            </p>
+                        )}
 
                         {/* Top Cards Grid (Ajustado la altura a 175px para cubrir perfectamente el espacio inferior) */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -1031,6 +1064,7 @@ export default function IndicadoresProductividadPage() {
                         </div>
                     </div>
                 )}
+                </>}
             </main>
         </div>
     );

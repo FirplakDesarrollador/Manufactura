@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { getOrdenesFabricacion, getAllMoldes, getRegistrosTrazabilidadHoyMetricas } from '@/lib/supabase/queries/fibra'
 import EncabezadoFibra, { useMetricasFibra } from './EncabezadoFibra'
+import ResumenFaltantes from './ResumenFaltantes'
 
 // Página común de los módulos de piso FV por pieza (Pulido, Ensayo, Guacales, Reparación…): encabezado de
 // indicadores y búsqueda, y la lista de piezas pendientes, cada una con la tarjeta de su orden y sus botones
@@ -13,9 +14,10 @@ interface ModuloPiezasFibraProps {
     sinPiezas: string              // mensaje cuando no hay piezas (sin filtros)
     renderPieza: (p: { registro: RegistroTrazabilidad; orden?: OrdenFabricacion; moldes: Molde[]; onRefresh: () => void }) => React.ReactNode
     extra?: React.ReactNode        // controles propios del módulo en la barra (p. ej. pestañas)
+    resumenFaltantes?: boolean     // botón "Resumen de faltantes" de componentes para la entrega (Digitado)
 }
 
-export default function ModuloPiezasFibra({ cargarPiezas, tituloLista, sinPiezas, renderPieza, extra }: ModuloPiezasFibraProps) {
+export default function ModuloPiezasFibra({ cargarPiezas, tituloLista, sinPiezas, renderPieza, extra, resumenFaltantes }: ModuloPiezasFibraProps) {
     const [registros, setRegistros] = useState<RegistroTrazabilidad[]>([])
     const [ordenes, setOrdenes] = useState<OrdenFabricacion[]>([])
     const [trazabilidad, setTrazabilidad] = useState<RegistroTrazabilidad[]>([])
@@ -76,8 +78,9 @@ export default function ModuloPiezasFibra({ cargarPiezas, tituloLista, sinPiezas
 
             <div className="flex-1 md:overflow-y-auto p-2 sm:p-4">
                 <div className="space-y-2">
-                    <div className="text-cyan-600 text-xs font-bold mb-2 uppercase">
-                        {tituloLista}: {filteredRegistros.length}
+                    <div className="text-[#324354] text-xs font-black mb-2 uppercase flex flex-wrap items-center gap-3">
+                        <span>{tituloLista}: {filteredRegistros.length}</span>
+                        {resumenFaltantes && <ResumenFaltantes ofs={filteredRegistros.map(r => r.orden_fabricacion)} />}
                     </div>
                     {loading ? (
                         <div className="text-center py-8 text-gray-500">Cargando piezas...</div>

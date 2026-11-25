@@ -19,6 +19,7 @@ import {
   Wrench,
   Building2,
   Cpu,
+  CalendarDays,
   Layers,
   Check,
   FileSpreadsheet,
@@ -76,8 +77,12 @@ import CalendarioSemanalPlanner from '@/components/mantenimiento/CalendarioSeman
 import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosColumnas';
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
+import TiempoEjecucionInput, { minutosValidos } from '@/components/mantenimiento/TiempoEjecucionInput';
+import MaquinasMultiples, { partesMaquina } from '@/components/mantenimiento/MaquinasMultiples';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
+import TurnosSemanales from '@/components/mantenimiento/TurnosSemanales';
+import EspecialidadesTecnicos from '@/components/mantenimiento/EspecialidadesTecnicos';
 import * as XLSX from 'xlsx';
 import { descargarHojaDeVidaEquipo } from '@/lib/mantenimiento/hojaDeVidaEquipo';
 import RelacionadosMaquina from '@/components/mantenimiento/RelacionadosMaquina';
@@ -246,6 +251,11 @@ interface MaintenanceTask {
   fechaCierre?: string | null;
   fotos?: string[];
   activo?: boolean;
+  /** Orden de trabajo (PREV-xxxx) vigente del plan, o la que se abrió desde Órdenes de Trabajo */
+  codigoOT?: string | null;
+  ordenId?: number | null;
+  /** minutos reales de la orden (mantenimiento_ordenes.tiempo_ejecucion_min) */
+  tiempoEjecucionMin?: number | null;
 }
 
 interface HistoryRecord {
@@ -286,7 +296,7 @@ interface CorrectiveRecord {
   fotos_solucion?: string[];
 }
 
-type TabType = 'planificador' | 'tecnico' | 'preventivo' | 'correctivo' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas';
+type TabType = 'planificador' | 'tecnico' | 'preventivo' | 'correctivo' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas' | 'turnos';
 
 const DAILY_CAPACITY_LIMIT = 7.2;
 
@@ -296,6 +306,13 @@ export default function GestionMantenimientoPage() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<TabType>('planificador');
   const [isSubHeaderOpen, setIsSubHeaderOpen] = useState(true);
+  // null = todas las pestañas; si el usuario tiene pestañas marcadas en sus permisos, solo esas
+  const [pestanasPermitidas, setPestanasPermitidas] = useState<TabType[] | null>(null);
+  // % del turno de hoy en producción por técnico (Turnos + Horario de plantas) para el reparto real de los NPPR
+  const [pctProduccionHoy, setPctProduccionHoy] = useState<Record<number, number | null>>({});
+  useEffect(() => {
+    if (pestanasPermitidas && pestanasPermitidas.length && !pestanasPermitidas.includes(activeTab)) setActiveTab(pestanasPermitidas[0]);
+  }, [pestanasPermitidas, activeTab]);
 
   // Core Data State
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -342,6 +359,9 @@ export default function GestionMantenimientoPage() {
   const [historySearch, setHistorySearch] = useState('');
   const [historyEstado, setHistoryEstado] = useState('Todos');
   const [historyTecnico, setHistoryTecnico] = useState('Todos');
+  // Rango de fechas de apertura (AAAA-MM-DD); vacío = sin límite
+  const [historyDesde, setHistoryDesde] = useState('');
+  const [historyHasta, setHistoryHasta] = useState('');
   const [historyTipo, setHistoryTipo] = useState('Todos');
   const [viewingHistoryRecord, setViewingHistoryRecord] = useState<HistoryRecord | null>(null);
   type HistorySortField = 'id' | 'codigo' | 'titulo' | 'planta' | 'maquina' | 'tecnico' | 'tipo' | 'estado' | 'plazo' | 'apertura' | 'cierre';
@@ -408,7 +428,11 @@ export default function GestionMantenimientoPage() {
     accion_tomada: string;
     prioridad: 'Alta' | 'Media' | 'Baja';
     fotos_solucion: string[];
+    /** minutos reales (texto del campo); obligatorio al cerrar */
+    tiempo_min: string;
   } | null>(null);
+  // Se intentó cerrar sin tiempo de ejecución (resalta el campo)
+  const [faltaTiempo, setFaltaTiempo] = useState(false);
   const [annotatingSolutionImage, setAnnotatingSolutionImage] = useState<{ src: string; index?: number } | null>(null);
   const solutionCameraInputRef = useRef<HTMLInputElement | null>(null);
   const solutionFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -422,6 +446,10 @@ export default function GestionMantenimientoPage() {
     observations: string;
     fechaApertura: string;
     fechaCierre: string;
+    /** Fecha/hora mínima del cierre: no se permite ponerla hacia atrás */
+    cierreMin?: string;
+    /** minutos reales (texto del campo); obligatorio al completar */
+    tiempoMin?: string;
     fotos?: string[];
   } | null>(null);
   const [annotatingPreventivoImage, setAnnotatingPreventivoImage] = useState<{ src: string; index?: number } | null>(null);
@@ -672,12 +700,10 @@ export default function GestionMantenimientoPage() {
         }
       }
 
-      // 3. Exact machine name or alternate name match
-      if (pMaq && (pMaq === name || (alt && pMaq === alt))) return true;
-
-      // 4. Exact prefix/suffix or full sub-name match when pMaq is specific (prevent short generic word match like "taladro")
-      if (pMaq && pMaq.length >= 8 && name.length >= 8) {
-        if (pMaq.includes(name) || (pMaq.startsWith(name) || name.startsWith(pMaq))) return true;
+      // 3 y 4. Nombre exacto (o alterno) o sub-nombre específico, con CADA equipo del plan (puede tener varios: "A | B")
+      for (const parte of partesMaquina(p.maquina).map(normalize)) {
+        if (parte === name || (alt && parte === alt)) return true;
+        if (parte.length >= 8 && name.length >= 8 && (parte.includes(name) || parte.startsWith(name) || name.startsWith(parte))) return true;
       }
 
       return false;
@@ -792,12 +818,11 @@ export default function GestionMantenimientoPage() {
         if (recAf && recAf.includes(af)) return true;
       }
 
-      // 4. Exact or sub-name match
-      const recMaqNorm = normalize(rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '');
-      if (recMaqNorm && (recMaqNorm === name || (alt && recMaqNorm === alt))) return true;
-
-      if (recMaqNorm && recMaqNorm.length >= 8 && name.length >= 8) {
-        if (recMaqNorm.includes(name) || name.includes(recMaqNorm)) return true;
+      // 4. Nombre exacto o sub-nombre, con CADA equipo del registro (un preventivo puede ser de varios: "A | B";
+      //    así la ejecución queda en la hoja de vida de todos)
+      for (const recMaqNorm of partesMaquina(rec.maquina || rec.equipo || rec.maquina_nombre || rec.equipo_nombre || '').map(normalize)) {
+        if (recMaqNorm === name || (alt && recMaqNorm === alt)) return true;
+        if (recMaqNorm.length >= 8 && name.length >= 8 && (recMaqNorm.includes(name) || name.includes(recMaqNorm))) return true;
       }
 
       return false;
@@ -993,6 +1018,18 @@ export default function GestionMantenimientoPage() {
           return;
         }
         setUserEmail(session.user.email || '');
+        // Pestañas permitidas (Configuración → Usuarios → Gestor de Mantenimiento). Sin ninguna marcada: todas.
+        const { data: u } = await supabase.from('usuarios').select('rol, permisos').ilike('correo', session.user.email || '').maybeSingle();
+        const rol = String(u?.rol || '').toLowerCase();
+        const gm = (u?.permisos as Record<string, unknown> | null)?.gestor_mantenimiento;
+        const MAPA: Record<string, TabType[]> = {
+          planificador: ['planificador'], mis_tareas: ['tecnico'], preventivo: ['preventivo'], ordenes_trabajo: ['historial', 'correctivo'],
+          indicadores: ['indicadores'], maquinas: ['maquinas'], configuracion: ['configuracion'],
+        };
+        const marcadas = gm && typeof gm === 'object' ? Object.entries(gm as Record<string, boolean>).filter(([, v]) => v).map(([k]) => k) : [];
+        if (rol !== 'admin' && rol !== 'desarrollador' && marcadas.length) {
+          setPestanasPermitidas(marcadas.flatMap(k => MAPA[k] || []));
+        }
       } catch (err) {
         console.error('Auth verification failed:', err);
       } finally {
@@ -1908,6 +1945,35 @@ export default function GestionMantenimientoPage() {
         .select('*')
         .order('id', { ascending: true });
 
+      // Técnicos en pantalla de una vez (Mis Tareas los necesita para reconocer al usuario); el resto de la carga
+      // (máquinas, preventivos, órdenes) los vuelve a calcular con la capacidad y las tareas al terminar
+      if (tecnicosData && tecnicosData.length) {
+        setTechnicians(prev => (prev.length ? prev : tecnicosData.map((t: any) => {
+          const pList = parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
+          return {
+            id: t.id, name: t.nombre, capacity: parseFloat(t.capacidad_horas) || systemSettings.baseCapacity || DAILY_CAPACITY_LIMIT,
+            turno: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'), documento: t.documento || '',
+            planta: pList.join(', '), plantas: pList, especialidad: pList.join(', '),
+            authorizedTitles: (t.titulos_autorizados || []).map(normalize), overloadMarginPercent: 10, activo: t.activo !== false,
+          } as Technician;
+        })));
+      }
+
+      // 4 y 5 (preventivos del día, planes y órdenes) van al mismo tiempo que el catálogo de máquinas
+      const planesYOrdenes = (async () => {
+        try {
+          await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
+        } catch (genErr) {
+          console.warn('Aviso verificando generación automática de preventivos:', genErr);
+        }
+        return Promise.all([
+          // Todos los planes (también los inactivos, para verlos y reactivarlos en Preventivo PMP);
+          // los inactivos no se generan ni salen en el Planificador ni en Mis Tareas
+          supabase.from('mantenimiento_planes_preventivos').select('*').order('id', { ascending: true }),
+          supabase.from('mantenimiento_ordenes').select('*').order('created_at', { ascending: false }),
+        ]);
+      })();
+
       // 3. Catálogo Oficial de Máquinas y Equipos
       let allMaquinas: any[] = [];
       let fromMaq = 0;
@@ -1956,25 +2022,8 @@ export default function GestionMantenimientoPage() {
 
       setMaquinasCatalogo(allMaquinas);
 
-      // Verificación y generación automática de preventivos del día
-      try {
-        await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
-      } catch (genErr) {
-        console.warn('Aviso verificando generación automática de preventivos:', genErr);
-      }
-
-      // 4. Planes Preventivos Maestros (PMP) desde Supabase
-      const { data: preventivosData, error: prevErr } = await supabase
-        .from('mantenimiento_planes_preventivos')
-        .select('*')
-        .eq('activo', true)
-        .order('id', { ascending: true });
-
-      // 5. Órdenes / Estados del día desde Supabase
-      const { data: ordenesData } = await supabase
-        .from('mantenimiento_ordenes')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // 4. Planes Preventivos Maestros (PMP) y 5. Órdenes del día (ya pedidos en paralelo arriba)
+      const [{ data: preventivosData, error: prevErr }, { data: ordenesData }] = await planesYOrdenes;
 
       if (tecnicosData && preventivosData) {
         processSupabaseData(preventivosData, tecnicosData, ordenesData || [], allMaquinas);
@@ -2005,9 +2054,9 @@ export default function GestionMantenimientoPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const rawParam = (params.get('tab') || '').toLowerCase();
-      const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas'];
+      const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas', 'turnos'];
       if (rawParam && validTabs.includes(rawParam as TabType)) {
-        setActiveTab(rawParam === 'correctivo' ? 'historial' : (rawParam as TabType));
+        setActiveTab(rawParam === 'correctivo' ? 'historial' : rawParam === 'turnos' ? 'configuracion' : (rawParam as TabType));
       }
     }
   }, []);
@@ -2097,14 +2146,23 @@ export default function GestionMantenimientoPage() {
 
       // Cross-match with official catalog for machine info
       const matchResult = matchPlanWithMaquina(p, machinesList);
-      const codigoMaquina = matchResult.codigo || null;
+      // Plan de varios equipos ("A | B"): se conservan todos y sus códigos (cada uno lo ve en su hoja de vida)
+      const variosEquipos = partesMaquina(maquina).length > 1;
+      const codigosVarios = variosEquipos
+        ? partesMaquina(maquina).map(n => matchPlanWithMaquina({ ...p, maquina: n, titulo: '', codigo: '', codigo_maquina: null }, machinesList).codigo).filter(Boolean).join(' | ')
+        : '';
+      const codigoMaquina = variosEquipos ? (codigosVarios || p.codigo_maquina || null) : (matchResult.codigo || null);
       const idMaquina = matchResult.matched?.id || null;
-      const finalMaquinaName = matchResult.nombre || maquina;
+      const finalMaquinaName = variosEquipos ? maquina : (matchResult.nombre || maquina);
 
       // Resolve assigned Planta(s) and Especialidad for this PMP
       let taskPlantas: string[] = [];
       const pmpCodeStr = (codigoMaquina || codeFormatted || title).toUpperCase();
-      if (p.plantas && Array.isArray(p.plantas) && p.plantas.length > 0) {
+      // Un solo equipo reconocido en el catálogo: manda la planta de la MÁQUINA (la del plan puede estar desactualizada)
+      const plantaMaquina = !variosEquipos && matchResult.matched?.planta ? parseTechPlantas(matchResult.matched.planta, plantasNomenclatura) : [];
+      if (plantaMaquina.length > 0) {
+        taskPlantas = plantaMaquina;
+      } else if (p.plantas && Array.isArray(p.plantas) && p.plantas.length > 0) {
         taskPlantas = parseTechPlantas(p.plantas, plantasNomenclatura);
       } else if (p.plantas && typeof p.plantas === 'string') {
         taskPlantas = parseTechPlantas(p.plantas, plantasNomenclatura);
@@ -2191,10 +2249,12 @@ export default function GestionMantenimientoPage() {
       }
 
       const matchingLocal = localTasks.find(t => t.id === id || t.title === title);
-      const matchingOrden = ordenesRaw.find(o => o.id_plan_preventivo === id || o.titulo === title);
+      // La orden más reciente DEL PLAN (vienen de la más nueva a la más vieja); por título solo si no hay ninguna ligada
+      const matchingOrden = ordenesRaw.find(o => o.id_plan_preventivo === id) || ordenesRaw.find(o => !o.id_plan_preventivo && o.titulo === title);
 
       const wasAdelantada = matchingOrden ? !!matchingOrden.adelantada : (matchingLocal ? !!matchingLocal.adelantada : false);
-      const isDueFinal = isValidFrequency || wasAdelantada;
+      // Plan inactivo: nunca queda pendiente ni suma carga
+      const isDueFinal = p.activo !== false && (isValidFrequency || wasAdelantada);
       const finalCandidate = (matchingOrden && matchingOrden.id_tecnico) 
         ? matchingOrden.id_tecnico 
         : ((matchingLocal && matchingLocal.idtecs && matchingLocal.idtecs !== 9999) ? matchingLocal.idtecs : bestCandidate);
@@ -2246,7 +2306,10 @@ export default function GestionMantenimientoPage() {
         observations: finalObs,
         fechaApertura: finalApertura,
         fechaCierre: finalCierre,
-        activo: p.activo !== false
+        activo: p.activo !== false,
+        codigoOT: matchingOrden?.codigo || null,
+        ordenId: matchingOrden?.id ?? null,
+        tiempoEjecucionMin: matchingOrden?.tiempo_ejecucion_min ?? null
       });
     });
 
@@ -3080,7 +3143,9 @@ export default function GestionMantenimientoPage() {
         frecuencia_dias: editingTask.frecuencia,
         ref_frecuencia: clampedRef,
         id_tecnicos_autorizados: [],
-        detalle_instrucciones: editingTask.detalle
+        detalle_instrucciones: editingTask.detalle,
+        // Inactivo: el generador de preventivos solo toma planes activos (no se crean más órdenes)
+        activo: editingTask.activo !== false
       };
 
       const { error } = await supabase
@@ -3090,9 +3155,11 @@ export default function GestionMantenimientoPage() {
 
       if (error) {
         console.error('Error actualizando PMP en Supabase:', error);
+        alert(`No se guardó el plan ${editingTask.code || ''} en la base de datos: ${error.message}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Excepción actualizando PMP en Supabase:', err);
+      alert(`No se guardó el plan ${editingTask.code || ''} en la base de datos: ${err?.message || err}`);
     }
 
     setEditingTask(null);
@@ -3123,12 +3190,17 @@ export default function GestionMantenimientoPage() {
     persistState(updatedTasks, technicians);
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('mantenimiento_planes_preventivos')
         .update({ activo: newActive })
         .eq('id', taskId);
-    } catch (err) {
+      if (error) throw error;
+    } catch (err: any) {
       console.warn('Error actualizando estado activo en Supabase:', err);
+      // No se guardó: vuelve a como estaba para no mostrar un estado falso
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, activo: !newActive } : t));
+      setViewingTask(v => v && v.id === taskId ? { ...v, activo: !newActive } : v);
+      alert(`No se guardó el estado del plan en la base de datos: ${err?.message || err}`);
     }
   };
 
@@ -3310,8 +3382,10 @@ export default function GestionMantenimientoPage() {
       fecha_limite: item.fecha_limite ? item.fecha_limite.slice(0, 10) : '',
       accion_tomada: item.accion_tomada || '',
       prioridad: item.prioridad,
-      fotos_solucion: item.fotos_solucion || []
+      fotos_solucion: item.fotos_solucion || [],
+      tiempo_min: (item as any).tiempo_ejecucion_min ? String((item as any).tiempo_ejecucion_min) : ''
     });
+    setFaltaTiempo(false);
     setCorrectivoModalFeedback(null);
   };
 
@@ -3377,21 +3451,35 @@ export default function GestionMantenimientoPage() {
         fotos: fotosArr,
         fotos_solucion: fotosSolucionArr
       };
+      (builtRecord as any).tiempo_ejecucion_min = row.tiempo_ejecucion_min ?? null;
 
       handleOpenCorrectivoDetail(builtRecord);
       return;
     }
 
-    // 3. If Preventivo (PMP):
-    const foundTask = tasks.find(t => 
-      t.code === code || 
-      t.csvId === code || 
-      t.id === row.id || 
-      t.title === row['Título']
-    );
+    // 3. If Preventivo (PMP): se abre ESA orden (PREV-xxxx) con los datos de su plan
+    const esOrdenDeTabla = !!row.id_plan_preventivo;
+    const foundTask = esOrdenDeTabla
+      ? tasks.find(t => t.id === row.id_plan_preventivo)
+      : tasks.find(t => t.code === code || t.csvId === code || t.title === row['Título']);
 
     if (foundTask) {
-      handleOpenPreventivoExecution(foundTask);
+      if (!esOrdenDeTabla) { handleOpenPreventivoExecution(foundTask); return; }
+      let fotosOrden: string[] = [];
+      if (Array.isArray(row.fotos_despues)) fotosOrden = row.fotos_despues;
+      else if (Array.isArray(row.fotos_solucion)) fotosOrden = row.fotos_solucion;
+      handleOpenPreventivoExecution({
+        ...foundTask,
+        ordenId: row.id,
+        codigoOT: row.codigo || code,
+        planta: row.planta || foundTask.planta,
+        status: (row._estadoDisplay || row.estado || 'Pendiente') as any,
+        observations: row.comentarios_ejecucion || row['COMENTARIO DE EJECUCION'] || '',
+        fechaApertura: row.fecha_apertura || row['FECHA DE APERTURA'] || null,
+        fechaCierre: row.fecha_cierre || row['FECHA DE CIERRE'] || null,
+        fotos: fotosOrden,
+        tiempoEjecucionMin: row.tiempo_ejecucion_min ?? null
+      });
       return;
     }
 
@@ -3422,7 +3510,10 @@ export default function GestionMantenimientoPage() {
       observations: row['COMENTARIO DE EJECUCION'] || row.accion_realizada || '',
       fechaApertura: row['FECHA DE APERTURA'] || row.fecha_apertura,
       fechaCierre: row['FECHA DE CIERRE'] || row.fecha_cierre,
-      fotos: pmpFotos
+      fotos: pmpFotos,
+      ordenId: esOrdenDeTabla ? row.id : null,
+      tiempoEjecucionMin: row.tiempo_ejecucion_min ?? null,
+      codigoOT: /^PREV-/i.test(String(code || row.codigo || '')) ? (code || row.codigo) : null
     };
     handleOpenPreventivoExecution(builtTask);
   };
@@ -3431,6 +3522,13 @@ export default function GestionMantenimientoPage() {
   const handleSaveCorrectivoModal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!viewingCorrectivo || !editingCorrectivoForm) return;
+    // Al cerrar es obligatorio el tiempo real de ejecución
+    const minutosCorr = minutosValidos(editingCorrectivoForm.tiempo_min);
+    if (editingCorrectivoForm.estado === 'Resuelta' && !minutosCorr) {
+      setFaltaTiempo(true);
+      setCorrectivoModalFeedback('Falta el tiempo de ejecución en minutos para cerrar la orden.');
+      return;
+    }
 
     setSavingCorrectivoModal(true);
     const form = editingCorrectivoForm;
@@ -3572,6 +3670,14 @@ export default function GestionMantenimientoPage() {
         }]);
       }
 
+      // 2b. Tiempo real de ejecución (aparte: si falta la columna no se pierde el resto del guardado)
+      if (minutosCorr) {
+        const { error: tErr } = await supabase.from('mantenimiento_ordenes')
+          .update({ tiempo_ejecucion_min: minutosCorr }).eq('codigo', viewingCorrectivo.codigo);
+        if (tErr) alert(`La orden se guardó, pero NO el tiempo de ejecución: ${tErr.message}\n(Falta ejecutar mant_tiempo_ejecucion.sql en Supabase).`);
+        else setHistoryRows(prev => prev.map(h => h.codigo === viewingCorrectivo.codigo ? { ...h, tiempo_ejecucion_min: minutosCorr } : h));
+      }
+
       // 3. Update tarjetas_falla_anomalia by all possible identifiers
       const tpmUpdatePayload = {
         tecnico_asignado: isUnassigned ? null : finalTechName,
@@ -3637,13 +3743,19 @@ export default function GestionMantenimientoPage() {
   // Handler to open the Preventivo Execution Modal (Portal Técnicos / Planificador)
   const handleOpenPreventivoExecution = (task: MaintenanceTask) => {
     setExecutingPreventivo(task);
+    // Cierre: por defecto ahora mismo; si ya estaba cerrada se conserva la suya. Nunca hacia atrás.
+    const ahora = getLocalDatetimeString().slice(0, 16);
+    const cierreGuardado = task.status === 'Completado' && task.fechaCierre ? task.fechaCierre.replace(' ', 'T').slice(0, 16) : '';
     setExecutingPreventivoForm({
       status: (task.status as any) || 'Pendiente',
       observations: task.observations || '',
-      fechaApertura: task.fechaApertura ? task.fechaApertura.slice(0, 16) : getLocalDatetimeString().slice(0, 16),
-      fechaCierre: task.fechaCierre ? task.fechaCierre.slice(0, 16) : (task.status === 'Completado' ? getLocalDatetimeString().slice(0, 16) : ''),
+      fechaApertura: task.fechaApertura ? task.fechaApertura.slice(0, 16) : ahora,
+      fechaCierre: cierreGuardado || ahora,
+      cierreMin: cierreGuardado || ahora,
+      tiempoMin: task.tiempoEjecucionMin ? String(task.tiempoEjecucionMin) : '',
       fotos: task.fotos || []
     });
+    setFaltaTiempo(false);
     setPreventivoModalFeedback(null);
   };
 
@@ -3651,12 +3763,23 @@ export default function GestionMantenimientoPage() {
   const handleSavePreventivoExecution = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!executingPreventivo || !executingPreventivoForm) return;
+    // Al completar es obligatorio el tiempo real de ejecución
+    const minutosPrev = minutosValidos(executingPreventivoForm.tiempoMin);
+    if (executingPreventivoForm.status === 'Completado' && !minutosPrev) {
+      setFaltaTiempo(true);
+      setPreventivoModalFeedback('Falta el tiempo de ejecución en minutos para completar la orden.');
+      return;
+    }
 
     setSavingPreventivoModal(true);
     const form = executingPreventivoForm;
     const isCompleted = form.status === 'Completado';
     const nowStr = getLocalDatetimeString();
-    const finalFechaCierre = isCompleted ? (form.fechaCierre ? form.fechaCierre : nowStr) : null;
+    // Al cerrar ahora: la hora exacta del cierre (nunca anterior a este momento). Si ya estaba cerrada, la suya.
+    const yaCerrada = executingPreventivo.status === 'Completado' && !!executingPreventivo.fechaCierre;
+    const finalFechaCierre = !isCompleted ? null
+      : yaCerrada ? (form.fechaCierre || executingPreventivo.fechaCierre || nowStr)
+      : (form.fechaCierre && form.fechaCierre.slice(0, 16) > nowStr.slice(0, 16) ? form.fechaCierre : nowStr);
     const finalFechaApertura = form.fechaApertura ? form.fechaApertura : nowStr;
 
     const updatedTask: MaintenanceTask = {
@@ -3667,28 +3790,38 @@ export default function GestionMantenimientoPage() {
       fechaCierre: finalFechaCierre,
       fotos: form.fotos || [],
       refFrecuencia: executingPreventivo.refFrecuencia,
-      isDue: isCompleted ? false : executingPreventivo.isDue
+      isDue: isCompleted ? false : executingPreventivo.isDue,
+      tiempoEjecucionMin: minutosPrev ?? executingPreventivo.tiempoEjecucionMin ?? null
     };
 
-    const updatedTasks = tasks.map(t => t.id === executingPreventivo.id ? updatedTask : t);
-    setTasks(updatedTasks);
-    persistState(updatedTasks, technicians);
+    // El plan en el Planificador solo cambia si se cerró su orden vigente (no una vieja abierta desde Órdenes de Trabajo)
+    const planActual = tasks.find(t => t.id === executingPreventivo.id);
+    const esOrdenVigente = !executingPreventivo.ordenId || !planActual?.ordenId || planActual.ordenId === executingPreventivo.ordenId;
+    if (esOrdenVigente) {
+      const updatedTasks = tasks.map(t => t.id === executingPreventivo.id ? updatedTask : t);
+      setTasks(updatedTasks);
+      persistState(updatedTasks, technicians);
+    }
     setExecutingPreventivo(updatedTask);
 
     try {
       const tech = technicians.find(t => t.id === updatedTask.idtecs);
       const techName = tech ? tech.name : 'Super técnico';
 
-      // Buscar si ya existe una orden en mantenimiento_ordenes para este plan
-      const { data: existingOrd } = await supabase
-        .from('mantenimiento_ordenes')
-        .select('id')
-        .eq('id_plan_preventivo', updatedTask.id)
-        .eq('estado', 'Pendiente')
-        .order('id', { ascending: false })
-        .limit(1);
+      // La orden que se abrió (PREV-xxxx); si no se sabe, la última pendiente del plan
+      const { data: existingOrd } = executingPreventivo.ordenId
+        ? { data: [{ id: executingPreventivo.ordenId }] }
+        : await supabase
+          .from('mantenimiento_ordenes')
+          .select('id')
+          .eq('id_plan_preventivo', updatedTask.id)
+          .eq('estado', 'Pendiente')
+          .order('id', { ascending: false })
+          .limit(1);
 
+      let ordenGuardadaId: number | null = null;
       if (existingOrd && existingOrd.length > 0) {
+        ordenGuardadaId = existingOrd[0].id;
         await supabase
           .from('mantenimiento_ordenes')
           .update({
@@ -3702,7 +3835,7 @@ export default function GestionMantenimientoPage() {
           })
           .eq('id', existingOrd[0].id);
       } else {
-        await supabase.from('mantenimiento_ordenes').insert({
+        const { data: nueva } = await supabase.from('mantenimiento_ordenes').insert({
           id_plan_preventivo: updatedTask.id,
           codigo: updatedTask.code,
           titulo: updatedTask.title,
@@ -3719,7 +3852,15 @@ export default function GestionMantenimientoPage() {
           comentarios_ejecucion: form.observations.trim(),
           fotos_despues: form.fotos || [],
           adelantada: !!updatedTask.adelantada
-        });
+        }).select('id');
+        ordenGuardadaId = nueva?.[0]?.id ?? null;
+      }
+
+      // Tiempo real de ejecución (aparte: si falta la columna no se pierde el resto del guardado)
+      if (minutosPrev && ordenGuardadaId) {
+        const { error: tErr } = await supabase.from('mantenimiento_ordenes')
+          .update({ tiempo_ejecucion_min: minutosPrev }).eq('id', ordenGuardadaId);
+        if (tErr) alert(`La orden se guardó, pero NO el tiempo de ejecución: ${tErr.message}\n(Falta ejecutar mant_tiempo_ejecucion.sql en Supabase).`);
       }
 
       fetchHistoryRecords();
@@ -4751,7 +4892,7 @@ export default function GestionMantenimientoPage() {
   }, [tasks, selectedTechId]);
 
   const waitingTasks = useMemo(() => {
-    return tasks.filter(t => t.idtecs === 9999);
+    return tasks.filter(t => t.idtecs === 9999 && t.activo !== false);
   }, [tasks]);
 
   const activeTasks = useMemo(() => {
@@ -4903,6 +5044,18 @@ export default function GestionMantenimientoPage() {
 
   // Pre-process & Index all History Records (resolves machines, pre-computes normalized search strings, formats dates once)
   const processedHistoryRecords = useMemo(() => {
+    // Día (AAAA-MM-DD, hora Colombia) para filtrar por rango y textos de fecha para la búsqueda (24/11/2026, 24/11/26)
+    const fmtDia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const diaDe = (t: number, raw: string) => {
+      if (t && !isNaN(t)) return fmtDia.format(new Date(t));
+      const m = String(raw || '').match(/^(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : '';
+    };
+    const textosFecha = (dia: string) => {
+      if (!dia) return '';
+      const [a, m, d] = dia.split('-');
+      return `${d}/${m}/${a} ${d}/${m}/${a.slice(2)} ${d}-${m}-${a} ${dia}`;
+    };
     return historyRows.map((row, idx) => {
       const category = getHistoryRecordCategory(row);
       const codigoDisplay = getHistoryRecordCode(row, idx);
@@ -4934,8 +5087,12 @@ export default function GestionMantenimientoPage() {
       const tPlazo = rawPlazo ? new Date(rawPlazo).getTime() : 0;
       const tApertura = rawApertura ? new Date(rawApertura).getTime() : 0;
       const tCierre = rawCierre ? new Date(rawCierre).getTime() : 0;
+      const diaApertura = rawApertura ? diaDe(tApertura, rawApertura) : '';
+      const diaCierre = rawCierre ? diaDe(tCierre, rawCierre) : '';
 
       const searchTokens = normalize([
+        textosFecha(diaApertura),
+        textosFecha(diaCierre),
         codigoDisplay,
         row.codigo || '',
         row['CODIGO'] || '',
@@ -4981,6 +5138,7 @@ export default function GestionMantenimientoPage() {
         _plazoTime: isNaN(tPlazo) ? 0 : tPlazo,
         _aperturaTime: isNaN(tApertura) ? 0 : tApertura,
         _cierreTime: isNaN(tCierre) ? 0 : tCierre,
+        _diaApertura: diaApertura,
         _searchString: searchTokens
       };
     });
@@ -5078,6 +5236,9 @@ export default function GestionMantenimientoPage() {
       if (historyTecnico !== 'Todos' && row._techName !== historyTecnico) {
         return false;
       }
+      // Rango de fechas (fecha de apertura)
+      if (historyDesde && (!row._diaApertura || row._diaApertura < historyDesde)) return false;
+      if (historyHasta && (!row._diaApertura || row._diaApertura > historyHasta)) return false;
       return true;
     });
 
@@ -5139,7 +5300,7 @@ export default function GestionMantenimientoPage() {
       if (valA > valB) return historySortAsc ? 1 : -1;
       return 0;
     });
-  }, [processedHistoryRecords, deferredHistorySearch, historyTipo, historyEstado, historyTecnico, historySortField, historySortAsc]);
+  }, [processedHistoryRecords, deferredHistorySearch, historyTipo, historyEstado, historyTecnico, historyDesde, historyHasta, historySortField, historySortAsc]);
 
   // Total pages and paginated slice for buttery smooth rendering
   const totalHistoryPages = useMemo(() => {
@@ -5756,14 +5917,30 @@ export default function GestionMantenimientoPage() {
   };
 
   // Portal Technician Object
+  // Técnico del usuario con sesión: el correo nombre.apellido@firplak.com contra el nombre del técnico
+  // (cada parte del correo debe ser el comienzo de una palabra del nombre; solo si hay un único técnico así)
+  const techDelUsuario = useMemo(() => {
+    const n = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const partes = n(userEmail.split('@')[0] || '').split(/[._-]+/).filter(p => p.length >= 2);
+    if (partes.length < 2) return null;
+    const cand = technicians.filter(t => t.id !== 9999).filter(t => {
+      const pal = n(t.name).split(/\s+/);
+      return partes.every(p => pal.some(w => w.startsWith(p)));
+    });
+    return cand.length === 1 ? cand[0] : null;
+  }, [technicians, userEmail]);
+
   const currentPortalTech = useMemo(() => {
+    if (techDelUsuario) return techDelUsuario;
     return technicians.find(t => t.id === activeTechId) || null;
-  }, [technicians, activeTechId]);
+  }, [technicians, activeTechId, techDelUsuario]);
 
   const portalTechTasks = useMemo(() => {
-    if (!activeTechId) return [];
-    return tasks.filter(t => t.idtecs === activeTechId);
-  }, [tasks, activeTechId]);
+    if (!currentPortalTech) return [];
+    return tasks.filter(t => t.idtecs === currentPortalTech.id && t.activo !== false);
+  }, [tasks, currentPortalTech]);
+  // Planes activos (los inactivos no salen en el Planificador)
+  const tasksActivas = useMemo(() => tasks.filter(t => t.activo !== false), [tasks]);
 
   const portalTechCorrectivos = useMemo(() => {
     if (!currentPortalTech) return [];
@@ -5792,6 +5969,7 @@ export default function GestionMantenimientoPage() {
     const q = normalize(portalSearchQuery);
     return portalTechTasks.filter(t => 
       normalize(t.code || t.csvId || '').includes(q) ||
+      normalize(t.codigoOT || '').includes(q) ||
       normalize(t.title).includes(q) ||
       normalize(t.maquina).includes(q) ||
       normalize(t.detalle || '').includes(q) ||
@@ -6077,15 +6255,15 @@ export default function GestionMantenimientoPage() {
   }, [portalTechTasks, portalTechCorrectivos, plannerColumns, currentPortalTech]);
 
   // SubHeader Navigation Items matching FIRPLAK Pattern
-  const subNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
+  const subNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = ([
     { id: 'planificador', label: 'Planificador', icon: <Layers size={14} /> },
-    { id: 'tecnico', label: 'Portal Técnicos', icon: <User size={14} /> },
+    { id: 'tecnico', label: 'Mis Tareas', icon: <User size={14} /> },
     { id: 'preventivo', label: 'Preventivo (PMP)', icon: <FileSpreadsheet size={14} /> },
     { id: 'historial', label: 'Órdenes de Trabajo', icon: <History size={14} /> },
     { id: 'indicadores', label: 'Indicadores', icon: <BarChart3 size={14} /> },
     { id: 'maquinas', label: 'Máquinas y Equipos', icon: <Cpu size={14} /> },
     { id: 'configuracion', label: 'Configuración', icon: <Settings size={14} /> },
-  ];
+  ] as { id: TabType; label: string; icon: React.ReactNode }[]).filter(i => !pestanasPermitidas || pestanasPermitidas.includes(i.id));
 
   if (loading) {
     return (
@@ -6174,7 +6352,7 @@ export default function GestionMantenimientoPage() {
           <div className="flex flex-col gap-2 animate-in fade-in duration-300">
             <PlannerTecnicosColumnas
               technicians={technicians}
-              tasks={tasks}
+              tasks={tasksActivas}
               correctiveRecords={correctiveRecords}
               isSubHeaderOpen={isSubHeaderOpen}
               onUpdateTaskTech={(taskId, newTechId) => handleAssignTask(taskId, newTechId)}
@@ -6191,6 +6369,7 @@ export default function GestionMantenimientoPage() {
               onSaveTask={handleSavePreventivoFromPlanner}
               onSaveCorrectivo={handleSaveCorrectivoFromPlanner}
               onOpenCorrectivoDetail={(corr) => handleOpenCorrectivoDetail(corr as unknown as CorrectiveRecord)}
+              onOpenPreventivoDetail={(task) => handleOpenPreventivoExecution(task as unknown as MaintenanceTask)}
             />
           </div>
         )}
@@ -6202,43 +6381,21 @@ export default function GestionMantenimientoPage() {
           <div className={`flex flex-col gap-3 w-full ${!currentPortalTech ? 'max-w-4xl mx-auto' : 'w-full'} animate-in fade-in duration-300`}>
             
             {!currentPortalTech ? (
-              /* Step 1: Login by Cédula or ID */
-              <div className="bg-white rounded-3xl p-8 sm:p-12 border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.06)] text-center flex flex-col items-center gap-6">
-                <div className="w-16 h-16 rounded-full bg-[#324354]/10 text-[#324354] flex items-center justify-center">
-                  <User className="w-8 h-8" />
+              /* Usuario que no es técnico (jefe, planificador): elige de quién ver el tablero.
+                 Los técnicos entran directo a su tablero por su usuario (techDelUsuario). */
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#e2ded5] shadow-[0_4px_25px_rgba(50,67,84,0.06)] text-center flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[#324354]/10 text-[#324354] flex items-center justify-center">
+                  <User className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-[#324354]">Portal de Consulta del Técnico</h2>
-                  <p className="text-sm text-gray-500 mt-1">Ingresa tu número de Cédula o ID de técnico para ver y reportar tus mantenimientos asignados hoy.</p>
+                  <h2 className="text-xl font-bold text-[#324354]">Mis Tareas</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {technicians.length ? <>Tu usuario ({userEmail}) no corresponde a ningún técnico. Elige el técnico cuyo tablero quieres ver.</> : 'Cargando técnicos…'}
+                  </p>
                 </div>
 
-                <form onSubmit={handlePortalLogin} className="w-full max-w-md flex flex-col gap-4">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={portalDocSearch}
-                      onChange={(e) => setPortalDocSearch(e.target.value)}
-                      placeholder="Ej. 1010232658 o ID: 1"
-                      className="w-full px-4 py-3 bg-[#F6F3EE] rounded-2xl border border-gray-300 text-center font-bold text-lg text-[#324354] focus:outline-none focus:border-[#324354]"
-                    />
-                  </div>
-                  {portalError && (
-                    <div className="text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                      {portalError}
-                    </div>
-                  )}
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-[#324354] text-white font-bold rounded-2xl shadow-md hover:bg-[#324354]/90 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>Ingresar a mis Mantenimientos</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-
-                {/* Quick select from active techs */}
-                <div className="pt-4 border-t border-gray-100 w-full">
-                  <div className="text-xs text-gray-400 font-semibold mb-3">O selecciona tu perfil directo de la jornada:</div>
+                <div className="pt-3 border-t border-gray-100 w-full">
+                  <div className="text-xs text-gray-400 font-semibold mb-3">Técnicos:</div>
                   <div className="flex flex-wrap gap-2 justify-center">
                     {technicians.filter(t => t.id !== 9999).map(t => (
                       <button
@@ -6363,17 +6520,17 @@ export default function GestionMantenimientoPage() {
                       </span>
                     </div>
 
-                    {/* Exit/Logout Button */}
-                    <button
+                    {/* Volver a la lista (solo quien no es técnico: el técnico ve siempre su propio tablero) */}
+                    {!techDelUsuario && <button
                       onClick={() => {
                         setActiveTechId(null);
                         sessionStorage.removeItem('techflow_active_tech_id');
                       }}
                       className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all cursor-pointer shrink-0"
-                      title="Salir del portal de técnico"
+                      title="Ver otro técnico"
                     >
                       <LogOut className="w-4 h-4" />
-                    </button>
+                    </button>}
 
                   </div>
 
@@ -7624,6 +7781,8 @@ export default function GestionMantenimientoPage() {
                       setHistoryTipo('Todos');
                       setHistoryEstado('Todos');
                       setHistoryTecnico('Todos');
+                      setHistoryDesde('');
+                      setHistoryHasta('');
                       setHistorySortField('apertura');
                       setHistorySortAsc(false);
                       setHistoryPage(1);
@@ -7647,6 +7806,18 @@ export default function GestionMantenimientoPage() {
                     placeholder="Búsqueda global (OT, máquina, técnico, síntoma, estado, fecha...)"
                     className="w-full pl-10 pr-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-medium focus:outline-none focus:border-[#324354] transition-all"
                   />
+                </div>
+
+                {/* Rango de fechas (apertura) */}
+                <div className="flex items-center gap-1.5 w-full md:w-auto shrink-0" title="Filtra por fecha de apertura">
+                  <span className="text-[10px] font-black text-[#7B8E90] uppercase">Desde</span>
+                  <input type="date" value={historyDesde} max={historyHasta || undefined}
+                    onChange={(e) => { setHistoryDesde(e.target.value); setHistoryPage(1); }}
+                    className="h-[34px] px-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none focus:border-[#324354] w-[128px]" />
+                  <span className="text-[10px] font-black text-[#7B8E90] uppercase">Hasta</span>
+                  <input type="date" value={historyHasta} min={historyDesde || undefined}
+                    onChange={(e) => { setHistoryHasta(e.target.value); setHistoryPage(1); }}
+                    className="h-[34px] px-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs font-semibold text-[#324354] focus:outline-none focus:border-[#324354] w-[128px]" />
                 </div>
 
                 {/* Origen / Tipo */}
@@ -8155,13 +8326,23 @@ export default function GestionMantenimientoPage() {
         {/* ========================================================================= */}
         {/* VIEW 7: CONFIGURACIÓN */}
         {/* ========================================================================= */}
+        {/* Configuración: primero los turnos de la semana (actual y próxima), después la cuadrilla y lo demás */}
+        {activeTab === 'configuracion' && (
+          <div className="w-full mb-4 animate-in fade-in duration-300">
+            <TurnosSemanales technicians={technicians} userEmail={userEmail} onTechsUpdated={fetchData} onDistribucion={setPctProduccionHoy} />
+          </div>
+        )}
+
         {activeTab === 'configuracion' && (
           <div className="max-w-[1600px] mx-auto w-full flex flex-col gap-7 animate-in fade-in duration-300">
             
             {/* ========================================================================= */}
             {/* SECCIÓN 1: PLANIFICACIÓN DE CUADRILLA, HORARIOS Y TURNOS (FUSIÓN TOTAL)   */}
             {/* ========================================================================= */}
-            <MatrizHorariosTurnos technicians={technicians} onTechsUpdated={fetchData} />
+            <MatrizHorariosTurnos technicians={technicians} onTechsUpdated={fetchData} pctProduccion={pctProduccionHoy} />
+
+            {/* Especialidades de cada técnico (varias), aparte de la cuadrilla */}
+            <EspecialidadesTecnicos technicians={technicians} plantas={plantasNomenclatura} onTechsUpdated={fetchData} />
 
             {/* ========================================================================= */}
             {/* SECCIÓN 2: TIPO DE INTERVENCIÓN */}
@@ -9719,32 +9900,19 @@ export default function GestionMantenimientoPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos</label>
-                <input
-                  list="maquinas-catalogo-options"
-                  type="text"
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos <span className="text-[10px] text-gray-400 font-normal normal-case">(uno o varios: la ejecución queda en la hoja de vida de cada uno)</span></label>
+                <MaquinasMultiples
                   value={newTaskForm.maquina}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const matched = maquinasCatalogo.find(m => 
-                      `${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`.toLowerCase() === val.toLowerCase() ||
-                      m.nombre_equipo?.toLowerCase() === val.toLowerCase() ||
-                      (m.codigo_equipo && m.codigo_equipo.toLowerCase() === val.toLowerCase())
-                    );
-                    if (matched) {
-                      const matchedPlanta = obtenerCodigoPlanta(matched.planta || 'MS', plantasNomenclatura);
-                      setNewTaskForm(prev => ({
-                        ...prev,
-                        maquina: matched.nombre_equipo,
-                        planta: matchedPlanta,
-                        plantas: [matchedPlanta]
-                      }));
-                    } else {
-                      setNewTaskForm(prev => ({ ...prev, maquina: val }));
-                    }
+                  catalogo={maquinasCatalogo}
+                  onChange={(valor, reconocidas) => {
+                    // Las plantas salen de los equipos reconocidos (sin repetir)
+                    const plantasM = [...new Set(reconocidas.map(m => obtenerCodigoPlanta(m.planta || 'MS', plantasNomenclatura)))];
+                    setNewTaskForm(prev => ({
+                      ...prev,
+                      maquina: valor,
+                      ...(plantasM.length ? { planta: plantasM.join(', '), plantas: plantasM } : {})
+                    }));
                   }}
-                  placeholder="Buscar o seleccionar equipo..."
-                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
@@ -9929,38 +10097,26 @@ export default function GestionMantenimientoPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos</label>
-                <input
-                  list="maquinas-catalogo-options"
-                  type="text"
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Máquinas y Equipos <span className="text-[10px] text-gray-400 font-normal normal-case">(uno o varios: la ejecución queda en la hoja de vida de cada uno)</span></label>
+                <MaquinasMultiples
                   value={editingTask.maquina || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const matched = maquinasCatalogo.find(m => 
-                      `${m.codigo_equipo ? `[${m.codigo_equipo}] ` : ''}${m.nombre_equipo}`.toLowerCase() === val.toLowerCase() ||
-                      m.nombre_equipo?.toLowerCase() === val.toLowerCase() ||
-                      (m.codigo_equipo && m.codigo_equipo.toLowerCase() === val.toLowerCase())
-                    );
-                    if (matched) {
-                      const matchedPlanta = obtenerCodigoPlanta(matched.planta || 'MS', plantasNomenclatura);
-                      setEditingTask(prev => {
-                        if (!prev) return null;
-                        const currPlantas = prev.plantas && prev.plantas.length > 0 ? prev.plantas : [matchedPlanta];
-                        return {
-                          ...prev,
-                          maquina: matched.nombre_equipo,
-                          codigoMaquina: matched.codigo_equipo || null,
-                          idMaquina: matched.id || null,
-                          planta: currPlantas.join(', '),
-                          plantas: currPlantas
-                        };
-                      });
-                    } else {
-                      setEditingTask(prev => prev ? { ...prev, maquina: val } : null);
-                    }
+                  catalogo={maquinasCatalogo}
+                  onChange={(valor, reconocidas) => {
+                    const plantasM = [...new Set(reconocidas.map(m => obtenerCodigoPlanta(m.planta || 'MS', plantasNomenclatura)))];
+                    setEditingTask(prev => {
+                      if (!prev) return null;
+                      const currPlantas = prev.plantas && prev.plantas.length > 0 ? prev.plantas : plantasM;
+                      return {
+                        ...prev,
+                        maquina: valor,
+                        // Códigos de todos los equipos (la hoja de vida los busca por código); el id, el del primero
+                        codigoMaquina: reconocidas.map(m => m.codigo_equipo).filter(Boolean).join(' | ') || null,
+                        idMaquina: (reconocidas[0]?.id as number) || null,
+                        planta: currPlantas.join(', '),
+                        plantas: currPlantas
+                      };
+                    });
                   }}
-                  placeholder="Buscar o seleccionar equipo..."
-                  className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#324354]"
                 />
               </div>
 
@@ -10068,6 +10224,22 @@ export default function GestionMantenimientoPage() {
                     <option value="General">General</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Estado del plan: Inactivo = no se vuelven a generar órdenes de este mantenimiento */}
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Estado del Plan</label>
+                <select
+                  value={editingTask.activo === false ? 'inactivo' : 'activo'}
+                  onChange={(e) => setEditingTask(prev => prev ? { ...prev, activo: e.target.value === 'activo' } : null)}
+                  className={`w-full px-3 py-2 rounded-xl border text-sm font-bold ${editingTask.activo === false ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-emerald-50 border-emerald-300 text-emerald-800'}`}
+                >
+                  <option value="activo">● Activo</option>
+                  <option value="inactivo">○ Inactivo</option>
+                </select>
+                {editingTask.activo === false && (
+                  <p className="text-[11px] text-slate-500 mt-1">Inactivo: no se generan más órdenes de este mantenimiento. Las órdenes ya creadas se conservan.</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -11110,6 +11282,15 @@ export default function GestionMantenimientoPage() {
                   </div>
                 </div>
 
+                {/* Tiempo real de ejecución (correctivos y tarjetas TPM): siempre visible; al cerrar se resalta si falta */}
+                <div className="mt-3">
+                  <TiempoEjecucionInput
+                    value={editingCorrectivoForm.tiempo_min}
+                    onChange={v => setEditingCorrectivoForm(prev => prev ? ({ ...prev, tiempo_min: v }) : null)}
+                    falta={faltaTiempo || editingCorrectivoForm.estado === 'Resuelta'}
+                  />
+                </div>
+
                 {/* Acción Correctiva / Observaciones */}
                 <div className="mt-3">
                   <label className="text-xs font-bold text-gray-700 block mb-1.5 flex items-center gap-1.5">
@@ -11313,8 +11494,14 @@ export default function GestionMantenimientoPage() {
             <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4">
               <div className="flex flex-col gap-1 pr-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200">
-                    #{executingPreventivo.code || executingPreventivo.csvId}
+                  {/* Primero el código único de la orden (PREV-xxxx); después el del plan (PMP) */}
+                  {executingPreventivo.codigoOT && executingPreventivo.codigoOT !== executingPreventivo.code && (
+                    <span className="px-2.5 py-1 bg-sky-50 font-mono font-black text-sky-800 rounded-lg text-xs border border-sky-200" title="Orden de trabajo (código único)">
+                      #{executingPreventivo.codigoOT}
+                    </span>
+                  )}
+                  <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-600 rounded-lg text-xs border border-slate-200" title="Plan preventivo">
+                    {executingPreventivo.code || executingPreventivo.csvId}
                   </span>
                   <span className="px-2.5 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                     <span className="font-bold text-[#324354]">{obtenerCodigoPlanta(executingPreventivo.planta)}</span>
@@ -11385,7 +11572,7 @@ export default function GestionMantenimientoPage() {
                         setExecutingPreventivoForm(prev => prev ? ({
                           ...prev,
                           status: newSt,
-                          fechaCierre: newSt === 'Completado' ? (prev.fechaCierre || getLocalDatetimeString().slice(0, 16)) : prev.fechaCierre
+                          fechaCierre: prev.fechaCierre || getLocalDatetimeString().slice(0, 16)
                         }) : null);
                       }}
                       className={`w-full px-3 py-2.5 rounded-xl border text-xs sm:text-sm font-bold focus:outline-none transition-all cursor-pointer ${
@@ -11446,10 +11633,25 @@ export default function GestionMantenimientoPage() {
                     <input
                       type="datetime-local"
                       value={executingPreventivoForm.fechaCierre}
-                      onChange={(e) => setExecutingPreventivoForm(prev => prev ? ({ ...prev, fechaCierre: e.target.value }) : null)}
+                      min={executingPreventivoForm.cierreMin}
+                      title="Por defecto, la fecha y hora del cierre. No se puede poner hacia atrás."
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        // No se deja poner hacia atrás: si es anterior al mínimo, queda el mínimo
+                        setExecutingPreventivoForm(prev => prev ? ({ ...prev, fechaCierre: v && prev.cierreMin && v < prev.cierreMin ? prev.cierreMin : (v || prev.cierreMin || '') }) : null);
+                      }}
                       className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-[#e2ded5] text-xs sm:text-sm font-semibold text-[#324354] focus:outline-none focus:border-[#324354]"
                     />
                   </div>
+                </div>
+
+                {/* Tiempo real de ejecución: siempre visible; al marcar Completado se resalta si falta */}
+                <div className="mt-3">
+                  <TiempoEjecucionInput
+                    value={executingPreventivoForm.tiempoMin || ''}
+                    onChange={v => setExecutingPreventivoForm(prev => prev ? ({ ...prev, tiempoMin: v }) : null)}
+                    falta={faltaTiempo || executingPreventivoForm.status === 'Completado'}
+                  />
                 </div>
 
                 {/* Observaciones de Ejecución */}
@@ -11604,13 +11806,14 @@ export default function GestionMantenimientoPage() {
       {/* Modal: View Maintenance Task Details (Ficha Técnica Completa) */}
       {viewingTask && (
         <div 
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 pt-16 sm:pt-20 pb-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-[10000] flex items-stretch justify-center p-2 sm:p-3 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setViewingTask(null);
           }}
         >
-          <div 
-            className="bg-white rounded-3xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[90vh] flex flex-col gap-4 relative my-auto overflow-hidden"
+          {/* Casi a pantalla completa (margen pequeño); en pantallas anchas, 2 columnas con scroll propio */}
+          <div
+            className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 w-full max-w-[1800px] h-full shadow-2xl border border-[#e2ded5] flex flex-col gap-3 sm:gap-4 relative overflow-hidden"
             onMouseDown={(e) => e.stopPropagation()}
             onMouseUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -11667,9 +11870,9 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Scrollable Body Content */}
-            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4">
-              {/* Technical Instructions Box */}
-              <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:overflow-hidden lg:pr-0">
+              {/* Technical Instructions Box (columna izquierda en pantallas anchas) */}
+              <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5 lg:min-h-0 lg:overflow-y-auto">
                 <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[#7B8E90]" />
                   <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
@@ -11685,8 +11888,10 @@ export default function GestionMantenimientoPage() {
                 )}
               </div>
 
+              {/* Columna derecha: parámetros, plantas y órdenes */}
+              <div className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
               {/* Parameters Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 2xl:grid-cols-4 gap-3 text-xs">
                 <div className="p-3 bg-white border border-gray-200 rounded-2xl flex flex-col gap-1">
                   <span className="text-gray-400 font-bold block text-[10px] uppercase">Máquinas y Equipos</span>
                   <div className="flex flex-wrap items-center gap-1.5 leading-snug">
@@ -11821,7 +12026,7 @@ export default function GestionMantenimientoPage() {
                         Aún no se han generado órdenes de trabajo ejecutadas para este plan preventivo.
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+                      <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden max-h-72 lg:max-h-none overflow-y-auto">
                         {orders.map((ord, idx) => {
                           const category = ord.category || getHistoryRecordCategory(ord);
                           const codigoDisplay = ord.codigoDisplay || getHistoryRecordCode(ord, idx);
@@ -11899,6 +12104,7 @@ export default function GestionMantenimientoPage() {
                   </button>
                 </div>
               )}
+              </div>
             </div>
 
             {/* Modal Actions - Fixed at Bottom */}

@@ -25,6 +25,7 @@ interface User {
         sistema_produccion?: any;
         mtto_autonomo?: any;
         hdt?: any;
+        inventarios_ciclicos?: any;
     }
 }
 
@@ -46,7 +47,7 @@ export default function HomePage() {
 
         let { data: userData } = await supabase
             .from('usuarios')
-            .select('id, permisos')
+            .select('id, permisos, planta_muebles')
             .eq('uuid', authUser.id)
             .maybeSingle()
 
@@ -54,7 +55,7 @@ export default function HomePage() {
             // Auto-vinculación por correo electrónico (insensible a mayúsculas/minúsculas)
             const { data: emailUser } = await supabase
                 .from('usuarios')
-                .select('id, permisos')
+                .select('id, permisos, planta_muebles')
                 .ilike('correo', authUser.email)
                 .maybeSingle()
 
@@ -78,7 +79,7 @@ export default function HomePage() {
         // Lógica de redirección automática si solo tiene UNA aplicación total
         const appPaths: Record<string, string> = {
             modulos: '/marmol',
-            muebles: '/muebles',
+            muebles: String((userData as any)?.planta_muebles || '').toLowerCase() === 'cefi' ? '/cefi' : '/muebles',
             calidad: '/calidad',
             fibra: '/fibra',
             configuracion: '/configuracion',
@@ -89,7 +90,8 @@ export default function HomePage() {
             asistencia: '/asistencia',
             sistema_produccion: '/sistema-produccion',
             hdt: '/hdt',
-            agente_manufactura: '/agente-manufactura'
+            agente_manufactura: '/agente-manufactura',
+            inventarios_ciclicos: '/inventarios-ciclicos'
         };
 
         const availableApps = Object.keys(combinedUser.permisos || {}).filter(key => 
@@ -153,6 +155,12 @@ export default function HomePage() {
         return true;
     }
 
+    const hasInventariosCiclicos = () => {
+        if (!user) return false;
+        if (user.email?.toLowerCase() === 'analista2.desarrollo@firplak.com') return true;
+        return !!user.permisos?.inventarios_ciclicos;
+    }
+
     return (
         <div className="min-h-screen bg-[#F6F3EE] flex flex-col font-sans text-[#000000]">
             {/* Header */}
@@ -197,6 +205,21 @@ export default function HomePage() {
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Informe de Turno</span>
+                            </button>
+                        </div>
+
+                        {/* Esquema de Personal Button */}
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <button
+                                onClick={() => router.push('/esquema-personal')}
+                                className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 6v12M6 6h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Esquema de<br/>Personal</span>
                             </button>
                         </div>
 
@@ -297,6 +320,25 @@ export default function HomePage() {
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Inventarios</span>
                             </button>
                         </div>
+
+                        {/* Inventarios Cíclicos Button (requiere permiso o analista2.desarrollo) */}
+                        {hasInventariosCiclicos() && (
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                                <button
+                                    onClick={() => router.push('/inventarios-ciclicos')}
+                                    className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                                >
+                                    <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
+                                        <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
+                                        Inventarios<br />Cíclicos
+                                    </span>
+                                </button>
+                            </div>
+                        )}
 
                         {/* Consulta SAP Button */}
                         <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">

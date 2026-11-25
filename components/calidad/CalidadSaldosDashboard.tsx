@@ -19,7 +19,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import FiltroPbi, { semanaIso } from '@/components/calidad/FiltroPbi';
 import RegistrarSaldoModal from '@/components/calidad/RegistrarSaldoModal';
-import { COLOR_TIPO_SD, CostoSku, EventoSD, NOMBRE_TIPO_SD, PLANTAS_SD, TipoSD, cargarEventosSD, fetchFabricadasMsPorMes } from '@/lib/calidad/saldosDestrucciones';
+import { COLOR_TIPO_SD, CostoSku, EventoSD, NOMBRE_TIPO_SD, PLANTAS_SD, TipoSD, cargarEventosSDCache, datosSDEnCache, fetchFabricadasMsPorMesCache } from '@/lib/calidad/saldosDestrucciones';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -157,10 +157,16 @@ export default function CalidadSaldosDashboard() {
     const [registrando, setRegistrando] = useState(false);
     const [recarga, setRecarga] = useState(0);
 
+    // Si ya hay datos en caché (precarga desde Calidad IFI o visita anterior) se muestran de inmediato
+    useEffect(() => {
+        const ya = datosSDEnCache();
+        if (ya) { setEventos(ya.eventos); setCostos(ya.costos); setAvisos(ya.avisos); setLoading(false); }
+    }, []);
+
     useEffect(() => {
         let vivo = true;
-        setLoading(true);
-        cargarEventosSD(supabase)
+        if (!datosSDEnCache() || recarga > 0) setLoading(true);
+        cargarEventosSDCache(supabase, recarga > 0)
             .then(d => { if (vivo) { setEventos(d.eventos); setCostos(d.costos); setAvisos(d.avisos); setError(null); } })
             .catch(e => { if (vivo) setError(e?.message || 'No se pudieron cargar los saldos y destrucciones'); })
             .finally(() => { if (vivo) setLoading(false); });
@@ -173,7 +179,7 @@ export default function CalidadSaldosDashboard() {
     useEffect(() => {
         if (!aniosConEventos) return;
         let vivo = true;
-        fetchFabricadasMsPorMes(supabase, aniosConEventos.split(',').map(Number))
+        fetchFabricadasMsPorMesCache(supabase, aniosConEventos.split(',').map(Number))
             .then(f => { if (vivo) setFabricadas(f); })
             .catch(() => { if (vivo) setFabricadas({}); });
         return () => { vivo = false; };
@@ -252,8 +258,10 @@ export default function CalidadSaldosDashboard() {
     }, [filtrados, selPeriodo, selCausa, busqueda]);
 
     // Columnas de las gráficas de tiempo (saldo y destrucción apilados + acumulado)
-    const columnasDe = (lista: EventoSD[], gran: Gran): Columna[] => {
+    // diasCero: días que deben verse aunque no tengan saldos ni destrucciones (columna en 0)
+    const columnasDe = (lista: EventoSD[], gran: Gran, diasCero: string[] = []): Columna[] => {
         const grupos = new Map<string, { saldo: number; destruccion: number }>();
+        diasCero.forEach(d => grupos.set(d, { saldo: 0, destruccion: 0 }));
         lista.forEach(e => {
             const k = clavePeriodo(e, gran);
             const g = grupos.get(k) || { saldo: 0, destruccion: 0 };
@@ -287,9 +295,23 @@ export default function CalidadSaldosDashboard() {
         });
     };
 
-    const columnasPrincipal = useMemo(() => columnasDe(filtrados.filter(e => conCausa(e) && enRef(e)), granPrincipal),
+    // Un mes: todos los días hasta hoy (o hasta fin de mes), también los que quedaron en 0; los domingos solo si tienen datos
+    const diasDelMes = useMemo(() => {
+        if (!unSoloMes || filtroDiario) return [];
+        const anio = anios[0], mes = meses[0];
+        const hoy = new Date();
+        const ultimo = anio === hoy.getFullYear() && mes === hoy.getMonth() + 1 ? hoy.getDate()
+            : new Date(anio, mes, 0) < hoy ? new Date(anio, mes, 0).getDate() : 0;
+        const dias: string[] = [];
+        for (let d = 1; d <= ultimo; d++) {
+            if (new Date(anio, mes - 1, d).getDay() === 0) continue;
+            dias.push(`${anio}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+        }
+        return dias;
+    }, [unSoloMes, filtroDiario, anios, meses]);
+    const columnasPrincipal = useMemo(() => columnasDe(filtrados.filter(e => conCausa(e) && enRef(e)), granPrincipal, granPrincipal === 'dia' ? diasDelMes : []),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [filtrados, selCausa, selRef, granPrincipal, medida, unSoloMes]);
+        [filtrados, selCausa, selRef, granPrincipal, medida, unSoloMes, diasDelMes]);
     // % sobre fabricadas: piezas de saldos y destrucciones de MS ÷ piezas de MS entregadas a CEDI (solo meses con entregas)
     const msVisible = !plantasSel.length || plantasSel.includes('MS');
     const pzsMsPorMes = (lista: EventoSD[]) => {
@@ -440,8 +462,9 @@ export default function CalidadSaldosDashboard() {
     // Con muchas columnas el valor va en una de cada dos para que no se monten
     const etiquetaTotal = (cols: Columna[]) => (p: any) => {
         const c = cols[p.index];
-        if (!c || !c.total) return null;
-        if (cols.length > 16 && p.index % 2 === 1) return null;
+        // Los días en 0 también llevan su etiqueta para que se vean
+        if (!c || !Number.isFinite(p.y)) return null;
+        if (cols.length > 16 && p.index % 2 === 1 && c.total) return null;
         return <text x={p.x + p.width / 2} y={p.y - 5} textAnchor="middle" fontSize={9} fontWeight={800} fill="#334155">{fmt(c.total)}</text>;
     };
     // Barras: la de arriba de la pila lleva la etiqueta del total

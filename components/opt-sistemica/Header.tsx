@@ -86,6 +86,8 @@ export default function Header({
   const getFirstName = (email: string) => {
     if (!email) return '';
     const part = email.split('@')[0]; // Toma la parte previa al @ (ej. hector.chinchilla)
+    // Correos de cargo (no de persona): se muestra el nombre de quien lo usa hoy
+    if (part.toLowerCase() === 'coordinacioncalidad') return 'Estiven';
     const firstName = part.split('.')[0].split('-')[0]; // Toma el primer nombre antes de un punto o guion (ej. hector)
     return firstName.charAt(0).toUpperCase() + firstName.slice(1); // Capitaliza (ej. Hector)
   };
@@ -93,7 +95,8 @@ export default function Header({
   return (
     <>
       <header className={`z-[100] bg-[#324354] border-b border-[#324354] shadow-md font-sans w-full ${compact ? 'sticky top-0' : 'fixed top-0 left-0 right-0'}`}>
-      <div className={`max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between relative ${estilo ? 'h-12' : 'h-20'}`}>
+      {/* pl-2: el centro del ≡ queda a 24 px, alineado con la columna de íconos del menú lateral recogido (w-12) */}
+      <div className={`w-full pl-2 pr-3 sm:pr-4 flex items-center justify-between relative ${estilo ? 'h-12' : 'h-20'}`}>
         
         {/* Left Side: Navigation Menu Button & Title/Subtitle */}
         <div className={`flex items-center ${estilo ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
@@ -212,15 +215,31 @@ export default function Header({
               subItems: [
                 { label: 'Mármol Sintético', path: '/marmol' },
                 { label: 'Muebles', path: '/muebles' },
-                { label: 'Fibra de Vidrio', path: '/fibra' }
+                { label: 'CEFI', path: '/cefi' },
+                { label: 'Fibra de Vidrio', path: '/fibra' },
+                { label: 'Superficies (RTM)', path: '/superficies' }
               ]
             },
+            { label: 'Tablero de Control', path: '/indicadores-productividad', icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            )},
             { 
               label: 'Informe de Turno',
               path: '/informe-turno',
               icon: (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )
+            },
+            {
+              label: 'Esquema de Personal',
+              path: '/esquema-personal',
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 6v12M6 6h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2z" />
                 </svg>
               )
             },
@@ -244,6 +263,7 @@ export default function Header({
               subItems: [
                 { label: 'Indicadores Calidad', path: '/calidad' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
+                { label: 'Calidad Reparación Moldes (RMOLD)', path: '/calidad/rmold' },
                 { label: 'Calidad FV (Atajo)', path: URL_CALIDAD_FV_POWERAPPS },
                 { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
                 { label: 'Criterios de Aceptación y Rechazo', path: '/calidad/criterios' },
@@ -291,9 +311,10 @@ export default function Header({
                 { label: 'Principio de Máquina', path: '/mantenimiento/principio-maquina' }
               ]
             },
-            { label: 'Tablero de Control', path: '/indicadores-productividad', icon: (
+            // En construcción: novedades, asignación de tareas, problemas y mantenimiento por usuario
+            { label: 'Notificaciones', path: '/notificaciones', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             )},
             { label: 'Inventarios', path: '/inventarios', icon: (

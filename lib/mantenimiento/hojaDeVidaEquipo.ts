@@ -72,7 +72,7 @@ export async function cargarPuestasAPunto(maquina: any) {
     .select('id_puesta_a_punto, consecutivo, nombre_puesta_a_punto, proceso, planta, version_formato, estado_puesta_a_punto')
     .in('id_puesta_a_punto', ids);
   if (errEnc) throw new Error(`No se pudieron consultar las puestas a punto: ${errEnc.message}`);
-  return (encs || []).map(e => ({
+  return (encs || []).filter(e => e.estado_puesta_a_punto !== 'Eliminada').map(e => ({
     encabezado: e,
     actividades: (detalle || [])
       .filter(d => d.id_puesta_a_punto === e.id_puesta_a_punto)

@@ -79,6 +79,7 @@ export default function QualityStep() {
                             <Input
                                 id="totales"
                                 type="number"
+                                onWheel={(e) => e.currentTarget.blur()}
                                 min="0"
                                 value={totales || ""}
                                 onChange={handleTotalesChange}
@@ -91,6 +92,7 @@ export default function QualityStep() {
                             <Input
                                 id="buenas"
                                 type="number"
+                                onWheel={(e) => e.currentTarget.blur()}
                                 min="0"
                                 max={totales}
                                 value={buenas || ""}

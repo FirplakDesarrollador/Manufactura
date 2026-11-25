@@ -1,5 +1,6 @@
 // Personas/roles con permiso de edición en módulos de Calidad (misma regla de /calidad/criterios)
-const ADMIN_NAMES = ['jair alvarez', 'maria isabel escobar', 'carolina escobar', 'hector', 'calidad', 'admin'];
+// "Carolina Escobar" es Estiven Londoño (cambio de puesto sin cambio de correo)
+const ADMIN_NAMES = ['jair alvarez', 'maria isabel escobar', 'estiven londono', 'carolina escobar', 'hector', 'calidad', 'admin'];
 
 export interface UsuarioCalidad {
     nombre?: string | null;
@@ -101,4 +102,18 @@ export function guardarPermisosCalidadMs(p: PermisosCalidadMs): Record<string, u
     };
     out.ms = BOTONES_CALIDAD_MS.some(b => p[b.key]) || !!p.configuracion || !!p.criterios;
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// Calidad Reparación de Moldes (RMOLD): los mismos permisos de Calidad MS (sin Saldos y destrucciones) y, además,
+// el usuario de Reparación de Moldes con acceso completo para registrar y configurar.
+// ---------------------------------------------------------------------------
+const CORREOS_REPARACION_MOLDES = ['reparacionmoldes@firplak.com'];
+
+export function permisosCalidadRmold(u: (UsuarioCalidad & { permisos?: any }) | null | undefined): PermisosCalidadMs {
+    const correo = (u?.correo || '').toLowerCase().trim();
+    if (CORREOS_REPARACION_MOLDES.includes(correo)) {
+        return { registro: true, reportes: true, historico: true, saldos: false, hora_a_hora: true, indicadores: true, configuracion: 'editar', criterios: 'editar', editarRegistros: true, eliminarRegistros: true };
+    }
+    return { ...permisosCalidadMs(u), saldos: false };
 }

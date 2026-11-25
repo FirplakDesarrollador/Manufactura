@@ -1,4 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { PLANTAS_CALIDAD, defectoCuenta, type PlantaCalidad } from './plantasCalidadConfig';
+
+// RMOLD (Reparación de Moldes) usa este mismo cálculo con su planta (parámetro opcional; por defecto MS):
+//  - Pieza buena = sin defectos (no aplica la regla de "1. Opaco": allí el defecto 1 es Despiques)
+//  - Se cuentan todos los defectos de la pieza y no hay Reparación; datos desde planta.inicio
+const MS = PLANTAS_CALIDAD.ms;
 
 // Cálculo de Calidad IFI de Mármol Sintético (MS).
 // Replica las medidas y transformaciones del Power BI "BI Calidad MS":
@@ -21,6 +27,7 @@ export interface MsReporteRaw {
     defecto: any;
     Reparacion?: string | null;
     producto?: { Referencia?: string | null } | null;
+    molde_manual?: string | null;   // RMOLD: nombre del molde escrito a mano
 }
 
 export interface MsDefectoCatalogo {
@@ -114,31 +121,35 @@ export function fechaUTC(createdAt: string): string {
 export function normalizarPiezas(
     rows: MsReporteRaw[],
     catalogo: Map<number, string>,
-    productos?: Map<number, string>
+    productos?: Map<number, string>,
+    planta: PlantaCalidad = MS
 ): MsPiezaNormalizada[] {
     const piezas: MsPiezaNormalizada[] = [];
     const vistos = new Set<number>();
+    const esMs = planta.id === 'ms';
 
     for (const r of rows) {
         if (vistos.has(r.id)) continue;
         const fecha = fechaUTC(r.created_at);
-        if (fecha <= MS_FECHA_INICIO_BI) continue;
+        if (esMs ? fecha <= MS_FECHA_INICIO_BI : fecha < planta.inicio) continue;
 
         // Power BI descarta los registros con defecto nulo (no generan filas al despivotar)
         const parsed = parseDefectos(r.defecto);
         if (parsed === null) continue;
         vistos.add(r.id);
 
-        const defectos = parsed.slice(0, MAX_DEFECTOS_POR_PIEZA).map(d => ({
+        const defectos = (esMs ? parsed.slice(0, MAX_DEFECTOS_POR_PIEZA) : parsed).map(d => ({
             id: d.id,
             nombre: (d.id !== null && catalogo.get(d.id)) || d.nombre || `Defecto ${d.id ?? ''}`.trim()
         }));
 
-        const esBuena = parsed.length === 0 || (parsed.length === 1 && parsed[0].id === OPACO_ID);
-        const tieneOpaco = defectos.some(d => d.id === OPACO_ID);
+        const esBuena = esMs
+            ? parsed.length === 0 || (parsed.length === 1 && parsed[0].id === OPACO_ID)
+            : !defectos.some(d => defectoCuenta(planta, d.nombre));
+        const tieneOpaco = esMs && defectos.some(d => d.id === OPACO_ID);
 
         const rep = r.Reparacion ?? null;
-        const reparacion2 = (rep === 'No cumple' || rep === null) && fecha >= FECHA_INICIO_REPARACION ? 'Reparacion' : rep;
+        const reparacion2 = !esMs ? null : (rep === 'No cumple' || rep === null) && fecha >= FECHA_INICIO_REPARACION ? 'Reparacion' : rep;
 
         piezas.push({
             id: r.id,
@@ -146,7 +157,8 @@ export function normalizarPiezas(
             referencia:
                 r.producto?.Referencia ||
                 (r.producto_id != null && productos?.get(Number(r.producto_id))) ||
-                `Producto #${r.producto_id ?? '-'}`,
+                (r.molde_manual ? `${r.molde_manual} (escrito)` : '') ||
+                (!esMs && r.producto_id == null ? 'Histórico (sin molde)' : `Producto #${r.producto_id ?? '-'}`),
             defectos,
             esBuena,
             tieneOpaco,
@@ -188,10 +200,10 @@ export function calcularResumen(piezas: MsPiezaNormalizada[]): MsCalidadResumen 
 }
 
 // Pareto: piezas por defecto, excluyendo "1. Opaco" (filtro del visual de anillo en Power BI)
-export function calcularPareto(piezas: MsPiezaNormalizada[]): MsParetoItem[] {
+export function calcularPareto(piezas: MsPiezaNormalizada[], planta: PlantaCalidad = MS): MsParetoItem[] {
     const conteo = new Map<string, number>();
     for (const p of piezas) {
-        const nombres = new Set(p.defectos.filter(d => d.id !== OPACO_ID).map(d => d.nombre));
+        const nombres = new Set(p.defectos.filter(d => planta.id !== 'ms' || d.id !== OPACO_ID).map(d => d.nombre));
         nombres.forEach(n => conteo.set(n, (conteo.get(n) || 0) + 1));
     }
     const total = Array.from(conteo.values()).reduce((a, b) => a + b, 0);
@@ -369,11 +381,13 @@ export async function fetchMsReportes(
     client: SupabaseClient,
     desde: string,
     hasta: string,
-    columnas = 'id, created_at, producto_id, defecto, Reparacion, producto:productos_defectos_ms (Referencia)',
-    opciones: { soloConFoto?: boolean } = {}
+    columnas?: string,
+    opciones: { soloConFoto?: boolean } = {},
+    planta: PlantaCalidad = MS
 ): Promise<MsReporteRaw[]> {
+    const cols = (columnas ?? `id, created_at, producto_id, defecto, Reparacion, producto:${planta.tReferencias} (Referencia)`) + (planta.conSerial ? ', molde_manual' : '');
     let countQuery = client
-        .from('ms_reporte_defectos')
+        .from(planta.tReportes)
         .select('id', { count: 'exact', head: true })
         .gte('created_at', desde)
         .lt('created_at', hasta);
@@ -389,8 +403,8 @@ export async function fetchMsReportes(
         const batch = Array.from({ length: Math.min(PARALLEL_PAGES, pages - start) }, (_, i) => {
             const from = (start + i) * PAGE_SIZE;
             let q = client
-                .from('ms_reporte_defectos')
-                .select(columnas)
+                .from(planta.tReportes)
+                .select(cols)
                 .gte('created_at', desde)
                 .lt('created_at', hasta);
             if (opciones.soloConFoto) q = q.not('fotoUrl', 'is', null);
@@ -406,14 +420,14 @@ export async function fetchMsReportes(
     return rows;
 }
 
-export async function fetchCatalogoDefectosMs(client: SupabaseClient): Promise<Map<number, string>> {
-    const { data, error } = await client.from('ms_defectos').select('id, Defecto');
+export async function fetchCatalogoDefectosMs(client: SupabaseClient, planta: PlantaCalidad = MS): Promise<Map<number, string>> {
+    const { data, error } = await client.from(planta.tDefectos).select('id, Defecto');
     if (error) throw error;
     return new Map((data || []).map((d: MsDefectoCatalogo) => [Number(d.id), String(d.Defecto || '').trim()]));
 }
 
-export async function fetchProductosMs(client: SupabaseClient): Promise<Map<number, string>> {
-    const { data, error } = await client.from('productos_defectos_ms').select('id, Referencia');
+export async function fetchProductosMs(client: SupabaseClient, planta: PlantaCalidad = MS): Promise<Map<number, string>> {
+    const { data, error } = await client.from(planta.tReferencias).select('id, Referencia');
     if (error) throw error;
     return new Map((data || []).map((p: { id: number; Referencia: string | null }) => [Number(p.id), String(p.Referencia || '').trim()]));
 }

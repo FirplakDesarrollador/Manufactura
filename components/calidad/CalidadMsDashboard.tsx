@@ -1,7 +1,9 @@
 'use client';
 
+import { useEstadoEnCache, leerCache, guardarCache } from '@/lib/utils/cacheMemoria';
+import { PLANTAS_CALIDAD, type PlantaCalidad } from '@/lib/calidad/plantasCalidadConfig';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, ChevronRight, ExternalLink, Loader2, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, BarChart3, ChevronDown, ChevronRight, ExternalLink, Loader2, Search, X } from 'lucide-react';
 import {
     ResponsiveContainer,
     LineChart,
@@ -47,7 +49,6 @@ const colorCalidad = (v: number | null | undefined) => (v == null ? '#94a3b8' : 
 
 const hoyBogota = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
 const fechaCorta = (f: string) => f.split('-').reverse().join('/');
-const ANIO_INICIO = Number(MS_FECHA_INICIO_BI.slice(0, 4));
 
 type Gran = 'dia' | 'mes' | 'anio';
 interface Columna { key: string; label: string; valor: number; total: number; buenas: number; conCausa: number; meses?: number }
@@ -116,7 +117,14 @@ const etiquetaPorcion = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
 };
 
 // Mármol Sintético (MS): tablero dinámico estilo Power BI (filtros Año/Mes/Semana/Día y filtro cruzado entre gráficas)
-export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string }) {
+// % de piezas defectuosas sobre el total de piezas (Detalle por Referencia); sin piezas → "—"
+const pctDef = (defectuosas: number, total: number) => total > 0 ? `${((defectuosas / total) * 100).toFixed(1)} %` : '—';
+
+// planta: MS (por defecto) o RMOLD (Reparación de Moldes), con sus tablas y su regla de pieza buena
+export default function CalidadMsDashboard({ powerBiUrl, planta = PLANTAS_CALIDAD.ms }: { powerBiUrl?: string; planta?: PlantaCalidad }) {
+    const esMs = planta.id === 'ms';
+    const fechaInicio = esMs ? MS_FECHA_INICIO_BI : planta.inicio;
+    const ANIO_INICIO = Number(fechaInicio.slice(0, 4));
     const hoy = hoyBogota();
     const anioActual = Number(hoy.slice(0, 4));
     const mesActual = Number(hoy.slice(5, 7));
@@ -138,17 +146,22 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
 
     // Tabla de referencias
     const [refSearch, setRefSearch] = useState('');
+    // Orden de la tabla Detalle por Referencia (clic en el título de la columna; otro clic invierte el orden)
+    type ColRef = 'referencia' | 'pct' | 'def' | 'total' | 'rep';
+    const [ordenRef, setOrdenRef] = useState<{ col: ColRef; asc: boolean } | null>(null);
+    const ordenarRef = (col: ColRef) => setOrdenRef(o => o?.col === col ? { col, asc: !o.asc } : { col, asc: col === 'referencia' });
     const [expandedRefs, setExpandedRefs] = useState<Record<string, boolean>>({});
     const [verTotal, setVerTotal] = useState(true);
     const [verReparacion, setVerReparacion] = useState(false);
 
     // Piezas por año ya consultadas
-    const [porAnio, setPorAnio] = useState<Record<number, MsPiezaNormalizada[]>>({});
+    // En caché de memoria (5 min) por planta: al volver a la pestaña se muestra de inmediato
+    const [porAnio, setPorAnio] = useEstadoEnCache<Record<number, MsPiezaNormalizada[]>>(`calidad-dash:${planta.id}`, {});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const catalogos = useRef<{ catalogo: Map<number, string>; productos: Map<number, string> } | null>(null);
+    const catalogos = useRef<{ catalogo: Map<number, string>; productos: Map<number, string> } | null>(leerCache(`calidad-dash-cat:${planta.id}`) ?? null);
 
-    const aniosDisponibles = useMemo(() => Array.from({ length: anioActual - ANIO_INICIO + 1 }, (_, i) => anioActual - i), [anioActual]);
+    const aniosDisponibles = useMemo(() => Array.from({ length: anioActual - ANIO_INICIO + 1 }, (_, i) => anioActual - i), [anioActual, ANIO_INICIO]);
     const todosLosAnios = anios.length === 0;
     const aniosVista = useMemo(() => (todosLosAnios ? [...aniosDisponibles] : [...anios]).sort((a, b) => a - b), [todosLosAnios, aniosDisponibles, anios]);
 
@@ -165,14 +178,15 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
             setError(null);
             try {
                 if (!catalogos.current) {
-                    const [catalogo, productos] = await Promise.all([fetchCatalogoDefectosMs(supabase), fetchProductosMs(supabase)]);
+                    const [catalogo, productos] = await Promise.all([fetchCatalogoDefectosMs(supabase, planta), fetchProductosMs(supabase, planta)]);
                     catalogos.current = { catalogo, productos };
+                    guardarCache(`calidad-dash-cat:${planta.id}`, catalogos.current);
                 }
                 const nuevos: Record<number, MsPiezaNormalizada[]> = {};
                 for (const a of pendientes) {
-                    const desde = a === ANIO_INICIO ? `${MS_FECHA_INICIO_BI}T00:00:00Z` : `${a}-01-01T00:00:00Z`;
-                    const rows = await fetchMsReportes(supabase, desde, `${a + 1}-01-01T00:00:00Z`, 'id, created_at, producto_id, defecto, Reparacion');
-                    nuevos[a] = normalizarPiezas(rows, catalogos.current.catalogo, catalogos.current.productos);
+                    const desde = a === ANIO_INICIO ? `${fechaInicio}T00:00:00Z` : `${a}-01-01T00:00:00Z`;
+                    const rows = await fetchMsReportes(supabase, desde, `${a + 1}-01-01T00:00:00Z`, 'id, created_at, producto_id, defecto, Reparacion', {}, planta);
+                    nuevos[a] = normalizarPiezas(rows, catalogos.current.catalogo, catalogos.current.productos, planta);
                 }
                 if (vivo) setPorAnio(prev => ({ ...prev, ...nuevos }));
             } catch (e: any) {
@@ -182,7 +196,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
             }
         })();
         return () => { vivo = false; };
-    }, [aniosCarga, porAnio]);
+    }, [aniosCarga, porAnio, planta, fechaInicio, ANIO_INICIO]);
 
     // Piezas en cascada: Año → Mes → Semana → Día
     const piezasAnios = useMemo(() => aniosVista.flatMap(a => porAnio[a] || []), [aniosVista, porAnio]);
@@ -214,7 +228,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
     const resumen = useMemo(() => calcularResumen(piezasKpi), [piezasKpi]);
 
     // Pareto: filtrado por periodo y referencia; la causa elegida se resalta
-    const pareto = useMemo(() => calcularPareto(piezas.filter(p => enPeriodo(p) && enRef(p))),
+    const pareto = useMemo(() => calcularPareto(piezas.filter(p => enPeriodo(p) && enRef(p)), planta),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [piezas, selPeriodo, selRef]);
     const colorCausa = useMemo(() => {
@@ -237,10 +251,18 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [piezas, selPeriodo, selCausa]);
     const referenciasVisibles = useMemo(() => {
-        if (!refSearch.trim()) return referencias;
-        const q = refSearch.toLowerCase();
-        return referencias.filter(r => r.referencia.toLowerCase().includes(q) || r.subdefectos.some(s => s.name.toLowerCase().includes(q)));
-    }, [referencias, refSearch]);
+        const q = refSearch.trim().toLowerCase();
+        const lista = q ? referencias.filter(r => r.referencia.toLowerCase().includes(q) || r.subdefectos.some(s => s.name.toLowerCase().includes(q))) : referencias;
+        if (!ordenRef) return lista;
+        const valor = (r: typeof lista[number]): number | string => ordenRef.col === 'referencia' ? r.referencia
+            : ordenRef.col === 'pct' ? (r.totalPiezas > 0 ? r.piezasDefectuosas / r.totalPiezas : -1)
+            : ordenRef.col === 'def' ? r.piezasDefectuosas : ordenRef.col === 'total' ? r.totalPiezas : r.reparacion;
+        return [...lista].sort((a, b) => {
+            const va = valor(a), vb = valor(b);
+            const c = typeof va === 'string' ? va.localeCompare(String(vb), 'es', { numeric: true }) : va - (vb as number);
+            return ordenRef.asc ? c : -c;
+        });
+    }, [referencias, refSearch, ordenRef]);
 
     // Tendencias: filtradas por referencia; con una causa elegida muestran el % de piezas con esa causa
     // Por año (vista secundaria): promedio de los valores mensuales de cada año
@@ -281,7 +303,8 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                 const valor = selCausa ? (r.piezasRevisadas ? (nCausa / r.piezasRevisadas) * 100 : 0) : r.calidad;
                 return { key, label, valor: Math.round(valor * 10) / 10, total: r.piezasRevisadas, buenas: r.piezasBuenas, conCausa: nCausa };
             })
-            .filter(c => c.total > 0 && (selCausa || c.valor > 0));
+            // Todo período con piezas revisadas se muestra, también los de IFI 0 % (ninguna buena)
+            .filter(c => c.total > 0);
     };
     const columnasPrincipal = useMemo(() => columnasDe(piezas.filter(enRef), granPrincipal),
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -378,21 +401,36 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
     const cargandoInicial = loading && !hayDatos;
 
     const kpis = [
-        { titulo: '% Opaco', valor: `${resumen.pctOpaco.toFixed(1)} %`, estilo: 'bg-white border-slate-200 text-slate-900', tit: 'text-slate-500' },
+        esMs && { titulo: '% Opaco', valor: `${resumen.pctOpaco.toFixed(1)} %`, estilo: 'bg-white border-slate-200 text-slate-900', tit: 'text-slate-500' },
         { titulo: 'Buenas', valor: resumen.piezasBuenas.toLocaleString('es-CO'), estilo: 'bg-white border-slate-200 text-slate-900', tit: 'text-slate-500' },
         { titulo: 'Defectuosas', valor: resumen.piezasDefectuosas.toLocaleString('es-CO'), estilo: 'bg-white border-slate-200 text-slate-900', tit: 'text-slate-500' },
         { titulo: 'Revisadas', valor: resumen.piezasRevisadas.toLocaleString('es-CO'), estilo: 'bg-white border-slate-200 text-slate-900', tit: 'text-slate-500' },
         { titulo: 'Defectos', valor: resumen.cantidadDefectos.toLocaleString('es-CO'), estilo: 'bg-white border-slate-200 text-slate-900', tit: 'text-slate-500' },
-        { titulo: '% Moldes', valor: `${resumen.pctMoldes.toFixed(1)} %`, estilo: 'bg-rose-50/70 border-rose-200 text-rose-900', tit: 'text-rose-800' },
+        esMs && { titulo: '% Moldes', valor: `${resumen.pctMoldes.toFixed(1)} %`, estilo: 'bg-rose-50/70 border-rose-200 text-rose-900', tit: 'text-rose-800' },
         { titulo: 'DPU', valor: resumen.dpu.toFixed(1), estilo: 'bg-sky-600 border-sky-600 text-white', tit: 'text-sky-100' },
         { titulo: 'Calidad', valor: `${resumen.calidad.toFixed(1)} %`, estilo: 'bg-[#0084d1] border-[#0084d1] text-white', tit: 'text-sky-100' }
-    ];
+    ].filter(Boolean) as { titulo: string; valor: string; estilo: string; tit: string }[];
 
     const chips = [
         selPeriodo && { texto: nombrePeriodo(selPeriodo.gran, selPeriodo.key), quitar: () => setSelPeriodo(null) },
         selCausa && { texto: selCausa, quitar: () => setSelCausa(null) },
         selRef && { texto: selRef, quitar: () => setSelRef(null) }
     ].filter(Boolean) as { texto: string; quitar: () => void }[];
+
+    // Título de columna con flechas para ordenar
+    const thOrden = (col: ColRef, texto: string, ayuda?: string) => {
+        const activa = ordenRef?.col === col;
+        const Icono = !activa ? ArrowUpDown : ordenRef!.asc ? ArrowUp : ArrowDown;
+        return (
+            <th className={`py-1 px-1.5 ${col === 'referencia' ? 'text-left' : 'text-right'}`}>
+                <button type="button" onClick={() => ordenarRef(col)} title={ayuda ? `${ayuda} · clic para ordenar` : 'Clic para ordenar'}
+                    className={`inline-flex items-center gap-0.5 font-bold hover:text-[#324354] ${activa ? 'text-[#324354]' : ''}`}>
+                    {texto}
+                    <Icono className={`w-2.5 h-2.5 ${activa ? '' : 'opacity-40'}`} />
+                </button>
+            </th>
+        );
+    };
 
     return (
         // Alto de cada fila de gráficas según la pantalla: el recuadro de MS mide ≈ 810 px de pantalla con el zoom de 100 %
@@ -401,7 +439,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
             <div className="flex flex-wrap items-start justify-between gap-3 pb-2 border-b border-slate-100 text-xs">
                 {/* Título y selector de vista en la misma línea (compacto) */}
                 <div className="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <h2 className="text-base sm:text-lg font-black text-[#324354]">Mármol Sintético (MS)</h2>
+                    <h2 className="text-base sm:text-lg font-black text-[#324354]">{esMs ? 'Mármol Sintético (MS)' : 'Reparación de Moldes (RMOLD)'}</h2>
                     <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 w-fit">
                         <button
                             onClick={() => setVista('html')}
@@ -455,7 +493,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                     )}
 
                     {/* Tarjetas KPI */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                    <div className={`grid grid-cols-2 sm:grid-cols-4 ${esMs ? 'lg:grid-cols-8' : 'lg:grid-cols-6'} gap-2`}>
                         {kpis.map(k => (
                             <div key={k.titulo} className={`px-2.5 py-1.5 rounded-xl border shadow-2xs flex flex-col justify-between ${k.estilo}`}>
                                 <span className={`text-[8px] font-bold uppercase truncate ${k.tit}`}>{k.titulo}</span>
@@ -541,10 +579,12 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                         <input type="checkbox" checked={verTotal} onChange={e => setVerTotal(e.target.checked)} className="w-3 h-3 rounded cursor-pointer" />
                                         Total piezas
                                     </label>
+                                    {esMs && (
                                     <label className="flex items-center gap-1 font-bold text-slate-600 cursor-pointer text-[9px] whitespace-nowrap shrink-0">
                                         <input type="checkbox" checked={verReparacion} onChange={e => setVerReparacion(e.target.checked)} className="w-3 h-3 rounded cursor-pointer" />
                                         Reparación
                                     </label>
+                                    )}
                                     <div className="relative flex-1 min-w-[80px] max-w-[160px]">
                                         <Search className="w-2.5 h-2.5 absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
@@ -561,10 +601,12 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 text-[10px] border-b border-slate-200">
                                         <tr>
-                                            <th className="py-1 px-1.5">Referencia</th>
-                                            <th className="py-1 px-1.5 text-right">{selCausa ? 'Con la causa' : 'Piezas Def.'}</th>
-                                            {verTotal && <th className="py-1 px-1.5 text-right">Total Piezas</th>}
-                                            {verReparacion && <th className="py-1 px-1.5 text-right">Reparación</th>}
+                                            {thOrden('referencia', 'Referencia')}
+                                            {/* % de piezas defectuosas sobre el total de piezas de la referencia */}
+                                            {thOrden('pct', '% Def.', 'Piezas defectuosas ÷ total de piezas de la referencia')}
+                                            {thOrden('def', selCausa ? 'Con la causa' : 'Piezas Def.')}
+                                            {verTotal && thOrden('total', 'Total Piezas')}
+                                            {verReparacion && thOrden('rep', 'Reparación')}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -591,6 +633,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                                                 <span className="truncate">{ref.referencia}</span>
                                                             </span>
                                                         </td>
+                                                        <td className="py-1 px-1.5 text-right font-black text-[#324354]">{pctDef(ref.piezasDefectuosas, ref.totalPiezas)}</td>
                                                         <td className="py-1 px-1.5 text-right font-black text-slate-900">{ref.piezasDefectuosas}</td>
                                                         {verTotal && <td className="py-1 px-1.5 text-right text-slate-600">{ref.totalPiezas}</td>}
                                                         {verReparacion && <td className="py-1 px-1.5 text-right text-slate-600">{ref.reparacion}</td>}
@@ -598,6 +641,7 @@ export default function CalidadMsDashboard({ powerBiUrl }: { powerBiUrl?: string
                                                     {abierta && ref.subdefectos.map(s => (
                                                         <tr key={s.name} className="bg-slate-50/80 text-[10px] text-slate-600">
                                                             <td className="py-0.5 pl-6 pr-1.5 border-l-2 border-blue-400 truncate">• {s.name}</td>
+                                                            <td className="py-0.5 px-1.5 text-right font-bold text-[#324354]">{pctDef(s.piezasDefectuosas, s.totalPiezas)}</td>
                                                             <td className="py-0.5 px-1.5 text-right font-bold text-slate-800">{s.piezasDefectuosas}</td>
                                                             {verTotal && <td className="py-0.5 px-1.5 text-right">{s.totalPiezas}</td>}
                                                             {verReparacion && <td className="py-0.5 px-1.5 text-right">{s.reparacion}</td>}

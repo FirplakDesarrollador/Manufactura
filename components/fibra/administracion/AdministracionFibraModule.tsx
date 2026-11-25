@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import AvisoCierreSap from './AvisoCierreSap'
+import MoverOfFibra from './MoverOfFibra'
 import { supabase } from '@/lib/supabase'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import {
@@ -11,6 +13,9 @@ import {
 } from '@/lib/supabase/queries/fibra_administracion'
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
+import EstadoEntregaOf from '../EstadoEntregaOf'
+import { conCompletadaSap } from '@/lib/fibra/completadaSap'
+import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import {
     RefreshCw,
     Search,
@@ -24,6 +29,23 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Procesos del Mapa de procesos FV (mismo orden del flujo); una OF está en un proceso si tiene al menos una pieza ahí
+const PROCESOS_FILTRO: { id: string; label: string; etapas: string[] }[] = [
+    { id: 'programado', label: 'Programado', etapas: ['programado'] },
+    { id: 'pintura', label: 'Pintura', etapas: ['pintura'] },
+    { id: 'vaciado', label: 'Vaciado', etapas: ['vaciado'] },
+    { id: 'herrajes', label: 'Herrajes', etapas: ['herrajes'] },
+    { id: 'pulido', label: 'Pulido', etapas: ['pulido'] },
+    { id: 'ensayo', label: 'Ensayo', etapas: ['acabado'] },
+    { id: 'reparacion', label: 'Reparación', etapas: ['reparacion', 'reparacion_larga'] },
+    { id: 'huacales', label: 'Huacales', etapas: ['empaque'] },
+    { id: 'digitado', label: 'Digitado', etapas: ['digitado'] },
+    { id: 'transito', label: 'Tránsito', etapas: ['transito'] },
+    { id: 'cedi', label: 'CEDI', etapas: ['cedi'] },
+    { id: 'saldo', label: 'Saldo', etapas: ['saldo'] },
+    { id: 'destruccion', label: 'Destrucción', etapas: ['destruccion'] }
+]
+
 export default function AdministracionFibraModule({ userEmail }: { userEmail?: string }) {
     // userEmail available for future use
     void userEmail;
@@ -34,6 +56,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
     const [loading, setLoading] = useState(true)
     const [searchText, setSearchText] = useState('')
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [procesoFiltro, setProcesoFiltro] = useState('')
     const [expandedRegistros, setExpandedRegistros] = useState<Set<string | number>>(new Set())
     const [expandedOrdenes, setExpandedOrdenes] = useState<Set<number>>(new Set())
     // Orden cuyo detalle de SAP (lista de materiales, comentarios…) está abierto
@@ -69,7 +92,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     .limit(10000),
                 getAllMoldes()
             ])
-            setOrdenes(ofRes.data || [])
+            setOrdenes(await conCompletadaSap(ofRes.data || []))
             setRegistros(trazRes.data || [])
             setAllMoldes(moldesData)
         } catch (error) {
@@ -108,7 +131,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         }
     }, [searchText])
 
-    const filteredOrdenes = useMemo(() => {
+    const ordenesBuscadas = useMemo(() => {
         const search = searchText.toLowerCase()
         const filtered = ordenes.filter(o => {
             const matchesSearch = !search ||
@@ -125,13 +148,36 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         })
 
         return filtered.sort((a, b) => {
-            const dateA = a.fecha_entrega_estimada ? new Date(a.fecha_entrega_estimada).getTime() : Infinity
-            const dateB = b.fecha_entrega_estimada ? new Date(b.fecha_entrega_estimada).getTime() : Infinity
+            const rawA = a.fecha_entrega_lote || a.fecha_ideal_produccion || a.fecha_entrega_estimada
+            const rawB = b.fecha_entrega_lote || b.fecha_ideal_produccion || b.fecha_entrega_estimada
+            const dateA = rawA ? new Date(rawA).getTime() : Infinity
+            const dateB = rawB ? new Date(rawB).getTime() : Infinity
             const valA = isNaN(dateA) ? Infinity : dateA
             const valB = isNaN(dateB) ? Infinity : dateB
             return valA - valB
         })
     }, [ordenes, searchText, selectedDate])
+
+    // Procesos en que tiene piezas cada orden (según la búsqueda y la fecha, sin el filtro de proceso)
+    const procesosPorOrden = useMemo(() => {
+        const m = new Map<number, Set<string>>()
+        for (const o of ordenesBuscadas) {
+            const { piezas } = piezasPorEtapa(o)
+            m.set(o.id, new Set(PROCESOS_FILTRO.filter(p => p.etapas.some(e => (piezas[e] || 0) > 0)).map(p => p.id)))
+        }
+        return m
+    }, [ordenesBuscadas])
+
+    const conteoProcesos = useMemo(() => {
+        const c: Record<string, number> = {}
+        for (const p of PROCESOS_FILTRO) c[p.id] = 0
+        for (const s of procesosPorOrden.values()) for (const id of s) c[id]++
+        return c
+    }, [procesosPorOrden])
+
+    const filteredOrdenes = useMemo(() =>
+        procesoFiltro ? ordenesBuscadas.filter(o => procesosPorOrden.get(o.id)?.has(procesoFiltro)) : ordenesBuscadas,
+        [ordenesBuscadas, procesosPorOrden, procesoFiltro])
 
     const filteredRegistros = useMemo(() => {
         const search = searchText.toLowerCase()
@@ -202,7 +248,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
         try {
             const { type, item } = editModal
             if (type === 'of') {
-                const sumEtapas = (item.pintura || 0) + (item.pulido || 0) + (item.reparacion || 0) + (item.saldo || 0) + (item.empaque || 0) + (item.transito || 0) + (item.vaciado || 0) + (item.estanteria || 0) + (item.acabado || 0) + (item.reparacion_larga || 0) + (item.digitado || 0) + (item.cedi || 0)
+                const sumEtapas = (item.pintura || 0) + (item.pulido || 0) + (item.reparacion || 0) + (item.saldo || 0) + (item.empaque || 0) + (item.transito || 0) + (item.vaciado || 0) + (item.herrajes || 0) + (item.estanteria || 0) + (item.acabado || 0) + (item.reparacion_larga || 0) + (item.digitado || 0) + (item.cedi || 0)
                 if (item.cantidad !== undefined && item.cantidad < sumEtapas) {
                     alert(`No se puede actualizar: La cantidad fijada (${item.cantidad}) es inferior a las piezas ya existentes en las etapas (${sumEtapas}).`)
                     setSaving(false)
@@ -224,7 +270,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
     const handleTransfer = async (registro: RegistroTrazabilidad, targetOrden: OrdenFabricacion) => {
         const targetCantidad = Math.max(0, targetOrden.cantidad || targetOrden.cantidad_programada || 0)
-        const targetSumEtapas = (targetOrden.pintura || 0) + (targetOrden.pulido || 0) + (targetOrden.reparacion || 0) + (targetOrden.saldo || 0) + (targetOrden.empaque || 0) + (targetOrden.transito || 0) + (targetOrden.vaciado || 0) + (targetOrden.estanteria || 0) + (targetOrden.acabado || 0) + (targetOrden.reparacion_larga || 0) + (targetOrden.digitado || 0) + (targetOrden.cedi || 0)
+        const targetSumEtapas = (targetOrden.pintura || 0) + (targetOrden.pulido || 0) + (targetOrden.reparacion || 0) + (targetOrden.saldo || 0) + (targetOrden.empaque || 0) + (targetOrden.transito || 0) + (targetOrden.vaciado || 0) + (targetOrden.herrajes || 0) + (targetOrden.estanteria || 0) + (targetOrden.acabado || 0) + (targetOrden.reparacion_larga || 0) + (targetOrden.digitado || 0) + (targetOrden.cedi || 0)
 
         if (targetCantidad > 0 && targetSumEtapas >= targetCantidad) {
             toast.error(`No se puede transferir: La orden de destino ${targetOrden.orden_fabricacion} ya cuenta con la cantidad máxima permitida (${targetCantidad} piezas).`)
@@ -294,6 +340,11 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
             if (response.ok) {
                 toast.success('Órdenes cargadas y sincronizadas exitosamente', { id: toastId })
+                // Las 4 fechas del Semáforo se traen en la misma carga; si fallan se avisa (las órdenes sí quedaron)
+                const resultado = await response.json().catch(() => null)
+                if (resultado?.avisoFechasSemaforo) toast.error(resultado.avisoFechasSemaforo, { duration: 12000 })
+                const { recargarFechasSemaforoFv } = await import('@/lib/fibra/fechasSemaforo')
+                recargarFechasSemaforoFv()
                 await loadData()
             } else {
                 toast.success('Actualizando lista de órdenes...', { id: toastId })
@@ -310,105 +361,95 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30 overflow-hidden">
-            {/* Summary Cards */}
-            <div className="px-4 py-2 bg-white border-b border-slate-200">
+            {/* Indicadores (mismo estilo que el encabezado de Control de Piso FV) */}
+            <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200">
                 <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
-                    <StatCard label="Cantidad" value={stats.cantidad} color="bg-blue-50 text-blue-600" />
-                    <StatCard label="Programado" value={stats.programado} color="bg-indigo-50 text-indigo-600" />
-                    <StatCard label="Pintura Hoy" value={stats.pintura} color="bg-orange-50 text-orange-600" />
-                    <StatCard label="Desgelcada" value={stats.desgelcada} color="bg-yellow-50 text-yellow-600" />
-                    <StatCard label="Vaciado Hoy" value={stats.vaciado} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard label="Ensayo Hoy" value={stats.acabado} color="bg-purple-50 text-purple-600" />
-                    <StatCard label="Saldo" value={stats.saldo} color="bg-rose-50 text-rose-600" />
-                    <StatCard label="Digitado" value={stats.digitado} color="bg-slate-50 text-slate-600" />
-                    <StatCard label="Transito" value={stats.transito} color="bg-amber-50 text-amber-600" />
-                    <StatCard label="Cedi Hoy" value={stats.cedi} color="bg-green-50 text-green-600" />
-                    <StatCard label="Kg Hoy" value={stats.kilos.toFixed(1)} color="bg-blue-600 text-white" />
+                    <StatCard label="Cantidad" value={stats.cantidad} color="bg-[#324354]/10 text-[#324354]" />
+                    <StatCard label="Programado" value={stats.programado} color="bg-[#324354]/10 text-[#324354]" />
+                    <StatCard label="Pintura Hoy" value={stats.pintura} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Desgelcada" value={stats.desgelcada} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Vaciado Hoy" value={stats.vaciado} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Ensayo Hoy" value={stats.acabado} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Saldo" value={stats.saldo} color="bg-[#deb841]/20 text-[#7a5f0e]" />
+                    <StatCard label="Digitado" value={stats.digitado} color="bg-[#59a96a]/15 text-[#2f7a40]" />
+                    <StatCard label="Transito" value={stats.transito} color="bg-[#59a96a]/15 text-[#2f7a40]" />
+                    <StatCard label="Cedi Hoy" value={stats.cedi} color="bg-[#59a96a]/15 text-[#2f7a40]" />
+                    <StatCard label="Kg Hoy" value={stats.kilos.toFixed(1)} color="bg-[#324354] text-white" />
                 </div>
             </div>
 
+            {/* Piezas que salieron del proceso porque su OF se cerró en SAP */}
+            <AvisoCierreSap />
+
             {/* Controls */}
-            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-4">
-                    <div className="flex-1 min-w-[300px]">
-                        <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Búsqueda Global</label>
+            <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-end gap-2 sm:gap-3">
+                    <div className="basis-full md:basis-0 flex-1 min-w-0 md:min-w-[300px]">
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Búsqueda Global</label>
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                             <input
                                 type="text"
                                 placeholder="Sku / Of / Pedido / Molde / Cliente"
                                 value={searchText}
                                 onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
                             />
                         </div>
                     </div>
 
-                    <div className="w-48">
-                        <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">Filtrar Fecha</label>
+                    {/* Filtrar por proceso (procesos del Mapa de procesos FV): solo las OF con piezas en ese proceso */}
+                    {activeTab === 'of' && (
+                        <div className="w-52">
+                            <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Proceso</label>
+                            <select value={procesoFiltro} onChange={e => setProcesoFiltro(e.target.value)}
+                                className={`w-full h-8 px-2.5 border rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90] cursor-pointer ${procesoFiltro ? 'bg-[#deb841]/20 border-[#deb841] text-[#25323f]' : 'bg-slate-50 border-slate-200 text-[#324354]'}`}>
+                                <option value="">Todos los procesos</option>
+                                {PROCESOS_FILTRO.map(p => (
+                                    <option key={p.id} value={p.id} disabled={conteoProcesos[p.id] === 0 && procesoFiltro !== p.id}>
+                                        {p.label} ({conteoProcesos[p.id]})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div className="w-40 sm:w-48">
+                        <label className="text-[10px] font-black text-[#324354] uppercase mb-1 block">Filtrar Fecha</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                             <input
                                 type="date"
                                 value={selectedDate || ''}
                                 onChange={(e) => setSelectedDate(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]"
                             />
                         </div>
                     </div>
 
                     <button
-                        onClick={() => { setSearchText(''); setSelectedDate(null); }}
-                        className="p-2.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
+                        onClick={() => { setSearchText(''); setSelectedDate(null); setProcesoFiltro(''); }}
+                        className="h-8 w-8 flex items-center justify-center bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-sm"
                         title="Limpiar filtros"
                     >
-                        <Eraser size={20} />
+                        <X size={16} />
                     </button>
+
 
                     <button
                         onClick={handleCargarOrdenes}
                         disabled={syncing}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300"
-                        title="Cargar Órdenes de Fabricación"
+                        className="flex items-center gap-1.5 px-3 py-2 bg-[#324354] text-white rounded-lg hover:bg-[#254153] transition-colors shadow-sm disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider h-8 self-end"
+                        title="Cargar Órdenes de Fabricación desde SAP"
                     >
-                        <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
-                        <span className="font-black text-[10px] uppercase tracking-wider">Cargar Órdenes</span>
-                    </button>
-                </div>
-                {/* Real-time Counter (Requested) */}
-                <div className="max-w-7xl mx-auto mt-3 flex items-center gap-2">
-                    <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
-                        Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
-                    </span>
-                    {(searchText || selectedDate) && (
-                        <span className="text-[10px] font-bold text-slate-400 italic">
-                            (Filtrado aplicado)
-                        </span>
-                    )}
-                    <button
-                        onClick={toggleAllVisible}
-                        disabled={activeTab === 'of' ? filteredOrdenes.length === 0 : filteredRegistros.length === 0}
-                        className={`ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300 ${
-                            activeTab === 'of'
-                                ? allOrdenesExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
-                                : allRegistrosExpanded ? 'bg-blue-600 text-white' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'
-                        }`}
-                        title={activeTab === 'of'
-                            ? allOrdenesExpanded ? 'Cerrar todas las ordenes' : 'Abrir todas las ordenes'
-                            : allRegistrosExpanded ? 'Cerrar todos los registros' : 'Abrir todos los registros'}
-                    >
-                        <ChevronsUpDown size={16} />
-                        <span>
-                            {activeTab === 'of'
-                                ? allOrdenesExpanded ? 'Cerrar todas' : 'Abrir todas'
-                                : allRegistrosExpanded ? 'Cerrar todos' : 'Abrir todos'}
-                        </span>
+                        <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
+                        <span className="hidden sm:inline">Cargar Órdenes</span>
                     </button>
                 </div>
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex bg-white px-4 border-b border-slate-200">
+            <div className="flex items-center bg-white px-4 border-b border-slate-200">
                 <TabButton
                     active={activeTab === 'of'}
                     label="Órdenes de Fabricación"
@@ -419,6 +460,12 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                     label="Registros de Trazabilidad"
                     onClick={() => setActiveTab('trazabilidad')}
                 />
+                {/* Total según los filtros aplicados */}
+                <span className="ml-auto shrink-0 px-3 py-1 bg-[#324354] text-white rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm"
+                    title={searchText || selectedDate || (activeTab === 'of' && procesoFiltro) ? 'Con filtros aplicados' : undefined}>
+                    Total {activeTab === 'of' ? 'Órdenes' : 'Registros'}: {activeTab === 'of' ? filteredOrdenes.length : filteredRegistros.length}
+                    {(searchText || selectedDate || (activeTab === 'of' && procesoFiltro)) && ' (filtrado)'}
+                </span>
             </div>
 
             {/* Main Table Area */}
@@ -446,19 +493,22 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             moldes={allMoldes}
                                         />
                                     </div>
-                                    <div className="rounded-b-md border-t-2 border-gray-200 bg-slate-50 px-3 py-1.5 flex flex-wrap items-center gap-2">
+                                    {/* Franja igual a la de los módulos de piso (crema, botones h-9) con los componentes para la entrega de la OF */}
+                                    <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1 flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1.5">
                                         <button
                                             onClick={() => toggleOrden(item.id)}
-                                            className={`h-8 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors ${expandedOrdenes.has(item.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`}
+                                            className={`h-9 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-colors ${expandedOrdenes.has(item.id) ? 'bg-[#324354] text-white border-[#324354]' : 'bg-white text-[#324354] border-[#e2ded5] hover:bg-[#F6F3EE]'}`}
                                             title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
                                         >
                                             <ChevronsUpDown size={15} />
                                             {expandedOrdenes.has(item.id) ? 'Ocultar piezas' : 'Ver piezas'}
                                         </button>
-                                        <div className="ml-auto flex gap-2">
+                                        <EstadoEntregaOf of={item.orden_fabricacion} />
+                                        <div className="ml-auto flex gap-2 shrink-0">
+                                            <MoverOfFibra orden={item} moldes={allMoldes} usuarioEmail={userEmail} onHecho={loadData} />
                                             <button
                                                 onClick={() => setEditModal({ type: 'of', item })}
-                                                className="h-8 px-3 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-xs font-bold flex items-center gap-1.5 transition-colors"
                                                 title="Editar Orden"
                                             >
                                                 <Edit2 size={15} />
@@ -466,7 +516,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             </button>
                                             <button
                                                 onClick={() => handleDelete('of', item.id)}
-                                                className="h-8 px-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                                className="h-9 px-3 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
                                                 title="Eliminar Orden"
                                             >
                                                 <Trash2 size={15} />
@@ -518,14 +568,14 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             <td className="p-4 flex gap-2">
                                                 <button
                                                     onClick={() => toggleRegistro(item.registrer || item.id || '')}
-                                                    className={`p-1.5 rounded transition-colors ${expandedRegistros.has(item.registrer || item.id || '') ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50'}`}
+                                                    className={`p-1.5 rounded transition-colors ${expandedRegistros.has(item.registrer || item.id || '') ? 'bg-[#324354] text-white' : 'text-[#324354] hover:bg-[#F6F3EE]'}`}
                                                     title={expandedRegistros.has(item.registrer || item.id || '') ? 'Ocultar procesos' : 'Ver procesos'}
                                                 >
                                                     <ChevronsUpDown size={16} />
                                                 </button>
                                                 <button
                                                     onClick={() => setEditModal({ type: 'registro', item })}
-                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                    className="p-1.5 text-[#324354] hover:bg-[#F6F3EE] rounded transition-colors"
                                                     title="Editar registro"
                                                 >
                                                     <Edit2 size={16} />
@@ -544,7 +594,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                                     <Trash2 size={16} />
                                                 </button>
                                             </td>
-                                            <td className="p-4 text-[11px] font-black text-blue-600">#{item.registrer || item.id}</td>
+                                            <td className="p-4 text-[11px] font-black text-[#324354]">#{item.registrer || item.id}</td>
                                             <td className="p-4">
                                                 <div className="font-bold text-slate-700">{item.orden_fabricacion}</div>
                                                 <div className="text-[10px] text-slate-400 font-bold">P: {item.numero_pedido}</div>
@@ -558,7 +608,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                                 <div className="text-[10px] text-slate-400 font-bold">{item.molde_descripcion}</div>
                                             </td>
                                             <td className="p-4">
-                                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-black text-[9px] uppercase">
+                                                <span className="px-2 py-0.5 rounded-full bg-[#324354]/10 text-[#324354] font-black text-[9px] uppercase">
                                                     {item.estado}
                                                 </span>
                                             </td>
@@ -602,7 +652,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                         <input
                                             value={editModal.item.cliente || ''}
                                             onChange={(e) => setEditModal({ ...editModal, item: { ...editModal.item, cliente: e.target.value } })}
-                                            className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#7B8E90] outline-none"
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
@@ -612,7 +662,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                                 type="number"
                                                 value={editModal.item.cantidad || 0}
                                                 onChange={(e) => setEditModal({ ...editModal, item: { ...editModal.item, cantidad: parseInt(e.target.value) } })}
-                                                className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#7B8E90] outline-none"
                                             />
                                         </div>
                                         <div>
@@ -621,7 +671,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                                 type="number"
                                                 value={editModal.item.saldo || 0}
                                                 onChange={(e) => setEditModal({ ...editModal, item: { ...editModal.item, saldo: parseInt(e.target.value) } })}
-                                                className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#7B8E90] outline-none"
                                             />
                                         </div>
                                     </div>
@@ -633,11 +683,12 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                         <select
                                             value={editModal.item.estado || ''}
                                             onChange={(e) => setEditModal({ ...editModal, item: { ...editModal.item, estado: e.target.value } })}
-                                            className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#7B8E90] outline-none"
                                         >
                                             <option value="Pintura">Pintura</option>
                                             <option value="Desgelcada">Desgelcada</option>
                                             <option value="Vaciado">Vaciado</option>
+                                            <option value="Herrajes">Herrajes</option>
                                             <option value="Pulido">Pulido</option>
                                             <option value="Ensayo">Ensayo</option>
                                             <option value="Guacales">Guacales</option>
@@ -659,7 +710,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             step="0.1"
                                             value={editModal.item.kilos_vaciados || 0}
                                             onChange={(e) => setEditModal({ ...editModal, item: { ...editModal.item, kilos_vaciados: parseFloat(e.target.value) } })}
-                                            className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            className="w-full p-3 bg-slate-100 border-none rounded-xl font-bold text-sm focus:ring-2 focus:ring-[#7B8E90] outline-none"
                                         />
                                     </div>
                                 </>
@@ -675,7 +726,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                 <button
                                     type="submit"
                                     disabled={saving}
-                                    className="flex-1 bg-blue-600 p-3 rounded-xl font-black text-white shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:bg-slate-300"
+                                    className="flex-1 bg-[#324354] p-3 rounded-xl font-black text-white shadow-lg shadow-slate-200 hover:bg-[#254153] transition-all active:scale-95 disabled:bg-slate-300"
                                 >
                                     {saving ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
                                 </button>
@@ -748,7 +799,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
 
 function StatCard({ label, value, color }: { label: string, value: string | number, color: string }) {
     return (
-        <div className={`flex-1 min-w-[76px] px-1.5 py-1.5 rounded-lg border border-slate-100 shadow-sm flex flex-col items-center justify-center ${color}`}>
+        <div className={`flex-1 min-w-[76px] px-1.5 py-1.5 rounded-lg border border-[#e2ded5] shadow-sm flex flex-col items-center justify-center ${color}`}>
             <span className="text-[9px] font-black uppercase opacity-70 leading-tight whitespace-nowrap">{label}</span>
             <span className="text-sm font-black tracking-tight">{value}</span>
         </div>
@@ -759,7 +810,7 @@ function TabButton({ active, label, onClick }: { active: boolean, label: string,
     return (
         <button
             onClick={onClick}
-            className={`py-4 px-6 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${active ? 'border-blue-600 text-blue-600 bg-blue-50/10' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            className={`py-4 px-6 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${active ? 'border-[#324354] text-[#324354] bg-[#F6F3EE]/60' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
         >
             {label}
         </button>
@@ -775,6 +826,7 @@ const TRACE_STAGES: Array<{
 }> = [
     { label: 'Pintura', dateKey: 'pintura_fecha', userKey: 'pintura_user_name' },
     { label: 'Vaciado', dateKey: 'vaciado_fecha', userKey: 'vaciado_user_name' },
+    { label: 'Herrajes', dateKey: 'herrajes_fecha', userKey: 'herrajes_user_name' },
     { label: 'Pulido', dateKey: 'pulido_fecha', userKey: 'pulido_user_name' },
     { label: 'Ensayo', dateKey: 'acabado_fecha', userKey: 'acabado_user_name' },
     { label: 'Reparacion', dateKey: 'reparacion_fecha', userKey: 'reparacion_user_name' },
@@ -841,20 +893,20 @@ export function OrderProcessesPanel({
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
                 <div>
-                    <div className="text-[11px] font-black uppercase tracking-widest text-blue-600">Procesos de la orden</div>
+                    <div className="text-[11px] font-black uppercase tracking-widest text-[#324354]">Procesos de la orden</div>
                     <div className="text-[12px] font-semibold text-slate-500">
                         OF {orden.orden_fabricacion} · {registros.length} registro{registros.length === 1 ? '' : 's'} encontrado{registros.length === 1 ? '' : 's'}
                     </div>
                 </div>
                 {loadingRecords && (
-                    <div className="text-xs text-blue-500 font-bold flex items-center gap-1.5 animate-pulse">
+                    <div className="text-xs text-[#7B8E90] font-bold flex items-center gap-1.5 animate-pulse">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Cargando historial completo...
                     </div>
                 )}
             </div>
             {loadingRecords && registros.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-[12px] font-bold text-slate-400 flex items-center justify-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin text-blue-500" /> Consultando piezas registradas en trazabilidad...
+                    <RefreshCw className="w-4 h-4 animate-spin text-[#7B8E90]" /> Consultando piezas registradas en trazabilidad...
                 </div>
             ) : registros.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-[12px] font-bold text-slate-400">
@@ -872,7 +924,7 @@ export function OrderProcessesPanel({
                                     <InfoPill label="Molde" value={registro.molde_serial || '-'} />
                                 </div>
                                 {(onEdit || onTransfer || onDelete) && <div className="flex gap-2">
-                                    <button onClick={() => onEdit?.(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
+                                    <button onClick={() => onEdit?.(registro)} className="p-1.5 text-[#324354] hover:bg-[#F6F3EE] rounded transition-colors" title="Editar registro">
                                         <Edit2 size={16} />
                                     </button>
                                     <button onClick={() => onTransfer?.(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
@@ -915,15 +967,15 @@ function TraceProcessTimeline({ registro }: { registro: RegistroTrazabilidad }) 
 function InfoPill({ label, value }: { label: string, value: string | number }) {
     return (
         <div className="font-semibold text-slate-700">
-            <span className="text-sky-600">{label}: </span>{value}
+            <span className="text-[#7B8E90]">{label}: </span>{value}
         </div>
     )
 }
 
 function StageBadge({ label, date, user, active }: { label: string, date: string, user?: string, active: boolean }) {
     return (
-        <div className={`w-[174px] min-h-[64px] rounded-lg border px-3 py-2 text-center shadow-sm ${active ? 'bg-teal-100 border-teal-200' : 'bg-white border-slate-200'}`}>
-            <div className="text-[12px] leading-none text-sky-600 font-semibold">{label}</div>
+        <div className={`w-[174px] min-h-[64px] rounded-lg border px-3 py-2 text-center shadow-sm ${active ? 'bg-[#deb841]/25 border-[#deb841]' : 'bg-white border-slate-200'}`}>
+            <div className="text-[12px] leading-none text-[#7B8E90] font-semibold">{label}</div>
             <div className="text-[12px] leading-tight text-slate-700 mt-1">{formatProcessDate(date)}</div>
             <div className="text-[11px] leading-tight text-slate-600 truncate" title={user || ''}>{user || 'Sin operario'}</div>
         </div>
