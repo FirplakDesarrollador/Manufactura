@@ -33,6 +33,8 @@ import FormEnchapeCefi from './FormEnchapeCefi';
 import HistorialEnchapeCefi from './HistorialEnchapeCefi';
 import FormOtrosCefi from './FormOtrosCefi';
 import HistorialOtrosCefi from './HistorialOtrosCefi';
+import FormMoldes from './FormMoldes';
+import HistorialMoldes from './HistorialMoldes';
 import {
     MarmolSinteticoIcon,
     FibraDeVidrioIcon,
@@ -66,7 +68,8 @@ const PROCESOS_CON_FORMULARIO = new Set([
     'pintura_ms', 'vaciado_ms', 'inspeccion_ms', 'otros_ms',
     'pintura_fv', 'vaciado_fv', 'inspeccion_fv',
     'corte_mbl', 'enchape_mbl', 'taladros', 'inspeccion_mbl', 'otros_mbl',
-    'corte_cefi', 'enchape_cefi', 'otros_cefi'
+    'corte_cefi', 'enchape_cefi', 'otros_cefi',
+    'moldes_general'
 ]);
 
 export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlantaViewProps) {
@@ -434,6 +437,17 @@ export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlant
                     />
                 ) : (
                     <HistorialOtrosCefi
+                        onNuevoRegistro={() => setActiveTabMode('registro')}
+                    />
+                )
+            ) : selectedProceso.id === 'moldes_general' ? (
+                activeTabMode === 'registro' ? (
+                    <FormMoldes
+                        onCancel={() => setActiveTabMode('historial')}
+                        onSuccess={() => handleFormSuccess('Control de Moldes')}
+                    />
+                ) : (
+                    <HistorialMoldes
                         onNuevoRegistro={() => setActiveTabMode('registro')}
                     />
                 )
