@@ -9,6 +9,7 @@ import { OrderProcessesPanel } from '@/components/fibra/administracion/Administr
 import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
 import { usePesosVaciado } from '@/lib/fibra/usePesosVaciado'
 import { cediSoloSap } from '@/lib/fibra/completadaSap'
+import { limiteDesmanchado } from '@/lib/supabase/queries/pintura'
 
 // Copia el número de la OF al portapapeles (con respaldo para navegadores sin permiso de portapapeles)
 const copiarOf = async (of: unknown) => {
@@ -108,16 +109,8 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
     const moldesDispConVueltas = relevantMoldes.filter(m => m.estado === 'Disponible' && m.vueltas_actuales != null)
     const minVueltas = moldesDispConVueltas.length > 0 ? Math.min(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
     const maxVueltas = moldesDispConVueltas.length > 0 ? Math.max(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
-    const getLimMolde = (m: any) => {
-        // Primero las vueltas MTO del molde (columna Vuletas_MTO)
-        const mto = Number(m?.Vuletas_MTO ?? 0);
-        if (mto > 0) return mto;
-        const atip = Number(m?.vueltas_mtto_atipicas ?? m?.vueltas_mto_atipicas ?? 0);
-        if (atip > 0) return atip;
-        const reg = Number(m?.vueltas_mtto ?? m?.vueltas_mto ?? 0);
-        if (reg > 0) return reg;
-        return Number(m?.vueltas_totales ?? 0);
-    };
+    // Límite de desmanchado (Vueltas_Desmanchado)
+    const getLimMolde = limiteDesmanchado;
     const tienePasados = moldesDispConVueltas.some(m => {
         const lim = getLimMolde(m);
         return lim > 0 && m.vueltas_actuales >= lim;

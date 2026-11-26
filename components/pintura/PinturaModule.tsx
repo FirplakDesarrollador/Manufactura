@@ -3,7 +3,7 @@
 import { moldeDeOtraReferencia } from '@/lib/fibra/moldesOrden'
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy, serialConT } from '@/lib/supabase/queries/pintura'
+import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy, serialConT, limiteDesmanchado, puedePintarMolde } from '@/lib/supabase/queries/pintura'
 import OrdenCard from './OrdenCard'
 import MoldSelector from './MoldSelector'
 import { Search, X, Calendar, History, ClipboardList } from 'lucide-react'
@@ -110,9 +110,10 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
                 (!!skuMolde && (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase() === skuMolde)))
 
             // 2) Respaldo (referencias sin tipo de molde asignado): SKU, prefijo del serial y palabras de la descripción
-            const available = (delTipo.length > 0 ? delTipo.filter(m => m.estado === 'Disponible') : allMoldes
+            // Disponibles, y los Por desmanchar mientras les quede su única vuelta extra (puedePintarMolde)
+            const available = (delTipo.length > 0 ? delTipo.filter(m => puedePintarMolde(m).ok) : allMoldes
                 .filter(m => {
-                    if (m.estado !== 'Disponible' || serialConT(m.serial)) return false
+                    if (!puedePintarMolde(m).ok || serialConT(m.serial)) return false
 
                     const mSku = (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase()
                     const mSerial = (m.serial || '').trim().toLowerCase()
@@ -272,16 +273,8 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         setSelectedDate('')
     }
 
-    const getLimiteMolde = (molde: any): number => {
-        // Primero las vueltas MTO del molde (columna Vuletas_MTO)
-        const mto = Number(molde?.Vuletas_MTO ?? 0);
-        if (mto > 0) return mto;
-        const atip = Number(molde?.vueltas_mtto_atipicas ?? molde?.vueltas_mto_atipicas ?? 0);
-        if (atip > 0) return atip;
-        const reg = Number(molde?.vueltas_mtto ?? molde?.vueltas_mto ?? 0);
-        if (reg > 0) return reg;
-        return Number(molde?.vueltas_totales ?? 0);
-    };
+    // Límite de desmanchado (Vueltas_Desmanchado): con vueltas >= límite el molde sale solo a "Por desmanchar"
+    const getLimiteMolde = limiteDesmanchado;
 
     const checkMantenimiento = (molde: Molde) => {
         const limite = getLimiteMolde(molde);
@@ -290,10 +283,17 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
         if (threshold > 0 && molde.vueltas_actuales >= threshold) {
             const isNew = ((molde as any).vueltas_mtto_atipicas ?? molde.vueltas_mto_atipicas) === 1;
             const title = isNew ? '🆕 Molde nuevo 🆕' : '⚠️ Molde para desmanchar ⚠️';
-            const message = isNew 
+            const v = molde.vueltas_actuales || 0;
+            const message = isNew
                 ? `El ${molde.molde_descripcion} # ${molde.serial} Se debe encerar en el puesto`
-                : `El ${molde.molde_descripcion} # ${molde.serial} Se debe sacar para desmanchar`;
-            
+                : v >= limite
+                    // Ya cumplió sus vueltas (Por desmanchar): esta es su única vuelta extra
+                    ? `El ${molde.molde_descripcion} # ${molde.serial} YA CUMPLIÓ sus ${limite} vueltas y está POR DESMANCHAR.\n\n` +
+                      `Solo se permite 1 vuelta más (quedaría en ${v + 1}). Después el molde queda BLOQUEADO y debe salir a desmanchar.`
+                    // Con esta pieza completa sus vueltas: sale a desmanchar cuando se libere (al desmoldar)
+                    : `El ${molde.molde_descripcion} # ${molde.serial} lleva ${v} de ${limite} vueltas: con esta pieza completa sus vueltas.\n\n` +
+                      `Al desmoldar queda POR DESMANCHAR (se permite 1 vuelta más antes de bloquearlo).`;
+
             alert(`${title}\n\n${message}`);
             return true;
         }
@@ -333,15 +333,27 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             return
         }
 
+        // Molde que ya cumplió sus vueltas: bloqueado si ya usó la vuelta extra; si no, confirmar la última vuelta
+        const permiso = puedePintarMolde(selectedMolde)
+        if (!permiso.ok) {
+            alert(`⛔ Molde bloqueado ⛔\n\n${permiso.motivo || 'Este molde no se puede usar.'}`)
+            return
+        }
+        if (permiso.ultima && !confirm(
+            `⚠️ ÚLTIMA VUELTA DEL MOLDE ${selectedMolde.serial} ⚠️\n\n` +
+            `Ya cumplió sus ${permiso.limite} vueltas y está por desmanchar. Esta es la única vuelta extra permitida: ` +
+            `después el molde queda BLOQUEADO y debe salir a desmanchar.\n\n¿Registrar de todas formas?`)) return
+
         setSubmitting(true)
         try {
             // 2. Proceso de registro (verificado en el backend)
-            await registrarPintura({
+            const registro = await registrarPintura({
                 orden_fabricacion_id: selectedOrden.id,
                 molde_id: selectedMolde.id,
                 linea: selectedLinea,
                 usuario_email: userEmail
             })
+            if (registro.aviso_molde) alert(`⚠️ Molde para desmanchar ⚠️\n\n${registro.aviso_molde}`)
 
             // 3. Éxito: Notificación, Limpiar campos, Invalidar caché (recargar data)
             setNotification({ message: '¡Registro creado exitosamente!', type: 'success' })

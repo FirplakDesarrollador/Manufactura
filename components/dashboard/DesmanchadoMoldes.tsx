@@ -3,26 +3,29 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { plantaDeMolde } from '@/lib/supabase/queries/fibra_moldes'
-import { serialConT } from '@/lib/supabase/queries/pintura'
+import { serialConT, limiteDesmanchado } from '@/lib/supabase/queries/pintura'
 import { AlertTriangle, CheckCircle2, Clock, RefreshCw, Search } from 'lucide-react'
 import IconoDesmanchado from './IconoDesmanchado'
 
-// Moldes de Mármol: vueltas actuales contra vueltas MTO (columna Vuletas_MTO de la tabla moldes).
-// 1 = ya llegó a las vueltas MTO → sacar a desmanchar.
+// Moldes de Mármol: vueltas actuales contra su límite de desmanchado (columna Vueltas_Desmanchado de la tabla moldes).
+// Lógica de salida: si vueltas actuales >= Vueltas_Desmanchado (y el límite es mayor que cero) el molde sale solo:
+// Supabase lo deja estado "Por desmanchar" y Estado_reparacion "En espera-produccion".
+// 1 = Por desmanchar (o ya llegó al límite) → sacarlo a desmanchar.
 // 2 = le faltan 2 vueltas o menos (o va en el 85 %) → próximo a desmanchar.
-// 3 = ya está en reparación por desmanchado: Pintura (o el desmanchado automático) lo pasó a "En reparacion"
-//     y le reinició las vueltas a 0. Es lo mismo que la app Registro moldes muestra como categoría Desmanchado.
+// 3 = ya está en desmanchado: tiene una reparación abierta en Registro moldes (BD_moldes) por "Límite de vueltas
+//     alcanzado" / "Desmanchado", sin entregar. Es la misma lista que muestra esa app.
 // Los demás moldes en reparación (otros daños) no entran en 1, 2 ni 3.
 
 interface MoldeVueltas {
     id: number
     serial: string
     estado: string
+    estado_reparacion: string | null
     nombre_articulo: string | null
     vueltas_actuales: number
-    mto: number
-    modificado_por: string | null
+    mto: number                    // límite de desmanchado (Vueltas_Desmanchado)
     modified_at: string | null
+    desmanche: { fechaEntrada: string | null } | null   // reparación de desmanchado abierta en BD_moldes
 }
 
 type Nivel = 'sacar' | 'proximo' | 'desmanchando' | 'reparacion' | 'ok' | 'sin_mto'
@@ -31,37 +34,63 @@ const FALTAN_PROXIMO = 2
 const PORC_PROXIMO = 0.85
 
 const enReparacion = (estado: string) => /reparac/i.test(estado || '')
-// Quién lo manda a desmanchar: el usuario de Pintura MS al llegar a las vueltas, o el proceso automático
-const POR_DESMANCHADO = /^pinturams@firplak\.com$|desmanchado/i
+const porDesmanchar = (estado: string) => /por desmanchar/i.test(estado || '')
 
 const nivelDe = (m: MoldeVueltas): Nivel => {
-    if (enReparacion(m.estado)) {
-        return m.vueltas_actuales === 0 && POR_DESMANCHADO.test(m.modificado_por || '') ? 'desmanchando' : 'reparacion'
-    }
+    if (porDesmanchar(m.estado)) return 'sacar'
+    if (enReparacion(m.estado)) return m.desmanche ? 'desmanchando' : 'reparacion'
     if (!(m.mto > 0)) return 'sin_mto'
     if (m.vueltas_actuales >= m.mto) return 'sacar'
     if (m.mto - m.vueltas_actuales <= FALTAN_PROXIMO || m.vueltas_actuales / m.mto >= PORC_PROXIMO) return 'proximo'
     return 'ok'
 }
 
-// Días desde que entró a desmanchar (fecha en que se pasó a "En reparacion")
+const claveSerial = (s: string | null | undefined) => (s || '').trim().toLowerCase()
+
+// Reparaciones de desmanchado abiertas en Registro moldes (BD_moldes): serial → fecha de entrada
+async function cargarDesmanchesAbiertos(): Promise<Map<string, string | null>> {
+    const mapa = new Map<string, string | null>()
+    const { data, error } = await supabase
+        .from('BD_moldes')
+        .select('"CODIGO MOLDE", ESTADO, "DEFECTOS A REPARAR", "FECHA ENTRADA"')
+        .not('ESTADO', 'ilike', '%entregado%')
+    if (error) {
+        console.error('No se pudo leer Registro moldes (BD_moldes):', error)
+        return mapa
+    }
+    for (const r of (data || []) as Record<string, string | null>[]) {
+        if (/destru/i.test(r['ESTADO'] || '')) continue
+        if (!/vueltas|desmanch/i.test(r['DEFECTOS A REPARAR'] || '')) continue
+        const k = claveSerial(r['CODIGO MOLDE'])
+        const f = r['FECHA ENTRADA']
+        if (!mapa.has(k) || (f && (mapa.get(k) || '') < f)) mapa.set(k, f)
+    }
+    return mapa
+}
+
+// Fecha de entrada a desmanchado (FECHA ENTRADA de Registro moldes; si no hay, la última modificación del molde).
+// Las fechas sin hora (AAAA-MM-DD) se leen a mediodía para que no se corran un día por la zona horaria.
+const aFecha = (fecha: string | null) => fecha ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T12:00:00` : fecha) : null
+const entradaDe = (m: MoldeVueltas) => m.desmanche?.fechaEntrada || m.modified_at
 const diasDesde = (fecha: string | null) => {
-    if (!fecha) return null
-    const ms = Date.now() - new Date(fecha).getTime()
+    const d = aFecha(fecha)
+    if (!d) return null
+    const ms = Date.now() - d.getTime()
     return Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 86400000)) : null
 }
 const fechaCorta = (fecha: string | null) =>
-    fecha ? new Date(fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '—'
+    aFecha(fecha)?.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) ?? '—'
 
 async function cargarMoldesMs(): Promise<MoldeVueltas[]> {
     const filas: {
-        id: number; serial: string; estado: string; nombre_articulo: string | null; vueltas_actuales: number | null
-        Vuletas_MTO: number | null; modificado_por: string | null; modified_at: string | null
+        id: number; serial: string; estado: string; Estado_reparacion: string | null; nombre_articulo: string | null
+        vueltas_actuales: number | null; Vueltas_Desmanchado: number | null; Vuletas_MTO: number | null; modified_at: string | null
     }[] = []
+    const desmanches = cargarDesmanchesAbiertos()
     for (let desde = 0; ; desde += 1000) {
         const { data, error } = await supabase
             .from('moldes')
-            .select('id, serial, estado, nombre_articulo, vueltas_actuales, Vuletas_MTO, modificado_por, modified_at')
+            .select('id, serial, estado, Estado_reparacion, nombre_articulo, vueltas_actuales, Vueltas_Desmanchado, Vuletas_MTO, modified_at')
             .neq('estado', 'Destruido')
             .order('id')
             .range(desde, desde + 999)
@@ -69,17 +98,19 @@ async function cargarMoldesMs(): Promise<MoldeVueltas[]> {
         filas.push(...(data || []))
         if (!data || data.length < 1000) break
     }
+    const abiertos = await desmanches
     return filas
         .filter(m => plantaDeMolde(m.nombre_articulo || '') === 'MS' && !serialConT(m.serial))
         .map(m => ({
             id: m.id,
             serial: m.serial,
             estado: m.estado,
+            estado_reparacion: m.Estado_reparacion,
             nombre_articulo: m.nombre_articulo,
             vueltas_actuales: Number(m.vueltas_actuales || 0),
-            mto: Number(m.Vuletas_MTO || 0),
-            modificado_por: m.modificado_por,
-            modified_at: m.modified_at
+            mto: limiteDesmanchado(m),
+            modified_at: m.modified_at,
+            desmanche: abiertos.has(claveSerial(m.serial)) ? { fechaEntrada: abiertos.get(claveSerial(m.serial)) ?? null } : null
         }))
 }
 
@@ -89,7 +120,7 @@ const ESTILO_NIVEL: Record<Nivel, { texto: string; clase: string }> = {
     desmanchando: { texto: '3 · En desmanchado', clase: 'bg-sky-100 text-sky-800 border-sky-300' },
     reparacion: { texto: 'En reparación (otro daño)', clase: 'bg-gray-100 text-gray-600 border-gray-300' },
     ok: { texto: 'Al día', clase: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    sin_mto: { texto: 'Sin vueltas MTO', clase: 'bg-gray-100 text-gray-500 border-gray-200' }
+    sin_mto: { texto: 'Sin límite de vueltas', clase: 'bg-gray-100 text-gray-500 border-gray-200' }
 }
 
 function BarraVueltas({ actuales, mto, nivel }: { actuales: number; mto: number; nivel: Nivel }) {
@@ -182,7 +213,7 @@ export default function DesmanchadoMoldes() {
         .sort((a, b) => (a.mto - a.vueltas_actuales) - (b.mto - b.vueltas_actuales)), [moldes])
     // Los que llevan más días en desmanchado, primero
     const desmanchando = useMemo(() => moldes.filter(m => nivelDe(m) === 'desmanchando')
-        .sort((a, b) => (a.modified_at || '').localeCompare(b.modified_at || '')), [moldes])
+        .sort((a, b) => (entradaDe(a) || '').localeCompare(entradaDe(b) || '')), [moldes])
     const alDia = useMemo(() => moldes.filter(m => nivelDe(m) === 'ok').length, [moldes])
 
     const tabla = useMemo(() => {
@@ -205,7 +236,7 @@ export default function DesmanchadoMoldes() {
                     </span>
                     <div>
                         <h2 className="text-lg font-black text-[#254153]">Desmanchado de moldes</h2>
-                        <p className="text-xs text-gray-500">Vueltas actuales de cada molde de Mármol contra sus vueltas MTO.</p>
+                        <p className="text-xs text-gray-500">Vueltas actuales de cada molde de Mármol contra su límite de desmanchado.</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -242,15 +273,20 @@ export default function DesmanchadoMoldes() {
                         <ListaNivel
                             numero={1}
                             titulo="Sacar a desmanchar"
-                            ayuda="Ya llegaron a sus vueltas MTO"
+                            ayuda="Por desmanchar: llegaron a su límite de vueltas"
                             moldes={sacar}
                             tono="rojo"
                             vacio="Ningún molde para desmanchar"
                             detalle={m => {
                                 const demas = m.vueltas_actuales - m.mto
                                 return {
-                                    principal: <>{m.vueltas_actuales}<span className="text-xs text-gray-400 font-bold"> / {m.mto}</span></>,
-                                    secundario: demas === 0 ? 'Llegó a las vueltas MTO' : `${plural(demas, 'vuelta')} de más`
+                                    principal: <>{m.vueltas_actuales}<span className="text-xs text-gray-400 font-bold"> / {m.mto || '—'}</span></>,
+                                    // Cumplió sus vueltas: le queda 1 vuelta extra; con la extra usada queda bloqueado
+                                    secundario: demas > 0
+                                        ? 'Vuelta extra usada · BLOQUEADO'
+                                        : m.estado === 'En uso'
+                                            ? 'Completa sus vueltas: al desmoldar queda Por desmanchar'
+                                            : `${porDesmanchar(m.estado) ? 'Por desmanchar' : 'Cumplió sus vueltas'} · queda 1 vuelta extra`
                                 }
                             }}
                         />
@@ -272,15 +308,15 @@ export default function DesmanchadoMoldes() {
                         <ListaNivel
                             numero={3}
                             titulo="En desmanchado"
-                            ayuda="Ya están en reparación por desmanchado"
+                            ayuda="En reparación por desmanchado (Registro moldes)"
                             moldes={desmanchando}
                             tono="azul"
                             vacio="Ningún molde en desmanchado"
                             detalle={m => {
-                                const dias = diasDesde(m.modified_at)
+                                const dias = diasDesde(entradaDe(m))
                                 return {
                                     principal: dias == null ? '—' : <>{dias}<span className="text-xs text-gray-400 font-bold"> {dias === 1 ? 'día' : 'días'}</span></>,
-                                    secundario: `Entró ${fechaCorta(m.modified_at)}`
+                                    secundario: `Entró ${fechaCorta(entradaDe(m))}`
                                 }
                             }}
                         />
@@ -314,7 +350,7 @@ export default function DesmanchadoMoldes() {
                                 <option value="desmanchando">3 · En desmanchado</option>
                                 <option value="ok">Al día</option>
                                 <option value="reparacion">En reparación (otro daño)</option>
-                                <option value="sin_mto">Sin vueltas MTO</option>
+                                <option value="sin_mto">Sin límite de vueltas</option>
                             </select>
                         </div>
                         <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
@@ -325,7 +361,7 @@ export default function DesmanchadoMoldes() {
                                         <th className="text-left px-4 py-2 font-black">Molde</th>
                                         <th className="text-left px-4 py-2 font-black">Estado</th>
                                         <th className="text-right px-4 py-2 font-black">Vueltas actuales</th>
-                                        <th className="text-right px-4 py-2 font-black">Vueltas MTO</th>
+                                        <th className="text-right px-4 py-2 font-black">Límite desmanchado</th>
                                         <th className="px-4 py-2 font-black w-40">Avance</th>
                                         <th className="text-left px-4 py-2 font-black">Desmanchado</th>
                                     </tr>
@@ -344,7 +380,7 @@ export default function DesmanchadoMoldes() {
                                                 <td className="px-4 py-2 text-right font-bold tabular-nums text-gray-600">{m.mto > 0 ? m.mto : '—'}</td>
                                                 <td className="px-4 py-2">
                                                     {enRep
-                                                        ? <span className="text-[11px] text-gray-400">Desde {fechaCorta(m.modified_at)}</span>
+                                                        ? <span className="text-[11px] text-gray-400">Desde {fechaCorta(entradaDe(m))}</span>
                                                         : <BarraVueltas actuales={m.vueltas_actuales} mto={m.mto} nivel={nivel} />}
                                                 </td>
                                                 <td className="px-4 py-2 whitespace-nowrap">
