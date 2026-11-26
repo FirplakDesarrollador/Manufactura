@@ -115,7 +115,8 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
                         filteredMoldes.map((molde) => {
                             const atip = Number((molde as any).vueltas_mtto_atipicas ?? molde.vueltas_mto_atipicas ?? 0);
                             const reg = Number((molde as any).vueltas_mtto ?? molde.vueltas_mto ?? 0);
-                            const limite = atip > 0 ? atip : reg > 0 ? reg : Number(molde.vueltas_totales ?? 0);
+                            const mto = Number((molde as any).Vuletas_MTO ?? 0);
+                            const limite = mto > 0 ? mto : atip > 0 ? atip : reg > 0 ? reg : Number(molde.vueltas_totales ?? 0);
                             const pasadoMtto = limite > 0 && (molde.vueltas_actuales || 0) >= limite;
                             const cercaMtto = limite > 0 && !pasadoMtto && (
                                 (molde.vueltas_actuales || 0) >= (limite - 2) || ((molde.vueltas_actuales || 0) / limite) >= 0.85

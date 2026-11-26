@@ -1,5 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
+export function isExternalConfigured(): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_TALENTO_HUMANO_URL || process.env.NEXT_PUBLIC_EXTERNAL_SUPABASE_URL || ''
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_TALENTO_HUMANO_ANON_KEY || process.env.NEXT_PUBLIC_EXTERNAL_SUPABASE_ANON_KEY || ''
+  return Boolean(supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('placeholder'))
+}
+
 export function createExternalClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_TALENTO_HUMANO_URL || process.env.NEXT_PUBLIC_EXTERNAL_SUPABASE_URL || ''
   const supabaseAnonKey = process.env.NEXT_PUBLIC_TALENTO_HUMANO_ANON_KEY || process.env.NEXT_PUBLIC_EXTERNAL_SUPABASE_ANON_KEY || ''
@@ -15,3 +21,4 @@ export function createExternalClient() {
     supabaseAnonKey || 'placeholder-key'
   )
 }
+

@@ -18,7 +18,8 @@ export const PROCESOS_PLANO = [
     { id: 'soldadura', nombre: 'Herrajes' },
     { id: 'pulido', nombre: 'Pulido' },
     { id: 'ensamble', nombre: 'Ensamble' },
-    { id: 'huacal', nombre: 'Huacal' }
+    { id: 'huacal', nombre: 'Huacal' },
+    { id: 'fotos_ensamble', nombre: 'Fotos ensamble' }
 ] as const;
 
 export type ProcesoPlano = typeof PROCESOS_PLANO[number]['id'];
@@ -37,10 +38,19 @@ export interface Plano {
     created_at: string;
 }
 
+// Procesos que reciben fotos (imágenes) además de PDF
+export const aceptaFotos = (proceso: string | null | undefined) => proceso === 'fotos_ensamble';
+const EXT_FOTO = /\.(jpe?g|png|webp)$/i;
+export const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp'];
+export const esPdf = (archivo: File) => archivo.type === 'application/pdf' || /\.pdf$/i.test(archivo.name);
+export const esFoto = (archivo: File) => TIPOS_FOTO.includes(archivo.type) || EXT_FOTO.test(archivo.name);
+// ¿El archivo guardado es una imagen? (por la extensión de la ruta en el bucket)
+export const rutaEsImagen = (ruta: string) => EXT_FOTO.test(ruta);
+
 export const nombreProceso = (id: string) => PROCESOS_PLANO.find(p => p.id === id)?.nombre || id;
 
 // Nombre de la bañera a partir del archivo: "BAÑERA OVALADA 170.pdf" → "BAÑERA OVALADA 170"
-export const baneraDeArchivo = (nombre: string) => nombre.replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+export const baneraDeArchivo = (nombre: string) => nombre.replace(/\.(pdf|jpe?g|png|webp)$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 const clave = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 export const mismaBanera = (a: string, b: string) => clave(a) === clave(b);
@@ -83,7 +93,8 @@ export function tituloModelo(nombres: string[]): string {
 function errorDe(e: { message?: string; code?: string } | null): Error {
     const m = e?.message || 'Error desconocido';
     if (e?.code === '42P01' || /fibra_planos/.test(m) && /does not exist|schema cache/.test(m)) return new Error('Falta ejecutar fibra_planos.sql en Supabase');
-    if (/fibra_planos_proceso_check/.test(m)) return new Error('Este proceso aún no está habilitado en Supabase: falta ejecutar fibra_planos_huacal.sql');
+    if (/fibra_planos_proceso_check/.test(m)) return new Error('Este proceso aún no está habilitado en Supabase: falta ejecutar fibra_planos_fotos_ensamble.sql');
+    if (/mime type/i.test(m)) return new Error('El bucket aún no recibe fotos: falta ejecutar fibra_planos_fotos_ensamble.sql en Supabase');
     if (/bucket not found/i.test(m)) return new Error('Falta ejecutar fibra_planos.sql en Supabase (bucket fibra-planos)');
     return new Error(m);
 }
@@ -124,10 +135,13 @@ export async function urlPlano(path: string): Promise<string> {
 
 // Sube el PDF y lo deja como plano vigente; si ya había uno, pasa a versión anterior
 export async function subirPlano(banera: string, proceso: ProcesoPlano, archivo: File, actual: Plano | null, observacion: string, email?: string, hash?: string | null) {
-    if (archivo.type !== 'application/pdf' && !/\.pdf$/i.test(archivo.name)) throw new Error(`${archivo.name} no es un PDF`);
+    const foto = aceptaFotos(proceso) && !esPdf(archivo) && esFoto(archivo);
+    if (!esPdf(archivo) && !foto) throw new Error(`${archivo.name} no es un PDF${aceptaFotos(proceso) ? ' ni una foto (JPG, PNG o WEBP)' : ''}`);
     if (archivo.size > PLANOS_MAX_BYTES) throw new Error(`${archivo.name} supera 30 MB`);
-    const ruta = `${proceso}/${crypto.randomUUID()}.pdf`;
-    const { error: e1 } = await supabase.storage.from(PLANOS_BUCKET).upload(ruta, archivo, { contentType: 'application/pdf', upsert: false });
+    const ext = foto ? (archivo.name.match(EXT_FOTO)?.[1] || 'jpg').toLowerCase() : 'pdf';
+    const tipo = foto ? (archivo.type || `image/${ext === 'jpg' ? 'jpeg' : ext}`) : 'application/pdf';
+    const ruta = `${proceso}/${crypto.randomUUID()}.${ext}`;
+    const { error: e1 } = await supabase.storage.from(PLANOS_BUCKET).upload(ruta, archivo, { contentType: tipo, upsert: false });
     if (e1) throw errorDe(e1);
     if (actual) {
         const { error: e2 } = await supabase.from(PLANOS_TABLA).update({ activo: false, updated_at: new Date().toISOString() }).eq('id', actual.id);
