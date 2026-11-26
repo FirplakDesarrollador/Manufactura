@@ -132,7 +132,8 @@ export default function PinturaFibraModule({ userEmail }: PinturaFibraModuleProp
                 // Kit de reparación: sin molde y directo a Digitado (no pasa por los procesos de la planta)
                 await registrarKitReparacionFv(orden.id, 'digitado', userEmail, null, 'pintura')
             } else {
-                await registrarPintura({ orden_fabricacion_id: orden.id, molde_id: molde!.id, linea: 'Linea 1', usuario_email: userEmail })
+                const r = await registrarPintura({ orden_fabricacion_id: orden.id, molde_id: molde!.id, linea: 'Linea 1', usuario_email: userEmail })
+                if (r.aviso_molde) alert(`⚠️ Molde para desmanchar ⚠️\n\n${r.aviso_molde}`)
             }
             setNotification({ message: kit ? 'Kit de reparación registrado: pasó directo a Digitado' : `OF ${orden.orden_fabricacion}: pieza registrada en Pintura`, type: 'success' })
             loadOrdenes()
