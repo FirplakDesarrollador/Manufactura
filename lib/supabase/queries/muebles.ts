@@ -1,10 +1,14 @@
 import { supabase } from '@/lib/supabase'
 import { OrdenMueble, MetricasMuebles, Defecto, ConteoDefecto, ReposicionMueble, Turno, Supervisor, SupervisorTurno } from '@/types/muebles'
 
+// Columnas que usan las pantallas de proceso. NO se pide la lista de componentes (columna 'componentes', ~2/3 del peso:
+// 7,4 MB → 2,4 MB con 3.000 OF); quien la necesita la lee aparte con getComponentesByOF.
+const COLUMNAS_OF_MUEBLES = 'id,created_at,numero_pedido,orden_fabricacion,cantidad,fecha_entrega_estimada,pendiente,fecha_entrega_real,modificado_por,cliente,ensayo,producto_sku,producto_descripcion,planta,por_cortar,piezas_pendientes,corte,enchape,inspeccion,empaque,digitado,transito,cedi,sum_cortados,sum_enchapado,sum_inspeccion,sum_empacado,sum_digitado,sum_transito,piezas,canto,rh_metros,reposiciones,por_reponer,reponer_corte,reponer_enchape,reponer_inspeccion'
+
 export async function getOrdenesMuebles(planta?: string, soloPendientes: boolean = false) {
     let query = supabase
         .from('query_of_muebles')
-        .select('*')
+        .select(COLUMNAS_OF_MUEBLES)
         .order('id', { ascending: false })
 
     if (planta) {
@@ -18,7 +22,7 @@ export async function getOrdenesMuebles(planta?: string, soloPendientes: boolean
     const { data, error } = await query
 
     if (error) throw error
-    return data as OrdenMueble[]
+    return data as unknown as OrdenMueble[]
 }
 
 export async function getMetricasMueblesHoy(turno?: string) {

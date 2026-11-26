@@ -80,7 +80,7 @@ export default function CalidadPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 justify-items-center w-full">
                         
                         {/* 1. Indicadores Calidad */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/calidad/indicadores')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -95,7 +95,7 @@ export default function CalidadPage() {
                         </div>
 
                         {/* 2. Calidad MS */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/calidad/ms')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -110,7 +110,7 @@ export default function CalidadPage() {
                         </div>
 
                         {/* 2.0 Calidad FV: aplicación propia (mismo módulo de Calidad MS) que reemplaza al atajo de Power Apps */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/calidad/fv')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -128,7 +128,7 @@ export default function CalidadPage() {
                         </div>
 
                         {/* 2.1 Calidad FV (atajo a la app de Power Apps, en transición a la aplicación propia) */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => window.open(URL_CALIDAD_FV_POWERAPPS, '_blank', 'noopener,noreferrer')}
                                 title="En transición: abre la aplicación Registro de Calidad FV (Power Apps) en otra pestaña mientras se construye Calidad FV en esta aplicación"
@@ -148,7 +148,7 @@ export default function CalidadPage() {
                         </div>
 
                         {/* 3. Respuesta Rápida Calidad RRC */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/ficha-rcc')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -158,12 +158,12 @@ export default function CalidadPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                 </div>
-                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Respuesta Rápida Calidad<br/>RRC</span>
+                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Respuesta Rápida Calidad<br/>(RRC)</span>
                             </button>
                         </div>
 
                         {/* 4. Criterios de Aceptación y Rechazo */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/calidad/criterios')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -178,7 +178,7 @@ export default function CalidadPage() {
                         </div>
 
                         {/* 5. Plan de Vigilancia */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/calidad/vigilancia')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -194,7 +194,7 @@ export default function CalidadPage() {
                         </div>
 
                         {/* 6. QRQC */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/calidad/qrqc')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -205,14 +205,14 @@ export default function CalidadPage() {
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                                    QRQC<br />
+                                    (QRQC)<br />
                                     <span className="text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">Quick Response Quality Control</span>
                                 </span>
                             </button>
                         </div>
 
                         {/* 7. Calidad Reparación de Moldes (RMOLD): mismo módulo de Calidad MS con los tipos de molde MS y FV */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/calidad/rmold')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"

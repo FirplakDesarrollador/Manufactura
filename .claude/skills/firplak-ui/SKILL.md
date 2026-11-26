@@ -197,7 +197,7 @@ Una ventana debe quedar **por encima del banner** (más de 100).
 
 ### 6.1 Menús de módulos (tarjetas cuadradas)
 Inicio, Control de piso, Calidad, Sistema de Producción, Mantenimiento y Nueva OPT: los 15 módulos del inicio (3 filas de 5) deben verse completos a **zoom 100 %** (≈ 1266 × 640 px CSS útiles).
-- Tarjeta: `w-full max-w-[165px] 2xl:max-w-[220px] aspect-square`, botón `p-2 sm:p-3 rounded-2xl`.
+- Tarjeta: `w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]` (más baja que ancha: 4 filas completas a zoom 100 %), botón `p-2 sm:p-3 rounded-2xl`.
 - Círculo del ícono `w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 mb-2 2xl:mb-3` con `[&_svg]:w-6 md:[&_svg]:w-7 2xl:[&_svg]:w-8` (mismo alto).
 - Nombre `text-[13px] sm:text-sm 2xl:text-base font-bold`; "(Atajo)" `text-[10px] md:text-xs italic`.
 - Cuadrícula `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4`; `<main>` con `px-4 py-4 md:py-6` (sin `pt-28`/`pt-32`: el `Header` ya deja su espacio); pie `py-2 text-xs`.
@@ -324,3 +324,4 @@ Referencia: `components/calidad/CalidadGeneralIFI.tsx` (Tablero de Control → C
 - 2026-11-02 · Control de Piso FV pasa al `Header` estándar; menú de módulos de planta recogible a barra de íconos (§2.0).
 - 2026-11-10 · Tarjeta de orden FV (§6.2): encabezado OF | descripción en 2 renglones, 3 fechas del Semáforo con nombres cortos, Moldes compacto y todo en colores Firplak; detalle SAP junto a la descripción.
 - 2026-11-16 · Banner: margen izquierdo `pl-2` en toda la app para alinear el ≡ con la columna de íconos del menú de módulos recogido (Control de Piso FV y MS). Control de Piso MS pasa al `Header` estándar y al mismo menú lateral de FV (íconos iguales en procesos comunes).
+- 2026-11-26 · Tarjetas de los menús de módulos (§6.1) pasan de cuadradas a `aspect-[4/3]` (mismo ancho, 25 % menos de alto) en Inicio, Control de piso, Calidad, Sistema de Producción, Mantenimiento y Nueva OPT, para que todas las filas se vean completas.

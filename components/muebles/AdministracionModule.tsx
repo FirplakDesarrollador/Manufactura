@@ -6,6 +6,10 @@ import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries
 import { supabase } from '@/lib/supabase'
 import OrderCard from './OrderCard'
 import EditOrderModal from './EditOrderModal'
+import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
+import { BotonMoverOfMuebles } from './MoverOfMuebles'
+import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
+import { ClipboardList, Pencil, Trash2 } from 'lucide-react'
 import { 
     Search, 
     X, 
@@ -41,12 +45,18 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
     const [selectedPlanta, setSelectedPlanta] = useState<string>('todas')
     const [selectedEstado, setSelectedEstado] = useState<string>('todas')
     const [selectedOrder, setSelectedOrder] = useState<OrdenMueble | null>(null)
+    // Franja de cada OF: Eliminar abre la confirmación; Trazabilidad abre el historial
+    const [eliminarDirecto, setEliminarDirecto] = useState(false)
+    const [trazabilidadDe, setTrazabilidadDe] = useState<OrdenMueble | null>(null)
+    // Se muestran por partes (la revisión de componentes de entrega consulta SAP por cada OF visible)
+    const [visibles, setVisibles] = useState(30)
 
     const loadData = React.useCallback(async () => {
         setLoading(true)
         try {
             const [ordenesData, metricasData] = await Promise.all([
-                getOrdenesMuebles(), // Trae todas las órdenes de Muebles y Cefi (abiertas y cerradas)
+                // Solo las abiertas de esta planta: pedir todas (abiertas y cerradas, ~26.000) supera el tiempo máximo de la base y no cargaba nada
+                getOrdenesMuebles(plantaMuebles, true),
                 getMetricasMueblesHoy(turno)
             ])
             setOrdenes(ordenesData)
@@ -58,7 +68,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         } finally {
             setLoading(false)
         }
-    }, [turno])
+    }, [turno, plantaMuebles])
 
     useEffect(() => {
         loadData()
@@ -388,15 +398,43 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {filteredOrdenes.map((orden) => (
+                            {filteredOrdenes.slice(0, visibles).map((orden) => (
                                 <OrderCard
                                     key={orden.id}
                                     orden={orden}
                                     isActive={selectedOrder?.id === orden.id}
-                                    onClick={() => setSelectedOrder(orden)}
+                                    onClick={() => { setEliminarDirecto(false); setSelectedOrder(orden) }}
                                     proceso="Vista General"
+                                    franja={
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <button type="button" onClick={() => setTrazabilidadDe(orden)}
+                                                className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#254153] text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-slate-50">
+                                                <ClipboardList size={16} /> Trazabilidad
+                                            </button>
+                                            <div className="flex-1 min-w-[220px]">
+                                                <EstadoEntregaOf of={orden.orden_fabricacion} />
+                                            </div>
+                                            <div className="flex items-center gap-2 ml-auto">
+                                                <BotonMoverOfMuebles orden={orden} planta={plantaMuebles} usuarioNombre={usuarioNombre} userEmail={userEmail} onHecho={loadData} />
+                                                <button type="button" onClick={() => { setEliminarDirecto(false); setSelectedOrder(orden) }}
+                                                    className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#254153] text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-slate-50">
+                                                    <Pencil size={15} /> Editar
+                                                </button>
+                                                <button type="button" onClick={() => { setEliminarDirecto(true); setSelectedOrder(orden) }}
+                                                    className="h-9 px-3 rounded-lg border border-rose-200 bg-white text-[#d14747] text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-rose-50">
+                                                    <Trash2 size={15} /> Eliminar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
                                 />
                             ))}
+                            {filteredOrdenes.length > visibles && (
+                                <button type="button" onClick={() => setVisibles(v => v + 30)}
+                                    className="w-full py-3 rounded-xl border border-[#e2ded5] bg-white text-[#254153] text-sm font-bold hover:bg-[#F6F3EE]">
+                                    Mostrar 30 más ({filteredOrdenes.length - visibles} restantes)
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -405,13 +443,19 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
             {/* Edit Order Modal */}
             {selectedOrder && (
                 <EditOrderModal 
-                    orden={selectedOrder} 
+                    key={`${selectedOrder.id}-${eliminarDirecto}`}
+                    abrirEliminar={eliminarDirecto}
+                    orden={selectedOrder}
                     usuarioNombre={usuarioNombre}
                     turno={turno}
                     userEmail={userEmail}
                     onClose={() => setSelectedOrder(null)}
                     onSuccess={loadData}
                 />
+            )}
+
+            {trazabilidadDe && (
+                <HistorialTrazabilidadModal orden={trazabilidadDe} onClose={() => setTrazabilidadDe(null)} onSuccess={loadData} />
             )}
 
             {isSyncing && (

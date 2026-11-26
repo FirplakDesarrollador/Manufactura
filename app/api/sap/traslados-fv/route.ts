@@ -7,7 +7,8 @@ import { grupoMaterial, sinTildes } from '@/lib/gruposMateriales';
 // Módulo Traslados (FV): revisa que cada OF liberada pendiente tenga su traslado y que lo trasladado cubra la lista de materiales.
 // Se exigen los Accesorios y Equipos que no son consumibles de uso común (tabla traslados_consumibles_fv), salvo que el
 // artículo tenga Sí / No propio en Parámetros a revisar (tabla traslados_articulos_fv), que manda sobre la regla.
-// Resultado por OF en traslados_of_fv. Automático (vercel.json): lunes a viernes 5:00 a. m., 12:00 m. y 5:00 p. m. hora Colombia.
+// Resultado por OF en traslados_of_fv. Automático (vercel.json): lunes a sábado 5:00 a. m., 12:00 m. y 5:00 p. m. hora Colombia,
+// para todas las plantas: FV (por defecto), ?planta=ms (Mármol), rtm (Superficies), mbl (Muebles) y cefi (CEFI).
 // ?of=NNN revisa solo esa OF (botón de la tarjeta).
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -26,7 +27,7 @@ const EPS = 1e-6;
 const CONSUMIBLES_INICIALES = ['TORNILLO', 'CHAPOLA', 'ARANDELA', 'TUERCA', 'VARILLA ROSCADA', 'CARTON', 'CALCOMANIA', 'ETIQUETA', 'MALLA GALLINERO', 'VARILLA MADERA', 'MANGUERA AGRICOLA', 'GRAPAS', 'LISTON ICOPOR', 'REGLETA', 'CINTA', 'TUBERIA FLEXIBLE', 'PATA SOPORTE', 'SNAP FIJACION', 'L FIJACION', 'MANGUERA 3/8IN BLANCA PARA AIRE', 'MANGUERA TRANSPAREN', 'TUBO CERRAM', 'TUBO C18', 'CANTONERA', 'NIVELADOR'];
 const red = (n: number) => Math.round(n * 10000) / 10000;
 
-async function revisarOf(docNum: string, consumibles: string[], ajustes: Map<string, boolean>, baseUrl: string, docsOf?: { solicitudes: DocTraslado[]; traslados: DocTraslado[] }) {
+async function revisarOf(docNum: string, consumibles: string[], ajustes: Map<string, boolean>, baseUrl: string, docsOf?: { solicitudes: DocTraslado[]; traslados: DocTraslado[] }, todos = false) {
     const r = await fetchSAP(`${baseUrl}/ProductionOrders?$filter=DocumentNumber eq ${docNum}&$select=DocumentNumber,ItemNo,ProductDescription,PlannedQuantity,ProductionOrderLines`, { method: 'GET' });
     if (!r.ok) throw new Error(`SAP no respondió la OF (${r.status})`);
     const po = (await r.json()).value?.[0];
@@ -60,7 +61,8 @@ async function revisarOf(docNum: string, consumibles: string[], ajustes: Map<str
         const sol = solicitado.get(item)?.cantidad || 0, tra = trasladado.get(item)?.cantidad || 0;
         const cons = grupo === 'acc' ? esConsumible(descripcion) : undefined;
         // Regla por defecto: se revisan los accesorios que no son consumibles. El Sí / No del artículo manda sobre la regla.
-        const porDefecto = grupo === 'acc' && !cons;
+        // Muebles / CEFI (todos): se revisan todos los componentes (aún sin consumibles excluidos), menos la mano de obra
+        const porDefecto = todos ? grupo !== 'mo' : grupo === 'acc' && !cons;
         const ajuste = ajustes.get(item);
         const base = { item, descripcion, grupo, porDefecto, ajuste, requerido: red(cantidad), solicitado: red(sol), trasladado: red(tra), pendiente: red(Math.max(0, cantidad - tra)) };
         if (!(ajuste ?? porDefecto)) {
@@ -101,22 +103,48 @@ export async function GET(request: Request) {
         const soloOf = params.get('of');
         // ?planta=rtm: Superficies (OF de ordenes_fabricacion_rtm_v, resultado en traslados_of_rtm); por defecto Fibra
         const rtm = params.get('planta') === 'rtm';
-        const tablaRes = rtm ? 'traslados_of_rtm' : 'traslados_of_fv';
+        // ?planta=mbl / cefi: Muebles y CEFI (OF pendientes de ordenes_fabricacion_muebles; resultado en traslados_of_mbl / _cefi)
+        const plantaMuebles = params.get('planta') === 'mbl' ? 'Muebles' : params.get('planta') === 'cefi' ? 'Cefi' : null;
+        // ?planta=ms: Mármol (OF pendientes de ordenes_fabricacion; misma regla de Fibra: accesorios que no son consumibles)
+        const ms = params.get('planta') === 'ms';
+        const tablaRes = rtm ? 'traslados_of_rtm' : ms ? 'traslados_of_ms' : plantaMuebles === 'Muebles' ? 'traslados_of_mbl' : plantaMuebles === 'Cefi' ? 'traslados_of_cefi' : 'traslados_of_fv';
         // ?simular=1: calcula y devuelve el resultado sin guardarlo (pruebas)
         const simular = params.get('simular') === '1';
         if (soloOf && !/^\d+$/.test(soloOf)) return NextResponse.json({ error: 'Número de orden inválido' }, { status: 400 });
 
         const { data: cons, error: errCons } = await supabase.from('traslados_consumibles_fv').select('patron');
         if (errCons && !simular) return NextResponse.json({ error: /traslados_consumibles_fv|relation|schema cache/i.test(errCons.message) ? 'Falta crear las tablas del módulo Traslados: ejecute traslados_fv.sql en Supabase.' : errCons.message }, { status: 500 });
-        const consumibles = (errCons ? CONSUMIBLES_INICIALES : (cons || []).map(c => c.patron))
+        // Muebles / CEFI: todavía no se excluye ningún consumible (los de Fibra no aplican)
+        const consumibles = plantaMuebles ? [] : (errCons ? CONSUMIBLES_INICIALES : (cons || []).map(c => c.patron))
             .map((p: string) => sinTildes(String(p || '').trim())).filter(Boolean);
         // Sí / No por artículo (Parámetros a revisar); si la tabla aún no existe se usa solo la regla por defecto
         const { data: aj } = await supabase.from('traslados_articulos_fv').select('item, revisar');
-        const ajustes = new Map<string, boolean>((aj || []).map((a: any) => [String(a.item), !!a.revisar]));
+        const ajustes = plantaMuebles ? new Map<string, boolean>() : new Map<string, boolean>((aj || []).map((a: any) => [String(a.item), !!a.revisar]));
 
         let ofs: string[];
         if (soloOf) ofs = [soloOf];
-        else {
+        else if (ms) {
+            ofs = [];
+            for (let desde = 0; ; desde += 1000) {
+                const { data, error } = await supabase.from('ordenes_fabricacion').select('orden_fabricacion')
+                    .eq('pendiente', true).order('id', { ascending: true }).range(desde, desde + 999);
+                if (error) return NextResponse.json({ error: `No se pudieron leer las OF de Mármol: ${error.message}` }, { status: 500 });
+                ofs.push(...(data || []).map(r => String(r.orden_fabricacion).trim()).filter(x => /^\d+$/.test(x)));
+                if (!data || data.length < 1000) break;
+            }
+            ofs = [...new Set(ofs)];
+        } else if (plantaMuebles) {
+            // Las OF abiertas de la planta (paginado: Supabase entrega máximo 1000 por consulta)
+            ofs = [];
+            for (let desde = 0; ; desde += 1000) {
+                const { data, error } = await supabase.from('ordenes_fabricacion_muebles').select('orden_fabricacion')
+                    .eq('pendiente', true).eq('planta', plantaMuebles).order('id', { ascending: true }).range(desde, desde + 999);
+                if (error) return NextResponse.json({ error: `No se pudieron leer las OF de ${plantaMuebles}: ${error.message}` }, { status: 500 });
+                ofs.push(...(data || []).map(r => String(r.orden_fabricacion).trim()).filter(x => /^\d+$/.test(x)));
+                if (!data || data.length < 1000) break;
+            }
+            ofs = [...new Set(ofs)];
+        } else {
             // Las mismas OF que muestra la app (vista de Fibra: pendientes y de productos de Fibra)
             const { data, error } = await supabase.from(rtm ? 'ordenes_fabricacion_rtm_v' : 'ordenes_fabricacion_fv').select('orden_fabricacion');
             if (error) return NextResponse.json({ error: `No se pudieron leer las OF de ${rtm ? 'Superficies' : 'Fibra'}: ${error.message}` }, { status: 500 });
@@ -148,7 +176,7 @@ export async function GET(request: Request) {
         // Una OF a la vez: en la misma sesión de SAP las consultas en paralelo se bloquean entre sí
         for (const of of ofs) {
             const lote = await Promise.all([of].map(async of => {
-                try { return await revisarOf(of, consumibles, ajustes, baseUrl, docsPorOf?.get(of)); }
+                try { return await revisarOf(of, consumibles, ajustes, baseUrl, docsPorOf?.get(of), !!plantaMuebles); }
                 catch (e: any) {
                     return { orden_fabricacion: of, estado: 'error', exigidos: 0, entregados: 0, solicitados_pendientes: 0, faltantes: 0, sustitutos: 0,
                         documentos: [], detalle: [], extras: [], error: e?.message || 'Error consultando SAP', calculado_at: new Date().toISOString() };
@@ -161,7 +189,7 @@ export async function GET(request: Request) {
 
         if (filas.length) {
             const { error } = await supabase.from(tablaRes).upsert(filas, { onConflict: 'orden_fabricacion' });
-            if (error) return NextResponse.json({ error: /traslados_of_fv|relation|schema cache/i.test(error.message) ? 'Falta crear las tablas del módulo Traslados: ejecute traslados_fv.sql en Supabase.' : `No se pudo guardar la revisión: ${error.message}` }, { status: 500 });
+            if (error) return NextResponse.json({ error: /traslados_of_|relation|schema cache/i.test(error.message) ? (ms ? 'Falta crear la tabla de Traslados de Mármol: ejecute traslados_ms.sql en Supabase.' : plantaMuebles ? 'Falta crear las tablas de Traslados de Muebles/CEFI: ejecute muebles_control_piso_fv.sql en Supabase.' : 'Falta crear las tablas del módulo Traslados: ejecute traslados_fv.sql en Supabase.') : `No se pudo guardar la revisión: ${error.message}` }, { status: 500 });
         }
         // Revisión completa: se quitan las OF que ya no están pendientes
         if (!soloOf && ofs.length) {

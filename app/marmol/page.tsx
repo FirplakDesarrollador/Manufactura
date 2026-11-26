@@ -18,6 +18,7 @@ import EmpaqueModule from '@/components/empaque/EmpaqueModule'
 import DigitadoModule, { GRUPO_DIGITADO_MS } from '@/components/digitado/DigitadoModule'
 import { useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
 import MoldesFibraModule from '@/components/fibra/moldes/MoldesFibraModule'
+import TrasladosFibraModule from '@/components/fibra/traslados/TrasladosFibraModule'
 import IconoMolde from '@/components/fibra/IconoMolde'
 
 // Bolita roja del menú: órdenes de Digitado con componentes faltantes para la entrega (última revisión de SAP)
@@ -124,6 +125,18 @@ export default function MarmorPage() {
         if (window.innerWidth < 768) setSidebarOpen(false)
     }, [])
 
+    // Aviso de Traslados (como Fibra): OF con novedades (sin traslado, con faltantes o solicitado sin trasladar)
+    const [novedadesTraslados, setNovedadesTraslados] = useState(0)
+    useEffect(() => {
+        const contar = async () => {
+            const { data, error } = await supabase.from('traslados_of_ms').select('orden_fabricacion').in('estado', ['sin_traslado', 'faltante', 'solicitado'])
+            if (!error) setNovedadesTraslados(new Set((data || []).map(r => String(r.orden_fabricacion))).size)
+        }
+        contar()
+        const t = setInterval(contar, 5 * 60000)
+        return () => clearInterval(t)
+    }, [])
+
     const handleSignOut = async () => {
         await supabase.auth.signOut()
         router.push('/login')
@@ -226,13 +239,36 @@ export default function MarmorPage() {
                             <IconoMolde />
                             <span>Moldes</span>
                         </button>
+
+                        {/* Traslados: OF abiertas vs. sus traslados en SAP (solo consulta, sin permiso propio, como en Fibra) */}
+                        <button
+                            onClick={() => setActiveModule('traslados')}
+                            title={sidebarOpen ? undefined : `Traslados${novedadesTraslados ? ` · ${novedadesTraslados} OF con novedades` : ''}`}
+                            className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'traslados'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h12m0 0l-4-4m4 4l-4 4M17 17H5m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            <span>Traslados</span>
+                            {novedadesTraslados > 0 && (
+                                <b title={`${novedadesTraslados} OF con faltantes o sin traslado`}
+                                    className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${sidebarOpen ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+                                    {novedadesTraslados > 99 ? '99+' : novedadesTraslados}
+                                </b>
+                            )}
+                        </button>
                     </nav>
                 </aside>
 
                 {/* Main Content */}
                 <main className="flex-1 min-w-0 h-[calc(100vh-3rem)] bg-white overflow-hidden relative">
                     <div className="h-full overflow-y-auto">
-                        {activeModule === 'pintura' && hasPermission('pintura') ? (
+                        {activeModule === 'traslados' ? (
+                            <TrasladosFibraModule planta="ms" />
+                        ) : activeModule === 'pintura' && hasPermission('pintura') ? (
                             <PinturaModule userEmail={user?.email || ''} />
                         ) : activeModule === 'contramoldes' && hasPermission('contramoldes') ? (
                             <ContramoldeModule userEmail={user?.email || ''} />

@@ -3,18 +3,25 @@
 //   1. Ejecutor: MT (técnicos de mantenimiento) con MT, OP (producción) con OP.
 //   2. Especialidad: el técnico atiende la planta de la orden (o "Todas").
 //   3. Turno: NP (paro) con técnicos NP o PRNP; PR (producción) con PR o PRNP; PRNP / General con todos.
-//   4. Disponibilidad: sus horas del día + la orden caben en su capacidad (capacidad × (1 + margen)).
-//      Entre los disponibles gana el que tenga menos carga.
-//   5. Si nadie tiene disponibilidad (solo MT): técnico de reserva, Roberto Aguilar o María Elena Pérez (el de menos carga).
-//      Una orden OP sin nadie disponible queda "Sin asignar" (la reserva es de mantenimiento).
+//   4. Disponibilidad: sus horas del día + la orden caben en su capacidad (capacidad × (1 + margen)), y además
+//      en la PARTE DEL TURNO que le corresponde: una tarea NP solo cabe en la parte del turno sin producción y una
+//      PR en la parte con producción (pct_produccion del técnico, de la tabla de Turnos). Ej.: 93 % PR · 7 % NP con
+//      7,2 h → 0,5 h para NP. Entre los disponibles gana el que tenga menos carga.
+//   5. Personas SIN HORARIO (no son técnicos): Roberto Aguilar (jefe de mantenimiento) y María Elena Pérez
+//      (coordinadora). Solo reciben órdenes de las plantas que tienen marcadas en la botonera de Especialidad
+//      (hoy MTTO y EX = externos / proveedores), sin mirar turno ni capacidad, y solo si ningún técnico la tomó.
+//   6. Si nadie tiene tiempo (MT u OP), la orden IGUAL se genera y queda en "Pendientes por Asignar" (sin técnico).
+//      Nunca se deja de generar un mantenimiento.
+//   Prioridad (la aplica quien llama): primero las órdenes de menor frecuencia (diarias, cada 2, cada 3 días…), luego
+//   las semanales y así hacia arriba; ver ordenPrioridad.
 
 import { normalizarEjecutor } from '@/lib/nomenclaturaPlantas';
 
 export const CAPACIDAD_BASE_HORAS = 7.2;
 export const MARGEN_SOBRECARGA_PCT = 10;
 
-/** Técnicos de reserva: reciben lo que nadie más puede atender (se reconocen por nombre) */
-export const TECNICOS_RESERVA: string[][] = [['roberto', 'aguilar'], ['maria elena', 'perez']];
+/** Personas sin horario (jefe y coordinadora de mantenimiento): solo sus plantas de la botonera, después de los técnicos */
+export const SIN_HORARIO: string[][] = [['roberto', 'aguilar'], ['maria elena', 'perez']];
 
 export type TecnicoAsignable = {
   id: number;
@@ -26,7 +33,38 @@ export type TecnicoAsignable = {
   turno?: string | null;
   capacidadHoras?: number | null;
   activo?: boolean;
+  /** % del turno de hoy en producción (0 a 1); sin dato se deduce del turno: PR 1, NP 0, mixto 0,5 */
+  pctProduccion?: number | null;
 };
+
+/** Horas ya asignadas a un técnico en el día: total y cuánto es de tareas NP y de tareas PR */
+export type CargaTecnico = { total: number; np: number; pr: number };
+export type CargaPorTecnico = Record<number, CargaTecnico>;
+
+const tipoTurno = (turno?: string | null): 'np' | 'pr' | 'mixto' => {
+  const t = String(turno ?? '').toLowerCase();
+  if (t.includes('prnp') || t.includes('nppr') || t.includes('general') || !t) return 'mixto';
+  if (t === 'pr' || t.includes('produccion')) return 'pr';
+  if (t === 'np' || t.includes('paro')) return 'np';
+  return 'mixto';
+};
+
+/** Suma una tarea a la carga del técnico (en su total y en la parte NP o PR según el turno del plan) */
+export function sumarCarga(carga: CargaPorTecnico, id: number, horas: number, turnoPlan?: string | null) {
+  const c = carga[id] || (carga[id] = { total: 0, np: 0, pr: 0 });
+  c.total += horas;
+  const tipo = tipoTurno(turnoPlan);
+  if (tipo === 'np') c.np += horas;
+  if (tipo === 'pr') c.pr += horas;
+}
+
+/** % del turno en producción del técnico (el guardado o, sin dato, el de su modalidad) */
+export function pctProduccionDe(t: TecnicoAsignable): number {
+  const p = Number(t.pctProduccion);
+  if (t.pctProduccion != null && !isNaN(p)) return Math.min(1, Math.max(0, p));
+  const tipo = tipoTurno(t.turno);
+  return tipo === 'pr' ? 1 : tipo === 'np' ? 0 : 0.5;
+}
 
 export type SolicitudAsignacion = {
   ejecutor?: string | null;
@@ -39,7 +77,7 @@ export type SolicitudAsignacion = {
 
 export type ResultadoAsignacion = {
   id: number | null;
-  motivo: 'disponible' | 'reserva' | 'sin_tecnico';
+  motivo: 'disponible' | 'sin_horario' | 'sin_tecnico';
 };
 
 const norm = (s: unknown) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
@@ -54,9 +92,9 @@ export function turnosCompatibles(turnoPlan?: string | null, turnoTecnico?: stri
   return true;
 }
 
-export function esTecnicoReserva(nombre: string): boolean {
+export function esSinHorario(nombre: string): boolean {
   const n = norm(nombre);
-  return TECNICOS_RESERVA.some(partes => partes.every(p => n.includes(p)));
+  return SIN_HORARIO.some(partes => partes.every(p => n.includes(p)));
 }
 
 export function capacidadEfectiva(t: TecnicoAsignable, margenPct = MARGEN_SOBRECARGA_PCT): number {
@@ -65,7 +103,13 @@ export function capacidadEfectiva(t: TecnicoAsignable, margenPct = MARGEN_SOBREC
 
 const estaActivo = (t: TecnicoAsignable) => t.activo !== false && norm(t.turno) !== 'inactivo' && t.id !== 9999;
 
-/** Técnicos que cumplen ejecutor, especialidad (planta) y turno, sin mirar la carga */
+/** Orden de prioridad para asignar: menor frecuencia primero (diarias antes que semanales…); empate, el orden original */
+export function ordenPrioridad(frecuenciaA: unknown, frecuenciaB: unknown): number {
+  const f = (v: unknown) => { const n = Number(v); return n > 0 ? n : 9999; };
+  return f(frecuenciaA) - f(frecuenciaB);
+}
+
+/** Técnicos que cumplen ejecutor, especialidad (planta) y turno, sin mirar la carga (las personas sin horario no entran aquí) */
 export function tecnicosCompatibles(sol: SolicitudAsignacion, tecnicos: TecnicoAsignable[]): TecnicoAsignable[] {
   const ej = normalizarEjecutor(sol.ejecutor);
   const plantas = sol.plantas.map(p => String(p).toUpperCase());
@@ -73,6 +117,7 @@ export function tecnicosCompatibles(sol: SolicitudAsignacion, tecnicos: TecnicoA
   const todasPlantas = plantas.includes('TODAS');
   return tecnicos.filter(t =>
     estaActivo(t)
+    && !esSinHorario(t.nombre)
     && normalizarEjecutor(t.ejecutor) === ej
     && (todasPlantas || t.plantas.some(tp => { const c = String(tp).toUpperCase(); return c === 'TODAS' || plantas.includes(c); }))
     && turnosCompatibles(sol.turno, t.turno)
@@ -86,20 +131,37 @@ export function tecnicosCompatibles(sol: SolicitudAsignacion, tecnicos: TecnicoA
 export function elegirTecnico(
   sol: SolicitudAsignacion,
   tecnicos: TecnicoAsignable[],
-  carga: Record<number, number>,
+  carga: CargaPorTecnico,
   margenPct = MARGEN_SOBRECARGA_PCT
 ): ResultadoAsignacion {
-  const cargaDe = (id: number) => carga[id] || 0;
-  const porCarga = (a: TecnicoAsignable, b: TecnicoAsignable) => cargaDe(a.id) - cargaDe(b.id) || a.nombre.localeCompare(b.nombre, 'es');
+  const vacio: CargaTecnico = { total: 0, np: 0, pr: 0 };
+  const cargaDe = (id: number) => carga[id] || vacio;
+  const porCarga = (a: TecnicoAsignable, b: TecnicoAsignable) => cargaDe(a.id).total - cargaDe(b.id).total || a.nombre.localeCompare(b.nombre, 'es');
+  const tipo = tipoTurno(sol.turno);
+  const cabe = (t: TecnicoAsignable) => {
+    const cap = capacidadEfectiva(t, margenPct);
+    const c = cargaDe(t.id);
+    if (c.total + sol.horas > cap + 0.0001) return false;
+    // La parte del turno que le toca a la tarea: NP en lo que no es producción, PR en lo que sí
+    const p = pctProduccionDe(t);
+    if (tipo === 'np') return c.np + sol.horas <= cap * (1 - p) + 0.0001;
+    if (tipo === 'pr') return c.pr + sol.horas <= cap * p + 0.0001;
+    return true;
+  };
 
-  const disponibles = tecnicosCompatibles(sol, tecnicos)
-    .filter(t => cargaDe(t.id) + sol.horas <= capacidadEfectiva(t, margenPct) + 0.0001)
-    .sort(porCarga);
+  const disponibles = tecnicosCompatibles(sol, tecnicos).filter(cabe).sort(porCarga);
   if (disponibles.length) return { id: disponibles[0].id, motivo: 'disponible' };
 
-  if (normalizarEjecutor(sol.ejecutor) === 'MT') {
-    const reserva = tecnicos.filter(t => estaActivo(t) && esTecnicoReserva(t.nombre)).sort(porCarga);
-    if (reserva.length) return { id: reserva[0].id, motivo: 'reserva' };
-  }
+  // Sin horario (jefe / coordinadora): solo plantas marcadas expresamente en su botonera (MTTO, EX…); sin turno ni capacidad
+  const ej = normalizarEjecutor(sol.ejecutor);
+  const plantas = sol.plantas.map(p => String(p).toUpperCase());
+  const sinHorario = tecnicos.filter(t =>
+    t.activo !== false && t.id !== 9999 && esSinHorario(t.nombre)
+    && normalizarEjecutor(t.ejecutor) === ej
+    && t.plantas.some(tp => plantas.includes(String(tp).toUpperCase()))
+  ).sort(porCarga);
+  if (sinHorario.length) return { id: sinHorario[0].id, motivo: 'sin_horario' };
+
+  // Nadie con tiempo: la orden se genera igual y queda en Pendientes por Asignar
   return { id: null, motivo: 'sin_tecnico' };
 }

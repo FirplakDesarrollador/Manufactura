@@ -896,10 +896,11 @@ export default function PlannerTecnicosColumnas({
           if (isInactive) {
             semaforoBadgeClass = 'bg-slate-400 text-white';
             progressBarClass = 'bg-slate-300';
-          } else if (pctCarga > 85 && pctCarga <= 100) {
+          // Semáforo de carga: verde hasta 100 %, amarillo hasta 105 %, rojo por encima de 105 %
+          } else if (pctCarga > 100 && pctCarga <= 105) {
             semaforoBadgeClass = 'bg-[#deb841] text-white';
             progressBarClass = 'bg-[#deb841]';
-          } else if (pctCarga > 100) {
+          } else if (pctCarga > 105) {
             semaforoBadgeClass = 'bg-[#d14747] text-white';
             progressBarClass = 'bg-[#d14747]';
           }
