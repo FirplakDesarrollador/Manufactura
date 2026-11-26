@@ -118,11 +118,45 @@ export async function getRegistrosTrazabilidadPorOrden(ordenFabricacion: string)
     return data || []
 }
 
+// Los seriales con la letra T (ej. 0062-73T) no se deben mostrar ni escoger en Mármol
+export const serialConT = (serial: string | null | undefined) => /t/i.test(serial || '')
+
+// Límite de desmanchado del molde: columna Vueltas_Desmanchado (debe ser mayor que cero).
+// Con vueltas actuales >= límite el molde sale solo a desmanchar (Supabase lo pasa a "Por desmanchar").
+// Si el molde no trae Vueltas_Desmanchado (p. ej. listas de Fibra que no lo consultan) se usa lo que tenga, solo para avisar.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const limiteDesmanchado = (m: any): number => {
+    for (const v of [m?.Vueltas_Desmanchado, m?.Vuletas_MTO, m?.vueltas_mtto_atipicas ?? m?.vueltas_mto_atipicas,
+        m?.vueltas_mtto ?? m?.vueltas_mto, m?.vueltas_totales]) {
+        const n = Number(v ?? 0)
+        if (n > 0) return n
+    }
+    return 0
+}
+
+// ¿Se puede pintar con este molde? (límite L = Vueltas_Desmanchado)
+//  - Disponible con menos de L vueltas: normal.
+//  - Ya cumplió L vueltas (Por desmanchar, o Disponible si Supabase aún no lo cambió): se permite 1 sola vuelta más,
+//    con alerta obligatoria (ultima = true).
+//  - Con L + 1 vueltas o más: bloqueado, debe salir a desmanchar.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function puedePintarMolde(m: any): { ok: boolean; ultima: boolean; limite: number; motivo?: string } {
+    const limite = limiteDesmanchado(m)
+    const v = Number(m?.vueltas_actuales ?? 0)
+    const estado = String(m?.estado || '')
+    if (estado !== 'Disponible' && estado !== 'Por desmanchar') return { ok: false, ultima: false, limite, motivo: `El molde está ${estado || 'sin estado'}` }
+    if (limite > 0 && v > limite) {
+        return { ok: false, ultima: false, limite, motivo: `El molde ${m?.serial ?? ''} ya usó su vuelta extra (${v} de ${limite}): está bloqueado y debe salir a desmanchar.` }
+    }
+    if (estado === 'Por desmanchar' && limite <= 0) return { ok: false, ultima: false, limite, motivo: 'El molde está Por desmanchar' }
+    return { ok: true, ultima: limite > 0 && v >= limite, limite }
+}
+
 export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
     const { data, error } = await supabase
         .from('query_moldes')
         .select('*')
-        .eq('estado', 'Disponible')
+        .in('estado', ['Disponible', 'Por desmanchar'])
         .eq('molde_sku', moldeSku)
         .order('vueltas_actuales', { ascending: true })
 
@@ -131,22 +165,23 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
         return []
     }
 
-    return conVueltasMto(data || [])
+    // Por desmanchar solo mientras le quede su única vuelta extra
+    return (await conVueltasMto((data || []).filter(m => !serialConT(m.serial)))).filter(m => puedePintarMolde(m).ok)
 }
 
-// La vista query_moldes no trae "Vuletas_MTO" (vueltas de mantenimiento del molde): se toma de la tabla moldes
+// La vista query_moldes no trae Vueltas_Desmanchado ni Vuletas_MTO: se toman de la tabla moldes
 async function conVueltasMto<T extends { id: number }>(moldes: T[]): Promise<T[]> {
     if (!moldes.length) return moldes
-    const { data } = await supabase.from('moldes').select('id, Vuletas_MTO').in('id', moldes.map(m => m.id))
-    const mapa = new Map((data || []).map((r: { id: number; Vuletas_MTO: number | null }) => [r.id, r.Vuletas_MTO]))
-    return moldes.map(m => ({ ...m, Vuletas_MTO: mapa.get(m.id) ?? null }))
+    const { data } = await supabase.from('moldes').select('id, Vuletas_MTO, Vueltas_Desmanchado').in('id', moldes.map(m => m.id))
+    const mapa = new Map((data || []).map((r: { id: number; Vuletas_MTO: number | null; Vueltas_Desmanchado: number | null }) => [r.id, r]))
+    return moldes.map(m => ({ ...m, Vuletas_MTO: mapa.get(m.id)?.Vuletas_MTO ?? null, Vueltas_Desmanchado: mapa.get(m.id)?.Vueltas_Desmanchado ?? null }))
 }
 
 export async function getAllMoldes(): Promise<Molde[]> {
     try {
         const [viewRes, rawRes] = await Promise.all([
             supabase.from('query_moldes').select('*').neq('estado', 'Destruido'),
-            supabase.from('moldes').select('id, nombre_articulo, descripcion_molde, tipo_molde_sku, Vuletas_MTO').neq('estado', 'Destruido')
+            supabase.from('moldes').select('id, nombre_articulo, descripcion_molde, tipo_molde_sku, Vuletas_MTO, Vueltas_Desmanchado').neq('estado', 'Destruido')
         ])
 
         if (viewRes.error) {
@@ -162,8 +197,9 @@ export async function getAllMoldes(): Promise<Molde[]> {
                 ...m,
                 // Nombre propio del molde (para descartar moldes asignados por error a otro tipo)
                 nombre_articulo: m.nombre_articulo ?? raw?.nombre_articulo ?? null,
-                // Vueltas MTO del molde (la vista no las trae)
+                // Vueltas de desmanchado y MTO del molde (la vista no las trae)
                 Vuletas_MTO: raw?.Vuletas_MTO ?? null,
+                Vueltas_Desmanchado: raw?.Vueltas_Desmanchado ?? null,
                 molde_sku: m.molde_sku || m.tipo_molde_sku || raw?.tipo_molde_sku || '',
                 molde_descripcion: m.molde_descripcion || m.nombre_articulo || raw?.nombre_articulo || raw?.descripcion_molde || ''
             }
@@ -220,17 +256,18 @@ export async function registrarPintura(pinturaData: {
     }
 
     // 1.1 Verificar piezas ya registradas (conteo real en trazabilidad)
-    // Se cuentan todas las piezas registradas en etapas para evitar que la sumatoria supere la cantidad de la orden.
-    const { count, error: countError } = await supabase
+    // Se cuentan las piezas registradas en etapas para evitar que la sumatoria supere la cantidad de la orden.
+    // Las desgelcadas y las destruidas no cuentan: esa pieza se pierde y se debe poder pintar otra (igual que en la pantalla).
+    const { data: piezasOrden, error: countError } = await supabase
         .from('query_trazabilidad_ms')
-        .select('*', { count: 'exact', head: true })
+        .select('estado')
         .eq('orden_fabricacion_id', pinturaData.orden_fabricacion_id)
 
     if (countError) {
         console.error('Error al contar piezas:', countError)
         // No bloqueamos si falla el conteo por red, pero registramos el error
     } else {
-        const piezasRegistradas = count || 0
+        const piezasRegistradas = (piezasOrden || []).filter(p => !/desgelc|destru/i.test(p.estado || '')).length
         const piezasPermitidas = orden.cantidad || orden.cantidad_programada || 0
 
         if (piezasRegistradas >= piezasPermitidas && piezasPermitidas > 0) {
@@ -315,6 +352,15 @@ export async function registrarPintura(pinturaData: {
         throw new Error(`Acción no permitida: El molde ${molde.serial} ya está en proceso de ${trazaReciente.estado}.`)
     }
 
+    // 5.1 Límite de desmanchado: ya cumplió sus vueltas → 1 sola vuelta más; con límite + 1 o más → bloqueado
+    const { data: moldeTabla } = await supabase.from('moldes')
+        .select('estado, vueltas_actuales, Vueltas_Desmanchado, Vuletas_MTO').eq('id', pinturaData.molde_id).maybeSingle()
+    const limiteMolde = limiteDesmanchado(moldeTabla)
+    const vueltasAntes = Number(moldeTabla?.vueltas_actuales ?? molde.vueltas_actuales ?? 0)
+    if (limiteMolde > 0 && vueltasAntes > limiteMolde) {
+        throw new Error(`Molde bloqueado: el molde ${molde.serial} ya usó su vuelta extra (${vueltasAntes} de ${limiteMolde} vueltas). Debe salir a desmanchar.`)
+    }
+
     // 6. Actualizar molde: estado + vueltas
     //    Columnas reales: estado, vueltas_actuales, vueltas_acumuladas, 
     //    modificado_por, modificado_desde, modified_at
@@ -333,6 +379,16 @@ export async function registrarPintura(pinturaData: {
     if (updateError) {
         throw new Error(`Error al actualizar el molde: ${updateError.message}`)
     }
+
+    // 6.1 Aviso de desmanchado (el cambio a "Por desmanchar" lo hace Supabase cuando el molde se libera, no al pintar)
+    const vueltasNuevas = (molde.vueltas_actuales || 0) + 1
+    const limite = limiteMolde
+    const avisoMolde = limite <= 0 || vueltasNuevas < limite ? null
+        : vueltasNuevas === limite
+            ? `El molde ${molde.serial} completa sus ${limite} vueltas con esta pieza.\n\n` +
+              `Al desmoldar queda POR DESMANCHAR. Solo se permite 1 vuelta más antes de bloquearlo.`
+            : `El molde ${molde.serial} usó su vuelta extra (${vueltasNuevas} de ${limite}).\n\n` +
+              `Al desmoldar SÁQUELO A DESMANCHAR: ya no se podrá volver a pintar con él.`
 
     // 7. Generar registrer: AAAAMMDDHHMMSS + Serial
     const timestamp = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14)
@@ -368,7 +424,7 @@ export async function registrarPintura(pinturaData: {
         throw new Error(`Error al crear registro: [${insertError.code}] ${insertError.message || JSON.stringify(insertError)}`)
     }
 
-    return data
+    return { ...data, aviso_molde: avisoMolde }
 }
 
 export async function eliminarRegistroPintura(registroId: number, moldeSerial: string) {

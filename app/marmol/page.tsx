@@ -6,6 +6,8 @@ import React, { useEffect, useState, useCallback } from 'react'
 import Header from '@/components/opt-sistemica/Header'
 import PinturaModule from '@/components/pintura/PinturaModule'
 import DashboardModule from '@/components/dashboard/DashboardModule'
+import DesmanchadoMoldes from '@/components/dashboard/DesmanchadoMoldes'
+import IconoDesmanchado from '@/components/dashboard/IconoDesmanchado'
 import ContramoldeModule from '@/components/contramoldes/ContramoldeModule'
 import VaciadoModule from '@/components/vaciado/VaciadoModule'
 import DesmoldeModule from '@/components/desmolde/DesmoldeModule'
@@ -171,6 +173,8 @@ export default function MarmorPage() {
         { id: 'digitado', permiso: 'digitado', label: 'Digitado', icono: <path {...trazo} d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM6 9h.01M10 9h.01M14 9h.01M18 9h.01M8 12.5h.01M12 12.5h.01M16 12.5h.01M7 16h10" /> },
         { id: 'cedi', permiso: 'cedi', label: 'CEDI', icono: <path {...trazo} d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35ZM6 22V12h12v10M6 15h12M6 18.5h12" /> },
         { id: 'dashboard', permiso: 'dashboard', label: 'Dashboard', icono: <path {...trazo} d="M3 3v18h18M7 15l4-4 3 3 6-6m0 0h-4m4 0v4" /> },
+        // Desmanchado: solo consulta (vueltas actuales contra vueltas MTO); lo ve cualquier usuario, como Moldes
+        { id: 'desmanchado', permiso: '', label: 'Desmanchado', icono: null },
         { id: 'parametros', permiso: 'parametros', label: 'Parámetros', icono: <path {...trazo} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /> },
         { id: 'administracion', permiso: 'administracion', label: 'Administración', icono: <><path {...trazo} d="M2 21a8 8 0 0 1 10.43-7.62M10 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10z" /><circle cx="18" cy="18" r="3" strokeWidth={2} /><path {...trazo} d="M18 13.5v1.5M18 21v1.5M21.9 15.75l-1.3.75M15.4 19.5l-1.3.75M14.1 15.75l1.3.75M20.6 19.5l1.3.75" /></> },
         { id: 'tvprensado', permiso: 'prensado', label: 'TV Prensado', icono: <path {...trazo} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /> },
@@ -205,7 +209,7 @@ export default function MarmorPage() {
                             <span className="flex-1 text-left">Módulos MS</span>
                         </button>
 
-                        {MENU.filter(m => hasPermission(m.permiso)).map(m => (
+                        {MENU.filter(m => !m.permiso || hasPermission(m.permiso)).map(m => (
                             <button
                                 key={m.id}
                                 onClick={() => setActiveModule(m.id)}
@@ -215,7 +219,9 @@ export default function MarmorPage() {
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
                             >
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{m.icono}</svg>
+                                {m.id === 'desmanchado'
+                                    ? <IconoDesmanchado className="w-4 h-4 shrink-0" />
+                                    : <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{m.icono}</svg>}
                                 <span>{m.label}</span>
                                 {m.id === 'digitado' && <AvisoFaltantesDigitado abierto={sidebarOpen} />}
                             </button>
@@ -284,6 +290,8 @@ export default function MarmorPage() {
                             <CediModule userEmail={user?.email || ''} />
                         ) : activeModule === 'dashboard' && hasPermission('dashboard') ? (
                             <DashboardModule />
+                        ) : activeModule === 'desmanchado' ? (
+                            <div className="p-3 bg-gray-50/50 min-h-full"><DesmanchadoMoldes /></div>
                         ) : activeModule === 'parametros' && hasPermission('parametros') ? (
                             <ParametrosModule userEmail={user?.email || ''} />
                         ) : activeModule === 'administracion' && hasPermission('administracion') ? (

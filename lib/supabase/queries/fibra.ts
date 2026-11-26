@@ -285,11 +285,13 @@ export async function registrarPintura(pinturaData: {
 
     // 6. Actualizar molde
     const now = new Date()
+    const vueltasNuevas = (molde.vueltas_actuales || 0) + 1
+    let avisoMolde: string | null = null
     const { error: updateError } = await supabase
         .from('moldes')
-        .update({ 
+        .update({
             estado: 'En uso',
-            vueltas_actuales: (molde.vueltas_actuales || 0) + 1,
+            vueltas_actuales: vueltasNuevas,
             vueltas_acumuladas: (molde.vueltas_acumuladas || 0) + 1,
             modificado_por: pinturaData.usuario_email,
             modified_at: now.toISOString()
@@ -297,7 +299,30 @@ export async function registrarPintura(pinturaData: {
         .eq('id', pinturaData.molde_id)
 
     if (updateError) {
-        throw new Error(`Error al actualizar el molde: ${updateError.message}`)
+        // Los triggers de desmanchado de la tabla moldes (llevan el molde a Registro moldes, BD_moldes) pueden fallar
+        // cuando el molde llega a sus vueltas. La pieza se registra igual: se marca el molde En uso sin sumar la vuelta
+        // (así no se vuelve a disparar el trigger) y se avisa que hay que sacar el molde a desmanchar.
+        if (!/BD_moldes|FECHA|of type date|desmanch/i.test(updateError.message || '')) {
+            throw new Error(`Error al actualizar el molde: ${updateError.message}`)
+        }
+        console.error('Trigger de desmanchado falló al sumar la vuelta:', updateError)
+        const { error: e2 } = await supabase.from('moldes')
+            .update({ estado: 'En uso', modificado_por: pinturaData.usuario_email, modified_at: now.toISOString() })
+            .eq('id', pinturaData.molde_id)
+        if (e2) throw new Error(`Error al actualizar el molde: ${e2.message}`)
+        avisoMolde = `El molde ${molde.serial} llegó a sus vueltas: SE DEBE SACAR A DESMANCHAR.\n\n` +
+            `La pieza se registró, pero no se pudo sumar la vuelta ni pasar el molde a Registro moldes ` +
+            `(error en la base de datos: ${updateError.message}). Avise para que lo registren a mano.`
+    } else {
+        // ¿El molde quedó para desmanchar? (los triggers lo pasan a "Por desmanchar" o "En reparacion" al llegar a sus vueltas)
+        const { data: despues } = await supabase.from('moldes')
+            .select('estado, vueltas_actuales, Vueltas_Desmanchado, Vuletas_MTO').eq('id', pinturaData.molde_id).maybeSingle()
+        const d = despues as { estado?: string; vueltas_actuales?: number; Vueltas_Desmanchado?: number; Vuletas_MTO?: number } | null
+        const limite = Number(d?.Vueltas_Desmanchado || d?.Vuletas_MTO || 0)
+        if (d && (d.estado === 'Por desmanchar' || d.estado === 'En reparacion' || (limite > 0 && vueltasNuevas >= limite))) {
+            avisoMolde = `El molde ${molde.serial} llegó a sus vueltas${limite ? ` (${vueltasNuevas} de ${limite})` : ''}: ` +
+                `SE DEBE SACAR A DESMANCHAR.\n\nLa pieza quedó registrada.`
+        }
     }
 
     // 7. Generar registrer
@@ -329,7 +354,7 @@ export async function registrarPintura(pinturaData: {
         throw new Error(`Error al crear registro: [${insertError.code}] ${insertError.message || JSON.stringify(insertError)}`)
     }
 
-    return data
+    return { ...data, aviso_molde: avisoMolde }
 }
 
 export async function eliminarRegistroPintura(registrer: string, moldeSerial: string) {

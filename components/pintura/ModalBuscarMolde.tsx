@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Molde } from '@/types/pintura'
-import { getAllMoldes, updateMoldeEstado } from '@/lib/supabase/queries/pintura'
+import { getAllMoldes, updateMoldeEstado, serialConT, limiteDesmanchado } from '@/lib/supabase/queries/pintura'
 import { Search, X, Eraser, RefreshCw } from 'lucide-react'
 
 interface ModalBuscarMoldeProps {
@@ -19,7 +19,7 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
     const loadMoldes = React.useCallback(async () => {
         setLoading(true)
         const data = await getAllMoldes()
-        setMoldes(data)
+        setMoldes(data.filter(m => !serialConT(m.serial)))
         setLoading(false)
     }, [])
 
@@ -113,10 +113,7 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
                         </div>
                     ) : (
                         filteredMoldes.map((molde) => {
-                            const atip = Number((molde as any).vueltas_mtto_atipicas ?? molde.vueltas_mto_atipicas ?? 0);
-                            const reg = Number((molde as any).vueltas_mtto ?? molde.vueltas_mto ?? 0);
-                            const mto = Number((molde as any).Vuletas_MTO ?? 0);
-                            const limite = mto > 0 ? mto : atip > 0 ? atip : reg > 0 ? reg : Number(molde.vueltas_totales ?? 0);
+                            const limite = limiteDesmanchado(molde);
                             const pasadoMtto = limite > 0 && (molde.vueltas_actuales || 0) >= limite;
                             const cercaMtto = limite > 0 && !pasadoMtto && (
                                 (molde.vueltas_actuales || 0) >= (limite - 2) || ((molde.vueltas_actuales || 0) / limite) >= 0.85
@@ -148,6 +145,7 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
                                             <div className={`text-xs font-black border px-2 py-0.5 rounded-md ${vueltasBadgeClass}`}>
                                                 {molde.vueltas_actuales ?? 0} {molde.vueltas_actuales === 1 ? 'vuelta' : 'vueltas'}
                                                 {limite > 0 && ` / ${limite}`}
+                                                {limite > 0 && (molde.vueltas_actuales || 0) > limite && ' · bloqueado'}
                                             </div>
                                         </div>
                                     </div>

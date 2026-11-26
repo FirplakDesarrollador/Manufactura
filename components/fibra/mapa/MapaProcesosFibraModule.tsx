@@ -316,8 +316,9 @@ export default function MapaProcesosFibraModule() {
         setMoldeElegido(null)
         setMoldes(null) // el molde queda en uso: se vuelven a consultar
         ejecutar(async () => {
-            await registrarPiezaProgramadoFv(r.pieza.ordenId, moldeId, r.destino, await usuarioActual(), r.mesa)
+            const { avisoMolde } = await registrarPiezaProgramadoFv(r.pieza.ordenId, moldeId, r.destino, await usuarioActual(), r.mesa)
             toast.success(`OF ${r.pieza.of}: pieza registrada en ${r.lugar}`)
+            if (avisoMolde) alert(`⚠️ Molde para desmanchar ⚠️\n\n${avisoMolde}`)
         })
     }
     // OF soltada desde Programado: pide el molde; un kit de reparación no usa molde y se registra de una vez
