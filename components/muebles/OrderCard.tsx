@@ -12,9 +12,11 @@ interface OrderCardProps {
     onClick: () => void
     proceso?: string // 'Corte', 'Enchape', etc.
     onReportDefect?: (orden: OrdenMueble) => void
+    /** Franja de acciones al pie de la tarjeta (Administración: Trazabilidad, componentes, Mover OF, Editar, Eliminar) */
+    franja?: React.ReactNode
 }
 
-export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte', onReportDefect }: OrderCardProps) {
+export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte', onReportDefect, franja }: OrderCardProps) {
     const semaforo = useFechasSemaforoMuebles()
     const parseSafeDate = (dateStr?: string | null) => {
         if (!dateStr) return null
@@ -199,6 +201,11 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                 </div>
             </div>
 
+            {franja && (
+                <div onClick={e => e.stopPropagation()} className="cursor-default border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-2">
+                    {franja}
+                </div>
+            )}
             {isActive && <div className="h-1 bg-[#254153] w-full" />}
         </div>
     )

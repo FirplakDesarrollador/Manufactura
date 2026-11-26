@@ -22,13 +22,15 @@ interface EditOrderModalProps {
     userEmail: string
     onClose: () => void
     onSuccess: () => void
+    /** Abre directamente la confirmación de eliminar (botón Eliminar de la franja) */
+    abrirEliminar?: boolean
 }
 
-export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail, onClose, onSuccess }: EditOrderModalProps) {
+export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail, onClose, onSuccess, abrirEliminar = false }: EditOrderModalProps) {
     const [cantidad, setCantidad] = useState(orden.cantidad || 0)
     const [ensayo, setEnsayo] = useState(orden.ensayo || false)
     const [loading, setLoading] = useState(false)
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(abrirEliminar)
     const [showTraceability, setShowTraceability] = useState(false)
 
     const handleSave = async () => {
@@ -209,7 +211,7 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail,
                         </div>
                         <div className="flex gap-3">
                             <button
-                                onClick={() => setShowDeleteConfirm(false)}
+                                onClick={() => { setShowDeleteConfirm(false); if (abrirEliminar) onClose() }}
                                 className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold transition-colors"
                             >
                                 CANCELAR
