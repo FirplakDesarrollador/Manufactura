@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Filter, Pencil, Settings, Download } from 'lucide-react'
+import { Trash2, AlertTriangle, PackageX, Plus, X, Search, Filter, Pencil, Settings, Download, Maximize2 } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { SaldosDefectsSettingsModal, DefectoSaldoDestruccion } from '@/components/calidad/SaldosDefectsSettingsModal'
 import { BrokenSinkIcon } from '@/components/icons/BrokenSinkIcon'
@@ -50,6 +50,14 @@ export default function SaldosYDestruccionesPage() {
     const [selectedDefect, setSelectedDefect] = useState<string>('')
     const [isUploading, setIsUploading] = useState(false)
     const [selectedReport, setSelectedReport] = useState<ReporteSaldo | null>(null)
+    // Foto del evento en pantalla completa (clic en la foto del detalle)
+    const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null)
+    useEffect(() => {
+        if (!fotoAmpliada) return
+        const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setFotoAmpliada(null) } }
+        window.addEventListener('keydown', tecla, true)
+        return () => window.removeEventListener('keydown', tecla, true)
+    }, [fotoAmpliada])
     const [hasEditPermission, setHasEditPermission] = useState(false)
     const [hasDeletePermission, setHasDeletePermission] = useState(false)
     const [hasSettingsPermission, setHasSettingsPermission] = useState(false)
@@ -924,6 +932,18 @@ export default function SaldosYDestruccionesPage() {
                 </div>
             )}
 
+            {/* Foto del evento en pantalla completa (por encima del detalle); se cierra con clic, la X o Escape */}
+            {fotoAmpliada && (
+                <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-2 sm:p-4 cursor-zoom-out"
+                    onClick={() => setFotoAmpliada(null)}>
+                    <img src={fotoAmpliada} alt="Evidencia ampliada" className="max-w-full max-h-full object-contain rounded-md shadow-2xl" />
+                    <button type="button" onClick={() => setFotoAmpliada(null)} title="Cerrar (Esc)"
+                        className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+            )}
+
             {/* Modal Detalle Evento */}
             {selectedReport && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -939,13 +959,17 @@ export default function SaldosYDestruccionesPage() {
                         </div>
                         <div className="p-4 overflow-y-auto flex-1 bg-gray-50">
                             {selectedReport.fotoUrl ? (
-                                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 overflow-hidden shadow-inner border border-gray-300">
-                                    <img 
+                                <button type="button" onClick={() => setFotoAmpliada(selectedReport.fotoUrl || null)} title="Ver en pantalla completa"
+                                    className="relative w-full aspect-square bg-gray-200 rounded-lg mb-4 overflow-hidden shadow-inner border border-gray-300 cursor-zoom-in group">
+                                    <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-[#254153]/85 text-white text-[10px] font-bold opacity-80 group-hover:opacity-100">
+                                        <Maximize2 className="w-3.5 h-3.5" /> Ampliar
+                                    </span>
+                                    <img
                                         src={selectedReport.fotoUrl} 
                                         alt="Evidencia" 
                                         className="w-full h-full object-contain"
                                     />
-                                </div>
+                                </button>
                             ) : (
                                 <div className="w-full h-40 bg-gray-200 rounded-lg mb-4 flex items-center justify-center border border-dashed border-gray-400">
                                     <span className="text-gray-400 font-bold text-xs uppercase tracking-widest">Sin Foto</span>

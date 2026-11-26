@@ -460,7 +460,7 @@ export default function AdministracionModule({ userEmail }: { userEmail?: string
                                             title={expandedOrdenes.has(item.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}
                                         >
                                             <ChevronsUpDown size={15} />
-                                            {expandedOrdenes.has(item.id) ? 'Ocultar piezas' : 'Ver piezas'}
+                                            {expandedOrdenes.has(item.id) ? 'Ocultar trazabilidad' : 'Trazabilidad'}
                                         </button>
                                         <EstadoEntregaOf of={item.orden_fabricacion} />
                                         <div className="ml-auto flex gap-2 shrink-0">
