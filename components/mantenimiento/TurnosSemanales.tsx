@@ -55,7 +55,7 @@ const info = (c: string | null | undefined) => !c ? { cod: '—', sub: '' }
 const DIAS = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
 
 type Fila = { tecnico_id: number; tecnico_nombre: string; dias: (string | null)[] };
-type Tecnico = { id: number; name: string; turno?: string; especialidad?: string; planta?: string };
+type Tecnico = { id: number; name: string; turno?: string; especialidad?: string; planta?: string; pctProduccion?: number | null };
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /** Domingo de la semana de una fecha (la semana del horario va de domingo a sábado). */
@@ -265,19 +265,28 @@ export default function TurnosSemanales({ technicians, userEmail, onTechsUpdated
   // Si la cuadrilla no coincide con lo calculado, se actualiza el técnico (modalidad y activo) y se recarga
   useEffect(() => {
     if (!ubicacion.listo || reubicando) return;
+    // Se guarda la modalidad y el % del turno en producción (la asignación de preventivos reparte la capacidad con él:
+    // tareas NP solo en la parte del turno sin producción, PR en la parte con producción)
+    const pct2 = (v: number | null | undefined) => v == null ? null : Math.round(Number(v) * 100) / 100;
     const cambios = Object.entries(ubicacion.res)
-      .map(([id, r]) => ({ id: Number(id), mod: r.modalidad, actual: technicians.find(t => t.id === Number(id))?.turno }))
-      .filter(c => c.actual !== undefined && c.actual !== c.mod);
+      .map(([id, r]) => {
+        const tec = technicians.find(t => t.id === Number(id));
+        return { id: Number(id), mod: r.modalidad, pct: pct2(r.pct), actual: tec?.turno, pctActual: pct2(tec?.pctProduccion) };
+      })
+      .filter(c => c.actual !== undefined && (c.actual !== c.mod || (c.mod !== 'INACTIVO' && c.pct !== c.pctActual)));
     if (!cambios.length) return;
     // El mismo intento no se repite (si falló, queda el aviso en rojo en vez de reintentar sin fin)
-    const clave = cambios.map(c => `${c.id}:${c.mod}`).sort().join(',');
+    const clave = cambios.map(c => `${c.id}:${c.mod}:${c.pct}`).sort().join(',');
     if (ultimoIntento.current === clave) return;
     ultimoIntento.current = clave;
     setReubicando(true);
     void (async () => {
       const fallas: string[] = [];
       for (const c of cambios) {
-        const { error: e } = await supabase.from('mantenimiento_tecnicos').update({ modalidad_operativa: c.mod, activo: c.mod !== 'INACTIVO' }).eq('id', c.id);
+        let { error: e } = await supabase.from('mantenimiento_tecnicos')
+          .update({ modalidad_operativa: c.mod, activo: c.mod !== 'INACTIVO', ...(c.mod !== 'INACTIVO' ? { pct_produccion: c.pct } : {}) }).eq('id', c.id);
+        // Sin la columna pct_produccion (falta mant_pct_produccion.sql) se guarda solo la modalidad
+        if (e && /pct_produccion/i.test(e.message)) ({ error: e } = await supabase.from('mantenimiento_tecnicos').update({ modalidad_operativa: c.mod, activo: c.mod !== 'INACTIVO' }).eq('id', c.id));
         if (e) fallas.push(`${technicians.find(t => t.id === c.id)?.name || c.id}: ${e.message}`);
       }
       setAvisoReubicacion(fallas.length ? `No se pudo reubicar a: ${fallas.join('; ')}` : `Cuadrilla reubicada para hoy (${cambios.length} técnico(s)).`);

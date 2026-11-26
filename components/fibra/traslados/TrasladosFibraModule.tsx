@@ -5,10 +5,11 @@ import { AlertTriangle, ArrowRightLeft, ChevronDown, ChevronUp, FileText, Loader
 import { supabase } from '@/lib/supabase'
 import DetalleOrdenSapModal from '@/components/administracion/DetalleOrdenSapModal'
 import { useFechasSemaforoFv } from '@/lib/fibra/fechasSemaforo'
+import { useFechasSemaforoMuebles } from '@/lib/muebles/fechasSemaforo'
 
 // Módulo Traslados (FV): cada OF liberada pendiente con su traslado comparado contra la lista de materiales.
 // Se exigen solo los Accesorios y Equipos que no son consumibles de uso común. La revisión la hace
-// /api/sap/traslados-fv (automática lunes a viernes 5 a. m., 12 m. y 5 p. m., o con "Revisar ahora").
+// /api/sap/traslados-fv (automática lunes a sábado 5 a. m., 12 m. y 5 p. m., o con "Revisar ahora").
 
 type EstadoOf = 'completo' | 'solicitado' | 'faltante' | 'sin_traslado' | 'error'
 type Fila = {
@@ -42,8 +43,11 @@ const num = (n: number) => Number(n || 0).toLocaleString('es-CO', { maximumFract
 const ORDEN_FILA = { faltante: 0, solicitado: 1, entregado: 2, no_exigido: 3 }
 
 // planta='rtm': el mismo módulo para Superficies (tabla traslados_of_rtm y ?planta=rtm en la revisión)
-export default function TrasladosFibraModule({ planta = 'fv' }: { planta?: 'fv' | 'rtm' } = {}) {
-    const tablaTraslados = planta === 'rtm' ? 'traslados_of_rtm' : 'traslados_of_fv'
+// planta='mbl' / 'cefi': Muebles y CEFI (traslados_of_mbl / traslados_of_cefi); se revisan todos los componentes
+// planta='ms': Mármol (traslados_of_ms), con la misma regla y parámetros de Fibra
+export default function TrasladosFibraModule({ planta = 'fv' }: { planta?: 'fv' | 'ms' | 'rtm' | 'mbl' | 'cefi' } = {}) {
+    const tablaTraslados = planta === 'rtm' ? 'traslados_of_rtm' : planta === 'ms' ? 'traslados_of_ms' : planta === 'mbl' ? 'traslados_of_mbl' : planta === 'cefi' ? 'traslados_of_cefi' : 'traslados_of_fv'
+    const esMuebles = planta === 'mbl' || planta === 'cefi'
     const [datos, setDatos] = useState<Revision[] | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [revisando, setRevisando] = useState<string | null>(null)   // 'todas' o el Nº de OF
@@ -57,12 +61,12 @@ export default function TrasladosFibraModule({ planta = 'fv' }: { planta?: 'fv' 
     const cargar = useCallback(async () => {
         const { data, error: e } = await supabase.from(tablaTraslados).select('*')
         if (e) {
-            setError(/traslados_of_fv|relation|schema cache/i.test(e.message) ? 'Falta crear las tablas del módulo Traslados: ejecute traslados_fv.sql en Supabase.' : e.message)
+            setError(/traslados_of_|relation|schema cache/i.test(e.message) ? (planta === 'ms' ? 'Falta crear la tabla de Traslados de Mármol: ejecute traslados_ms.sql en Supabase.' : esMuebles ? 'Falta crear las tablas de Traslados de Muebles/CEFI: ejecute muebles_control_piso_fv.sql en Supabase.' : 'Falta crear las tablas del módulo Traslados: ejecute traslados_fv.sql en Supabase.') : e.message)
             setDatos([]); return
         }
         setError(null)
         setDatos((data || []) as Revision[])
-    }, [])
+    }, [tablaTraslados, esMuebles])
     useEffect(() => { cargar() }, [cargar])
 
     const revisar = async (of?: string) => {
@@ -80,7 +84,9 @@ export default function TrasladosFibraModule({ planta = 'fv' }: { planta?: 'fv' 
 
     const ultima = useMemo(() => (datos || []).reduce((m, d) => d.calculado_at > m ? d.calculado_at : m, ''), [datos])
     const cuenta = (e: EstadoOf) => (datos || []).filter(d => d.estado === e).length
-    const semaforo = useFechasSemaforoFv()
+    const semaforoFv = useFechasSemaforoFv(planta === 'fv' || planta === 'rtm')
+    const semaforoMuebles = useFechasSemaforoMuebles(esMuebles)
+    const semaforo = esMuebles ? semaforoMuebles : semaforoFv
     const fechaLib = (of: string) => semaforo?.mapa.get(String(of).trim())?.realLib?.slice(0, 10) || null
     const visibles = useMemo(() => {
         const q = busqueda.trim().toLowerCase()
@@ -129,13 +135,13 @@ export default function TrasladosFibraModule({ planta = 'fv' }: { planta?: 'fv' 
                                 className="w-full h-8 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-xs outline-none focus:ring-2 focus:ring-[#7B8E90]" />
                         </div>
                     </div>
-                    <div className="text-[11px] text-slate-500 font-semibold pb-1.5" title="Revisión automática: lunes a viernes 5:00 a. m., 12:00 m. y 5:00 p. m.">
+                    <div className="text-[11px] text-slate-500 font-semibold pb-1.5" title="Revisión automática: lunes a sábado 5:00 a. m., 12:00 m. y 5:00 p. m.">
                         {ultima ? `Última revisión: ${new Date(ultima).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}` : 'Sin revisiones'}
                     </div>
-                    <button onClick={() => setVerConsumibles(true)} title="Qué artículos se exigen en el traslado de cada OF (Sí / No por artículo)"
+                    {!esMuebles && <button onClick={() => setVerConsumibles(true)} title="Qué artículos se exigen en el traslado de cada OF (Sí / No por artículo)"
                         className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] hover:bg-[#F6F3EE] text-[11px] font-bold">
                         <Settings2 size={15} /> <span className="hidden sm:inline">Parámetros a revisar</span>
-                    </button>
+                    </button>}
                     <button onClick={() => revisar()} disabled={!!revisando}
                         className="flex items-center gap-1.5 px-3 py-2 bg-[#324354] text-white rounded-lg hover:bg-[#254153] transition-colors shadow-sm disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider h-8"
                         title="Comparar ahora todas las OF contra SAP (puede tardar unos minutos)">

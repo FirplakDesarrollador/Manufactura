@@ -134,7 +134,7 @@ export default function SelectionPage() {
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                                    Control de Piso Mármol
+                                    Control de Piso<br />Mármol<br /><span className="text-[11px] sm:text-xs font-black text-[#7B8E90]">(MS)</span>
                                 </span>
                             </button>
                         </div>
@@ -153,7 +153,7 @@ export default function SelectionPage() {
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                                    Control de Piso Muebles
+                                    Control de Piso<br />Muebles<br /><span className="text-[11px] sm:text-xs font-black text-[#7B8E90]">(MBL)</span>
                                 </span>
                             </button>
                         </div>
@@ -172,7 +172,7 @@ export default function SelectionPage() {
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                                    Control de Piso CEFI
+                                    Control de Piso<br />CEFI<br /><span className="text-[11px] sm:text-xs font-black text-[#7B8E90]">(CEFI)</span>
                                 </span>
                             </button>
                         </div>
@@ -191,7 +191,7 @@ export default function SelectionPage() {
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                                    Control de Piso Fibra
+                                    Control de Piso<br />Fibra<br /><span className="text-[11px] sm:text-xs font-black text-[#7B8E90]">(FV)</span>
                                 </span>
                             </button>
                         </div>
@@ -210,7 +210,7 @@ export default function SelectionPage() {
                                     </svg>
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
-                                    Control de Piso Superficies (RTM)
+                                    Control de Piso<br />Superficies<br /><span className="text-[11px] sm:text-xs font-black text-[#7B8E90]">(RTM)</span>
                                 </span>
                             </button>
                         </div>

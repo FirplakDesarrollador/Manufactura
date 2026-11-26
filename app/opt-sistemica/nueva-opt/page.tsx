@@ -84,7 +84,7 @@ export default function NuevaOptPage() {
         <div className="w-full max-w-[1700px] mx-auto px-4 md:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 justify-items-center w-full">
             {subModules.map((module) => (
-              <div key={module.id} className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+              <div key={module.id} className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                 <button 
                   onClick={() => router.push(`/opt-sistemica/nueva-opt/${module.id}`)}
                   className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"

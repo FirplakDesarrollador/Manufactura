@@ -78,7 +78,7 @@ import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosC
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
 import TiempoEjecucionInput, { minutosValidos } from '@/components/mantenimiento/TiempoEjecucionInput';
-import { elegirTecnico, tecnicosCompatibles, type TecnicoAsignable } from '@/lib/mantenimiento/asignacionTecnicos';
+import { elegirTecnico, tecnicosCompatibles, sumarCarga, ordenPrioridad, type TecnicoAsignable, type CargaPorTecnico } from '@/lib/mantenimiento/asignacionTecnicos';
 import MaquinasMultiples, { partesMaquina } from '@/components/mantenimiento/MaquinasMultiples';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
@@ -215,6 +215,8 @@ interface Technician {
   activo?: boolean;
   /** MT = técnico de mantenimiento, OP = operativo / producción (ej. encargada de planta) */
   ejecutor?: Ejecutor;
+  /** % del turno de hoy en producción (0 a 1), de la tabla de Turnos */
+  pctProduccion?: number | null;
 }
 
 interface SystemSettings {
@@ -329,6 +331,8 @@ export default function GestionMantenimientoPage() {
   const [isSubHeaderOpen, setIsSubHeaderOpen] = useState(true);
   // null = todas las pestañas; si el usuario tiene pestañas marcadas en sus permisos, solo esas
   const [pestanasPermitidas, setPestanasPermitidas] = useState<TabType[] | null>(null);
+  // Máquinas y Equipos: "ver" solo consulta; crear, editar y eliminar requieren "Máquinas y Equipos (editar)"
+  const [puedeEditarMaquinas, setPuedeEditarMaquinas] = useState(true);
   // % del turno de hoy en producción por técnico (Turnos + Horario de plantas) para el reparto real de los NPPR
   const [pctProduccionHoy, setPctProduccionHoy] = useState<Record<number, number | null>>({});
   useEffect(() => {
@@ -1081,11 +1085,12 @@ export default function GestionMantenimientoPage() {
         const gm = (u?.permisos as Record<string, unknown> | null)?.gestor_mantenimiento;
         const MAPA: Record<string, TabType[]> = {
           planificador: ['planificador'], mis_tareas: ['tecnico', 'total_tareas'], total_tareas: ['total_tareas'], preventivo: ['preventivo'], ordenes_trabajo: ['historial', 'correctivo'],
-          indicadores: ['indicadores'], maquinas: ['maquinas'], configuracion: ['configuracion'],
+          indicadores: ['indicadores'], maquinas: ['maquinas'], maquinas_editar: ['maquinas'], configuracion: ['configuracion'],
         };
         const marcadas = gm && typeof gm === 'object' ? Object.entries(gm as Record<string, boolean>).filter(([, v]) => v).map(([k]) => k) : [];
         if (rol !== 'admin' && rol !== 'desarrollador' && marcadas.length) {
           setPestanasPermitidas(marcadas.flatMap(k => MAPA[k] || []));
+          setPuedeEditarMaquinas(marcadas.includes('maquinas_editar'));
         }
       } catch (err) {
         console.error('Auth verification failed:', err);
@@ -2005,6 +2010,7 @@ export default function GestionMantenimientoPage() {
             planta: pList.join(', '), plantas: pList, especialidad: pList.join(', '),
             authorizedTitles: (t.titulos_autorizados || []).map(normalize), overloadMarginPercent: 10, activo: t.activo !== false,
             ejecutor: normalizarEjecutor(t.ejecutor),
+            pctProduccion: t.pct_produccion != null ? Number(t.pct_produccion) : null,
           } as Technician;
         })));
       }
@@ -2153,7 +2159,8 @@ export default function GestionMantenimientoPage() {
         authorizedTitles: (t.titulos_autorizados || []).map(normalize),
         overloadMarginPercent: 10,
         activo: t.activo !== false,
-        ejecutor: normalizarEjecutor(t.ejecutor)
+        ejecutor: normalizarEjecutor(t.ejecutor),
+        pctProduccion: t.pct_produccion != null ? Number(t.pct_produccion) : null
       };
     });
 
@@ -2172,8 +2179,10 @@ export default function GestionMantenimientoPage() {
     // Mismos datos que usa el generador para asignar (lib/mantenimiento/asignacionTecnicos)
     const tecnicosAsignables: TecnicoAsignable[] = newTechnicians.filter(t => t.id !== 9999).map(t => ({
       id: t.id, nombre: t.name, ejecutor: t.ejecutor, plantas: t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura),
-      turno: t.turno, capacidadHoras: t.capacity, activo: t.activo,
+      turno: t.turno, capacidadHoras: t.capacity, activo: t.activo, pctProduccion: t.pctProduccion,
     }));
+    // Carga para la asignación sugerida (total y parte NP / PR), con las mismas reglas del generador
+    const cargaAsig: CargaPorTecnico = {};
 
     let localTasks: MaintenanceTask[] = [];
     const localTasksStr = localStorage.getItem('techflow_v2_tasks');
@@ -2185,7 +2194,10 @@ export default function GestionMantenimientoPage() {
 
     const newTasks: MaintenanceTask[] = [];
 
-    preventivosRaw.forEach((p, pIdx) => {
+    const ordenOriginal = new Map<number, number>(preventivosRaw.map((p, i) => [p.id, i]));
+    preventivosRaw.map((p, pIdx) => ({ p, pIdx }))
+      .sort((a, b) => ordenPrioridad(a.p.frecuencia_dias, b.p.frecuencia_dias) || a.pIdx - b.pIdx)
+      .forEach(({ p, pIdx }) => {
       const title = p.titulo;
       const tiempoMinutos = p.duracion_minutos || 60;
       const id = p.id;
@@ -2250,7 +2262,7 @@ export default function GestionMantenimientoPage() {
       // Ventana constante de 3 días adelantados para planificación (sin alterar el contador real en BD)
       const DIAS_VENTANA_ADELANTO = 3;
       const isValidFrequency = (refFrecuencia + DIAS_VENTANA_ADELANTO) >= frecuencia || frecuencia <= 1;
-      const asignacionSugerida = elegirTecnico(solicitudAsig, tecnicosAsignables, techHoursMap, systemSettings.defaultOverloadMargin ?? 10);
+      const asignacionSugerida = elegirTecnico(solicitudAsig, tecnicosAsignables, cargaAsig, systemSettings.defaultOverloadMargin ?? 10);
       const bestCandidate: number = asignacionSugerida.id ?? 9999;
       const bestErrors: string[] = asignacionSugerida.motivo === 'sin_tecnico' ? ['requiere_asignacion_manual'] : [];
 
@@ -2267,6 +2279,7 @@ export default function GestionMantenimientoPage() {
 
       if (isDueFinal && finalCandidate !== 9999) {
         techHoursMap[finalCandidate] = (techHoursMap[finalCandidate] || 0) + (tiempoMinutos / 60);
+        sumarCarga(cargaAsig, finalCandidate, tiempoMinutos / 60, tipoIntervencion);
       }
 
       if (!isDueFinal) {
@@ -2324,6 +2337,7 @@ export default function GestionMantenimientoPage() {
     });
 
     setTechnicians(newTechnicians);
+    newTasks.sort((a, b) => (ordenOriginal.get(a.id) ?? 0) - (ordenOriginal.get(b.id) ?? 0));
     setTasks(newTasks);
 
     if (newTechnicians.length > 0 && (selectedTechId === null || !newTechnicians.some(t => t.id === selectedTechId))) {
@@ -4647,6 +4661,7 @@ export default function GestionMantenimientoPage() {
   };
 
   const handleOpenCreateMachine = () => {
+    if (!puedeEditarMaquinas) return;
     resetMachineForm();
     const { firstGapCode, nextMaxCode } = getNextMachineConsecutiveInfo();
     const suggestedCode = firstGapCode || nextMaxCode;
@@ -4659,6 +4674,7 @@ export default function GestionMantenimientoPage() {
   };
 
   const handleOpenEditMachine = (m: any) => {
+    if (!puedeEditarMaquinas) return;
     if (!m) return;
     setEditingMachineId(m.id);
     setMachineFormMode('edit');
@@ -4743,6 +4759,7 @@ export default function GestionMantenimientoPage() {
       : fichaValor(url);
 
   const handleSaveMachineSubmit = async (e: React.FormEvent) => {
+    if (!puedeEditarMaquinas) { e.preventDefault(); return; }
     e.preventDefault();
     if (!machineFormData.nombre_equipo.trim()) {
       alert('El nombre del equipo o máquina es obligatorio.');
@@ -4842,6 +4859,7 @@ export default function GestionMantenimientoPage() {
   };
 
   const handleRequestDeleteMachine = (m: any) => {
+    if (!puedeEditarMaquinas) return;
     if (!m) return;
     setMachineToDelete({
       id: m.id,
@@ -4852,6 +4870,7 @@ export default function GestionMantenimientoPage() {
   };
 
   const handleConfirmDeleteMachine = async () => {
+    if (!puedeEditarMaquinas) return;
     if (!machineToDelete) return;
     const { id, nombre } = machineToDelete;
 
@@ -6316,9 +6335,10 @@ export default function GestionMantenimientoPage() {
     const todayPctCarga = Math.round((todayHoras / capacityBase) * 100);
 
     let todaySemaforoClass = 'bg-[#59a96a] text-white';
-    if (todayPctCarga > 100) {
+    // Semáforo de carga: verde hasta 100 %, amarillo hasta 105 %, rojo por encima de 105 %
+    if (todayPctCarga > 105) {
       todaySemaforoClass = 'bg-[#d14747] text-white';
-    } else if (todayPctCarga > 85) {
+    } else if (todayPctCarga > 100) {
       todaySemaforoClass = 'bg-[#deb841] text-white';
     }
 
@@ -9093,14 +9113,14 @@ export default function GestionMantenimientoPage() {
                   </button>
 
                   {/* Nueva Máquina Button */}
-                  <button
+                  {puedeEditarMaquinas && <button
                     type="button"
                     onClick={handleOpenCreateMachine}
                     className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Nueva Máquina</span>
-                  </button>
+                  </button>}
                 </div>
               </div>
 
@@ -11711,6 +11731,10 @@ export default function GestionMantenimientoPage() {
                     <Wrench className="w-3.5 h-3.5" />
                     <span>Mantenimiento Preventivo</span>
                   </span>
+                  {/* Nomenclatura del plan (la misma del catálogo Preventivo PMP) */}
+                  <span className="px-2.5 py-1 bg-white font-mono font-bold text-[#324354] rounded-lg text-xs border border-[#324354]/30" title="Nomenclatura: Periodicidad + Ejecutor + Planta + Intervención + Tiempo">
+                    {computeNomenclatura(executingPreventivo.planta, executingPreventivo.tipoIntervencion, executingPreventivo.durationMinutes, executingPreventivo.nomenclatura || executingPreventivo.code, executingPreventivo.frecuencia, executingPreventivo.ejecutor)}
+                  </span>
                 </div>
                 <h3 className="text-lg sm:text-xl font-black text-[#324354] leading-snug mt-1">
                   {executingPreventivo.title}
@@ -13325,14 +13349,14 @@ export default function GestionMantenimientoPage() {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <button
+                    {puedeEditarMaquinas && <button
                       type="button"
                       onClick={() => handleRequestDeleteMachine(selectedMachineModal)}
                       className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Eliminar Máquina</span>
-                    </button>
+                    </button>}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -13343,14 +13367,14 @@ export default function GestionMantenimientoPage() {
                     >
                       Cerrar
                     </button>
-                    <button
+                    {puedeEditarMaquinas && <button
                       type="button"
                       onClick={() => handleOpenEditMachine(selectedMachineModal)}
                       className="px-5 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       <span>Editar Máquina</span>
-                    </button>
+                    </button>}
                   </div>
                 </>
               )}

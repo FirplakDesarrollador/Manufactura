@@ -12,7 +12,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
-import { elegirTecnico, type TecnicoAsignable } from '@/lib/mantenimiento/asignacionTecnicos';
+import { elegirTecnico, sumarCarga, ordenPrioridad, type TecnicoAsignable, type CargaPorTecnico } from '@/lib/mantenimiento/asignacionTecnicos';
 
 const DIA_MS = 86400000;
 
@@ -50,7 +50,7 @@ export type ResultadoGeneracion = {
   fechaGeneracion: string;
   fechaProgramada: string;
   ordenesGeneradas: number;
-  asignadasReserva: number;
+  asignadasSinHorario: number;
   sinAsignar: number;
   planesActualizadosContador: number;
   rangoCodigos: string;
@@ -86,18 +86,19 @@ export async function generarPreventivos(supabase: SupabaseClient, ahora: Date =
     plantas: plantasDeTexto(t.especialidad || t.planta),
     turno: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'),
     capacidadHoras: parseFloat(t.capacidad_horas) || null, activo: t.activo !== false,
+    pctProduccion: t.pct_produccion != null ? Number(t.pct_produccion) : null,
   }));
 
   // 4. Carga de cada técnico por día programado (hoy y mañana: órdenes abiertas de ese día)
-  const delDia = await traerTodo<{ id_tecnico: number | null; duracion_estimada_min: number | null; estado: string | null; fecha_programada: string | null }>(
-    () => supabase.from('mantenimiento_ordenes').select('id_tecnico, duracion_estimada_min, estado, fecha_programada')
+  const delDia = await traerTodo<{ id_tecnico: number | null; duracion_estimada_min: number | null; estado: string | null; fecha_programada: string | null; turno: string | null }>(
+    () => supabase.from('mantenimiento_ordenes').select('id_tecnico, duracion_estimada_min, estado, fecha_programada, turno')
       .in('fecha_programada', [hoy, manana]).order('id', { ascending: true })
   );
-  const cargaPorDia: Record<string, Record<number, number>> = { [hoy]: {}, [manana]: {} };
+  const cargaPorDia: Record<string, CargaPorTecnico> = { [hoy]: {}, [manana]: {} };
   delDia.forEach(o => {
     const dia = String(o.fecha_programada || '').slice(0, 10);
     if (!o.id_tecnico || o.estado === 'Completado' || !cargaPorDia[dia]) return;
-    cargaPorDia[dia][o.id_tecnico] = (cargaPorDia[dia][o.id_tecnico] || 0) + (Number(o.duracion_estimada_min) || 60) / 60;
+    sumarCarga(cargaPorDia[dia], o.id_tecnico, (Number(o.duracion_estimada_min) || 60) / 60, o.turno);
   });
 
   // 5. Planta de la orden = la de la MÁQUINA en el catálogo (no la escrita en el plan)
@@ -135,10 +136,13 @@ export async function generarPreventivos(supabase: SupabaseClient, ahora: Date =
   // 7. Planes que vencen a más tardar mañana
   const nuevas: any[] = [];
   const contadores: { id: number; ref_frecuencia: number }[] = [];
-  let asignadasReserva = 0;
+  let asignadasSinHorario = 0;
   let sinAsignar = 0;
 
-  for (const p of planes) {
+  // Prioridad: primero los planes de menor frecuencia (diarios, cada 2, cada 3 días…), así toman la capacidad de los
+  // técnicos antes que los semanales y mensuales
+  const enPrioridad = [...planes].sort((a, b) => ordenPrioridad(a.frecuencia_dias, b.frecuencia_dias) || a.id - b.id);
+  for (const p of enPrioridad) {
     const freq = Math.max(1, Number(p.frecuencia_dias) || 1);
     const refActual = Math.min(freq, Math.max(0, Number(p.ref_frecuencia || 0)));
     const ultima = ultimaProgramada.get(p.id) || null;
@@ -167,8 +171,8 @@ export async function generarPreventivos(supabase: SupabaseClient, ahora: Date =
         tecnicos, carga
       );
       const tec = asig.id ? tecnicos.find(t => t.id === asig.id) : null;
-      if (tec) carga[tec.id] = (carga[tec.id] || 0) + horas;
-      if (asig.motivo === 'reserva') asignadasReserva++;
+      if (tec) sumarCarga(carga, tec.id, horas, p.tipo_intervencion || p.turno_requerido);
+      if (asig.motivo === 'sin_horario') asignadasSinHorario++;
       if (asig.motivo === 'sin_tecnico') sinAsignar++;
 
       nuevas.push({
@@ -233,7 +237,7 @@ export async function generarPreventivos(supabase: SupabaseClient, ahora: Date =
     fechaGeneracion: hoy,
     fechaProgramada: manana,
     ordenesGeneradas: insertadas,
-    asignadasReserva,
+    asignadasSinHorario,
     sinAsignar,
     planesActualizadosContador: aGuardar.length,
     rangoCodigos: insertadas > 0 ? `PREV-${maxNum + 1} a PREV-${siguiente - 1}` : 'Sin nuevas órdenes',

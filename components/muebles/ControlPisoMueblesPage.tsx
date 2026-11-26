@@ -22,6 +22,19 @@ function AvisoFaltantesDigitado({ planta, abierto }: { planta: string; abierto: 
     )
 }
 import TransitoModule from '@/components/muebles/TransitoModule'
+import TrasladosFibraModule from '@/components/fibra/traslados/TrasladosFibraModule'
+import MapaProcesosMuebles from '@/components/muebles/MapaProcesosMuebles'
+
+// Número rojo tipo notificación (igual al de Fibra): OF con novedades de traslado en ese proceso
+function AvisoNovedades({ n, abierto, texto }: { n?: number; abierto: boolean; texto: string }) {
+    if (!n) return null
+    return (
+        <b title={`${n} ${texto}`}
+            className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${abierto ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+            {n > 99 ? '99+' : n}
+        </b>
+    )
+}
 import CediModule from '@/components/muebles/CediModule'
 import AdministracionModule from '@/components/muebles/AdministracionModule'
 import DefectosModule from '@/components/muebles/DefectosModule'
@@ -51,6 +64,36 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
     const [isTurnosModalOpen, setIsTurnosModalOpen] = useState(false)
     const [isSupervisoresModalOpen, setIsSupervisoresModalOpen] = useState(false)
     const [isPlantaModalOpen, setIsPlantaModalOpen] = useState(false)
+    // Avisos rojos (como Fibra): OF con novedades de traslado (sin traslado, con faltantes o solicitado sin trasladar)
+    // en total y por proceso (el proceso donde están sus unidades por trabajar)
+    const [novedadesTraslados, setNovedadesTraslados] = useState(0)
+    const [novedadesProceso, setNovedadesProceso] = useState<Record<string, number>>({})
+    useEffect(() => {
+        const tabla = planta === 'Cefi' ? 'traslados_of_cefi' : 'traslados_of_mbl'
+        const contar = async () => {
+            const { data, error } = await supabase.from(tabla).select('orden_fabricacion').in('estado', ['sin_traslado', 'faltante', 'solicitado'])
+            if (error) return
+            const ofs = [...new Set((data || []).map(r => String(r.orden_fabricacion)))]
+            setNovedadesTraslados(ofs.length)
+            if (!ofs.length) { setNovedadesProceso({}); return }
+            const { data: q, error: errQ } = await supabase.from('query_of_muebles')
+                .select('orden_fabricacion, por_cortar, corte, enchape, inspeccion').in('orden_fabricacion', ofs.slice(0, 1000)).eq('pendiente', true)
+            if (errQ) return
+            // Cada módulo muestra lo que le llega del proceso anterior
+            const cuenta: Record<string, number> = {}
+            const sumar = (m: string) => { cuenta[m] = (cuenta[m] || 0) + 1 }
+            for (const o of q || []) {
+                if ((o.por_cortar || 0) > 0) sumar('corte')
+                if ((o.corte || 0) > 0) sumar('enchape')
+                if ((o.enchape || 0) > 0) sumar('inspeccion')
+                if (planta !== 'Cefi' && (o.inspeccion || 0) > 0) sumar('empaque')
+            }
+            setNovedadesProceso(cuenta)
+        }
+        contar()
+        const t = setInterval(contar, 5 * 60000)
+        return () => clearInterval(t)
+    }, [planta])
 
     useEffect(() => {
         const getUser = async () => {
@@ -240,8 +283,39 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
                                 {item.icon}
                                 <span>{item.label}</span>
                                 {item.id === 'digitado' && <AvisoFaltantesDigitado planta={planta} abierto={sidebarOpen} />}
+                                {item.id !== 'digitado' && <AvisoNovedades n={novedadesProceso[item.id]} abierto={sidebarOpen} texto="OF con faltantes o sin traslado en este proceso" />}
                             </button>
                         ))}
+
+                        {/* Traslados: OF abiertas vs. sus traslados en SAP (solo consulta, sin permiso propio, como en Fibra) */}
+                        <button
+                            onClick={() => setActiveModule('traslados')}
+                            title={sidebarOpen ? undefined : `Traslados${novedadesTraslados ? ` · ${novedadesTraslados} OF con novedades` : ''}`}
+                            className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'traslados'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'}`}
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h12m0 0l-4-4m4 4l-4 4M17 17H5m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            <span>Traslados</span>
+                            <AvisoNovedades n={novedadesTraslados} abierto={sidebarOpen} texto="OF con faltantes o sin traslado" />
+                        </button>
+
+                        {/* Mapa de procesos: solo consulta, sin permiso propio */}
+                        <button
+                            onClick={() => setActiveModule('mapa')}
+                            title={sidebarOpen ? undefined : 'Mapa de procesos'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'mapa'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'}`}
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span>Mapa de procesos</span>
+                        </button>
 
                         <div className="pt-2 border-t border-[#e2ded5] mt-2 space-y-1">
                             {utilityItems.map((item) => (
@@ -273,7 +347,11 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
                 <main className="flex-1 min-w-0 h-[calc(100vh-3rem)] bg-white overflow-hidden relative">
                     <ErrorBoundary fallbackTitle="Error al cargar el módulo de Muebles">
                         <div className="h-full overflow-y-auto">
-                            {activeModule === 'corte' ? (
+                            {activeModule === 'traslados' ? (
+                                <TrasladosFibraModule planta={planta === 'Cefi' ? 'cefi' : 'mbl'} />
+                            ) : activeModule === 'mapa' ? (
+                                <MapaProcesosMuebles plantaMuebles={planta} />
+                            ) : activeModule === 'corte' ? (
                                 <CorteModule 
                                     userEmail={user?.email || ''} 
                                     turno="1" 

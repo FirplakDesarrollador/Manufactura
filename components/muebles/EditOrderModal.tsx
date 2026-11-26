@@ -13,6 +13,7 @@ import {
     CheckCircle2
 } from 'lucide-react'
 import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
+import MoverOfMuebles from './MoverOfMuebles'
 
 interface EditOrderModalProps {
     orden: OrdenMueble
@@ -67,6 +68,17 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail,
                 .delete()
                 .eq('id', orden.id)
 
+            // Con registros de trazabilidad la base no deja borrarla: se oculta (cierra) del control de piso
+            if (error && (error.code === '23503' || /foreign key|violates/i.test(error.message))) {
+                const { error: errCierre } = await supabase.from('ordenes_fabricacion_muebles')
+                    .update({ pendiente: false, fecha_entrega_real: new Date().toISOString(), modificado_por: `Cierre manual: ${usuarioNombre}` })
+                    .eq('id', orden.id)
+                if (errCierre) throw errCierre
+                alert('La orden tiene registros de trazabilidad, así que no se borró: se cerró y ya no sale en el control de piso.')
+                onSuccess()
+                onClose()
+                return
+            }
             if (error) throw error
 
             alert('¡Acción exitosa! Se ha eliminado la orden correctamente')
@@ -74,7 +86,7 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail,
             onClose()
         } catch (error: any) {
             console.error('Error deleting order:', error)
-            alert('Error al eliminar la orden')
+            alert(`Error al eliminar la orden: ${error?.message || error}`)
         } finally {
             setLoading(false)
         }
@@ -94,7 +106,7 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail,
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[94vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
                 {/* Header */}
                 <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-gray-100">
                     <h3 className="text-xl font-bold text-blue-600">OF: {orden.orden_fabricacion}</h3>
@@ -123,6 +135,10 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail,
                         <ClipboardList size={20} />
                         REGISTROS DE TRAZABILIDAD
                     </button>
+
+                    {/* Jalar la OF hasta un proceso (Digitado, Tránsito…) */}
+                    <MoverOfMuebles orden={orden} planta={orden.planta} usuarioNombre={usuarioNombre} userEmail={userEmail}
+                        onHecho={() => { onSuccess(); onClose() }} />
 
                     {/* Form Controls */}
                     <div className="grid grid-cols-2 gap-6 pt-2">
