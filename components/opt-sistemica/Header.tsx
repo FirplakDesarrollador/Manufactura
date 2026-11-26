@@ -218,7 +218,8 @@ export default function Header({
                 { label: 'Muebles (MBL)', path: '/muebles' },
                 { label: 'CEFI (CEFI)', path: '/cefi' },
                 { label: 'Fibra de Vidrio (FV)', path: '/fibra' },
-                { label: 'Superficies (RTM)', path: '/superficies' }
+                { label: 'Superficies (RTM)', path: '/superficies' },
+                { label: 'Semielaborados (SEM)', path: '/semielaborados' }
               ]
             },
             { label: 'Tablero de Control', path: '/indicadores-productividad', icon: (

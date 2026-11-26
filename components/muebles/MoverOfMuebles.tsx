@@ -26,13 +26,19 @@ const FLUJO: Etapa[] = [
     { id: 'cedi', campo: 'cedi', label: 'CEDI', proceso: 'Cedi' },
 ]
 
-type Props = { orden: OrdenMueble; planta: string; usuarioNombre: string; userEmail: string; onHecho: () => void }
+type Props = { orden: OrdenMueble; planta: string; usuarioNombre: string; userEmail: string; onHecho: () => void
+    /** Semielaborados: Programado → Corte → Digitado → Tránsito → Almacén (el campo cedi trae Almacén) */
+    variante?: 'semielaborados' }
+
+const FLUJO_SEMIELABORADOS = ['programado', 'corte', 'digitado', 'transito', 'cedi']
 
 // Panel: dónde está cada unidad, destino, cantidad y botón Mover
-export default function MoverOfMuebles({ orden, planta, usuarioNombre, userEmail, onHecho }: Props) {
+export default function MoverOfMuebles({ orden, planta, usuarioNombre, userEmail, onHecho, variante }: Props) {
     const esCefi = (planta || orden.planta || '').toLowerCase().includes('cefi')
     // CEFI no usa Empaque
-    const flujo = useMemo(() => FLUJO.filter(e => !(esCefi && e.id === 'empaque')), [esCefi])
+    const flujo = useMemo(() => variante === 'semielaborados'
+        ? FLUJO.filter(e => FLUJO_SEMIELABORADOS.includes(e.id)).map(e => e.id === 'cedi' ? { ...e, label: 'Almacén' } : e)
+        : FLUJO.filter(e => !(esCefi && e.id === 'empaque')), [esCefi, variante])
     const cant = (e: Etapa) => Math.max(0, Number(orden[e.campo]) || 0)
 
     // Desde: por defecto el proceso más avanzado (sin contar CEDI) que tenga unidades; Hasta: el siguiente
