@@ -78,6 +78,7 @@ import PlannerTecnicosColumnas from '@/components/mantenimiento/PlannerTecnicosC
 import PhotoAnnotationEditor from '@/components/mantenimiento/PhotoAnnotationEditor';
 import MachineSearchAutocomplete from '@/components/mantenimiento/MachineSearchAutocomplete';
 import TiempoEjecucionInput, { minutosValidos } from '@/components/mantenimiento/TiempoEjecucionInput';
+import { elegirTecnico, tecnicosCompatibles, type TecnicoAsignable } from '@/lib/mantenimiento/asignacionTecnicos';
 import MaquinasMultiples, { partesMaquina } from '@/components/mantenimiento/MaquinasMultiples';
 import LiveCameraModal from '@/components/mantenimiento/LiveCameraModal';
 import MatrizHorariosTurnos from '@/components/mantenimiento/MatrizHorariosTurnos';
@@ -87,7 +88,7 @@ import * as XLSX from 'xlsx';
 import { descargarHojaDeVidaEquipo } from '@/lib/mantenimiento/hojaDeVidaEquipo';
 import RelacionadosMaquina from '@/components/mantenimiento/RelacionadosMaquina';
 import { getNextConsecutiveCode, isCleanConsecutiveCode } from '@/lib/consecutivos';
-import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas, computeSemanasFromFrecuencia } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, normalizarPlanta, NomenclaturaPlanta, NOMENCLATURA_PLANTAS_DEFAULT, computeNomenclatura, cleanTaskTitle, obtenerCodigosOficialesPlantas, computeSemanasFromFrecuencia, normalizarEjecutor, EJECUTORES, type Ejecutor } from '@/lib/nomenclaturaPlantas';
 
 export interface Empleado {
   id: number | string;
@@ -212,6 +213,8 @@ interface Technician {
   authorizedTitles: string[];
   overloadMarginPercent?: number; // e.g. 10 for 10% extra buffer
   activo?: boolean;
+  /** MT = técnico de mantenimiento, OP = operativo / producción (ej. encargada de planta) */
+  ejecutor?: Ejecutor;
 }
 
 interface SystemSettings {
@@ -256,6 +259,24 @@ interface MaintenanceTask {
   ordenId?: number | null;
   /** minutos reales de la orden (mantenimiento_ordenes.tiempo_ejecucion_min) */
   tiempoEjecucionMin?: number | null;
+  /** Nota fija del sistema (mantenimiento_ordenes.nota_sistema): no la edita el técnico */
+  notaSistema?: string | null;
+  /** Quién ejecuta el plan: MT técnicos / OP producción */
+  ejecutor?: Ejecutor;
+  /** Técnico que le tocaría al próximo ciclo según las reglas del generador (si no tiene orden abierta) */
+  idtecsSugerido?: number;
+}
+
+// Notas que escribe el sistema al crear la orden (las viejas quedaron al inicio de comentarios_ejecucion)
+const RE_NOTA_SISTEMA = /^\s*(Orden generada automáticamente por plan preventivo ciclo \(\d+ días\)\.|⚡ Mantenimiento preventivo forzado\/adelantado desde el catálogo PMP\.)\s*/;
+/** Separa la nota del sistema de las observaciones del técnico. Solo si la orden ya tiene la columna nota_sistema. */
+function separarNotaSistema(orden: any, obsRespaldo = ''): { nota: string | null; obs: string } {
+  const obs = (orden?.comentarios_ejecucion ?? obsRespaldo ?? '') as string;
+  if (!orden || !('nota_sistema' in orden)) return { nota: null, obs };
+  const m = obs.match(RE_NOTA_SISTEMA);
+  const notaCol = (orden.nota_sistema || '').trim();
+  if (m) return { nota: notaCol || m[1], obs: obs.slice(m[0].length) };
+  return { nota: notaCol || null, obs };
 }
 
 interface HistoryRecord {
@@ -296,7 +317,7 @@ interface CorrectiveRecord {
   fotos_solucion?: string[];
 }
 
-type TabType = 'planificador' | 'tecnico' | 'preventivo' | 'correctivo' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas' | 'turnos';
+type TabType = 'planificador' | 'tecnico' | 'total_tareas' | 'preventivo' | 'correctivo' | 'historial' | 'configuracion' | 'indicadores' | 'maquinas' | 'turnos';
 
 const DAILY_CAPACITY_LIMIT = 7.2;
 
@@ -317,6 +338,25 @@ export default function GestionMantenimientoPage() {
   // Core Data State
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [tasks, setTasks] = useState<MaintenanceTask[]>([]);
+  // Órdenes PREV abiertas de los planes (todas, también las acumuladas): una tarjeta por orden en el Planificador
+  const [ordenesPlanAbiertas, setOrdenesPlanAbiertas] = useState<any[]>([]);
+  const cargarOrdenesPlanAbiertas = async () => {
+    const filas: any[] = [];
+    let cols = 'id, id_plan_preventivo, codigo, titulo, estado, planta, id_tecnico, tecnico_nombre, fecha_programada, fecha_apertura, fecha_cierre, comentarios_ejecucion, fotos_despues, tiempo_ejecucion_min, duracion_estimada_min, adelantada, nota_sistema';
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await supabase.from('mantenimiento_ordenes')
+        .select(cols)
+        .not('id_plan_preventivo', 'is', null).neq('estado', 'Completado').ilike('codigo', 'PREV-%')
+        .order('fecha_programada', { ascending: true }).order('id', { ascending: true })
+        .range(desde, desde + 999);
+      // Sin la columna nota_sistema (falta mant_nota_sistema.sql): se vuelve a pedir sin ella
+      if (error && /nota_sistema/i.test(error.message) && cols.includes('nota_sistema')) { cols = cols.replace(', nota_sistema', ''); filas.length = 0; desde = -1000; continue; }
+      if (error) { console.warn('No se pudieron leer las órdenes preventivas abiertas:', error); return; }
+      filas.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    setOrdenesPlanAbiertas(filas);
+  };
   const [maquinasCatalogo, setMaquinasCatalogo] = useState<any[]>([]);
   const [plantasNomenclatura, setPlantasNomenclatura] = useState<NomenclaturaPlanta[]>(NOMENCLATURA_PLANTAS_DEFAULT);
   const [historyRows, setHistoryRows] = useState<HistoryRecord[]>([]);
@@ -371,6 +411,16 @@ export default function GestionMantenimientoPage() {
   const [historyPageSize, setHistoryPageSize] = useState<number>(30);
   const [historySummaryFilter, setHistorySummaryFilter] = useState<'ayer' | 'hoy'>('hoy');
   const isFetchingHistoryRef = useRef(false);
+  // Historial y correctivos leen las mismas tablas al mismo tiempo: comparten la descarga que esté en curso
+  // (al terminar se borra, así un refresco posterior trae datos nuevos)
+  const consultasEnCurso = useRef<Record<string, Promise<any>>>({});
+  const consultaCompartida = (clave: string, hacer: () => PromiseLike<any>): Promise<any> => {
+    const enCurso = consultasEnCurso.current[clave];
+    if (enCurso) return enCurso;
+    const p = Promise.resolve(hacer()).finally(() => { delete consultasEnCurso.current[clave]; });
+    consultasEnCurso.current[clave] = p;
+    return p;
+  };
 
   const handleHistorySort = (field: HistorySortField) => {
     if (historySortField === field) {
@@ -438,6 +488,9 @@ export default function GestionMantenimientoPage() {
   const solutionFileInputRef = useRef<HTMLInputElement | null>(null);
   const [savingCorrectivoModal, setSavingCorrectivoModal] = useState(false);
   const [correctivoModalFeedback, setCorrectivoModalFeedback] = useState<string | null>(null);
+
+  // Detalle abierto desde Total Tareas: se ve todo pero no se edita ni se guarda
+  const [detalleSoloLectura, setDetalleSoloLectura] = useState(false);
 
   // Preventivo Execution Modal State (Portal Técnicos / Planificador)
   const [executingPreventivo, setExecutingPreventivo] = useState<MaintenanceTask | null>(null);
@@ -904,7 +957,9 @@ export default function GestionMantenimientoPage() {
     plantas: string[];
     capacity: string;
     overloadMarginPercent: string;
+    ejecutor: Ejecutor;
   }>({
+    ejecutor: 'MT',
     id: '',
     name: '',
     turno: 'PR',
@@ -926,7 +981,9 @@ export default function GestionMantenimientoPage() {
     especialidad: string;
     maquina: string;
     detalle: string;
+    ejecutor: Ejecutor;
   }>({
+    ejecutor: 'MT',
     title: '',
     durationMinutes: 60,
     frecuencia: 30,
@@ -1023,7 +1080,7 @@ export default function GestionMantenimientoPage() {
         const rol = String(u?.rol || '').toLowerCase();
         const gm = (u?.permisos as Record<string, unknown> | null)?.gestor_mantenimiento;
         const MAPA: Record<string, TabType[]> = {
-          planificador: ['planificador'], mis_tareas: ['tecnico'], preventivo: ['preventivo'], ordenes_trabajo: ['historial', 'correctivo'],
+          planificador: ['planificador'], mis_tareas: ['tecnico', 'total_tareas'], total_tareas: ['total_tareas'], preventivo: ['preventivo'], ordenes_trabajo: ['historial', 'correctivo'],
           indicadores: ['indicadores'], maquinas: ['maquinas'], configuracion: ['configuracion'],
         };
         const marcadas = gm && typeof gm === 'object' ? Object.entries(gm as Record<string, boolean>).filter(([, v]) => v).map(([k]) => k) : [];
@@ -1134,27 +1191,19 @@ export default function GestionMantenimientoPage() {
     isFetchingHistoryRef.current = true;
     setHistoryLoading(true);
     try {
-      if (force) {
-        try {
-          await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
-        } catch (genErr) {
-          console.warn('Aviso verificando generación automática de preventivos:', genErr);
-        }
-      }
-
       // 1. Query ordenes
-      const { data: ordenesData, error: ordErr } = await supabase
+      const { data: ordenesData, error: ordErr } = await consultaCompartida('ordenes', () => supabase
         .from('mantenimiento_ordenes')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }));
 
       if (ordErr) console.warn('Aviso consultando mantenimiento_ordenes en historial:', ordErr);
 
       // 2. Query tarjetas
-      const { data: tarjetasData, error: tarjErr } = await supabase
+      const { data: tarjetasData, error: tarjErr } = await consultaCompartida('tarjetas', () => supabase
         .from('tarjetas_falla_anomalia')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }));
 
       if (tarjErr) console.warn('Aviso consultando tarjetas_falla_anomalia en historial:', tarjErr);
 
@@ -1336,20 +1385,20 @@ export default function GestionMantenimientoPage() {
   const fetchCorrectivoRecords = async () => {
     try {
       // 1. Query Correctivos and TPM Cards from mantenimiento_ordenes
-      const { data: ordenesData, error: ordErr } = await supabase
+      const { data: ordenesData, error: ordErr } = await consultaCompartida('ordenes', () => supabase
         .from('mantenimiento_ordenes')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }));
 
       if (ordErr) {
         console.warn('Aviso consultando mantenimiento_ordenes:', ordErr);
       }
 
       // 2. Query tarjetas_falla_anomalia
-      const { data: tarjetasData, error: tarjErr } = await supabase
+      const { data: tarjetasData, error: tarjErr } = await consultaCompartida('tarjetas', () => supabase
         .from('tarjetas_falla_anomalia')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }));
 
       if (tarjErr) {
         console.warn('Aviso consultando tarjetas_falla_anomalia:', tarjErr);
@@ -1955,22 +2004,24 @@ export default function GestionMantenimientoPage() {
             turno: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'), documento: t.documento || '',
             planta: pList.join(', '), plantas: pList, especialidad: pList.join(', '),
             authorizedTitles: (t.titulos_autorizados || []).map(normalize), overloadMarginPercent: 10, activo: t.activo !== false,
+            ejecutor: normalizarEjecutor(t.ejecutor),
           } as Technician;
         })));
       }
 
       // 4 y 5 (preventivos del día, planes y órdenes) van al mismo tiempo que el catálogo de máquinas
+      // Las órdenes PREV ya NO se generan al abrir el Gestor: las crea la tarea diaria de las 5:00 a. m.
       const planesYOrdenes = (async () => {
-        try {
-          await fetch('/api/mantenimiento/generar-preventivos', { method: 'POST' });
-        } catch (genErr) {
-          console.warn('Aviso verificando generación automática de preventivos:', genErr);
-        }
         return Promise.all([
           // Todos los planes (también los inactivos, para verlos y reactivarlos en Preventivo PMP);
           // los inactivos no se generan ni salen en el Planificador ni en Mis Tareas
           supabase.from('mantenimiento_planes_preventivos').select('*').order('id', { ascending: true }),
-          supabase.from('mantenimiento_ordenes').select('*').order('created_at', { ascending: false }),
+          (async () => {
+            const cols = 'id, id_plan_preventivo, codigo, titulo, estado, id_tecnico, adelantada, comentarios_ejecucion, fecha_apertura, fecha_cierre, tiempo_ejecucion_min, created_at';
+            const r = await supabase.from('mantenimiento_ordenes').select(`${cols}, nota_sistema`).order('created_at', { ascending: false });
+            // Sin la columna nota_sistema (falta mant_nota_sistema.sql) se pide sin ella
+            return r.error && /nota_sistema/i.test(r.error.message) ? await supabase.from('mantenimiento_ordenes').select(cols).order('created_at', { ascending: false }) : r;
+          })(),
         ]);
       })();
 
@@ -2027,6 +2078,7 @@ export default function GestionMantenimientoPage() {
 
       if (tecnicosData && preventivosData) {
         processSupabaseData(preventivosData, tecnicosData, ordenesData || [], allMaquinas);
+        cargarOrdenesPlanAbiertas();
         fetchHistoryRecords();
         fetchCorrectivoRecords();
         if (showNotification) {
@@ -2054,7 +2106,7 @@ export default function GestionMantenimientoPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const rawParam = (params.get('tab') || '').toLowerCase();
-      const validTabs: TabType[] = ['planificador', 'tecnico', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas', 'turnos'];
+      const validTabs: TabType[] = ['planificador', 'tecnico', 'total_tareas', 'preventivo', 'correctivo', 'historial', 'configuracion', 'indicadores', 'maquinas', 'turnos'];
       if (rawParam && validTabs.includes(rawParam as TabType)) {
         setActiveTab(rawParam === 'correctivo' ? 'historial' : rawParam === 'turnos' ? 'configuracion' : (rawParam as TabType));
       }
@@ -2100,7 +2152,8 @@ export default function GestionMantenimientoPage() {
         especialidad: pStr,
         authorizedTitles: (t.titulos_autorizados || []).map(normalize),
         overloadMarginPercent: 10,
-        activo: t.activo !== false
+        activo: t.activo !== false,
+        ejecutor: normalizarEjecutor(t.ejecutor)
       };
     });
 
@@ -2116,6 +2169,11 @@ export default function GestionMantenimientoPage() {
 
     const techHoursMap: { [techId: number]: number } = {};
     newTechnicians.forEach(t => { techHoursMap[t.id] = 0; });
+    // Mismos datos que usa el generador para asignar (lib/mantenimiento/asignacionTecnicos)
+    const tecnicosAsignables: TecnicoAsignable[] = newTechnicians.filter(t => t.id !== 9999).map(t => ({
+      id: t.id, nombre: t.name, ejecutor: t.ejecutor, plantas: t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura),
+      turno: t.turno, capacidadHoras: t.capacity, activo: t.activo,
+    }));
 
     let localTasks: MaintenanceTask[] = [];
     const localTasksStr = localStorage.getItem('techflow_v2_tasks');
@@ -2184,69 +2242,17 @@ export default function GestionMantenimientoPage() {
 
       const finalPlanta = taskPlantas.join(', ');
       const finalEspecialidad = p.especialidad || finalPlanta;
+      const ejecutorPlan = normalizarEjecutor(p.ejecutor);
 
-      // Identify eligible candidate technicians based on matching Planta / Especialidad and Turno
-      const candidateTechsForTask = newTechnicians.filter(t => {
-        if (t.id === 9999) return false;
-        if (t.activo === false || t.turno === 'INACTIVO') return false;
-        const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
-        const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
-        const matchesTurno = areTurnosCompatible(tipoIntervencion, t.turno);
-        return matchesPlanta && matchesTurno;
-      });
-
+      // Técnico con las MISMAS reglas del generador: ejecutor → planta → turno → disponibilidad → reserva
+      const solicitudAsig = { ejecutor: ejecutorPlan, plantas: taskPlantas, turno: tipoIntervencion, horas: tiempoMinutos / 60 };
+      const idtecsList: number[] = tecnicosCompatibles(solicitudAsig, tecnicosAsignables).map(t => t.id);
       // Ventana constante de 3 días adelantados para planificación (sin alterar el contador real en BD)
-      const idtecsList: number[] = candidateTechsForTask.map(t => t.id);
       const DIAS_VENTANA_ADELANTO = 3;
       const isValidFrequency = (refFrecuencia + DIAS_VENTANA_ADELANTO) >= frecuencia || frecuencia <= 1;
-      const diasFaltantes = Math.max(0, frecuencia - refFrecuencia);
-
-      let bestCandidate: number | null = null;
-      let bestErrors: string[] = [];
-      let bestScore = -999;
-
-      idtecsList.forEach(candidateId => {
-        if (candidateId === 9999) return;
-        const tech = newTechnicians.find(t => t.id === candidateId);
-        const candidateErrors: string[] = [];
-
-        if (!tech) {
-          candidateErrors.push('tecnico_no_encontrado');
-        } else {
-          if (!areTurnosCompatible(tipoIntervencion, tech.turno)) {
-            candidateErrors.push('turno_incorrecto');
-          }
-          if (tech.authorizedTitles.length > 0 && !tech.authorizedTitles.includes(normalize(title))) {
-            candidateErrors.push('no_autorizado');
-          }
-          const currentHours = techHoursMap[candidateId] || 0;
-          const taskHours = tiempoMinutos / 60;
-          const effectiveCap = getTechEffectiveCapacity(tech);
-          if (isValidFrequency && (currentHours + taskHours) > (effectiveCap + 0.0001)) {
-            candidateErrors.push('exceso_capacidad');
-          }
-        }
-
-        const score = 4 - candidateErrors.length;
-        if (score > bestScore) {
-          bestScore = score;
-          bestCandidate = candidateId;
-          bestErrors = candidateErrors;
-        }
-      });
-
-      const techExists = newTechnicians.some(t => t.id === bestCandidate);
-      if (bestCandidate === null || !techExists || (bestErrors && bestErrors.includes('exceso_capacidad'))) {
-        const isExceso = bestErrors && bestErrors.includes('exceso_capacidad');
-        bestCandidate = 9999;
-        if (!bestErrors) bestErrors = [];
-        bestErrors = bestErrors.filter(e => e !== 'exceso_capacidad');
-        if (isExceso) {
-          bestErrors.push('exceso_capacidad_reorganizado');
-        } else if (!bestErrors.includes('requiere_asignacion_manual')) {
-          bestErrors.push('requiere_asignacion_manual');
-        }
-      }
+      const asignacionSugerida = elegirTecnico(solicitudAsig, tecnicosAsignables, techHoursMap, systemSettings.defaultOverloadMargin ?? 10);
+      const bestCandidate: number = asignacionSugerida.id ?? 9999;
+      const bestErrors: string[] = asignacionSugerida.motivo === 'sin_tecnico' ? ['requiere_asignacion_manual'] : [];
 
       const matchingLocal = localTasks.find(t => t.id === id || t.title === title);
       // La orden más reciente DEL PLAN (vienen de la más nueva a la más vieja); por título solo si no hay ninguna ligada
@@ -2271,11 +2277,12 @@ export default function GestionMantenimientoPage() {
       const techTurno = assignedTechObj ? assignedTechObj.turno : '';
 
       const finalStatus = matchingOrden?.estado || matchingLocal?.status || 'Pendiente';
-      const finalObs = matchingOrden?.comentarios_ejecucion || matchingLocal?.observations || '';
+      const sepNota = separarNotaSistema(matchingOrden, matchingLocal?.observations || '');
+      const finalObs = sepNota.obs;
       const finalApertura = matchingOrden?.fecha_apertura || matchingLocal?.fechaApertura || (finalCandidate !== 9999 ? getLocalDatetimeString() : null);
       const finalCierre = matchingOrden?.fecha_cierre || matchingLocal?.fechaCierre || null;
 
-      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title, frecuencia);
+      const nomenclaturaCalculated = computeNomenclatura(finalPlanta, tipoIntervencion, tiempoMinutos, p.codigo || title, frecuencia, ejecutorPlan);
       const cleanTitle = cleanTaskTitle(title, nomenclaturaCalculated);
 
       newTasks.push({
@@ -2288,6 +2295,7 @@ export default function GestionMantenimientoPage() {
         durationHours: tiempoMinutos / 60,
         idtecs: finalCandidate,
         idtecsCandidates: idtecsList,
+        idtecsSugerido: bestCandidate,
         tipoIntervencion: tipoIntervencion,
         techTurno: techTurno,
         frecuencia: frecuencia,
@@ -2309,7 +2317,9 @@ export default function GestionMantenimientoPage() {
         activo: p.activo !== false,
         codigoOT: matchingOrden?.codigo || null,
         ordenId: matchingOrden?.id ?? null,
-        tiempoEjecucionMin: matchingOrden?.tiempo_ejecucion_min ?? null
+        tiempoEjecucionMin: matchingOrden?.tiempo_ejecucion_min ?? null,
+        notaSistema: sepNota.nota,
+        ejecutor: ejecutorPlan
       });
     });
 
@@ -2384,6 +2394,7 @@ export default function GestionMantenimientoPage() {
               tecnico_nombre: techName,
               fecha_cierre: formatDateForSupabase(task.fechaCierre),
               comentarios_ejecucion: task.observations || '',
+              ...(task.notaSistema ? { nota_sistema: task.notaSistema } : {}),
               updated_at: new Date().toISOString()
             })
             .eq('id', existingOrd[0].id);
@@ -2684,6 +2695,7 @@ export default function GestionMantenimientoPage() {
     
     const candidateTechs = technicians.filter(t => {
       if (t.id === 9999 || t.activo === false || t.turno === 'INACTIVO') return false;
+      if (normalizarEjecutor(t.ejecutor) !== normalizarEjecutor(taskToForce.ejecutor)) return false;
       const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
       const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
       const matchesTurno = areTurnosCompatible(taskToForce.tipoIntervencion, t.turno);
@@ -2859,6 +2871,7 @@ export default function GestionMantenimientoPage() {
         modalidad_operativa: newTechForm.turno,
         especialidad: pStr,
         capacidad_horas: parseFloat(newTechForm.capacity) || systemSettings.baseCapacity,
+        ejecutor: newTechForm.ejecutor,
         activo: !isInactive
       };
 
@@ -2900,7 +2913,7 @@ export default function GestionMantenimientoPage() {
     persistState(tasks, updatedTechs);
     setSelectedTechId(newTechId);
     setShowTechModal(false);
-    setNewTechForm({ id: '', name: '', turno: 'PR', documento: '', planta: 'MS', plantas: ['MS'], capacity: '7.2', overloadMarginPercent: '10' });
+    setNewTechForm({ id: '', name: '', turno: 'PR', documento: '', planta: 'MS', plantas: ['MS'], capacity: '7.2', overloadMarginPercent: '10', ejecutor: 'MT' });
   };
 
   // Helper to determine next consecutive ID (#) and Code (PMP-XXXX)
@@ -2938,7 +2951,7 @@ export default function GestionMantenimientoPage() {
       : parseTechPlantas(newTaskForm.planta, plantasNomenclatura);
     const plantaStr = taskPlantas.join(', ');
 
-    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia);
+    const nomenclaturaGen = computeNomenclatura(plantaStr, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia, newTaskForm.ejecutor);
     const cleanTitle = cleanTaskTitle(newTaskForm.title.trim(), nomenclaturaGen);
 
     // Candidate technicians matching Planta/Especialidad & Turno
@@ -2947,7 +2960,7 @@ export default function GestionMantenimientoPage() {
       const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
       const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
       const matchesTurno = areTurnosCompatible(newTaskForm.intervencion, t.turno);
-      return matchesPlanta && matchesTurno;
+      return matchesPlanta && matchesTurno && normalizarEjecutor(t.ejecutor) === newTaskForm.ejecutor;
     });
 
     // 1. Calculate next consecutives based on current tasks & Supabase
@@ -3003,6 +3016,7 @@ export default function GestionMantenimientoPage() {
         detalle_instrucciones: newTaskForm.detalle.trim(),
         maquina: newTaskForm.maquina.trim() || 'General',
         planta: plantaStr,
+        ejecutor: newTaskForm.ejecutor,
         activo: true
       };
 
@@ -3047,6 +3061,7 @@ export default function GestionMantenimientoPage() {
       idtecs: 9999,
       idtecsCandidates: candidateTechsForTask.map(t => t.id),
       tipoIntervencion: newTaskForm.intervencion,
+      ejecutor: newTaskForm.ejecutor,
       frecuencia: newTaskForm.frecuencia,
       refFrecuencia: newTaskForm.refFrecuencia,
       errors: newTaskForm.refFrecuencia >= newTaskForm.frecuencia ? [] : ['frecuencia_insuficiente'],
@@ -3067,6 +3082,7 @@ export default function GestionMantenimientoPage() {
     persistState(updatedTasks, technicians);
     setShowTaskModal(false);
     setNewTaskForm({
+      ejecutor: 'MT',
       title: '',
       durationMinutes: 60,
       frecuencia: 30,
@@ -3111,10 +3127,10 @@ export default function GestionMantenimientoPage() {
       const tPlantas = t.plantas || parseTechPlantas(t.planta || t.especialidad, plantasNomenclatura);
       const matchesPlanta = tPlantas.some(tp => taskPlantas.includes(tp) || tp === 'Todas');
       const matchesTurno = areTurnosCompatible(editingTask.tipoIntervencion, t.turno);
-      return matchesPlanta && matchesTurno;
+      return matchesPlanta && matchesTurno && normalizarEjecutor(t.ejecutor) === normalizarEjecutor(editingTask.ejecutor);
     });
 
-    const updatedNom = computeNomenclatura(plantaStr, editingTask.tipoIntervencion, editingTask.durationMinutes, editingTask.code || editingTask.title, editingTask.frecuencia);
+    const updatedNom = computeNomenclatura(plantaStr, editingTask.tipoIntervencion, editingTask.durationMinutes, editingTask.code || editingTask.title, editingTask.frecuencia, editingTask.ejecutor);
 
     const updatedTask: MaintenanceTask = {
       ...editingTask,
@@ -3144,6 +3160,7 @@ export default function GestionMantenimientoPage() {
         ref_frecuencia: clampedRef,
         id_tecnicos_autorizados: [],
         detalle_instrucciones: editingTask.detalle,
+        ejecutor: normalizarEjecutor(editingTask.ejecutor),
         // Inactivo: el generador de preventivos solo toma planes activos (no se crean más órdenes)
         activo: editingTask.activo !== false
       };
@@ -3375,6 +3392,7 @@ export default function GestionMantenimientoPage() {
 
   // Handler to open the Correctivo Detail Pop-up / Modal
   const handleOpenCorrectivoDetail = (item: CorrectiveRecord) => {
+    setDetalleSoloLectura(false);
     setViewingCorrectivo(item);
     setEditingCorrectivoForm({
       tecnico_asignado: item.tecnico_asignado && item.tecnico_asignado !== 'Por asignar' ? item.tecnico_asignado : 'Sin asignar',
@@ -3474,7 +3492,8 @@ export default function GestionMantenimientoPage() {
         codigoOT: row.codigo || code,
         planta: row.planta || foundTask.planta,
         status: (row._estadoDisplay || row.estado || 'Pendiente') as any,
-        observations: row.comentarios_ejecucion || row['COMENTARIO DE EJECUCION'] || '',
+        observations: separarNotaSistema(row, row['COMENTARIO DE EJECUCION'] || '').obs,
+        notaSistema: separarNotaSistema(row).nota,
         fechaApertura: row.fecha_apertura || row['FECHA DE APERTURA'] || null,
         fechaCierre: row.fecha_cierre || row['FECHA DE CIERRE'] || null,
         fotos: fotosOrden,
@@ -3521,7 +3540,7 @@ export default function GestionMantenimientoPage() {
   // Handler to save changes from the Correctivo Detail Modal
   const handleSaveCorrectivoModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!viewingCorrectivo || !editingCorrectivoForm) return;
+    if (!viewingCorrectivo || !editingCorrectivoForm || detalleSoloLectura) return;
     // Al cerrar es obligatorio el tiempo real de ejecución
     const minutosCorr = minutosValidos(editingCorrectivoForm.tiempo_min);
     if (editingCorrectivoForm.estado === 'Resuelta' && !minutosCorr) {
@@ -3742,6 +3761,7 @@ export default function GestionMantenimientoPage() {
 
   // Handler to open the Preventivo Execution Modal (Portal Técnicos / Planificador)
   const handleOpenPreventivoExecution = (task: MaintenanceTask) => {
+    setDetalleSoloLectura(false);
     setExecutingPreventivo(task);
     // Cierre: por defecto ahora mismo; si ya estaba cerrada se conserva la suya. Nunca hacia atrás.
     const ahora = getLocalDatetimeString().slice(0, 16);
@@ -3762,6 +3782,7 @@ export default function GestionMantenimientoPage() {
   // Handler to save Preventivo Execution from the Modal
   const handleSavePreventivoExecution = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (detalleSoloLectura) return;
     if (!executingPreventivo || !executingPreventivoForm) return;
     // Al completar es obligatorio el tiempo real de ejecución
     const minutosPrev = minutosValidos(executingPreventivoForm.tiempoMin);
@@ -3856,6 +3877,12 @@ export default function GestionMantenimientoPage() {
         ordenGuardadaId = nueva?.[0]?.id ?? null;
       }
 
+      // Nota del sistema en su columna (las órdenes viejas la traían dentro de las observaciones)
+      if (executingPreventivo.notaSistema && ordenGuardadaId) {
+        await supabase.from('mantenimiento_ordenes')
+          .update({ nota_sistema: executingPreventivo.notaSistema }).eq('id', ordenGuardadaId);
+      }
+
       // Tiempo real de ejecución (aparte: si falta la columna no se pierde el resto del guardado)
       if (minutosPrev && ordenGuardadaId) {
         const { error: tErr } = await supabase.from('mantenimiento_ordenes')
@@ -3864,6 +3891,7 @@ export default function GestionMantenimientoPage() {
       }
 
       fetchHistoryRecords();
+      cargarOrdenesPlanAbiertas();
       setPreventivoModalFeedback('¡Ejecución de mantenimiento preventivo guardada exitosamente!');
       setTimeout(() => {
         setPreventivoModalFeedback(null);
@@ -4331,6 +4359,7 @@ export default function GestionMantenimientoPage() {
         modalidad_operativa: updatedTech.turno,
         especialidad: plantasStr,
         capacidad_horas: updatedTech.capacity,
+        ejecutor: normalizarEjecutor(updatedTech.ejecutor),
         activo: !isInactive
       };
 
@@ -4343,6 +4372,7 @@ export default function GestionMantenimientoPage() {
 
       if (error) {
         console.error('Error actualizando técnico en Supabase:', error);
+        alert(`No se guardó el técnico en la base de datos: ${error.message}`);
       }
     } catch (err) {
       console.warn('Error actualizando técnico en Supabase:', err);
@@ -5585,7 +5615,7 @@ export default function GestionMantenimientoPage() {
         return {
           '#': t.id,
           'Código': t.code || `PMP-${String(t.id).padStart(4, '0')}`,
-          'Nomenclatura': computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes, t.nomenclatura || t.code, t.frecuencia),
+          'Nomenclatura': computeNomenclatura(t.planta, t.tipoIntervencion, t.durationMinutes, t.nomenclatura || t.code, t.frecuencia, t.ejecutor),
           'Mantenimiento / Tarea': t.title,
           'Detalle / Instrucciones': t.detalle || '',
           'Planta / Especialidad': plantasLabel || t.planta,
@@ -5935,12 +5965,76 @@ export default function GestionMantenimientoPage() {
     return technicians.find(t => t.id === activeTechId) || null;
   }, [technicians, activeTechId, techDelUsuario]);
 
-  const portalTechTasks = useMemo(() => {
-    if (!currentPortalTech) return [];
-    return tasks.filter(t => t.idtecs === currentPortalTech.id && t.activo !== false);
-  }, [tasks, currentPortalTech]);
   // Planes activos (los inactivos no salen en el Planificador)
   const tasksActivas = useMemo(() => tasks.filter(t => t.activo !== false), [tasks]);
+
+  // Planificador / Mis Tareas / Total Tareas: UNA TARJETA POR CADA ORDEN PREV ABIERTA (se ven todas las acumuladas),
+  // con el técnico que le asignó el generador. Un plan sin orden abierta sale como su próximo ciclo con el técnico
+  // que le tocaría por las mismas reglas (en Mis Tareas se conserva su última orden completada).
+  const tareasConOrdenes = useMemo(() => {
+    const porPlan = new Map<number, any[]>();
+    ordenesPlanAbiertas.forEach(o => {
+      const l = porPlan.get(o.id_plan_preventivo) || [];
+      l.push(o);
+      porPlan.set(o.id_plan_preventivo, l);
+    });
+    const planificador: MaintenanceTask[] = [];
+    const misTareas: MaintenanceTask[] = [];
+    tasksActivas.forEach(t => {
+      const abiertas = porPlan.get(t.id) || [];
+      if (abiertas.length) {
+        abiertas.forEach(o => {
+          const sep = separarNotaSistema(o);
+          const tarjeta: MaintenanceTask = {
+            ...t,
+            ordenId: o.id,
+            codigoOT: o.codigo || null,
+            idtecs: o.id_tecnico || 9999,
+            status: o.estado || 'Pendiente',
+            observations: sep.obs,
+            notaSistema: sep.nota,
+            fechaApertura: o.fecha_apertura || o.fecha_programada || null,
+            fechaCierre: o.fecha_cierre || null,
+            fotos: Array.isArray(o.fotos_despues) ? o.fotos_despues : [],
+            tiempoEjecucionMin: o.tiempo_ejecucion_min ?? null,
+            planta: o.planta || t.planta,
+            isDue: true,
+            errors: t.errors.filter(e => e !== 'frecuencia_insuficiente'),
+          };
+          planificador.push(tarjeta);
+          misTareas.push(tarjeta);
+        });
+      } else {
+        misTareas.push(t);
+        planificador.push(t.ordenId || t.status === 'Completado'
+          ? { ...t, ordenId: null, codigoOT: null, status: 'Pendiente', observations: '', notaSistema: null, fechaApertura: null, fechaCierre: null, fotos: [], tiempoEjecucionMin: null, idtecs: t.idtecsSugerido ?? t.idtecs }
+          : t);
+      }
+    });
+    return { planificador, misTareas };
+  }, [tasksActivas, ordenesPlanAbiertas]);
+
+  // Reasignar desde el Planificador: si la tarjeta es una orden, se cambia el técnico DE ESA ORDEN (no se crea otra)
+  const handleReasignarTarea = async (task: MaintenanceTask, techId: number) => {
+    if (!task.ordenId) { handleAssignTask(task.id, techId); return; }
+    const tech = technicians.find(t => t.id === techId);
+    const idTec = techId === 9999 || !tech ? null : techId;
+    const nombre = idTec && tech ? tech.name : 'Sin asignar';
+    setOrdenesPlanAbiertas(prev => prev.map(o => o.id === task.ordenId ? { ...o, id_tecnico: idTec, tecnico_nombre: nombre } : o));
+    const { error } = await supabase.from('mantenimiento_ordenes').update({ id_tecnico: idTec, tecnico_nombre: nombre }).eq('id', task.ordenId);
+    if (error) {
+      alert(`No se reasignó la orden ${task.codigoOT || ''}: ${error.message}`);
+      cargarOrdenesPlanAbiertas();
+      return;
+    }
+    fetchHistoryRecords(true);
+  };
+
+  // Mis Tareas: las órdenes abiertas del técnico (todas) + sus planes sin orden abierta
+  const portalTechTasks = useMemo(() => {
+    if (!currentPortalTech) return [];
+    return tareasConOrdenes.misTareas.filter(t => t.idtecs === currentPortalTech.id);
+  }, [tareasConOrdenes, currentPortalTech]);
 
   const portalTechCorrectivos = useMemo(() => {
     if (!currentPortalTech) return [];
@@ -6258,6 +6352,7 @@ export default function GestionMantenimientoPage() {
   const subNavItems: { id: TabType; label: string; icon: React.ReactNode }[] = ([
     { id: 'planificador', label: 'Planificador', icon: <Layers size={14} /> },
     { id: 'tecnico', label: 'Mis Tareas', icon: <User size={14} /> },
+    { id: 'total_tareas', label: 'Total Tareas', icon: <Users size={14} /> },
     { id: 'preventivo', label: 'Preventivo (PMP)', icon: <FileSpreadsheet size={14} /> },
     { id: 'historial', label: 'Órdenes de Trabajo', icon: <History size={14} /> },
     { id: 'indicadores', label: 'Indicadores', icon: <BarChart3 size={14} /> },
@@ -6342,7 +6437,7 @@ export default function GestionMantenimientoPage() {
 
       {/* Main Content Area: el Header ya deja su espacio (48); aquí se suman el nivel 2 (40) y, en el planificador, el nivel 3 (40) */}
       <main className={`relative z-10 max-w-[1700px] w-full mx-auto px-2 sm:px-4 lg:px-6 flex-1 flex flex-col gap-1.5 transition-all duration-300 ${
-        activeTab === 'planificador' && isSubHeaderOpen ? 'pt-[88px]' : 'pt-[48px]'
+        (activeTab === 'planificador' && isSubHeaderOpen) || activeTab === 'total_tareas' ? 'pt-[88px]' : 'pt-[48px]'
       }`}>
 
         {/* ========================================================================= */}
@@ -6352,10 +6447,10 @@ export default function GestionMantenimientoPage() {
           <div className="flex flex-col gap-2 animate-in fade-in duration-300">
             <PlannerTecnicosColumnas
               technicians={technicians}
-              tasks={tasksActivas}
+              tasks={tareasConOrdenes.planificador}
               correctiveRecords={correctiveRecords}
               isSubHeaderOpen={isSubHeaderOpen}
-              onUpdateTaskTech={(taskId, newTechId) => handleAssignTask(taskId, newTechId)}
+              onUpdateTaskTech={(task, newTechId) => handleReasignarTarea(task as unknown as MaintenanceTask, newTechId)}
               onUpdateCorrectivoTech={(corrId, newTechName, newTechId) => handleAssignTechToCorrectivo(corrId, newTechName, newTechId)}
               onRefreshData={() => fetchData(true)}
               syncing={syncing}
@@ -6370,6 +6465,26 @@ export default function GestionMantenimientoPage() {
               onSaveCorrectivo={handleSaveCorrectivoFromPlanner}
               onOpenCorrectivoDetail={(corr) => handleOpenCorrectivoDetail(corr as unknown as CorrectiveRecord)}
               onOpenPreventivoDetail={(task) => handleOpenPreventivoExecution(task as unknown as MaintenanceTask)}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW 1b: TOTAL TAREAS = el mismo Planificador en modo solo consulta (para los técnicos) */}
+        {/* ========================================================================= */}
+        {activeTab === 'total_tareas' && (
+          <div className="flex flex-col gap-2 animate-in fade-in duration-300">
+            <PlannerTecnicosColumnas
+              technicians={technicians}
+              tasks={tareasConOrdenes.planificador}
+              correctiveRecords={correctiveRecords}
+              isSubHeaderOpen={true}
+              soloLectura
+              onUpdateTaskTech={() => {}}
+              onUpdateCorrectivoTech={() => {}}
+              syncing={syncing}
+              onOpenCorrectivoDetail={(corr) => { handleOpenCorrectivoDetail(corr as unknown as CorrectiveRecord); setDetalleSoloLectura(true); }}
+              onOpenPreventivoDetail={(task) => { handleOpenPreventivoExecution(task as unknown as MaintenanceTask); setDetalleSoloLectura(true); }}
             />
           </div>
         )}
@@ -7269,7 +7384,7 @@ export default function GestionMantenimientoPage() {
                             {/* Nomenclatura Estándar ([S...]) */}
                             <td className="py-2 px-1.5 font-bold text-[#324354] overflow-hidden">
                               <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-800 rounded font-mono text-[10px] group-hover:bg-white group-hover:border-slate-300 transition-colors block truncate" title={task.nomenclatura}>
-                                {computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes, task.nomenclatura || task.code, task.frecuencia)}
+                                {computeNomenclatura(task.planta, task.tipoIntervencion, task.durationMinutes, task.nomenclatura || task.code, task.frecuencia, task.ejecutor)}
                               </span>
                             </td>
 
@@ -8566,31 +8681,36 @@ export default function GestionMantenimientoPage() {
                     Estructura Maestra de Nomenclatura
                   </span>
                   <span className="text-[11px] text-gray-300 font-mono">
-                    [ Periodicidad + Planta + Tipo Intervención + Tiempo ]
+                    [ Periodicidad + Ejecutor + Planta + Tipo Intervención + Tiempo ]
                   </span>
                 </div>
 
                 <div className="flex items-center justify-center py-2">
                   <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 font-mono font-black text-2xl sm:text-3xl tracking-widest text-center">
-                    <span className="text-amber-300">D01</span>
+                    <span className="text-amber-300">S01</span>
+                    <span className="text-violet-300">OP</span>
                     <span className="text-sky-300">MS</span>
-                    <span className="text-rose-300">NP</span>
+                    <span className="text-rose-300">PR</span>
                     <span className="text-emerald-300">T30</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs pt-2 border-t border-white/15">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs pt-2 border-t border-white/15">
                   <div>
-                    <span className="font-bold text-amber-300 block font-mono">D01</span>
-                    <span className="text-gray-300 text-[11px]">Periodicidad (Diario)</span>
+                    <span className="font-bold text-amber-300 block font-mono">S01</span>
+                    <span className="text-gray-300 text-[11px]">Periodicidad (Semanal)</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-violet-300 block font-mono">OP</span>
+                    <span className="text-gray-300 text-[11px]">Ejecutor (Producción)</span>
                   </div>
                   <div>
                     <span className="font-bold text-sky-300 block font-mono">MS</span>
                     <span className="text-gray-300 text-[11px]">Planta (Mármol Sint.)</span>
                   </div>
                   <div>
-                    <span className="font-bold text-rose-300 block font-mono">NP</span>
-                    <span className="text-gray-300 text-[11px]">Intervención (Paro)</span>
+                    <span className="font-bold text-rose-300 block font-mono">PR</span>
+                    <span className="text-gray-300 text-[11px]">Intervención (Producción)</span>
                   </div>
                   <div>
                     <span className="font-bold text-emerald-300 block font-mono">T30</span>
@@ -8599,8 +8719,8 @@ export default function GestionMantenimientoPage() {
                 </div>
               </div>
 
-              {/* Grid 4 Columnas / Tablas de Consulta Rápida */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Grid 5 Columnas / Tablas de Consulta Rápida */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
                 
                 {/* 1. Periodicidad */}
                 <div className="p-4 bg-[#F6F3EE] rounded-2xl border border-gray-200/80 flex flex-col gap-2.5">
@@ -8609,16 +8729,17 @@ export default function GestionMantenimientoPage() {
                     <span>Periodicidad</span>
                   </h4>
                   <div className="flex flex-col gap-1.5 text-xs">
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">D01:</strong> <span className="text-gray-600">Diario</span></div>
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">D02:</strong> <span className="text-gray-600">Cada 2 días</span></div>
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">D03:</strong> <span className="text-gray-600">Cada 3 días</span></div>
-                    <div className="text-[10px] text-gray-400 text-center py-0.5">···</div>
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S01:</strong> <span className="text-gray-600">Semanal (7d)</span></div>
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S02:</strong> <span className="text-gray-600">Cada 2 semanas</span></div>
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S04:</strong> <span className="text-gray-600">Mensual (4 sem)</span></div>
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S26:</strong> <span className="text-gray-600">Cada 24/26 sem</span></div>
-                    <div className="text-[10px] text-gray-400 text-center py-0.5">···</div>
-                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">A01:</strong> <span className="text-gray-600">Anual</span></div>
+                    <p className="text-[11px] text-gray-500 italic">Días ÷ 7 = semanas; 52 semanas = 1 año.</p>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">D01 – D06:</strong> <span className="text-gray-600">Cada 1 a 6 días</span></div>
+                    <div className="text-[10px] text-gray-500 text-right -mt-1">D07 no existe → es S01</div>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S01:</strong> <span className="text-gray-600">Semanal (7 días)</span></div>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S02:</strong> <span className="text-gray-600">Cada 2 semanas (14 días)</span></div>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S04:</strong> <span className="text-gray-600">Mensual (≈30 días)</span></div>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S13:</strong> <span className="text-gray-600">Trimestral (≈90 días)</span></div>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S26:</strong> <span className="text-gray-600">Semestral (≈180 días)</span></div>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">S01 – S51:</strong> <span className="text-gray-600">Cada 1 a 51 semanas</span></div>
+                    <div className="text-[10px] text-gray-500 text-right -mt-1">S52 no existe → es A01</div>
+                    <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">A01:</strong> <span className="text-gray-600">Anual (360 días o más)</span></div>
                     <div className="flex justify-between py-0.5"><strong className="font-mono text-[#324354]">A02:</strong> <span className="text-gray-600">Cada 2 años</span></div>
                   </div>
                 </div>
@@ -8670,6 +8791,27 @@ export default function GestionMantenimientoPage() {
                       <strong className="font-mono text-sky-800 text-[11px]">CEDI:</strong>
                       <span className="text-gray-700 text-[11px] text-right">Logística</span>
                     </div>
+                  </div>
+                </div>
+
+                {/* 5. Ejecutor (va en el código justo después de la periodicidad) */}
+                <div className="p-4 bg-[#F6F3EE] rounded-2xl border border-gray-200/80 flex flex-col gap-2.5">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[#324354] flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                    <Users className="w-3.5 h-3.5 text-[#7B8E90]" />
+                    <span>Ejecutor</span>
+                  </h4>
+                  <p className="text-[11px] text-gray-500 italic">
+                    Quién realiza el mantenimiento (va después de la periodicidad):
+                  </p>
+                  <div className="flex flex-col gap-2 text-xs">
+                    {EJECUTORES.map(e => (
+                      <div key={e.codigo} className="p-2.5 bg-white rounded-xl border border-gray-200/80">
+                        <strong className="font-mono text-violet-800">{e.codigo}</strong>
+                        <span className="block text-gray-700 font-semibold">{e.nombre}</span>
+                        <span className="block text-[11px] text-gray-500">{e.detalle}</span>
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-gray-500">Ej.: <span className="font-mono font-bold text-[#324354]">S01MTMSPRT30</span> · <span className="font-mono font-bold text-[#324354]">S01OPMSPRT30</span></p>
                   </div>
                 </div>
 
@@ -9406,6 +9548,18 @@ export default function GestionMantenimientoPage() {
                 </select>
               </div>
 
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Ejecutor</label>
+                  <select
+                    value={newTechForm.ejecutor}
+                    onChange={(e) => setNewTechForm(prev => ({ ...prev, ejecutor: e.target.value as Ejecutor }))}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none"
+                    title="MT: lo hacen los técnicos de mantenimiento · OP: lo hace producción"
+                  >
+                    {EJECUTORES.map(e => <option key={e.codigo} value={e.codigo}>{e.nombre} ({e.codigo})</option>)}
+                  </select>
+                </div>
+
               {/* Multiple selection for Plantas / Especialidades */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -9669,7 +9823,19 @@ export default function GestionMantenimientoPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Ejecutor</label>
+                  <select
+                    value={normalizarEjecutor(editingTech.ejecutor)}
+                    onChange={(e) => setEditingTech(prev => prev ? { ...prev, ejecutor: e.target.value as Ejecutor } : null)}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none"
+                    title="MT: lo hacen los técnicos de mantenimiento · OP: lo hace producción"
+                  >
+                    {EJECUTORES.map(e => <option key={e.codigo} value={e.codigo}>{e.nombre} ({e.codigo})</option>)}
+                  </select>
+                </div>
                 <div>
                   <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Turno</label>
                   <select
@@ -9868,7 +10034,7 @@ export default function GestionMantenimientoPage() {
                   <div className="flex flex-col text-right">
                     <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Nomenclatura Estándar</span>
                     <span className="text-xs font-mono font-bold text-slate-800 px-2 py-0.5 bg-white border border-slate-300 rounded mt-0.5">
-                      {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia)}
+                      {computeNomenclatura(newTaskForm.planta, newTaskForm.intervencion, newTaskForm.durationMinutes, null, newTaskForm.frecuencia, newTaskForm.ejecutor)}
                     </span>
                   </div>
                 </div>
@@ -10018,6 +10184,18 @@ export default function GestionMantenimientoPage() {
                   </select>
                 </div>
               </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Ejecutor</label>
+                  <select
+                    value={newTaskForm.ejecutor}
+                    onChange={(e) => setNewTaskForm(prev => ({ ...prev, ejecutor: e.target.value as Ejecutor }))}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none"
+                    title="MT: lo hacen los técnicos de mantenimiento · OP: lo hace producción"
+                  >
+                    {EJECUTORES.map(e => <option key={e.codigo} value={e.codigo}>{e.nombre} ({e.codigo})</option>)}
+                  </select>
+                </div>
 
               <div>
                 <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Frecuencia Estándar (Días)</label>
@@ -10225,6 +10403,19 @@ export default function GestionMantenimientoPage() {
                   </select>
                 </div>
               </div>
+
+
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase block mb-1">Ejecutor</label>
+                  <select
+                    value={normalizarEjecutor(editingTask.ejecutor)}
+                    onChange={(e) => setEditingTask(prev => prev ? { ...prev, ejecutor: e.target.value as Ejecutor } : null)}
+                    className="w-full px-3 py-2 bg-[#F6F3EE] rounded-xl border border-gray-300 text-sm font-semibold text-[#324354] focus:outline-none"
+                    title="MT: lo hacen los técnicos de mantenimiento · OP: lo hace producción"
+                  >
+                    {EJECUTORES.map(e => <option key={e.codigo} value={e.codigo}>{e.nombre} ({e.codigo})</option>)}
+                  </select>
+                </div>
 
               {/* Estado del plan: Inactivo = no se vuelven a generar órdenes de este mantenimiento */}
               <div>
@@ -11040,7 +11231,7 @@ export default function GestionMantenimientoPage() {
       {/* Modal: View & Edit Correctivo Details (Detalle / Ficha de Mantenimiento Correctivo) */}
       {viewingCorrectivo && editingCorrectivoForm && (
         <div
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-20 pb-8 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in"
+          className="fixed inset-0 z-[10000] flex items-stretch justify-center p-2 sm:p-3 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget && !savingCorrectivoModal) {
               setViewingCorrectivo(null);
@@ -11049,12 +11240,12 @@ export default function GestionMantenimientoPage() {
           }}
         >
           <div
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[88vh] overflow-y-auto flex flex-col gap-5 relative my-auto"
+            className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 w-full max-w-[1800px] h-full shadow-2xl border border-[#e2ded5] overflow-y-auto flex flex-col gap-4 sm:gap-5 relative lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-6 lg:gap-y-5 lg:content-start"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4">
+            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4 lg:col-span-2">
               <div className="flex flex-col gap-1.5 pr-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`px-2.5 py-1 font-mono font-bold rounded-lg text-xs border ${
@@ -11145,8 +11336,9 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Editable Form Section */}
-            <form onSubmit={handleSaveCorrectivoModal} className="flex flex-col gap-4">
-              <div className="border-t border-[#e2ded5] pt-4">
+            <form onSubmit={handleSaveCorrectivoModal} className="flex flex-col gap-4 min-w-0">
+              <fieldset disabled={detalleSoloLectura} className="contents">
+              <div className="border-t border-[#e2ded5] pt-4 lg:border-t-0 lg:pt-0">
                 <h4 className="text-xs font-black text-[#324354] uppercase tracking-wider mb-3 flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-[#7B8E90]" />
                   <span>Gestión y Planificación de Cierre</span>
@@ -11420,8 +11612,15 @@ export default function GestionMantenimientoPage() {
                 </div>
               )}
 
+              </fieldset>
+
               {/* Actions Footer */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#e2ded5]">
+                {detalleSoloLectura && (
+                  <span className="mr-auto flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-500">
+                    <Eye className="w-4 h-4" /> Solo consulta (Total Tareas)
+                  </span>
+                )}
                 <button
                   type="button"
                   disabled={savingCorrectivoModal}
@@ -11431,9 +11630,9 @@ export default function GestionMantenimientoPage() {
                   }}
                   className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all disabled:opacity-50"
                 >
-                  Cancelar
+                  {detalleSoloLectura ? 'Cerrar' : 'Cancelar'}
                 </button>
-                <button
+                {!detalleSoloLectura && <button
                   type="submit"
                   disabled={savingCorrectivoModal}
                   className="flex items-center gap-2 px-6 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-md disabled:opacity-50"
@@ -11449,7 +11648,7 @@ export default function GestionMantenimientoPage() {
                       <span>Guardar Cambios</span>
                     </>
                   )}
-                </button>
+                </button>}
               </div>
             </form>
           </div>
@@ -11477,7 +11676,7 @@ export default function GestionMantenimientoPage() {
       {/* Modal: Ejecución y Cierre de Mantenimiento Preventivo (PMP) */}
       {executingPreventivo && executingPreventivoForm && (
         <div
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-20 pb-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in"
+          className="fixed inset-0 z-[10000] flex items-stretch justify-center p-2 sm:p-3 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget && !savingPreventivoModal) {
               setExecutingPreventivo(null);
@@ -11486,12 +11685,12 @@ export default function GestionMantenimientoPage() {
           }}
         >
           <div
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-[#e2ded5] max-h-[88vh] overflow-y-auto flex flex-col gap-5 relative my-auto"
+            className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 w-full max-w-[1800px] h-full shadow-2xl border border-[#e2ded5] overflow-y-auto flex flex-col gap-4 sm:gap-5 relative lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-6 lg:gap-y-5 lg:content-start"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4">
+            <div className="flex items-start justify-between border-b border-[#e2ded5] pb-4 lg:col-span-2">
               <div className="flex flex-col gap-1 pr-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Primero el código único de la orden (PREV-xxxx); después el del plan (PMP) */}
@@ -11545,14 +11744,15 @@ export default function GestionMantenimientoPage() {
                 <FileText className="w-4 h-4 text-[#7B8E90]" />
                 <span>Procedimiento Técnico e Instrucciones de Mantenimiento</span>
               </h4>
-              <div className="text-xs sm:text-sm text-gray-800 bg-white p-3.5 rounded-xl border border-gray-200/80 leading-relaxed font-normal shadow-2xs">
+              <div className="text-xs sm:text-sm text-gray-800 bg-white p-3.5 rounded-xl border border-gray-200/80 leading-relaxed font-normal shadow-2xs whitespace-pre-wrap">
                 {executingPreventivo.detalle || 'Realizar inspección preventiva, limpieza, lubricación y comprobación de parámetros operativos de acuerdo con el estándar de la máquina.'}
               </div>
             </div>
 
             {/* Execution Form */}
-            <form onSubmit={handleSavePreventivoExecution} className="flex flex-col gap-4">
-              <div className="border-t border-[#e2ded5] pt-4">
+            <form onSubmit={handleSavePreventivoExecution} className="flex flex-col gap-4 min-w-0">
+              <fieldset disabled={detalleSoloLectura} className="contents">
+              <div className="border-t border-[#e2ded5] pt-4 lg:border-t-0 lg:pt-0">
                 <h4 className="text-xs font-black text-[#324354] uppercase tracking-wider mb-3 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   <span>Reporte de Ejecución y Cierre</span>
@@ -11660,6 +11860,12 @@ export default function GestionMantenimientoPage() {
                     <FileText className="w-3.5 h-3.5 text-[#324354]" />
                     <span>Observaciones de Ejecución / Diagnóstico Técnico</span>
                   </label>
+                  {executingPreventivo.notaSistema && (
+                    <div className="mb-2 flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 border border-gray-200 text-[11px] sm:text-xs text-gray-500" title="Nota del sistema: no se puede editar">
+                      <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span className="whitespace-pre-wrap">{executingPreventivo.notaSistema}</span>
+                    </div>
+                  )}
                   <textarea
                     rows={3}
                     value={executingPreventivoForm.observations}
@@ -11755,8 +11961,15 @@ export default function GestionMantenimientoPage() {
                 </div>
               )}
 
+              </fieldset>
+
               {/* Actions Footer */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#e2ded5]">
+                {detalleSoloLectura && (
+                  <span className="mr-auto flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-500">
+                    <Eye className="w-4 h-4" /> Solo consulta (Total Tareas)
+                  </span>
+                )}
                 <button
                   type="button"
                   disabled={savingPreventivoModal}
@@ -11766,9 +11979,9 @@ export default function GestionMantenimientoPage() {
                   }}
                   className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all disabled:opacity-50"
                 >
-                  Cancelar
+                  {detalleSoloLectura ? 'Cerrar' : 'Cancelar'}
                 </button>
-                <button
+                {!detalleSoloLectura && <button
                   type="submit"
                   disabled={savingPreventivoModal}
                   className="flex items-center gap-2 px-6 py-2.5 bg-[#324354] hover:bg-[#324354]/90 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-md disabled:opacity-50"
@@ -11784,7 +11997,7 @@ export default function GestionMantenimientoPage() {
                       <span>Guardar y Cerrar</span>
                     </>
                   )}
-                </button>
+                </button>}
               </div>
             </form>
           </div>
@@ -11813,20 +12026,20 @@ export default function GestionMantenimientoPage() {
         >
           {/* Casi a pantalla completa (margen pequeño); en pantallas anchas, 2 columnas con scroll propio */}
           <div
-            className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 w-full max-w-[1800px] h-full shadow-2xl border border-[#e2ded5] flex flex-col gap-3 sm:gap-4 relative overflow-hidden"
+            className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 w-full max-w-[1800px] h-full shadow-2xl border border-[#e2ded5] flex flex-col gap-3 sm:gap-4 relative overflow-y-auto lg:overflow-hidden"
             onMouseDown={(e) => e.stopPropagation()}
             onMouseUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with Title, Code, Nomenclature & Active Status Toggle */}
             <div className="flex items-start justify-between border-b border-[#e2ded5] pb-3 shrink-0">
-              <div className="flex flex-col gap-1 pr-4">
-                <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-col gap-1 pr-2 sm:pr-4 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap [&>*]:text-[11px] sm:[&>*]:text-xs">
                   <span className="px-2.5 py-1 bg-amber-50 font-mono font-bold text-amber-900 rounded-lg text-xs border border-amber-200" title="Código Único PMP">
                     {viewingTask.code || `PMP-${String(viewingTask.id).padStart(4, '0')}`}
                   </span>
                   <span className="px-2.5 py-1 bg-slate-100 font-mono font-bold text-slate-800 rounded-lg text-xs border border-slate-200" title="Nomenclatura Estándar">
-                    {computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes, viewingTask.nomenclatura || viewingTask.code, viewingTask.frecuencia)}
+                    {computeNomenclatura(viewingTask.planta, viewingTask.tipoIntervencion, viewingTask.durationMinutes, viewingTask.nomenclatura || viewingTask.code, viewingTask.frecuencia, viewingTask.ejecutor)}
                   </span>
                   <span className="px-2.5 py-1 bg-[#F6F3EE] rounded-lg border border-[#e2ded5] text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                     <span className="font-bold text-[#324354]">{obtenerCodigoPlanta(viewingTask.planta)}</span>
@@ -11855,7 +12068,7 @@ export default function GestionMantenimientoPage() {
                     </span>
                   )}
                 </div>
-                <h3 className="text-lg sm:text-xl font-black text-[#324354] leading-snug mt-1">
+                <h3 className="text-base sm:text-xl font-black text-[#324354] leading-snug mt-1 break-words">
                   {viewingTask.title}
                 </h3>
               </div>
@@ -11870,7 +12083,7 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Scrollable Body Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:overflow-hidden lg:pr-0">
+            <div className="flex flex-col gap-4 lg:flex-1 lg:min-h-0 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:overflow-hidden">
               {/* Technical Instructions Box (columna izquierda en pantallas anchas) */}
               <div className="bg-[#F6F3EE] p-4 sm:p-5 rounded-2xl border border-[#e2ded5] flex flex-col gap-2.5 lg:min-h-0 lg:overflow-y-auto">
                 <h4 className="text-xs font-bold text-[#324354] uppercase tracking-wider flex items-center gap-1.5">
@@ -12043,7 +12256,7 @@ export default function GestionMantenimientoPage() {
                               onClick={() => {
                                 handleOpenHistoryRowDetail({ ...ord, codigoDisplay, category, 'TECNICO': tecnicoNombre, 'ESTADO': estado });
                               }}
-                              className="p-3 bg-white hover:bg-amber-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                              className="p-3 bg-white hover:bg-amber-50/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 cursor-pointer group"
                               title="Haz clic para ver la orden completa"
                             >
                               <div className="flex items-center gap-3 min-w-0">
@@ -12055,14 +12268,14 @@ export default function GestionMantenimientoPage() {
                                     {ord['Título'] || ord.titulo || viewingTask.title}
                                   </span>
                                   <div className="text-[11px] text-gray-500 flex items-center gap-2 flex-wrap">
-                                    <span>📅 Creada: <strong>{fechaCreada}</strong></span>
+                                    <span>📅 Creada: <strong>{formatFechaDDMMAAAA(fechaCreada) || fechaCreada}</strong></span>
                                     <span>👤 Técnico: <strong>{tecnicoNombre}</strong></span>
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              <div className="flex items-center justify-between sm:justify-start gap-2 shrink-0">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${
                                   isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                                   isAtrasada ? 'bg-rose-50 text-rose-700 border-rose-200' :
                                   isIncomplete ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -12108,8 +12321,8 @@ export default function GestionMantenimientoPage() {
             </div>
 
             {/* Modal Actions - Fixed at Bottom */}
-            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
-              <div className="flex items-center gap-2 flex-wrap">
+            <div className="shrink-0 pt-3 border-t border-[#e2ded5] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sticky bottom-0 bg-white -mb-4 pb-4 sm:-mb-5 sm:pb-5 lg:static lg:m-0 lg:pb-0 z-10">
+              <div className="grid grid-cols-2 sm:flex items-center gap-2 [&>button]:justify-center">
                 <button
                   type="button"
                   disabled={forcingTaskId === viewingTask.id}
@@ -12141,7 +12354,7 @@ export default function GestionMantenimientoPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="grid grid-cols-2 sm:flex items-center gap-2 [&>button]:justify-center">
                 <button
                   type="button"
                   onClick={() => setViewingTask(null)}
@@ -12440,7 +12653,7 @@ export default function GestionMantenimientoPage() {
       {/* Modal: Ficha Técnica de Máquinas y Equipos (consulta y edición en la misma ventana) */}
       {selectedMachineModal && (
         <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-[9998] flex items-stretch justify-center p-2 sm:p-3 bg-black/60 backdrop-blur-sm animate-in fade-in"
           onMouseDown={(e) => {
             // En modo edición el clic en el fondo no cierra, para no perder cambios
             if (e.target === e.currentTarget && !editandoFicha) {
@@ -12449,7 +12662,7 @@ export default function GestionMantenimientoPage() {
           }}
         >
           <div
-            className={`bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] shadow-2xl border flex flex-col overflow-hidden relative animate-in zoom-in-95 duration-200 ${
+            className={`bg-white rounded-2xl sm:rounded-3xl max-w-[1800px] w-full h-full shadow-2xl border flex flex-col overflow-hidden relative animate-in zoom-in-95 duration-200 ${
               editandoFicha ? 'border-2 border-amber-500 ring-4 ring-amber-100' : 'border-[#e2ded5]'
             }`}
             onMouseDown={(e) => e.stopPropagation()}

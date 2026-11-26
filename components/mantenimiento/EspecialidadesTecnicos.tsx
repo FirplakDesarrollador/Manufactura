@@ -9,14 +9,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Wrench } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { obtenerCodigoPlanta, type NomenclaturaPlanta } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, normalizarEjecutor, EJECUTORES, type Ejecutor, type NomenclaturaPlanta } from '@/lib/nomenclaturaPlantas';
 import { PLANTAS_OCULTAS_SP } from '@/lib/sistema-produccion/cumplimiento';
 
 // Plantas que no salen aquí: las ocultas del Sistema de Producción, menos Proveedor Externo (EX) y Obras Civiles (OC),
 // que sí son especialidades de mantenimiento
 const OCULTAS = PLANTAS_OCULTAS_SP.filter(c => c !== 'EX' && c !== 'OC');
 
-type Tecnico = { id: number; name: string; turno?: string; especialidad?: string; planta?: string };
+type Tecnico = { id: number; name: string; turno?: string; especialidad?: string; planta?: string; ejecutor?: string };
 
 export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUpdated }: {
   technicians: Tecnico[]; plantas: NomenclaturaPlanta[]; onTechsUpdated?: () => void;
@@ -26,6 +26,30 @@ export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUp
   const [local, setLocal] = useState<Record<number, string[]>>({});
   const recarga = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (recarga.current) clearTimeout(recarga.current); }, []);
+  // Ejecutor cambiado aquí (MT técnico de mantenimiento / OP operativo-producción)
+  const [ejecutorLocal, setEjecutorLocal] = useState<Record<number, Ejecutor>>({});
+  const ejecutorDe = (t: Tecnico): Ejecutor => ejecutorLocal[t.id] ?? normalizarEjecutor(t.ejecutor);
+  const programarRecarga = () => {
+    // El Gestor se recarga una sola vez, 3 s después del último cambio (recargarlo en cada clic es lento)
+    if (recarga.current) clearTimeout(recarga.current);
+    recarga.current = setTimeout(() => onTechsUpdated?.(), 3000);
+  };
+
+  const cambiarEjecutor = (t: Tecnico, nuevo: Ejecutor) => {
+    const antes = ejecutorDe(t);
+    if (antes === nuevo) return;
+    setError(null);
+    setEjecutorLocal(prev => ({ ...prev, [t.id]: nuevo }));
+    void (async () => {
+      const { error: e } = await supabase.from('mantenimiento_tecnicos').update({ ejecutor: nuevo }).eq('id', t.id);
+      if (e) {
+        setEjecutorLocal(prev => ({ ...prev, [t.id]: antes }));
+        setError(`No se guardó el ejecutor de ${t.name}: ${e.message}`);
+        return;
+      }
+      programarRecarga();
+    })();
+  };
 
   const principales = useMemo(() => plantas.filter(p => p.activo !== false && !OCULTAS.includes(p.codigo)), [plantas]);
   const codigosDe = (t: Tecnico): string[] => {
@@ -52,9 +76,7 @@ export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUp
         setError(`No se guardó la especialidad de ${t.name}: ${e.message}`);
         return;
       }
-      // El Gestor se recarga una sola vez, 3 s después del último cambio (recargarlo en cada clic es lento)
-      if (recarga.current) clearTimeout(recarga.current);
-      recarga.current = setTimeout(() => onTechsUpdated?.(), 3000);
+      programarRecarga();
     })();
   };
 
@@ -63,8 +85,8 @@ export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUp
       <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
         <Wrench className="w-5 h-5 text-[#324354] shrink-0" />
         <div>
-          <h2 className="text-base sm:text-lg font-black text-[#324354] leading-tight">Especialidad de los Técnicos (plantas)</h2>
-          <p className="text-[11px] text-slate-500">Toque una planta para marcarla o quitarla; cada técnico puede atender varias. El Planificador le asigna las tareas de esas plantas. Solo técnicos activos.</p>
+          <h2 className="text-base sm:text-lg font-black text-[#324354] leading-tight">Especialidad de los Técnicos (ejecutor y plantas)</h2>
+          <p className="text-[11px] text-slate-500">Ejecutor: <strong>MT</strong> recibe los planes de mantenimiento y <strong>OP</strong> los de producción (operativo). Toque una planta para marcarla o quitarla; cada técnico puede atender varias. El Planificador le asigna las tareas de esas plantas. Solo técnicos activos.</p>
         </div>
       </div>
 
@@ -85,6 +107,18 @@ export default function EspecialidadesTecnicos({ technicians, plantas, onTechsUp
                 <span className="text-xs font-black text-[#324354] truncate block" title={t.name}>{t.name}</span>
               </div>
               <div className="flex flex-wrap items-center gap-1">
+                {/* Ejecutor: uno solo (MT u OP), separado de las plantas */}
+                <div className="inline-flex items-center -space-x-px mr-2" role="group" aria-label={`Ejecutor de ${t.name}`}>
+                  {EJECUTORES.map((e, i) => {
+                    const on = ejecutorDe(t) === e.codigo;
+                    return (
+                      <button key={e.codigo} type="button" onClick={() => cambiarEjecutor(t, e.codigo)} title={`${e.nombre}: ${e.detalle}`}
+                        className={`h-6 px-2.5 border text-[10px] font-bold ${i === 0 ? 'rounded-l-md' : 'rounded-r-md'} ${on ? 'bg-violet-700 border-violet-700 text-white relative z-10' : 'bg-white border-slate-200 text-slate-500 hover:border-violet-700 hover:text-violet-700'}`}>
+                        {e.codigo}
+                      </button>
+                    );
+                  })}
+                </div>
                 {principales.map(p => {
                   const on = suyas.includes(p.codigo);
                   return (
