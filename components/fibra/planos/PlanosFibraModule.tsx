@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, BarChart3, ChevronDown, ExternalLink, FileText, History, Loader2, Plus, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, BarChart3, ChevronDown, ExternalLink, FileText, History, Image as ImageIcon, Loader2, Plus, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react'
 import {
     PROCESOS_PLANO, Plano, ProcesoPlano, baneraDeArchivo, cargarBanerasFv, cargarPlanos, mismaBanera, modeloBanera, nombreProceso, nombreVisible,
-    hashArchivo, planoRepetido, puedeEditarPlanos, quitarPlano, subirPlano, tituloModelo, urlPlano
+    aceptaFotos, esFoto, esPdf, rutaEsImagen, hashArchivo, planoRepetido, puedeEditarPlanos, quitarPlano, subirPlano, tituloModelo, urlPlano
 } from '@/lib/fibra-planos'
 import IndicadoresPlanos from './IndicadoresPlanos'
 
@@ -108,13 +108,16 @@ export default function PlanosFibraModule({ userEmail }: { userEmail: string }) 
     // Celda de una bañera en un proceso: un PDF se abre directo; varios (o las acciones de edición) van en una lista
     const celda = (titulo: string, col: ProcesoPlano, lista: Plano[]) => {
         const abrirMenu = (e: React.MouseEvent<HTMLElement>) => setMenu({ titulo, proceso: col, lista, rect: e.currentTarget.getBoundingClientRect() })
+        // En Fotos ensamble la celda dice FOTO y lleva el icono de imagen
+        const fotos = aceptaFotos(col)
+        const Icono = fotos ? ImageIcon : FileText
         return (
             <td key={col} className="px-1.5 py-1 border-b border-r border-[#e2ded5] text-center">
                 {lista.length === 1 ? (
                     <div className="inline-flex items-center">
                         <button type="button" onClick={() => verPdf(lista[0])} title={`${nombreVisible(lista[0].banera)} · cargado ${fecha(lista[0].created_at)}`}
                             className={`h-7 px-2 bg-white border border-[#324354]/25 text-[#324354] text-[11px] font-black flex items-center gap-1 hover:bg-[#324354] hover:text-white transition-colors ${editor ? 'rounded-l-lg' : 'rounded-lg'}`}>
-                            <FileText className="w-3.5 h-3.5" /> PDF
+                            <Icono className="w-3.5 h-3.5" /> {fotos && rutaEsImagen(lista[0].pdf_path) ? 'FOTO' : 'PDF'}
                         </button>
                         {editor && (
                             <button type="button" title="Opciones" onClick={abrirMenu}
@@ -124,7 +127,7 @@ export default function PlanosFibraModule({ userEmail }: { userEmail: string }) 
                 ) : lista.length > 1 ? (
                     <button type="button" onClick={abrirMenu}
                         className="h-7 px-2 rounded-lg bg-[#F6F3EE] border border-[#e2ded5] text-[#324354] text-[11px] font-black inline-flex items-center gap-1 hover:border-[#324354]">
-                        <FileText className="w-3.5 h-3.5" /> {lista.length} PDF <ChevronDown className="w-3 h-3" />
+                        <Icono className="w-3.5 h-3.5" /> {lista.length} {fotos ? 'FOTOS' : 'PDF'} <ChevronDown className="w-3 h-3" />
                     </button>
                 ) : editor ? (
                     <button type="button" onClick={() => setCargar({ proceso: col })} className="h-7 px-2 rounded-lg text-[11px] font-bold text-slate-300 hover:text-[#324354] hover:bg-slate-100 inline-flex items-center gap-0.5"><Plus className="w-3 h-3" /> Cargar</button>
@@ -297,8 +300,10 @@ function CargarPlanos({ inicial, baneras, vigente, vigentes, email, onCerrar, on
 
     const agregar = (files: FileList | null) => {
         if (!files?.length) return
-        const pdfs = [...files].filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
-        if (pdfs.length < files.length) setError('Solo se cargan archivos PDF; los demás se ignoraron.')
+        // Fotos ensamble también recibe fotos (JPG, PNG, WEBP); los demás procesos solo PDF
+        const conFotos = aceptaFotos(proceso)
+        const pdfs = [...files].filter(f => esPdf(f) || (conFotos && esFoto(f)))
+        if (pdfs.length < files.length) setError(conFotos ? 'Solo se cargan PDF o fotos (JPG, PNG, WEBP); los demás se ignoraron.' : 'Solo se cargan archivos PDF; los demás se ignoraron.')
         else setError(null)
         const nuevas: Carga[] = pdfs.map(f => ({ archivo: f, banera: inicial.banera || baneraDeArchivo(f.name) }))
         setCargas(c => (unaBanera ? nuevas.slice(0, 1) : [...c, ...nuevas]))
@@ -356,13 +361,15 @@ function CargarPlanos({ inicial, baneras, vigente, vigentes, email, onCerrar, on
                 </div>
 
                 <div>
-                    <input ref={input} type="file" accept="application/pdf,.pdf" multiple={!unaBanera} className="hidden" onChange={e => { agregar(e.target.files); e.target.value = '' }} />
+                    <input ref={input} type="file" accept={aceptaFotos(proceso) ? 'application/pdf,.pdf,image/jpeg,image/png,image/webp' : 'application/pdf,.pdf'} multiple={!unaBanera} className="hidden" onChange={e => { agregar(e.target.files); e.target.value = '' }} />
                     <button type="button" disabled={ocupado} onClick={() => input.current?.click()}
                         onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); agregar(e.dataTransfer.files) }}
                         className="w-full border-2 border-dashed border-slate-300 rounded-xl py-4 text-sm font-bold text-slate-500 hover:border-[#324354] hover:text-[#324354] flex flex-col items-center gap-1">
                         <Upload className="w-5 h-5" />
-                        {unaBanera ? 'Elegir el PDF del plano' : 'Elegir o arrastrar los PDF (uno por bañera)'}
-                        <span className="text-[10px] font-medium text-slate-400">Solo PDF, hasta 30 MB cada uno</span>
+                        {aceptaFotos(proceso)
+                            ? (unaBanera ? 'Elegir la foto o el PDF' : 'Elegir o arrastrar las fotos o PDF (uno por bañera)')
+                            : (unaBanera ? 'Elegir el PDF del plano' : 'Elegir o arrastrar los PDF (uno por bañera)')}
+                        <span className="text-[10px] font-medium text-slate-400">{aceptaFotos(proceso) ? 'Fotos JPG, PNG o WEBP, o PDF' : 'Solo PDF'}, hasta 30 MB cada uno</span>
                     </button>
                 </div>
 
@@ -374,7 +381,7 @@ function CargarPlanos({ inicial, baneras, vigente, vigentes, email, onCerrar, on
                             const malo = !!c.repetido || !!c.enLista
                             return (
                                 <div key={i} className={`p-2 flex items-center gap-2 ${subiendo === i ? 'bg-sky-50' : malo ? 'bg-rose-50/60' : ''}`}>
-                                    <FileText className="w-4 h-4 text-[#324354] shrink-0" />
+                                    {esPdf(c.archivo) ? <FileText className="w-4 h-4 text-[#324354] shrink-0" /> : <ImageIcon className="w-4 h-4 text-[#324354] shrink-0" />}
                                     <div className="flex-1 min-w-0">
                                         <input value={c.banera} list="baneras-fv" disabled={ocupado || unaBanera} placeholder="Bañera"
                                             onChange={e => setCargas(l => l.map((x, j) => (j === i ? { ...x, banera: e.target.value } : x)))}
@@ -459,7 +466,7 @@ function MenuPdfs({ rect, titulo, lista, editor, versiones, onAbrir, onHistorial
                 {lista.map(p => (
                     <div key={p.id} className="flex items-center gap-1 px-2 py-1.5 hover:bg-[#F6F3EE]/60">
                         <button type="button" onClick={() => onAbrir(p)} className="flex-1 min-w-0 flex items-center gap-2 text-left" title={p.banera}>
-                            <FileText className="w-4 h-4 text-[#324354] shrink-0" />
+                            {rutaEsImagen(p.pdf_path) ? <ImageIcon className="w-4 h-4 text-[#324354] shrink-0" /> : <FileText className="w-4 h-4 text-[#324354] shrink-0" />}
                             <span className="min-w-0">
                                 <span className="block text-[12px] font-bold text-[#324354] leading-tight truncate">{nombreVisible(p.banera)}</span>
                                 <span className="block text-[10px] text-slate-500 leading-tight">{fecha(p.created_at)}{p.version > 1 ? ` · v${p.version}` : ''}</span>
@@ -473,7 +480,7 @@ function MenuPdfs({ rect, titulo, lista, editor, versiones, onAbrir, onHistorial
             </div>
             {editor && (
                 <button type="button" onClick={onAgregar} className="w-full px-3 py-2 border-t border-[#e2ded5] text-[11px] font-black text-[#324354] hover:bg-[#F6F3EE] flex items-center gap-1">
-                    <Plus className="w-3.5 h-3.5" /> Agregar PDF a este proceso
+                    <Plus className="w-3.5 h-3.5" /> Agregar archivo a este proceso
                 </button>
             )}
         </div>
@@ -502,7 +509,9 @@ function VistaPdf({ vista, onPestana, onCerrar }: { vista: { p: Plano; url: stri
                 </div>
                 <div className="flex-1 bg-[#F6F3EE]">
                     {url
-                        ? <iframe src={url} title={p.banera} className="w-full h-full border-0" />
+                        ? (rutaEsImagen(p.pdf_path)
+                            ? <div className="w-full h-full flex items-center justify-center p-2"><img src={url} alt={p.banera} className="max-w-full max-h-full object-contain rounded-lg" /></div>
+                            : <iframe src={url} title={p.banera} className="w-full h-full border-0" />)
                         : <div className="h-full flex items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-slate-400" /></div>}
                 </div>
             </div>
