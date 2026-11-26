@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/opt-sistemica/Header'
 import VigilanciaMainMenu from '@/components/calidad/vigilancia/VigilanciaMainMenu'
 import VigilanciaPlantaView from '@/components/calidad/vigilancia/VigilanciaPlantaView'
+import IndicadoresVigilanciaView from '@/components/calidad/vigilancia/IndicadoresVigilanciaView'
 import { PLANTAS_VIGILANCIA, PlantaVigilanciaKey } from '@/components/calidad/vigilancia/types'
 
 function VigilanciaContent() {
@@ -15,17 +16,29 @@ function VigilanciaContent() {
     const [loading, setLoading] = useState(true)
     const [isPending, startTransition] = useTransition()
 
-    // Planta seleccionada desde la URL (?planta=ms) o null para el Menú Principal
+    // Parámetros URL
     const plantaParam = searchParams.get('planta') as PlantaVigilanciaKey | null
+    const vistaParam = searchParams.get('vista')
+
     const [activePlantaKey, setActivePlantaKey] = useState<PlantaVigilanciaKey | null>(plantaParam)
+    const [showIndicadores, setShowIndicadores] = useState<boolean>(vistaParam === 'indicadores')
+    const [indicadoresPlantaKey, setIndicadoresPlantaKey] = useState<PlantaVigilanciaKey | null>(plantaParam)
 
     useEffect(() => {
         if (plantaParam && PLANTAS_VIGILANCIA.some(p => p.key === plantaParam)) {
             setActivePlantaKey(plantaParam)
+            setIndicadoresPlantaKey(plantaParam)
         } else {
             setActivePlantaKey(null)
+            setIndicadoresPlantaKey(null)
         }
-    }, [plantaParam])
+
+        if (vistaParam === 'indicadores') {
+            setShowIndicadores(true)
+        } else {
+            setShowIndicadores(false)
+        }
+    }, [plantaParam, vistaParam])
 
     useEffect(() => {
         const checkUser = async () => {
@@ -42,18 +55,49 @@ function VigilanciaContent() {
 
     const handleSelectPlanta = (key: PlantaVigilanciaKey) => {
         startTransition(() => {
+            setShowIndicadores(false)
             setActivePlantaKey(key)
             const url = new URL(window.location.href)
             url.searchParams.set('planta', key)
+            url.searchParams.delete('vista')
+            window.history.pushState(null, '', url.toString())
+        })
+    }
+
+    const handleOpenIndicadores = (plantaKey?: PlantaVigilanciaKey) => {
+        startTransition(() => {
+            setShowIndicadores(true)
+            if (plantaKey) {
+                setIndicadoresPlantaKey(plantaKey)
+            }
+            const url = new URL(window.location.href)
+            url.searchParams.set('vista', 'indicadores')
+            if (plantaKey) {
+                url.searchParams.set('planta', plantaKey)
+            } else {
+                url.searchParams.delete('planta')
+            }
+            window.history.pushState(null, '', url.toString())
+        })
+    }
+
+    const handleBackFromIndicadores = () => {
+        startTransition(() => {
+            setShowIndicadores(false)
+            const url = new URL(window.location.href)
+            url.searchParams.delete('vista')
             window.history.pushState(null, '', url.toString())
         })
     }
 
     const handleBackToMenu = () => {
         startTransition(() => {
+            setShowIndicadores(false)
             setActivePlantaKey(null)
+            setIndicadoresPlantaKey(null)
             const url = new URL(window.location.href)
             url.searchParams.delete('planta')
+            url.searchParams.delete('vista')
             window.history.pushState(null, '', url.toString())
         })
     }
@@ -84,14 +128,23 @@ function VigilanciaContent() {
                 onLogout={handleLogout}
             />
 
-            <main className="flex-1 flex flex-col items-center justify-start p-3 sm:p-6">
-                {activePlantaConfig ? (
+            <main className="flex-1 flex flex-col items-center justify-start p-3 sm:p-6 w-full">
+                {showIndicadores ? (
+                    <IndicadoresVigilanciaView
+                        plantaInicial={indicadoresPlantaKey}
+                        onBack={activePlantaConfig ? () => setShowIndicadores(false) : handleBackFromIndicadores}
+                    />
+                ) : activePlantaConfig ? (
                     <VigilanciaPlantaView
                         planta={activePlantaConfig}
                         onBack={handleBackToMenu}
+                        onOpenIndicadores={handleOpenIndicadores}
                     />
                 ) : (
-                    <VigilanciaMainMenu onSelectPlanta={handleSelectPlanta} />
+                    <VigilanciaMainMenu
+                        onSelectPlanta={handleSelectPlanta}
+                        onOpenIndicadores={() => handleOpenIndicadores()}
+                    />
                 )}
             </main>
         </div>
