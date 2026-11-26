@@ -271,19 +271,6 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                                 </div>
 
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Planta:</span>
-                                    <select
-                                        value={selectedPlanta}
-                                        onChange={(e) => setSelectedPlanta(e.target.value)}
-                                        className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 cursor-pointer"
-                                    >
-                                        <option value="todas">TODAS LAS PLANTAS</option>
-                                        <option value="Muebles">MUEBLES</option>
-                                        <option value="Cefi">CEFI</option>
-                                    </select>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
                                     <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Estado:</span>
                                     <select
                                         value={selectedEstado}
@@ -296,24 +283,6 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                                     </select>
                                 </div>
 
-                                <div className="flex flex-col gap-0.5 ml-4">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Exportar:</span>
-                                    <button
-                                        onClick={handleDownloadExcel}
-                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm font-bold text-xs"
-                                    >
-                                        <Download size={18} />
-                                        DESCARGAR EXCEL
-                                    </button>
-                                </div>
-
-                                <button
-                                    onClick={handleClearFilters}
-                                    className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-sm self-end mb-0.5"
-                                    title="Limpiar filtros"
-                                >
-                                    <X size={20} />
-                                </button>
                             </div>
                         </div>
 
