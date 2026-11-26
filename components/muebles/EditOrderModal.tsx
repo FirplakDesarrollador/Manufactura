@@ -140,6 +140,7 @@ export default function EditOrderModal({ orden, usuarioNombre, turno, userEmail,
 
                     {/* Jalar la OF hasta un proceso (Digitado, Tránsito…) */}
                     <MoverOfMuebles orden={orden} planta={orden.planta} usuarioNombre={usuarioNombre} userEmail={userEmail}
+                        variante={orden.planta === 'Semielaborados' ? 'semielaborados' : undefined}
                         onHecho={() => { onSuccess(); onClose() }} />
 
                     {/* Form Controls */}

@@ -112,7 +112,8 @@ export async function GET() {
                     (row.planta && String(row.planta).toLowerCase().includes('cefi')) ||
                     desc.includes('TABLERO COMPUESTO') ||
                     desc.includes('MODULAR');
-                const calculatedPlant = isCefi ? 'Cefi' : 'Muebles';
+                // Cajas (SKU PEMP…): semielaborados, con su propio control de piso (no salen en Muebles ni en CEFI)
+                const calculatedPlant = sku.startsWith('PEMP') ? 'Semielaborados' : isCefi ? 'Cefi' : 'Muebles';
 
                 orderMap.set(docNum, {
                     orden_fabricacion: docNum,
