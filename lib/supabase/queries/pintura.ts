@@ -118,6 +118,9 @@ export async function getRegistrosTrazabilidadPorOrden(ordenFabricacion: string)
     return data || []
 }
 
+// Los seriales con la letra T (ej. 0062-73T) no se deben mostrar ni escoger en Mármol
+export const serialConT = (serial: string | null | undefined) => /t/i.test(serial || '')
+
 export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
     const { data, error } = await supabase
         .from('query_moldes')
@@ -131,7 +134,7 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
         return []
     }
 
-    return conVueltasMto(data || [])
+    return conVueltasMto((data || []).filter(m => !serialConT(m.serial)))
 }
 
 // La vista query_moldes no trae "Vuletas_MTO" (vueltas de mantenimiento del molde): se toma de la tabla moldes
@@ -220,17 +223,18 @@ export async function registrarPintura(pinturaData: {
     }
 
     // 1.1 Verificar piezas ya registradas (conteo real en trazabilidad)
-    // Se cuentan todas las piezas registradas en etapas para evitar que la sumatoria supere la cantidad de la orden.
-    const { count, error: countError } = await supabase
+    // Se cuentan las piezas registradas en etapas para evitar que la sumatoria supere la cantidad de la orden.
+    // Las desgelcadas y las destruidas no cuentan: esa pieza se pierde y se debe poder pintar otra (igual que en la pantalla).
+    const { data: piezasOrden, error: countError } = await supabase
         .from('query_trazabilidad_ms')
-        .select('*', { count: 'exact', head: true })
+        .select('estado')
         .eq('orden_fabricacion_id', pinturaData.orden_fabricacion_id)
 
     if (countError) {
         console.error('Error al contar piezas:', countError)
         // No bloqueamos si falla el conteo por red, pero registramos el error
     } else {
-        const piezasRegistradas = count || 0
+        const piezasRegistradas = (piezasOrden || []).filter(p => !/desgelc|destru/i.test(p.estado || '')).length
         const piezasPermitidas = orden.cantidad || orden.cantidad_programada || 0
 
         if (piezasRegistradas >= piezasPermitidas && piezasPermitidas > 0) {

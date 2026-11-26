@@ -429,4 +429,6 @@ export async function registrarPiezaProgramadoFv(ordenId: number, moldeId: numbe
         detalle: { destino }
     }]
     await registrarMovimientosFv(movimientos)
+    // Aviso si el molde llegó a sus vueltas y se debe sacar a desmanchar (la pieza ya quedó registrada)
+    return { avisoMolde: (pieza as { aviso_molde?: string | null })?.aviso_molde ?? null }
 }

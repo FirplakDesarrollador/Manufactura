@@ -3,7 +3,7 @@
 import { moldeDeOtraReferencia } from '@/lib/fibra/moldesOrden'
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenFabricacion, Molde, RegistroTrazabilidad } from '@/types/pintura'
-import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy } from '@/lib/supabase/queries/pintura'
+import { getOrdenesFabricacion, getMoldesDisponibles, registrarPintura, getRegistrosTrazabilidad, getAllMoldes, getRegistrosTrazabilidadHoy, serialConT } from '@/lib/supabase/queries/pintura'
 import OrdenCard from './OrdenCard'
 import MoldSelector from './MoldSelector'
 import { Search, X, Calendar, History, ClipboardList } from 'lucide-react'
@@ -105,14 +105,14 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
             const tipoOrden = Number((selectedOrden as any).molde_id) || null
             const skuMolde = (selectedOrden.molde_sku || '').trim().toLowerCase()
             // Sin los moldes cuyo nombre es de otra referencia (asignados por error al tipo)
-            const delTipo = allMoldes.filter(m => !moldeDeOtraReferencia(m) && (
+            const delTipo = allMoldes.filter(m => !serialConT(m.serial) && !moldeDeOtraReferencia(m) && (
                 (tipoOrden != null && Number((m as any).tipo_molde_id) === tipoOrden) ||
                 (!!skuMolde && (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase() === skuMolde)))
 
             // 2) Respaldo (referencias sin tipo de molde asignado): SKU, prefijo del serial y palabras de la descripción
             const available = (delTipo.length > 0 ? delTipo.filter(m => m.estado === 'Disponible') : allMoldes
                 .filter(m => {
-                    if (m.estado !== 'Disponible') return false
+                    if (m.estado !== 'Disponible' || serialConT(m.serial)) return false
 
                     const mSku = (m.molde_sku || (m as any).tipo_molde_sku || '').trim().toLowerCase()
                     const mSerial = (m.serial || '').trim().toLowerCase()

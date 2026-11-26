@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Molde } from '@/types/pintura'
-import { getAllMoldes, updateMoldeEstado } from '@/lib/supabase/queries/pintura'
+import { getAllMoldes, updateMoldeEstado, serialConT } from '@/lib/supabase/queries/pintura'
 import { Search, X, Eraser, RefreshCw } from 'lucide-react'
 
 interface ModalBuscarMoldeProps {
@@ -19,7 +19,7 @@ export default function ModalBuscarMolde({ isOpen, onClose }: ModalBuscarMoldePr
     const loadMoldes = React.useCallback(async () => {
         setLoading(true)
         const data = await getAllMoldes()
-        setMoldes(data)
+        setMoldes(data.filter(m => !serialConT(m.serial)))
         setLoading(false)
     }, [])
 
