@@ -131,14 +131,22 @@ export async function getMoldesDisponibles(moldeSku: string): Promise<Molde[]> {
         return []
     }
 
-    return data || []
+    return conVueltasMto(data || [])
+}
+
+// La vista query_moldes no trae "Vuletas_MTO" (vueltas de mantenimiento del molde): se toma de la tabla moldes
+async function conVueltasMto<T extends { id: number }>(moldes: T[]): Promise<T[]> {
+    if (!moldes.length) return moldes
+    const { data } = await supabase.from('moldes').select('id, Vuletas_MTO').in('id', moldes.map(m => m.id))
+    const mapa = new Map((data || []).map((r: { id: number; Vuletas_MTO: number | null }) => [r.id, r.Vuletas_MTO]))
+    return moldes.map(m => ({ ...m, Vuletas_MTO: mapa.get(m.id) ?? null }))
 }
 
 export async function getAllMoldes(): Promise<Molde[]> {
     try {
         const [viewRes, rawRes] = await Promise.all([
             supabase.from('query_moldes').select('*').neq('estado', 'Destruido'),
-            supabase.from('moldes').select('id, nombre_articulo, descripcion_molde, tipo_molde_sku').neq('estado', 'Destruido')
+            supabase.from('moldes').select('id, nombre_articulo, descripcion_molde, tipo_molde_sku, Vuletas_MTO').neq('estado', 'Destruido')
         ])
 
         if (viewRes.error) {
@@ -154,6 +162,8 @@ export async function getAllMoldes(): Promise<Molde[]> {
                 ...m,
                 // Nombre propio del molde (para descartar moldes asignados por error a otro tipo)
                 nombre_articulo: m.nombre_articulo ?? raw?.nombre_articulo ?? null,
+                // Vueltas MTO del molde (la vista no las trae)
+                Vuletas_MTO: raw?.Vuletas_MTO ?? null,
                 molde_sku: m.molde_sku || m.tipo_molde_sku || raw?.tipo_molde_sku || '',
                 molde_descripcion: m.molde_descripcion || m.nombre_articulo || raw?.nombre_articulo || raw?.descripcion_molde || ''
             }
