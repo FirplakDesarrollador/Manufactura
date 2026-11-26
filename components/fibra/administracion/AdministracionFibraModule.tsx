@@ -14,6 +14,7 @@ import {
 import { getAllMoldes } from '@/lib/supabase/queries/fibra'
 import OrdenCard from '@/components/pintura/OrdenCard'
 import EstadoEntregaOf from '../EstadoEntregaOf'
+import AvisoTrasladoOf from '@/components/fibra/AvisoTrasladoOf'
 import { conCompletadaSap } from '@/lib/fibra/completadaSap'
 import { piezasPorEtapa } from '@/components/fibra/buscador/BuscadorOrdenesFibraModule'
 import {
@@ -504,6 +505,7 @@ export default function AdministracionFibraModule({ userEmail }: { userEmail?: s
                                             {expandedOrdenes.has(item.id) ? 'Ocultar trazabilidad' : 'Trazabilidad'}
                                         </button>
                                         <EstadoEntregaOf of={item.orden_fabricacion} />
+                                        <AvisoTrasladoOf of={item.orden_fabricacion} />
                                         <div className="ml-auto flex gap-2 shrink-0">
                                             <MoverOfFibra orden={item} moldes={allMoldes} usuarioEmail={userEmail} onHecho={loadData} />
                                             <button

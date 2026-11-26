@@ -56,6 +56,8 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
     const totalPiezas = Number(orden.piezas) || 0
     const programmedMuebles = orden.cantidad || 1
     const piezasPerMueble = totalPiezas / programmedMuebles
+    // Piezas por unidad (mueble) de la OF; con decimales solo si no es exacto
+    const ppuTexto = totalPiezas > 0 ? (Number.isInteger(piezasPerMueble) ? String(piezasPerMueble) : piezasPerMueble.toFixed(1)) : ''
     let pendingMuebles = 0
     let pendingPiezas = 0
     if (isCefi) {
@@ -142,7 +144,10 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                         </span>
                     </div>
                     <p className="text-base sm:text-lg font-black text-[#254153] uppercase leading-tight mt-1.5 line-clamp-2">{descripcion}</p>
-                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5">SKU: {orden.producto_sku}{orden.planta ? ` · ${orden.planta}` : ''}</p>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span>SKU: {orden.producto_sku}{orden.planta ? ` · ${orden.planta}` : ''}</span>
+                        {ppuTexto && <span className="px-2 py-0.5 rounded-full bg-[#324354]/10 text-[#324354] font-black">{ppuTexto} piezas por unidad</span>}
+                    </p>
 
                     <div className="grid grid-cols-3 gap-2 mt-2.5 max-w-[560px]">
                         <div className="border-l-2 border-slate-300 pl-2">
@@ -195,6 +200,11 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                                                 : 'bg-white border-slate-200'}`}>
                                 <p className={`text-[8px] sm:text-[9px] font-black uppercase leading-none ${c.k === 'cantidad' ? 'text-white/80' : 'text-slate-500'}`}>{c.t}</p>
                                 <p className={`text-base font-black leading-tight mt-0.5 ${c.k === 'cantidad' ? 'text-white' : Number(c.v) ? (c.k === 'reponer' ? 'text-red-700' : 'text-[#254153]') : 'text-slate-300'}`}>{c.v}</p>
+                                {c.k !== 'piezas' && c.k !== 'reponer' && totalPiezas > 0 && (
+                                    <p className={`text-[9px] font-bold leading-none mt-0.5 opacity-60 ${c.k === 'cantidad' ? 'text-white' : 'text-slate-500'}`}>
+                                        {isCefi ? `${Math.round(Number(c.v) / (piezasPerMueble || 1))} und` : `${Math.round(Number(c.v) * piezasPerMueble)} pzs`}
+                                    </p>
+                                )}
                             </div>
                         ))}
                     </div>

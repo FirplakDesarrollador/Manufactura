@@ -5,6 +5,7 @@ import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarEnsayoConDestino } from '@/lib/supabase/queries/fibra_ensayo'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
 import EstadoEntregaOf from '../EstadoEntregaOf'
+import AvisoTrasladoOf from '@/components/fibra/AvisoTrasladoOf'
 import AccionesPiezaFibra from '../AccionesPiezaFibra'
 import { FlaskConical, Wrench, Trash2 } from 'lucide-react'
 
@@ -33,5 +34,5 @@ export default function RegistroEnsayoCard({ registro, orden, moldes, usuarioEma
     )
 
     return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-purple-50/40"
-        extra={<EstadoEntregaOf of={registro.orden_fabricacion} />} />
+        extra={<><EstadoEntregaOf of={registro.orden_fabricacion} /><AvisoTrasladoOf of={registro.orden_fabricacion} /></>} />
 }

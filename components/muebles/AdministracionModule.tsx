@@ -108,18 +108,8 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                 ? orden.fecha_entrega_estimada 
                 : orden.created_at
             
-            const ordenDate = ordenDateStr ? new Date(ordenDateStr).getTime() : 0
-            const start = startDate ? new Date(startDate).getTime() : 0
-            const end = endDate ? new Date(endDate).getTime() : 0
-
-            let matchesDate = true
-            if (start && end) {
-                matchesDate = ordenDate >= start && ordenDate <= end + 86400000 // include full end day
-            } else if (start) {
-                matchesDate = ordenDate >= start
-            } else if (end) {
-                matchesDate = ordenDate <= end + 86400000
-            }
+            // Ese día exacto (por texto aaaa-mm-dd, sin corrimiento de zona horaria)
+            const matchesDate = !startDate || String(ordenDateStr || '').slice(0, 10) === startDate
 
             return matchesPlanta && matchesEstado && matchesSearch && matchesDate
         })
@@ -225,117 +215,45 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
     return (
         <div className="h-full flex flex-col bg-white">
-            <div className="bg-white p-3 border-b border-gray-200">
-                <div className="max-w-[1400px] mx-auto flex flex-col gap-3">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-bold text-blue-600 uppercase">Filtrar ordenes:</span>
-                            <div className="flex items-center gap-1">
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Rango de Fechas:</span>
-                                    <div className="flex items-center gap-1">
-                                        <button 
-                                            onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
-                                            className={`p-2 rounded-lg text-white transition-all shadow-sm ${dateType === 'entrega' ? 'bg-indigo-600' : 'bg-purple-600'}`}
-                                            title={dateType === 'entrega' ? 'Filtrando por Fecha de Entrega' : 'Filtrando por Fecha de Creación'}
-                                        >
-                                            <Calendar size={18} />
-                                        </button>
-                                        <input
-                                            type="date"
-                                            value={startDate}
-                                            onChange={(e) => setStartDate(e.target.value)}
-                                            className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-gray-400 font-bold text-[10px]">A</span>
-                                        <input
-                                            type="date"
-                                            value={endDate}
-                                            onChange={(e) => setEndDate(e.target.value)}
-                                            className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Buscar:</span>
-                                    <div className="relative w-48">
-                                        <input
-                                            type="text"
-                                            placeholder="Sku / Of / Pedido / Cliente"
-                                            value={searchText}
-                                            onChange={(e) => setSearchText(e.target.value)}
-                                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Estado:</span>
-                                    <select
-                                        value={selectedEstado}
-                                        onChange={(e) => setSelectedEstado(e.target.value)}
-                                        className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 cursor-pointer"
-                                    >
-                                        <option value="todas">TODOS LOS ESTADOS</option>
-                                        <option value="abierta">ABIERTAS</option>
-                                        <option value="cerrada">CERRADAS</option>
-                                    </select>
-                                </div>
-
-                            </div>
+            {/* Encabezado compacto (26/11/2026): un renglón de filtros y otro de indicadores. Sin fecha final ni filtro de
+                estado (Administración solo carga OF abiertas); la fecha filtra ese día exacto, como en Fibra. */}
+            <div className="bg-white px-3 py-2 border-b border-gray-200">
+                <div className="max-w-[1400px] mx-auto flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative flex-1 min-w-[180px] max-w-[420px]">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Sku / Of / Pedido / Cliente"
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                className="w-full h-8 pl-8 pr-3 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
                         </div>
-
-                        <div className="flex flex-wrap gap-2 flex-1">
-                            <MetricBox title="Corte" metrics={[
-                                { label: 'Muebles', val: metricas?.cortados },
-                                { label: 'Piezas', val: metricas?.corte_piezas },
-                                { label: 'm2', val: metricas?.corte_m2 }
-                            ]} />
-                            <MetricBox title="Enchape" metrics={[
-                                { label: 'Muebles', val: metricas?.enchapados },
-                                { label: 'Piezas', val: metricas?.enchape_piezas },
-                                { label: 'ml', val: metricas?.enchape_ml }
-                            ]} />
-                            <MetricBox title="Inspeccion" metrics={[
-                                { label: 'Muebles', val: metricas?.inspeccion },
-                                { label: 'Piezas', val: metricas?.inspeccion_piezas },
-                                { label: 'm2', val: metricas?.inspeccion_m2 }
-                            ]} />
-                            <MetricBox title="Empaque" metrics={[
-                                { label: 'Muebles', val: metricas?.empacados },
-                                { label: 'Piezas', val: metricas?.empaque_piezas },
-                                { label: 'm2', val: metricas?.empaque_m2 }
-                            ]} />
-                            
-                            <div className="flex gap-1">
-                                <SingleMetricBox label="Reparaciones" val={metricas?.reparaciones} color="red" />
-                                <SingleMetricBox label="Reposiciones" val={metricas?.reposiciones} color="red" />
-                                <SingleMetricBox label="Digitado" val={metricas?.digitado} color="teal" />
-                                <SingleMetricBox label="Transito" val={metricas?.transito} color="teal" />
-                                <SingleMetricBox label="Cedi" val={metricas?.cedi} color="teal" />
-                                <SingleMetricBox label="% Calidad" val={metricas?.p_calidad} color="blue" />
-                                <SingleMetricBox label="% Rechazado" val={metricas?.p_rechazado} color="blue" />
-                            </div>
+                        <button
+                            onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
+                            className={`h-8 w-8 flex items-center justify-center rounded-lg text-white shadow-sm shrink-0 ${dateType === 'entrega' ? 'bg-indigo-600' : 'bg-purple-600'}`}
+                            title={dateType === 'entrega' ? 'Filtrando por fecha de entrega (clic: fecha de creación)' : 'Filtrando por fecha de creación (clic: fecha de entrega)'}
+                        >
+                            <Calendar size={16} />
+                        </button>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            title={dateType === 'entrega' ? 'Fecha de entrega' : 'Fecha de creación'}
+                            className="h-8 px-2 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <div className="text-[11px] font-bold text-indigo-600 whitespace-nowrap">
+                            ÓRDENES: <span className="text-gray-900">{filteredOrdenes.length}</span>
                         </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="text-[11px] font-bold text-indigo-600">
-                                ORDENES ENCONTRADAS: <span className="text-gray-900">{filteredOrdenes.length}</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={loadData} className="p-1.5 bg-gray-100 text-indigo-600 rounded shadow-sm hover:bg-gray-200">
-                                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                                </button>
-                                <button onClick={handleSyncSAP} className="p-1.5 bg-orange-100 text-orange-600 rounded shadow-sm hover:bg-orange-200">
-                                    <ArrowUpFromLine size={18} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
+                        <button onClick={loadData} title="Actualizar" className="h-8 w-8 flex items-center justify-center bg-gray-100 text-indigo-600 rounded-lg shadow-sm hover:bg-gray-200">
+                            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                        </button>
+                        <button onClick={handleSyncSAP} title="Cargar órdenes de SAP" className="h-8 w-8 flex items-center justify-center bg-orange-100 text-orange-600 rounded-lg shadow-sm hover:bg-orange-200">
+                            <ArrowUpFromLine size={16} />
+                        </button>
+                        <div className="flex gap-2 ml-auto">
                             <SummaryBox title="Cantidad" color="blue" metrics={[
                                 { label: 'Muebles', val: stats.programado.muebles },
                                 { label: 'Piezas', val: stats.programado.piezas }
@@ -349,6 +267,36 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                                 { label: 'Realiz.', val: stats.reposiciones.piezas }
                             ]} />
                         </div>
+                    </div>
+
+                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                        <MetricBox title="Corte" metrics={[
+                            { label: 'Muebles', val: metricas?.cortados },
+                            { label: 'Piezas', val: metricas?.corte_piezas },
+                            { label: 'm2', val: metricas?.corte_m2 }
+                        ]} />
+                        <MetricBox title="Enchape" metrics={[
+                            { label: 'Muebles', val: metricas?.enchapados },
+                            { label: 'Piezas', val: metricas?.enchape_piezas },
+                            { label: 'ml', val: metricas?.enchape_ml }
+                        ]} />
+                        <MetricBox title="Inspeccion" metrics={[
+                            { label: 'Muebles', val: metricas?.inspeccion },
+                            { label: 'Piezas', val: metricas?.inspeccion_piezas },
+                            { label: 'm2', val: metricas?.inspeccion_m2 }
+                        ]} />
+                        <MetricBox title="Empaque" metrics={[
+                            { label: 'Muebles', val: metricas?.empacados },
+                            { label: 'Piezas', val: metricas?.empaque_piezas },
+                            { label: 'm2', val: metricas?.empaque_m2 }
+                        ]} />
+                        <SingleMetricBox label="Reparaciones" val={metricas?.reparaciones} color="red" />
+                        <SingleMetricBox label="Reposiciones" val={metricas?.reposiciones} color="red" />
+                        <SingleMetricBox label="Digitado" val={metricas?.digitado} color="teal" />
+                        <SingleMetricBox label="Transito" val={metricas?.transito} color="teal" />
+                        <SingleMetricBox label="Cedi" val={metricas?.cedi} color="teal" />
+                        <SingleMetricBox label="% Calidad" val={metricas?.p_calidad} color="blue" />
+                        <SingleMetricBox label="% Rechazado" val={metricas?.p_rechazado} color="blue" />
                     </div>
                 </div>
             </div>
@@ -444,11 +392,11 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
 function MetricBox({ title, metrics }: { title: string, metrics: { label: string, val: any }[] }) {
     return (
-        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col min-w-[120px]">
+        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col min-w-[120px] shrink-0">
             <div className="bg-gray-100 text-[10px] font-black text-center py-0.5 uppercase text-gray-600">{title}</div>
             <div className="flex divide-x divide-gray-100 bg-white">
                 {metrics.map((m, i) => (
-                    <div key={i} className="flex-1 px-2 py-1 flex flex-col items-center">
+                    <div key={i} className="flex-1 px-2 py-0.5 flex flex-col items-center leading-tight">
                         <span className="text-[8px] font-bold text-gray-400 uppercase">{m.label}</span>
                         <span className="text-[11px] font-black text-gray-800">{m.val || 0}</span>
                     </div>
@@ -465,7 +413,7 @@ function SingleMetricBox({ label, val, color }: { label: string, val: any, color
         blue: 'border-blue-200 text-blue-600 bg-blue-50'
     }
     return (
-        <div className={`border rounded-lg px-2 py-1 flex flex-col items-center min-w-[70px] ${colorClasses[color]}`}>
+        <div className={`border rounded-lg px-2 py-1 flex flex-col items-center justify-center min-w-[70px] shrink-0 ${colorClasses[color]}`}>
             <span className="text-[8px] font-bold uppercase text-center leading-tight">{label}</span>
             <span className="text-[11px] font-black">{val || 0}</span>
         </div>
@@ -480,11 +428,11 @@ function SummaryBox({ title, color, metrics }: { title: string, color: 'blue' | 
     }
     const theme = colorClasses[color]
     return (
-        <div className={`border rounded-xl overflow-hidden min-w-[140px] shadow-sm ${theme.border}`}>
+        <div className={`border rounded-lg overflow-hidden min-w-[120px] shadow-sm ${theme.border}`}>
             <div className={`${theme.header} text-white text-[10px] font-black text-center py-0.5 uppercase`}>{title}</div>
             <div className="flex divide-x divide-gray-50 bg-white">
                 {metrics.map((m, i) => (
-                    <div key={i} className="flex-1 px-3 py-1.5 flex flex-col items-center">
+                    <div key={i} className="flex-1 px-2 py-0.5 flex flex-col items-center leading-tight">
                         <span className={`text-[8px] font-bold uppercase ${theme.text}`}>{m.label}</span>
                         <span className="text-sm font-black text-gray-900">{m.val || 0}</span>
                     </div>

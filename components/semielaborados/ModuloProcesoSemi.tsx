@@ -3,12 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { OrdenSemi, ProcesoSemi, ENTRADA, NOMBRE_PROCESO, cargarOrdenesSemi, registrarSemi, coincideSemi } from '@/lib/semielaborados/datos'
+import { OrdenSemi, ProcesoSemi, TipoSemi, ENTRADA, tipoSemi, cargarOrdenesSemi, registrarSemi, coincideSemi } from '@/lib/semielaborados/datos'
 import { IndicadoresSemi, BuscadorSemi, TarjetaOrdenSemi } from './comunesSemi'
 
 // Proceso del Control de Piso Semielaborados (Corte, Digitado, Tránsito, Almacén): las OF con unidades por hacer en
 // este proceso (las que llegan del anterior); se registra CUÁNTAS terminan el proceso, a nombre del usuario.
-export default function ModuloProcesoSemi({ proceso, usuario }: { proceso: ProcesoSemi; usuario: { email: string; nombre: string } }) {
+export default function ModuloProcesoSemi({ tipo, proceso, usuario }: { tipo: TipoSemi; proceso: ProcesoSemi; usuario: { email: string; nombre: string } }) {
+    const NOMBRE_PROCESO = tipoSemi(tipo).procesos
     const [ordenes, setOrdenes] = useState<OrdenSemi[] | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [busqueda, setBusqueda] = useState('')
@@ -18,8 +19,8 @@ export default function ModuloProcesoSemi({ proceso, usuario }: { proceso: Proce
 
     const cargar = useCallback(async () => {
         setError(null)
-        try { setOrdenes(await cargarOrdenesSemi()) } catch (e: any) { setError(e?.message || String(e)); setOrdenes([]) }
-    }, [])
+        try { setOrdenes(await cargarOrdenesSemi(tipo)) } catch (e: any) { setError(e?.message || String(e)); setOrdenes([]) }
+    }, [tipo])
     useEffect(() => { cargar() }, [cargar])
 
     const lista = useMemo(() => (ordenes || [])
@@ -43,7 +44,7 @@ export default function ModuloProcesoSemi({ proceso, usuario }: { proceso: Proce
     return (
         <div className="h-full flex flex-col">
             <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 space-y-2">
-                <IndicadoresSemi ordenes={ordenes || []} />
+                <IndicadoresSemi ordenes={ordenes || []} tipo={tipo} />
                 <div className="flex items-center gap-2">
                     <BuscadorSemi valor={busqueda} onCambio={setBusqueda} />
                     <button onClick={cargar} className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] text-xs font-bold flex items-center gap-1.5 hover:bg-[#F6F3EE]">

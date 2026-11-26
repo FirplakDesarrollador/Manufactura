@@ -6,6 +6,7 @@ import { ArrowRightLeft, ChevronDown, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { OrdenMueble } from '@/types/muebles'
 import { supabase } from '@/lib/supabase'
+import { tipoDeSku, tipoSemi } from '@/lib/semielaborados/datos'
 
 // Administración Muebles / CEFI: mover unidades de la OF entre procesos, HACIA ADELANTE o HACIA ATRÁS (devolución),
 // por cantidades (como se lleva Muebles). Se elige Desde (proceso con unidades), Hasta y Cantidad.
@@ -37,8 +38,12 @@ export default function MoverOfMuebles({ orden, planta, usuarioNombre, userEmail
     const esCefi = (planta || orden.planta || '').toLowerCase().includes('cefi')
     // CEFI no usa Empaque
     const flujo = useMemo(() => variante === 'semielaborados'
-        ? FLUJO.filter(e => FLUJO_SEMIELABORADOS.includes(e.id)).map(e => e.id === 'cedi' ? { ...e, label: 'Almacén' } : e)
-        : FLUJO.filter(e => !(esCefi && e.id === 'empaque')), [esCefi, variante])
+        // Nombres del tipo de semielaborado (Cajas: Corte/Almacén; Herrajes FV: Herrajes/Almacén; Kits motobomba: Ensamble/CEDI)
+        ? FLUJO.filter(e => FLUJO_SEMIELABORADOS.includes(e.id)).map(e => {
+            const n = tipoSemi(tipoDeSku(orden.producto_sku)).procesos
+            return e.id === 'corte' ? { ...e, label: n.Corte } : e.id === 'cedi' ? { ...e, label: n.Almacen } : e
+        })
+        : FLUJO.filter(e => !(esCefi && e.id === 'empaque')), [esCefi, variante, orden.producto_sku])
     const cant = (e: Etapa) => Math.max(0, Number(orden[e.campo]) || 0)
 
     // Desde: por defecto el proceso más avanzado (sin contar CEDI) que tenga unidades; Hasta: el siguiente

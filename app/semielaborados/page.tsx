@@ -6,11 +6,14 @@ import { supabase } from '@/lib/supabase'
 import Header from '@/components/opt-sistemica/Header'
 import ModuloProcesoSemi from '@/components/semielaborados/ModuloProcesoSemi'
 import AdministracionSemi from '@/components/semielaborados/AdministracionSemi'
-import type { ProcesoSemi } from '@/lib/semielaborados/datos'
+import { type ProcesoSemi, type TipoSemi, TIPOS_SEMI, tipoSemi, permisoSemi } from '@/lib/semielaborados/datos'
 
-// Control de Piso Semielaborados (SEM): las cajas (SKU PEMP…) que antes salían en Muebles y CEFI.
-// Procesos: Corte → Digitado → Tránsito → Almacén (el último es Almacén, no CEDI) + Administración.
-// Permisos: los de Semielaborados (permisos.semielaborados) o, mientras se asignan, los mismos de Muebles.
+// Control de Piso Semielaborados (SEM), un tipo a la vez (operarios distintos por tipo):
+//  - Cajas (SKU PEMP…): Corte → Digitado → Tránsito → Almacén
+//  - Herrajes FV (PMPD04…): Herrajes → Digitado → Tránsito → Almacén
+//  - Kits motobomba FV (PEST01… MOTOBOMBA): Ensamble → Digitado → Tránsito → CEDI
+// Permisos: semielaborados.<tipo>_<proceso> (Configuración → Usuarios) y semielaborados.administracion (todos los
+// tipos). Cajas también acepta los permisos anteriores (semielaborados.corte… o los de Muebles).
 type Modulo = 'corte' | 'digitado' | 'transito' | 'almacen' | 'administracion'
 const PROCESO: Record<Exclude<Modulo, 'administracion'>, ProcesoSemi> = { corte: 'Corte', digitado: 'Digitado', transito: 'Transito', almacen: 'Almacen' }
 
@@ -30,6 +33,7 @@ export default function SemielaboradosPage() {
     const [perfil, setPerfil] = useState<any>(null)
     const [abierto, setAbierto] = useState(true)
     const [activo, setActivo] = useState<Modulo>('corte')
+    const [tipo, setTipo] = useState<TipoSemi>('cajas')
 
     useEffect(() => {
         (async () => {
@@ -43,13 +47,20 @@ export default function SemielaboradosPage() {
         if (typeof window !== 'undefined' && window.innerWidth < 768) setAbierto(false)
     }, [router])
 
-    const puede = (m: (typeof MENU)[number]) => {
-        if (!perfil) return true
-        if (perfil.rol === 'desarrollador' || perfil.rol === 'director' || perfil.rol === 'admin') return true
-        const p = perfil.permisos || {}
-        return m.permisos.some(k => p.semielaborados?.[k] === true || p.muebles?.[k] === true)
+    const esAdminApp = !perfil || perfil.rol === 'desarrollador' || perfil.rol === 'director' || perfil.rol === 'admin'
+    const p = perfil?.permisos || {}
+    const puedeAdministrar = esAdminApp || p.semielaborados?.administracion === true || p.muebles?.administracion === true
+    const puede = (t: TipoSemi, m: (typeof MENU)[number]) => {
+        if (esAdminApp) return true
+        if (m.id === 'administracion') return puedeAdministrar
+        const proc = PROCESO[m.id]
+        if (p.semielaborados?.[permisoSemi(t, proc)] === true) return true
+        // Cajas: permisos anteriores (semielaborados.corte… o los de Muebles)
+        return t === 'cajas' && m.permisos.some(k => p.semielaborados?.[k] === true || p.muebles?.[k] === true)
     }
-    const menu = MENU.filter(puede)
+    const tipos = TIPOS_SEMI.filter(t => MENU.some(m => puede(t.id, m)))
+    const menu = MENU.filter(m => puede(tipo, m))
+    useEffect(() => { if (!cargando && tipos.length && !tipos.some(t => t.id === tipo)) setTipo(tipos[0].id) }, [cargando, tipos, tipo])
     useEffect(() => { if (!cargando && menu.length && !menu.some(m => m.id === activo)) setActivo(menu[0].id) }, [cargando, menu, activo])
 
     if (cargando) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#254153]" /></div>
@@ -69,11 +80,23 @@ export default function SemielaboradosPage() {
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path {...trazo} d={abierto ? 'M11 19l-7-7 7-7m8 14l-7-7 7-7' : 'M13 5l7 7-7 7M5 5l7 7-7 7'} /></svg>
                             <span className="flex-1 text-left">Módulos SEM</span>
                         </button>
+                        {/* Tipo de semielaborado: solo los que el usuario puede ver */}
+                        {tipos.length > 1 && abierto && (
+                            <div className="mb-2 p-1 rounded-lg bg-[#F6F3EE] border border-[#e2ded5] space-y-0.5">
+                                {tipos.map(t => (
+                                    <button key={t.id} onClick={() => setTipo(t.id)}
+                                        className={`w-full text-left px-2.5 h-7 rounded-md text-[11px] font-bold ${tipo === t.id ? 'bg-[#324354] text-white' : 'text-[#324354] hover:bg-white'}`}>
+                                        <span>{t.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {abierto && <p className="px-3 pt-1 text-[10px] font-black uppercase tracking-wider text-[#7B8E90]">{tipoSemi(tipo).label}</p>}
                         {menu.map(m => (
                             <button key={m.id} onClick={() => { setActivo(m.id); if (window.innerWidth < 768) setAbierto(false) }} title={abierto ? undefined : m.label}
                                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activo === m.id ? 'bg-[#254153] text-white' : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'}`}>
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">{m.icono}</svg>
-                                <span>{m.label}</span>
+                                <span>{m.id === 'administracion' ? m.label : tipoSemi(tipo).procesos[PROCESO[m.id]]}</span>
                             </button>
                         ))}
                     </nav>
@@ -82,9 +105,9 @@ export default function SemielaboradosPage() {
                     {!menu.length ? (
                         <div className="h-full flex items-center justify-center text-sm text-slate-500 p-6 text-center">No tiene permisos para el Control de Piso Semielaborados.</div>
                     ) : activo === 'administracion' ? (
-                        <AdministracionSemi usuario={usuario} />
+                        <AdministracionSemi key={tipo} tipo={tipo} usuario={usuario} />
                     ) : (
-                        <ModuloProcesoSemi key={activo} proceso={PROCESO[activo]} usuario={usuario} />
+                        <ModuloProcesoSemi key={`${tipo}-${activo}`} tipo={tipo} proceso={PROCESO[activo]} usuario={usuario} />
                     )}
                 </main>
             </div>
