@@ -98,7 +98,7 @@ export default function SistemaProduccionPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 justify-items-center w-full">
                         
                         {/* 1. Indicadores del Sistema Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/estadisticas-produccion')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -113,7 +113,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 2. Bitácora Button (Nuevo / En construcción) */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/sistema-produccion/bitacora')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -128,7 +128,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 3. HDT Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/hdt')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -147,7 +147,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 4. Hora a Hora Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/hora-a-hora')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -162,7 +162,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 5. OPT Operativa Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/opt')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -177,7 +177,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 6. OPT Sistémica Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/opt-sistemica')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -192,7 +192,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 7. 5'S Button (Nuevo / En construcción) */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => handleUnderConstruction("5'S")}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -207,7 +207,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 8. Tarjetas Excelencia Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/tarjetas-excelencia')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -222,7 +222,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 9. Auditorías Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/sistema-produccion/auditorias')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -237,7 +237,7 @@ export default function SistemaProduccionPage() {
                         </div>
 
                         {/* 10. Reglas de Medición del Sistema */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/sistema-produccion/reglas')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"

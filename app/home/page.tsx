@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/opt-sistemica/Header'
+import IconoSap from '@/components/ui/IconoSap'
 
 interface User {
     id: string
@@ -178,7 +179,7 @@ export default function HomePage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 justify-items-center w-full">
                         {/* Control de Piso Button */}
                         {hasManufactura() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/home/selection')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -194,7 +195,7 @@ export default function HomePage() {
                         )}
 
                         {/* Informe de Turno Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/informe-turno')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -209,7 +210,7 @@ export default function HomePage() {
                         </div>
 
                         {/* Esquema de Personal Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/esquema-personal')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -224,7 +225,7 @@ export default function HomePage() {
                         </div>
 
                         {/* Tarjetas de Anomalías TPM Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/mantenimiento/tarjetas-falla')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -240,7 +241,7 @@ export default function HomePage() {
 
                         {/* Calidad Button */}
                         {hasCalidad() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/calidad')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -257,7 +258,7 @@ export default function HomePage() {
 
                         {/* Sistema de Producción Button */}
                         {hasSistemaProduccion() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/sistema-produccion')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -274,7 +275,7 @@ export default function HomePage() {
 
                         {/* Mantenimiento Button */}
                         {hasMttoAutonomo() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/mantenimiento')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -291,7 +292,7 @@ export default function HomePage() {
 
                         {/* Tablero de Control Button */}
                         {hasIndicadoresProductividad() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/indicadores-productividad')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -307,7 +308,7 @@ export default function HomePage() {
                         )}
 
                         {/* Inventarios Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/inventarios')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -323,7 +324,7 @@ export default function HomePage() {
 
                         {/* Inventarios Cíclicos Button (requiere permiso o analista2.desarrollo) */}
                         {hasInventariosCiclicos() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/inventarios-ciclicos')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -341,22 +342,20 @@ export default function HomePage() {
                         )}
 
                         {/* Consulta SAP Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/consulta-sap')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
                             >
                                 <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
-                                    <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                                    </svg>
+                                    <IconoSap className="text-[#324354] group-hover:text-white transition-colors duration-300" />
                                 </div>
                                 <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">Consulta SAP</span>
                             </button>
                         </div>
 
                         {/* Moldes Shortcut Button (app aparte, MoldApp) */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => window.open('https://app-moldes-theta.vercel.app/login', '_blank')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -374,7 +373,7 @@ export default function HomePage() {
                         </div>
 
                         {/* Talento Humano Shortcut Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => window.open(`https://talentohumano.vercel.app?email=${encodeURIComponent(user?.email || '')}`, '_blank')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -391,8 +390,44 @@ export default function HomePage() {
                             </button>
                         </div>
 
+                        {/* Notificaciones (en construcción): novedades, tareas y problemas por usuario */}
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
+                            <button
+                                onClick={() => router.push('/notificaciones')}
+                                className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                    </svg>
+                                </div>
+                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
+                                    Notificaciones<br />
+                                    <span className="text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">En construcción</span>
+                                </span>
+                            </button>
+                        </div>
+
+                        {/* Firplak.com (atajo a la página pública) */}
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
+                            <button
+                                onClick={() => window.open('https://www.firplak.com', '_blank')}
+                                className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 bg-[#324354]/5 rounded-full flex items-center justify-center mb-2 2xl:mb-3 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 2xl:[&_svg]:w-8 2xl:[&_svg]:h-8 group-hover:bg-[#324354] transition-all duration-300">
+                                    <svg className="text-[#324354] group-hover:text-white transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                                    </svg>
+                                </div>
+                                <span className="text-[13px] sm:text-sm 2xl:text-base font-bold text-[#324354] group-hover:text-[#324354] transition-colors duration-300 text-center leading-tight">
+                                    Firplak.com<br />
+                                    <span className="text-xs md:text-sm font-normal italic text-gray-400 group-hover:text-gray-500 transition-colors duration-300 mt-1 block">Atajo</span>
+                                </span>
+                            </button>
+                        </div>
+
                         {/* Cultura Button */}
-                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                        <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                             <button
                                 onClick={() => router.push('/cultura')}
                                 className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -408,7 +443,7 @@ export default function HomePage() {
 
                         {/* Asistencia Button */}
                         {hasAsistencia() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/asistencia')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -425,7 +460,7 @@ export default function HomePage() {
 
                         {/* Agente Manufactura Button */}
                         {hasAgenteManufactura() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/agente-manufactura')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"
@@ -442,7 +477,7 @@ export default function HomePage() {
 
                         {/* Configuración Button */}
                         {hasConfiguracion() && (
-                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-square">
+                            <div className="w-full max-w-[165px] 2xl:max-w-[220px] aspect-[4/3]">
                                 <button
                                     onClick={() => router.push('/configuracion')}
                                     className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 bg-white rounded-2xl shadow-[0_4px_25px_rgba(50,67,84,0.05)] border border-[#e2ded5] hover:border-[#324354] hover:shadow-[0_15px_30px_rgba(50,67,84,0.12)] hover:-translate-y-1 transition-all duration-300 group"

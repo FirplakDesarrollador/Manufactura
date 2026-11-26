@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { URL_CALIDAD_FV_POWERAPPS } from '@/lib/calidad/enlaces';
+import IconoSap from '@/components/ui/IconoSap'
 
 interface HeaderProps {
   title: string;
@@ -213,10 +214,10 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'Mármol Sintético', path: '/marmol' },
-                { label: 'Muebles', path: '/muebles' },
-                { label: 'CEFI', path: '/cefi' },
-                { label: 'Fibra de Vidrio', path: '/fibra' },
+                { label: 'Mármol Sintético (MS)', path: '/marmol' },
+                { label: 'Muebles (MBL)', path: '/muebles' },
+                { label: 'CEFI (CEFI)', path: '/cefi' },
+                { label: 'Fibra de Vidrio (FV)', path: '/fibra' },
                 { label: 'Superficies (RTM)', path: '/superficies' }
               ]
             },
@@ -261,14 +262,15 @@ export default function Header({
                 </svg>
               ),
               subItems: [
-                { label: 'Indicadores Calidad', path: '/calidad' },
+                { label: 'Indicadores Calidad', path: '/calidad/indicadores' },
                 { label: 'Calidad MS', path: '/calidad/ms' },
+                { label: 'Calidad FV', path: '/calidad/fv' },
                 { label: 'Calidad Reparación Moldes (RMOLD)', path: '/calidad/rmold' },
                 { label: 'Calidad FV (Atajo)', path: URL_CALIDAD_FV_POWERAPPS },
-                { label: 'Respuesta Rápida Calidad RRC', path: '/ficha-rcc' },
+                { label: 'Respuesta Rápida Calidad (RRC)', path: '/ficha-rcc' },
                 { label: 'Criterios de Aceptación y Rechazo', path: '/calidad/criterios' },
                 { label: 'Plan de Vigilancia', path: '/calidad/vigilancia' },
-                { label: 'QRQC Quick Response Quality Control', path: '/calidad/qrqc' }
+                { label: 'Quick Response Quality Control (QRQC)', path: '/calidad/qrqc' }
               ]
             },
             { 
@@ -288,7 +290,8 @@ export default function Header({
                 { label: 'OPT Sistémica', path: '/opt-sistemica' },
                 { label: "5'S", path: '/sistema-produccion/5s' },
                 { label: 'Tarjetas Excelencia', path: '/tarjetas-excelencia' },
-                { label: 'Auditorías', path: '/sistema-produccion/auditorias' }
+                { label: 'Auditorías', path: '/sistema-produccion/auditorias' },
+                { label: 'Reglas de Medición', path: '/sistema-produccion/reglas' }
               ]
             },
             { 
@@ -303,11 +306,11 @@ export default function Header({
                 { label: 'Gestor de Mantenimiento', path: '/mantenimiento/gestion-mantenimiento' },
                 { label: 'Indicadores Mantenimiento', path: '/mantenimiento' },
                 { label: 'Almacén', path: '/mantenimiento/almacen' },
-                { label: 'Máquinas', path: '/mantenimiento/maquinas' },
+                { label: 'Máquinas', path: '/mantenimiento/gestion-mantenimiento?tab=maquinas' },
                 { label: 'Mantenimiento Autónomo LILAC', path: '/mantenimiento/lilac' },
                 { label: 'Puestas a Punto', path: '/mantenimiento/puestas-a-punto' },
                 { label: 'Controles Visuales', path: '/mantenimiento/controles-visuales' },
-                { label: 'Lecciones LUP', path: '/mantenimiento/lecciones-lup' },
+                { label: 'Gestión del Conocimiento', path: '/mantenimiento/gestion-conocimiento' },
                 { label: 'Principio de Máquina', path: '/mantenimiento/principio-maquina' }
               ]
             },
@@ -321,11 +324,14 @@ export default function Header({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4" />
               </svg>
-            )},
+            ),
+              subItems: [
+                { label: 'Inventarios', path: '/inventarios' },
+                { label: 'Inventarios Cíclicos', path: '/inventarios-ciclicos' }
+              ]
+            },
             { label: 'Consulta SAP', path: '/consulta-sap', icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-              </svg>
+              <IconoSap className="w-5 h-5" />
             )},
             { label: 'Talento Humano (Atajo)', path: 'https://talentohumano.vercel.app', icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

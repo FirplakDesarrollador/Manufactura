@@ -2,7 +2,8 @@
 
 import React from 'react'
 import { OrdenMueble } from '@/types/muebles'
-import { FileText, Calendar, Package, User, AlertCircle, TrendingUp, Truck, CheckCircle, Info, AlertTriangle } from 'lucide-react'
+import { User, AlertCircle, AlertTriangle, ClipboardList } from 'lucide-react'
+import { useFechasSemaforoMuebles } from '@/lib/muebles/fechasSemaforo'
 import { format, isBefore, isToday, parseISO, isValid } from 'date-fns'
 
 interface OrderCardProps {
@@ -14,6 +15,7 @@ interface OrderCardProps {
 }
 
 export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte', onReportDefect }: OrderCardProps) {
+    const semaforo = useFechasSemaforoMuebles()
     const parseSafeDate = (dateStr?: string | null) => {
         if (!dateStr) return null
         try {
@@ -27,17 +29,6 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
     const deliveryDate = parseSafeDate(orden.fecha_entrega_estimada)
     const creationDate = parseSafeDate(orden.created_at)
     
-    const getDeliveryColor = () => {
-        if (!deliveryDate) return 'bg-gray-100 text-gray-500'
-        try {
-            if (isToday(deliveryDate)) return 'bg-amber-100 text-amber-700 border-amber-200'
-            if (isBefore(deliveryDate, new Date())) return 'bg-red-100 text-red-700 border-red-200'
-        } catch {
-            return 'bg-gray-100 text-gray-500'
-        }
-        return 'bg-blue-50 text-blue-600 border-blue-100'
-    }
-
     const formatDateSafe = (d: Date | null, fallback = 'N/A') => {
         if (!d) return fallback
         try {
@@ -58,251 +49,158 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
     const piecesToReponer = currentReposiciones > 0 ? currentReposiciones : (orden.por_reponer || 0)
     const isReponer = piecesToReponer > 0
 
+    // Pendiente del proceso de esta pantalla (misma regla de antes)
+    const isCefi = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF')
+    const totalPiezas = Number(orden.piezas) || 0
+    const programmedMuebles = orden.cantidad || 1
+    const piezasPerMueble = totalPiezas / programmedMuebles
+    let pendingMuebles = 0
+    let pendingPiezas = 0
+    if (isCefi) {
+        let pending = 0
+        switch (proceso) {
+            case 'Corte': pending = orden.por_cortar || 0; break
+            case 'Enchape': pending = (orden.corte || 0) + (orden.reponer_enchape || 0); break
+            case 'Inspeccion': pending = (orden.enchape || 0) + (orden.reponer_inspeccion || 0); break
+            case 'Empaque': pending = 0; break
+            case 'Digitado': pending = (orden.inspeccion || 0) + (orden.empaque || 0); break
+            case 'Transito': pending = orden.digitado || 0; break
+            case 'CEDI': pending = orden.transito || 0; break
+            default: pending = orden.por_cortar || 0
+        }
+        pendingPiezas = pending
+        const ppm = (totalPiezas > 0 && programmedMuebles > 0) ? (totalPiezas / programmedMuebles) : 1
+        pendingMuebles = ppm > 0 ? Math.round(pending / ppm) : pending
+    } else {
+        switch (proceso) {
+            case 'Corte': pendingMuebles = orden.por_cortar || 0; pendingPiezas = Number(orden.piezas_pendientes) || 0; break
+            case 'Enchape': pendingMuebles = (orden.corte || 0) + (orden.reponer_enchape || 0); pendingPiezas = Math.round(pendingMuebles * piezasPerMueble); break
+            case 'Inspeccion': pendingMuebles = (orden.enchape || 0) + (orden.reponer_inspeccion || 0); pendingPiezas = Math.round(pendingMuebles * piezasPerMueble); break
+            case 'Empaque': pendingMuebles = orden.inspeccion || 0; pendingPiezas = Math.round(pendingMuebles * piezasPerMueble); break
+            case 'Digitado': pendingMuebles = orden.empaque || 0; pendingPiezas = Math.round(pendingMuebles * piezasPerMueble); break
+            case 'Transito': pendingMuebles = orden.digitado || 0; pendingPiezas = Math.round(pendingMuebles * piezasPerMueble); break
+            case 'CEDI': pendingMuebles = orden.transito || 0; pendingPiezas = Math.round(pendingMuebles * piezasPerMueble); break
+            default: pendingMuebles = orden.por_cortar || 0; pendingPiezas = Number(orden.piezas_pendientes) || 0
+        }
+    }
+
+    // Fechas del Semáforo (igual que la tarjeta de Fibra); sin dato, las de SAP
+    const sem = semaforo?.mapa.get(String(orden.orden_fabricacion).trim())
+    const fLiberacion = parseSafeDate(sem?.realLib) || creationDate
+    const fPrometida = parseSafeDate(sem?.prometida) || deliveryDate
+    const fNivel = parseSafeDate(sem?.idealW)
+    const descripcion = orden.producto_descripcion && orden.producto_descripcion.trim() !== '' && !/^sin descripci[oó]n$/i.test(orden.producto_descripcion.trim())
+        ? orden.producto_descripcion
+        : (orden.producto_sku ? `PRODUCTO (${orden.producto_sku})` : `ORDEN DE FABRICACIÓN #${orden.orden_fabricacion}`)
+
+    // Unidades por proceso (columnas como en Fibra); la del proceso de esta pantalla resaltada
+    const resaltado = proceso === 'CEDI' ? 'transito' : proceso === 'Transito' ? 'digitado' : proceso === 'Digitado' ? (isCefi ? 'inspeccion' : 'empaque')
+        : proceso === 'Empaque' ? 'inspeccion' : proceso === 'Inspeccion' ? 'enchape' : proceso === 'Enchape' ? 'corte' : proceso === 'Corte' ? 'por_cortar' : ''
+    const columnas: { k: string; t: string; v: number | string }[] = [
+        { k: 'cantidad', t: 'Cantidad', v: orden.cantidad },
+        { k: 'por_cortar', t: 'Programado', v: orden.por_cortar || 0 },
+        { k: 'corte', t: 'Corte', v: orden.corte || 0 },
+        { k: 'enchape', t: 'Enchape', v: orden.enchape || 0 },
+        { k: 'inspeccion', t: 'Inspección', v: orden.inspeccion || 0 },
+        ...(!isCefi ? [{ k: 'empaque', t: 'Empaque', v: orden.empaque || 0 }] : []),
+        { k: 'digitado', t: 'Digitado', v: orden.digitado || 0 },
+        { k: 'transito', t: 'Tránsito', v: orden.transito || 0 },
+        { k: 'cedi', t: 'CEDI', v: orden.cedi || 0 },
+        { k: 'piezas', t: 'Piezas', v: orden.piezas || 0 },
+        { k: 'reponer', t: 'A reponer', v: orden.por_reponer || 0 },
+    ]
+
     return (
-        <div 
+        <div
             onClick={onClick}
-            className={`w-full bg-white rounded-xl border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col ${
-                isActive 
-                    ? 'border-blue-500 ring-4 ring-blue-500/10 shadow-lg' 
+            className={`w-full bg-white rounded-lg border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col ${
+                isActive
+                    ? 'border-[#254153] ring-4 ring-[#254153]/10 shadow-lg'
                     : isReponer
-                        ? 'border-red-400 bg-red-50/10 hover:border-red-500 hover:shadow-md'
-                        : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                        ? 'border-red-400 hover:border-red-500 hover:shadow-md'
+                        : 'border-[#e2ded5] hover:border-[#7B8E90] hover:shadow-md'
             }`}
         >
-            {/* Process Badge / Status indicator */}
             {isReponer && (
-                <div className="absolute top-0 right-0 z-10">
-                    <div className="bg-red-600 text-white px-3 py-1 rounded-bl-xl font-bold text-xs flex items-center gap-1 shadow-sm">
-                        <AlertCircle size={14} />
-                        REPOSICIÓN
-                    </div>
+                <div className="absolute top-0 right-0 z-10 bg-red-600 text-white px-3 py-1 rounded-bl-xl font-bold text-xs flex items-center gap-1 shadow-sm">
+                    <AlertCircle size={14} /> REPOSICIÓN · {piecesToReponer}
                 </div>
             )}
 
-            <div className="p-4 flex flex-wrap gap-4 items-center justify-between">
-                {/* Column 1: Identificación */}
-                <div className="w-full sm:w-[275px] flex items-start gap-3">
-                    {isReponer && (
-                        <div className="w-12 h-12 shrink-0 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex flex-col items-center justify-center text-white font-black shadow-md border-2 border-red-200" title="Piezas por reponer">
-                            <span className="text-lg leading-none">{piecesToReponer}</span>
+            <div className="p-3 sm:p-4 flex flex-col xl:flex-row gap-3 xl:gap-4">
+                {/* Identificación: OF, pedido, descripción, SKU, fechas y cliente (como la tarjeta de Fibra) */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
+                        <span className={`text-lg sm:text-xl font-black flex items-center gap-1.5 ${isReponer ? 'text-red-700' : 'text-[#254153]'}`}>
+                            <ClipboardList size={18} /> OF: {orden.orden_fabricacion}
+                        </span>
+                        {orden.numero_pedido && <span className="text-sm font-bold text-[#7B8E90]">Pedido: {orden.numero_pedido}</span>}
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${orden.pendiente ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
+                            {orden.pendiente ? 'Abierta' : 'Cerrada'}
+                        </span>
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-[#254153] uppercase leading-tight mt-1.5 line-clamp-2">{descripcion}</p>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5">SKU: {orden.producto_sku}{orden.planta ? ` · ${orden.planta}` : ''}</p>
+
+                    <div className="grid grid-cols-3 gap-2 mt-2.5 max-w-[560px]">
+                        <div className="border-l-2 border-slate-300 pl-2">
+                            <p className="text-[9px] font-black uppercase text-slate-500 leading-none">Liberación</p>
+                            <p className="text-sm font-black text-[#254153] mt-0.5">{formatDateSafe(fLiberacion, '—')}</p>
                         </div>
-                    )}
-                    <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <FileText size={16} className={`${isReponer ? 'text-red-600' : 'text-blue-600'}`} />
-                            <span className={`font-bold text-sm ${isReponer ? 'text-red-700' : 'text-gray-900'}`}>OF: {orden.orden_fabricacion}</span>
-                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${orden.pendiente ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
-                                {orden.pendiente ? 'Abierta' : 'Cerrada'}
+                        <div className="border-l-2 border-[#d14747] pl-2">
+                            <p className="text-[9px] font-black uppercase text-[#d14747] leading-none">Prometida cliente</p>
+                            <p className="text-sm font-black text-[#d14747] mt-0.5">{formatDateSafe(fPrometida, '—')}</p>
+                        </div>
+                        <div className="border-l-2 border-[#59a96a] pl-2">
+                            <p className="text-[9px] font-black uppercase text-[#2f7a40] leading-none">Nivel de servicio</p>
+                            <p className="text-sm font-black text-[#254153] mt-0.5">{formatDateSafe(fNivel, '—')}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                        {orden.cliente && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#254153] text-white text-[10px] font-black uppercase max-w-full truncate" title={orden.cliente}>
+                                <User size={12} className="shrink-0" /> {orden.cliente}
                             </span>
-                        </div>
-                    <div className="text-xs flex flex-col gap-1">
-                        <div className="flex justify-between items-center bg-gray-50 px-2 py-1 rounded">
-                            <span className="text-gray-500 font-medium uppercase text-[10px]">Liberación:</span>
-                            <span className="text-gray-900 font-semibold">{formatDateSafe(creationDate, 'N/A')}</span>
-                        </div>
-                        <div className="flex items-center gap-1 mt-1">
-                            <span className="text-blue-600 font-bold">Pedido:</span>
-                            <span className="text-gray-700">{orden.numero_pedido}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <User size={12} className="text-blue-600" />
-                            <span className="text-gray-500">Cliente:</span>
-                            <span className="text-gray-900 font-medium truncate max-w-[180px]">{orden.cliente}</span>
-                        </div>
-                    </div>
-                    {onReportDefect && (
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onReportDefect(orden)
-                            }}
-                            className="mt-2 w-full py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95"
-                            title="Reportar Defecto o Reposición para esta OF"
-                        >
-                            <AlertTriangle size={12} className="text-amber-600" />
-                            <span>REPORTAR DEFECTO</span>
-                        </button>
-                    )}
+                        )}
+                        {onReportDefect && (
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onReportDefect(orden) }}
+                                className="py-1 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                                title="Reportar Defecto o Reposición para esta OF"
+                            >
+                                <AlertTriangle size={12} className="text-amber-600" /> REPORTAR DEFECTO
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                {/* Vertical Divider (Desktop) */}
-                <div className="hidden lg:block h-24 w-px bg-gray-100" />
-
-                {/* Column 2: Producto & Entrega */}
-                <div className="w-full sm:w-[275px] space-y-2">
-                    <div className="h-10 flex items-center justify-center">
-                        <p className="text-xs font-bold text-gray-800 line-clamp-2 leading-tight text-center">
-                            {orden.producto_descripcion && orden.producto_descripcion.trim() !== '' && orden.producto_descripcion.toLowerCase() !== 'sin descripcion' && orden.producto_descripcion.toLowerCase() !== 'sin descripción'
-                                ? orden.producto_descripcion
-                                : (orden.producto_sku ? `PRODUCTO (${orden.producto_sku})` : `ORDEN DE FABRICACIÓN #${orden.orden_fabricacion}`)}
-                        </p>
+                {/* Pendiente en este proceso + unidades por proceso */}
+                <div className="flex gap-2 shrink-0 xl:w-[600px]">
+                    <div className="w-[92px] shrink-0 rounded-lg bg-[#deb841]/20 border border-[#deb841] flex flex-col items-center justify-center px-1 py-2 text-center" title={`Pendiente en ${proceso}`}>
+                        <p className="text-[9px] font-black uppercase text-[#7a5f0e] leading-tight">Pendiente</p>
+                        <p className="text-2xl font-black text-[#254153] leading-tight">{pendingMuebles}</p>
+                        <p className="text-[10px] font-bold text-[#7a5f0e]">{pendingPiezas} piezas</p>
                     </div>
-                    <div className="flex items-center justify-between text-xs mt-1">
-                        <span className="text-gray-500 italic">SKU: {orden.producto_sku}</span>
-                        <span className="text-red-500 font-bold uppercase">{orden.planta}</span>
-                    </div>
-                    <div className={`flex items-center justify-center gap-2 py-1.5 rounded-lg border px-3 mt-1 ${getDeliveryColor()}`}>
-                        <Calendar size={14} />
-                        <span className="text-[11px] font-bold">ENTREGA: {formatDateSafe(deliveryDate, 'PENDIENTE')}</span>
-                    </div>
-                </div>
-
-                {/* Vertical Divider (Desktop) */}
-                <div className="hidden lg:block h-24 w-px bg-gray-100" />
-
-                {/* Column 3: Cantidad & Pendiente */}
-                <div className="w-full lg:flex-1 grid grid-cols-2 gap-2">
-                    {/* Cantidad Grid */}
-                    <div className="border border-blue-200 rounded-lg overflow-hidden bg-blue-50/30">
-                        <div className="bg-blue-600 text-white text-[10px] font-bold text-center py-0.5 uppercase">Cant. Programada</div>
-                        <div className="grid grid-cols-2 p-2 gap-1 text-center">
-                            <div>
-                                <div className="text-[9px] text-blue-600 font-bold uppercase">Muebles</div>
-                                <div className="text-sm font-bold text-gray-900">{orden.cantidad}</div>
+                    <div className="flex-1 grid grid-cols-4 sm:grid-cols-6 gap-1">
+                        {columnas.map(c => (
+                            <div key={c.k} className={`rounded-md border px-1 py-1.5 text-center flex flex-col justify-center ${
+                                c.k === 'cantidad' ? 'bg-[#254153] border-[#254153]'
+                                    : c.k === resaltado ? 'bg-[#deb841]/20 border-[#deb841]'
+                                        : c.k === 'cedi' ? 'bg-emerald-50 border-emerald-200'
+                                            : c.k === 'reponer' && Number(c.v) > 0 ? 'bg-red-50 border-red-200'
+                                                : 'bg-white border-slate-200'}`}>
+                                <p className={`text-[8px] sm:text-[9px] font-black uppercase leading-none ${c.k === 'cantidad' ? 'text-white/80' : 'text-slate-500'}`}>{c.t}</p>
+                                <p className={`text-base font-black leading-tight mt-0.5 ${c.k === 'cantidad' ? 'text-white' : Number(c.v) ? (c.k === 'reponer' ? 'text-red-700' : 'text-[#254153]') : 'text-slate-300'}`}>{c.v}</p>
                             </div>
-                            <div>
-                                <div className="text-[9px] text-blue-600 font-bold uppercase">Piezas</div>
-                                <div className="text-sm font-bold text-gray-900">{orden.piezas}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Pendiente Grid */}
-                    <div className="border border-orange-200 rounded-lg overflow-hidden bg-orange-50/30">
-                        <div className="bg-orange-500 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-wider">Pendiente</div>
-                        <div className="grid grid-cols-2 p-2 gap-1 text-center divide-x divide-orange-100">
-                            {(() => {
-                                // Logic to define what 'Pending' means for each stage
-                                const isCefi = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF');
-                                let pendingMuebles = 0;
-                                let pendingPiezas = 0;
-                                const totalPiezas = Number(orden.piezas) || 0;
-                                const programmedMuebles = orden.cantidad || 1;
-                                const piezasPerMueble = totalPiezas / programmedMuebles;
-
-                                if (isCefi) {
-                                    let pending = 0;
-                                    switch (proceso) {
-                                        case 'Corte':
-                                            pending = orden.por_cortar || 0;
-                                            break;
-                                        case 'Enchape':
-                                            pending = (orden.corte || 0) + (orden.reponer_enchape || 0);
-                                            break;
-                                        case 'Inspeccion':
-                                            pending = (orden.enchape || 0) + (orden.reponer_inspeccion || 0);
-                                            break;
-                                        case 'Empaque':
-                                            pending = 0;
-                                            break;
-                                        case 'Digitado':
-                                            pending = (orden.inspeccion || 0) + (orden.empaque || 0);
-                                            break;
-                                        case 'Transito':
-                                            pending = orden.digitado || 0;
-                                            break;
-                                        case 'CEDI':
-                                            pending = orden.transito || 0;
-                                            break;
-                                        default:
-                                            pending = orden.por_cortar || 0;
-                                    }
-                                    pendingPiezas = pending;
-                                    const ppm = (totalPiezas > 0 && programmedMuebles > 0) ? (totalPiezas / programmedMuebles) : 1;
-                                    pendingMuebles = ppm > 0 ? Math.round(pending / ppm) : pending;
-                                } else {
-                                    switch (proceso) {
-                                        case 'Corte':
-                                            pendingMuebles = orden.por_cortar || 0;
-                                            pendingPiezas = Number(orden.piezas_pendientes) || 0;
-                                            break;
-                                        case 'Enchape':
-                                            pendingMuebles = (orden.corte || 0) + (orden.reponer_enchape || 0);
-                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                            break;
-                                        case 'Inspeccion':
-                                            pendingMuebles = (orden.enchape || 0) + (orden.reponer_inspeccion || 0);
-                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                            break;
-                                        case 'Empaque':
-                                            pendingMuebles = orden.inspeccion || 0;
-                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                            break;
-                                        case 'Digitado':
-                                            pendingMuebles = orden.empaque || 0;
-                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                            break;
-                                        case 'Transito':
-                                            pendingMuebles = orden.digitado || 0;
-                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                            break;
-                                        case 'CEDI':
-                                            pendingMuebles = orden.transito || 0;
-                                            pendingPiezas = Math.round(pendingMuebles * piezasPerMueble);
-                                            break;
-                                        default:
-                                            pendingMuebles = orden.por_cortar || 0;
-                                            pendingPiezas = Number(orden.piezas_pendientes) || 0;
-                                    }
-                                }
-
-                                return (
-                                    <>
-                                        <div>
-                                            <div className="text-[9px] text-orange-600 font-bold uppercase">Muebles</div>
-                                            <div className="text-sm font-bold text-gray-900">{pendingMuebles}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-[9px] text-orange-600 font-bold uppercase">Piezas</div>
-                                            <div className="text-sm font-bold text-gray-900">{pendingPiezas}</div>
-                                        </div>
-                                    </>
-                                )
-                            })()}
-                        </div>
+                        ))}
                     </div>
                 </div>
             </div>
 
-            {/* Bottom Section: Progress Timeline */}
-            <div className="bg-gray-50 border-t border-gray-100 p-2 overflow-x-auto no-scrollbar">
-                <div className="flex items-center justify-between min-w-[700px] gap-2">
-                    {(() => {
-                        const isCefiCard = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF');
-                        return [
-                            { label: 'Corte', val: orden.corte, icon: <TrendingUp size={12} />, color: 'blue' },
-                            { label: 'Enchape', val: orden.enchape, icon: <TrendingUp size={12} />, color: 'blue' },
-                            { label: 'Inspecc.', val: orden.inspeccion, icon: <TrendingUp size={12} />, color: 'blue' },
-                            ...(!isCefiCard ? [{ label: 'Empaque', val: orden.empaque, icon: <Package size={12} />, color: 'blue' }] : []),
-                            { label: 'Digitado', val: orden.digitado, icon: <FileText size={12} />, color: 'amber' },
-                            { label: 'Transito', val: orden.transito, icon: <Truck size={12} />, color: 'amber' },
-                            { label: 'Cedi', val: orden.cedi, icon: <CheckCircle size={12} />, color: 'green' },
-                        ];
-                    })().map((step, idx) => (
-                        <div key={idx} className="flex-1 flex flex-col items-center justify-center p-1 rounded border border-gray-200 bg-white">
-                            <div className={`flex items-center gap-1 text-[9px] font-bold uppercase ${
-                                step.color === 'blue' ? 'text-blue-600' : 
-                                step.color === 'amber' ? 'text-amber-600' : 'text-green-600'
-                            }`}>
-                                {step.icon}
-                                {step.label}
-                            </div>
-                            <div className="text-xs font-bold text-gray-900">{step.val}</div>
-                        </div>
-                    ))}
-                    
-                    {/* Extra: Reponer Info */}
-                    <div className="flex-[0.5] flex flex-col items-center justify-center p-1 rounded border border-red-100 bg-red-50">
-                        <div className="text-[8px] font-bold text-red-600 uppercase">A reponer</div>
-                        <div className="text-xs font-bold text-red-700">{orden.por_reponer}</div>
-                    </div>
-                </div>
-            </div>
-            
-            {/* Active Highlight line */}
-            {isActive && <div className="h-1 bg-blue-500 w-full" />}
+            {isActive && <div className="h-1 bg-[#254153] w-full" />}
         </div>
     )
 }
+

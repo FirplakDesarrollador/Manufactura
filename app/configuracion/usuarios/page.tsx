@@ -40,7 +40,7 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     asistencia: true,
     mantenimiento: ['acceso_general', 'editar_estandares', 'autorizar_editar', 'administrador'],
     // Pestañas del Gestor de Mantenimiento: sin ninguna marcada se ven todas (como antes); con alguna, solo esas
-    gestor_mantenimiento: ['planificador', 'mis_tareas', 'total_tareas', 'preventivo', 'ordenes_trabajo', 'indicadores', 'maquinas', 'configuracion'],
+    gestor_mantenimiento: ['planificador', 'mis_tareas', 'total_tareas', 'preventivo', 'ordenes_trabajo', 'indicadores', 'maquinas', 'maquinas_editar', 'configuracion'],
     esquema_personal: ['editar'],
     inventarios_ciclicos: true
 };
@@ -87,7 +87,8 @@ const SUBMODULO_LABELS: Record<string, string> = {
     preventivo: 'Preventivo (PMP)',
     ordenes_trabajo: 'Órdenes de Trabajo',
     indicadores: 'Indicadores',
-    maquinas: 'Máquinas y Equipos',
+    maquinas: 'Máquinas y Equipos (ver)',
+    maquinas_editar: 'Máquinas y Equipos (editar)',
     configuracion: 'Configuración (turnos y cuadrilla)'
 };
 
