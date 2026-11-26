@@ -109,6 +109,9 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
     const minVueltas = moldesDispConVueltas.length > 0 ? Math.min(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
     const maxVueltas = moldesDispConVueltas.length > 0 ? Math.max(...moldesDispConVueltas.map(m => m.vueltas_actuales)) : null
     const getLimMolde = (m: any) => {
+        // Primero las vueltas MTO del molde (columna Vuletas_MTO)
+        const mto = Number(m?.Vuletas_MTO ?? 0);
+        if (mto > 0) return mto;
         const atip = Number(m?.vueltas_mtto_atipicas ?? m?.vueltas_mto_atipicas ?? 0);
         if (atip > 0) return atip;
         const reg = Number(m?.vueltas_mtto ?? m?.vueltas_mto ?? 0);

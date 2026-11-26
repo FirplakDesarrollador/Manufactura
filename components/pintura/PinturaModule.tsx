@@ -273,6 +273,9 @@ export default function PinturaModule({ userEmail }: PinturaModuleProps) {
     }
 
     const getLimiteMolde = (molde: any): number => {
+        // Primero las vueltas MTO del molde (columna Vuletas_MTO)
+        const mto = Number(molde?.Vuletas_MTO ?? 0);
+        if (mto > 0) return mto;
         const atip = Number(molde?.vueltas_mtto_atipicas ?? molde?.vueltas_mto_atipicas ?? 0);
         if (atip > 0) return atip;
         const reg = Number(molde?.vueltas_mtto ?? molde?.vueltas_mto ?? 0);
