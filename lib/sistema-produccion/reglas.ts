@@ -48,6 +48,14 @@ export type ReglasSP = {
     // una de sus plantas (el indicador de cada planta promedia a todas sus personas). Antes era un solo código o
     // "TRANSVERSAL" (se lee como lista; "TRANSVERSAL" queda sin planta para que se definan las plantas).
     plantaPersona?: Record<string, string | string[]>
+    // Personas ocultas: siguen en su rol (sus ejecuciones no salen como "sin reglas") pero no se miden ni se muestran
+    // en el tablero. Va en la versión de las reglas: aplica desde la fecha elegida.
+    ocultas?: string[]
+}
+/** ¿La persona está oculta en estas reglas? (sin tildes ni mayúsculas) */
+export function personaOculta(reglas: Pick<ReglasSP, 'ocultas'> | null | undefined, nombre: string): boolean {
+    const k = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+    return (reglas?.ocultas || []).some(o => k(o) === k(nombre))
 }
 // RRC: días con asistencia "Presente" en el módulo RRC contra la frecuencia de las reglas (por ahora solo asistencia;
 // a futuro se medirá la robustez de la RRC y el cierre de los temas abiertos)
@@ -232,6 +240,14 @@ export function nombreEnReglas(nombre: string, reglas: Pick<ReglasSP, 'personas'
     const pal = k.split(' ')
     const cand = todas.filter(p => { const w = n(p).split(' '); return pal.every(x => w.some(y => y.startsWith(x))) })
     return cand.length === 1 ? cand[0] : nombre
+}
+
+/** ¿Se mide y se muestra? Solo las personas de las Reglas de Medición (en algún rol) que no estén ocultas. */
+export function personaVisibleSP(nombre: string, reglas: Pick<ReglasSP, 'personas' | 'ocultas'>): boolean {
+    const n = (x: string) => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[.\s]+/g, ' ').trim()
+    const r = nombreEnReglas(nombre, reglas)
+    const esta = Object.values(reglas.personas || {}).flat().some(p => n(p) === n(r))
+    return esta && !personaOculta(reglas, r)
 }
 
 // Reglas guardadas antes de que existiera un campo: se completan con los valores iniciales (por código de herramienta)

@@ -12,7 +12,6 @@ import {
   Search,
   Filter,
   ChevronDown,
-  MapPin,
   Check
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -34,6 +33,8 @@ export interface TechnicianObj {
 interface Props {
   technicians?: any[];
   onTechsUpdated?: () => void;
+  /** % del turno de hoy en producción por técnico (Distribución de hoy); sin dato el NPPR se reparte 50/50 */
+  pctProduccion?: Record<number, number | null>;
 }
 
 const normalizeStr = (text: string = '') =>
@@ -43,7 +44,9 @@ const normalizeStr = (text: string = '') =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
-export default function MatrizHorariosTurnos({ technicians: propTechnicians, onTechsUpdated }: Props) {
+export default function MatrizHorariosTurnos({ technicians: propTechnicians, onTechsUpdated, pctProduccion }: Props) {
+  // Fracción del turno en producción de un técnico NPPR (la real de hoy; si no hay, mitad y mitad)
+  const fraccionPr = (id: number | string) => { const v = pctProduccion?.[Number(id)]; return v == null ? 0.5 : v; };
   const [dbTechnicians, setDbTechnicians] = useState<TechnicianObj[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -143,13 +146,14 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
   }, [propTechnicians]);
 
   // Unique plants for filtering
+  // Plantas de un técnico: la especialidad guarda varias separadas por coma ("MS, FV, RTM")
+  const plantasDe = (t: TechnicianObj) => [...new Set((t.especialidad || t.planta || '').split(',').map(s => s.trim()).filter(Boolean)
+    .map(p => (obtenerCodigoPlanta(p) !== 'OTROS' ? obtenerCodigoPlanta(p) : p.toUpperCase())))];
   const availablePlants = useMemo(() => {
     const set = new Set<string>();
-    dbTechnicians.forEach(t => {
-      if (t.planta) set.add(t.planta.trim());
-      else if (t.especialidad) set.add(t.especialidad.trim());
-    });
+    dbTechnicians.forEach(t => plantasDe(t).forEach(p => set.add(p)));
     return Array.from(set).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbTechnicians]);
 
   // Filter technicians
@@ -163,10 +167,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
         (t.planta && normalizeStr(t.planta).includes(q)) ||
         (t.especialidad && normalizeStr(t.especialidad).includes(q));
 
-      const matchPlant =
-        plantaFilter === 'TODAS' ||
-        (t.planta && normalizeStr(t.planta) === normalizeStr(plantaFilter)) ||
-        (t.especialidad && normalizeStr(t.especialidad) === normalizeStr(plantaFilter));
+      const matchPlant = plantaFilter === 'TODAS' || plantasDe(t).includes(plantaFilter);
 
       return matchSearch && matchPlant;
     });
@@ -200,11 +201,13 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
   }, [filteredTechs]);
 
   // Calculate Capacity Totals
-  // NPPR divides 50% to PR and 50% to NP
+  // NPPR se reparte con el % real de hoy de cada técnico (Distribución de hoy); sin dato, 50/50
   const capacityStats = useMemo(() => {
     let directPrHours = 0;
     let directNpHours = 0;
     let npprTotalHours = 0;
+    let splitPrFromNppr = 0;
+    let splitNpFromNppr = 0;
 
     dbTechnicians.forEach(t => {
       const hours = t.capacidad_horas || 7.2;
@@ -215,12 +218,11 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           directNpHours += hours;
         } else if (t.modalidad_operativa === 'PRNP') {
           npprTotalHours += hours;
+          splitPrFromNppr += hours * fraccionPr(t.id);
+          splitNpFromNppr += hours * (1 - fraccionPr(t.id));
         }
       }
     });
-
-    const splitPrFromNppr = npprTotalHours * 0.5;
-    const splitNpFromNppr = npprTotalHours * 0.5;
 
     return {
       totalTechs: dbTechnicians.length,
@@ -228,7 +230,8 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
       totalNpHours: Math.round((directNpHours + splitNpFromNppr) * 10) / 10,
       npprTotalHours: Math.round(npprTotalHours * 10) / 10,
     };
-  }, [dbTechnicians]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbTechnicians, pctProduccion]);
 
   // Open Create Modal
   const handleOpenNewTech = () => {
@@ -297,7 +300,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           : targetModality === 'NP'
           ? 'NP (No Producción)'
           : targetModality === 'PRNP'
-          ? 'NPPR (Mitad y Mitad)'
+          ? 'NPPR (Producción - No Producción)'
           : 'Inactivo';
 
       setStatusMsg({
@@ -358,7 +361,6 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
   const renderTechCard = (tech: TechnicianObj, currentColumn: ModalityType) => {
     const isInactive = tech.modalidad_operativa === 'INACTIVO' || tech.activo === false;
     const currentMod: ModalityType = isInactive ? 'INACTIVO' : tech.modalidad_operativa || 'PR';
-    const plantaDisplay = tech.planta || tech.especialidad || 'General';
 
     return (
       <div
@@ -384,14 +386,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             >
               {tech.name}
             </span>
-
-            {/* Planta / Especialidad Tag */}
-            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium mt-0.5">
-              <span className="inline-flex items-center gap-0.5 text-gray-600 font-bold bg-gray-100/90 px-1.5 py-0.2 rounded text-[9.5px] border border-gray-200 truncate max-w-[180px]">
-                <MapPin className="w-2.5 h-2.5 text-gray-400 shrink-0" />
-                <span className="truncate">{plantaDisplay}</span>
-              </span>
-            </div>
+            {/* La planta / especialidad ya no se muestra aquí: las especialidades van en su propia sección (EspecialidadesTecnicos) */}
           </div>
 
           <button
@@ -421,7 +416,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           >
             <option value="PR">🟢 PR · Producción (100%)</option>
             <option value="NP">🔵 NP · No Producción (100%)</option>
-            <option value="PRNP">🟡 NPPR · Mitad y Mitad (50/50)</option>
+            <option value="PRNP">🟡 NPPR · Producción - No Producción</option>
             <option value="INACTIVO">⚪ Inactivo</option>
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-gray-500">
@@ -432,7 +427,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
         {/* Sub-label for NPPR 50/50 breakdown */}
         {currentMod === 'PRNP' && (
           <div className="text-[9px] font-bold text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded border border-amber-200 text-center">
-            50% PR ({((tech.capacidad_horas || 7.2) * 0.5).toFixed(1)}h) · 50% NP ({((tech.capacidad_horas || 7.2) * 0.5).toFixed(1)}h)
+            {Math.round(fraccionPr(tech.id) * 100)}% PR ({((tech.capacidad_horas || 7.2) * fraccionPr(tech.id)).toFixed(1)}h) · {100 - Math.round(fraccionPr(tech.id) * 100)}% NP ({((tech.capacidad_horas || 7.2) * (1 - fraccionPr(tech.id))).toFixed(1)}h)
           </div>
         )}
       </div>
@@ -466,7 +461,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             <span className="text-gray-300">|</span>
             <span className="text-sky-800">NP: {capacityStats.totalNpHours}h</span>
             <span className="text-gray-300">|</span>
-            <span className="text-amber-800">NPPR (50/50): {capacityStats.npprTotalHours}h</span>
+            <span className="text-amber-800">NPPR: {capacityStats.npprTotalHours}h</span>
           </div>
 
           <button
@@ -532,8 +527,8 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
             Todas ({dbTechnicians.length})
           </button>
           {availablePlants.map(p => {
-            const count = dbTechnicians.filter(t => t.planta === p || t.especialidad === p).length;
-            const code = obtenerCodigoPlanta(p) !== 'OTROS' ? obtenerCodigoPlanta(p) : p;
+            const count = dbTechnicians.filter(t => plantasDe(t).includes(p)).length;
+            const code = p;
             return (
               <button
                 key={p}
@@ -617,7 +612,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
           </div>
 
           {/* ===================================================================== */}
-          {/* COLUMNA 3: NPPR · MITAD Y MITAD (50% PR / 50% NP)                     */}
+          {/* COLUMNA 3: NPPR · PRODUCCIÓN - NO PRODUCCIÓN                     */}
           {/* ===================================================================== */}
           <div className="bg-[#fffdf5] rounded-2xl border-2 border-amber-200 p-2.5 flex flex-col gap-2 shadow-xs">
             {/* Header */}
@@ -625,7 +620,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                 <span className="text-xs font-black text-amber-950 uppercase tracking-tight">
-                  NPPR · Mitad y Mitad
+                  NPPR · Producción - No Producción
                 </span>
               </div>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300">
@@ -733,7 +728,7 @@ export default function MatrizHorariosTurnos({ technicians: propTechnicians, onT
                 >
                   <option value="PR">🟢 PR · Producción (100% Línea Activa)</option>
                   <option value="NP">🔵 NP · No Producción (100% Paro de Planta)</option>
-                  <option value="PRNP">🟡 NPPR · Mitad Producción y Mitad Paro (50% PR / 50% NP)</option>
+                  <option value="PRNP">🟡 NPPR · Producción - No Producción</option>
                   <option value="INACTIVO">⚪ Inactivo (Fuera de cuadrilla)</option>
                 </select>
                 {techFormData.modalidad_operativa === 'PRNP' && (

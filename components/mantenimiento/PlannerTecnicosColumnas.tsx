@@ -19,7 +19,8 @@ import {
   Plus,
   AlertTriangle,
   Wrench,
-  Building2
+  Building2,
+  Eye,
 } from 'lucide-react';
 
 export interface Technician {
@@ -65,6 +66,9 @@ export interface MaintenanceTask {
   fechaApertura?: string | null;
   fechaCierre?: string | null;
   activo?: boolean;
+  /** Orden de trabajo (PREV-xxxx) vigente del plan */
+  codigoOT?: string | null;
+  ordenId?: number | null;
 }
 
 export interface CorrectiveRecord {
@@ -89,7 +93,8 @@ interface PlannerTecnicosColumnasProps {
   tasks: MaintenanceTask[];
   correctiveRecords: CorrectiveRecord[];
   isSubHeaderOpen?: boolean; // Nivel 3 (barra de búsqueda y acciones) visible
-  onUpdateTaskTech: (taskId: number, newTechId: number) => void;
+  /** Reasignar: recibe la tarjeta (con su ordenId si es una orden PREV) */
+  onUpdateTaskTech: (task: MaintenanceTask, newTechId: number) => void;
   onUpdateCorrectivoTech: (correctivoId: number | string, newTechName: string, newTechId?: number | null) => void;
   onRefreshData?: () => void;
   syncing?: boolean;
@@ -100,9 +105,16 @@ interface PlannerTecnicosColumnasProps {
   onSaveCorrectivo?: (corrId: number | string, updates: Partial<CorrectiveRecord>) => Promise<boolean>;
   // Si se pasa, los correctivos/TPM abren el detalle completo de la página (el mismo de Órdenes de Trabajo)
   onOpenCorrectivoDetail?: (corr: CorrectiveRecord) => void;
+  // Si se pasa, los preventivos abren la ventana de ejecución de la página (la misma de Órdenes de Trabajo y Mis Tareas)
+  onOpenPreventivoDetail?: (task: MaintenanceTask) => void;
+  /** Visor (pestaña Total Tareas): sin reasignar, sin crear, sin abrir ni cerrar órdenes */
+  soloLectura?: boolean;
 }
 
 export type TaskTimeCategory = 'atrasadas' | 'hoy' | 'proximas';
+
+/** Llave única de una tarjeta preventiva: la orden PREV si la tiene (un plan puede tener varias abiertas), si no el plan */
+export const claveTarea = (t: { id: number; ordenId?: number | null }) => (t.ordenId ? `prev-o${t.ordenId}` : `prev-p${t.id}`);
 
 export interface EnrichedTaskCardData {
   uniqueKey: string;
@@ -114,6 +126,8 @@ export interface EnrichedTaskCardData {
   dateStatus: 'overdue' | 'today' | 'upcoming';
   code: string;
   cleanCode: string;
+  /** Orden de trabajo (PREV-xxxx) del preventivo */
+  codigoOT?: string | null;
   title: string;
   maquina?: string;
   planta?: string;
@@ -147,6 +161,8 @@ export default function PlannerTecnicosColumnas({
   onSaveTask,
   onSaveCorrectivo,
   onOpenCorrectivoDetail,
+  onOpenPreventivoDetail,
+  soloLectura = false,
 }: PlannerTecnicosColumnasProps) {
   const [searchQuery, setSearchQuery] = useState('');
   // El portal del nivel 3 solo se monta en el navegador (document.body)
@@ -337,7 +353,7 @@ export default function PlannerTecnicosColumnas({
     tasks.forEach(t => {
       const isUnassigned = t.idtecs === 9999 || !technicians.some(tech => tech.id === t.idtecs);
       if (!isUnassigned) return;
-      if (!matchesSearch({ code: t.code || t.csvId, title: t.title, maquina: t.maquina, planta: t.planta })) return;
+      if (!matchesSearch({ code: `${t.code || t.csvId || ''} ${t.codigoOT || ''}`, title: t.title, maquina: t.maquina, planta: t.planta })) return;
 
       const { category, dateLabel, dateStatus, rawTimestamp } = categorizeTask(t);
       const codeStr = t.code || t.csvId || `MP-${t.id}`;
@@ -345,7 +361,7 @@ export default function PlannerTecnicosColumnas({
       const cleanDuration = Math.round((t.durationHours || 0.5) * 10) / 10;
 
       unassignedItems.push({
-        uniqueKey: `prev-${t.id}`,
+        uniqueKey: claveTarea(t),
         tipo: 'preventivo',
         item: t,
         category,
@@ -354,6 +370,7 @@ export default function PlannerTecnicosColumnas({
         dateStatus,
         code: codeStr,
         cleanCode,
+        codigoOT: t.codigoOT,
         title: t.title,
         maquina: t.maquina,
         planta: t.planta,
@@ -363,7 +380,7 @@ export default function PlannerTecnicosColumnas({
     });
 
     // Correctives
-    correctiveRecords.forEach(c => {
+    correctiveRecords.forEach((c, cIdx) => {
       if (c.estado === 'Resuelta') return;
       const isUnassigned = !c.tecnico_asignado || c.tecnico_asignado === 'Sin asignar' || c.tecnico_asignado === 'Por asignar';
       if (!isUnassigned) return;
@@ -374,7 +391,8 @@ export default function PlannerTecnicosColumnas({
       const cleanCode = codeStr.replace(/^\[+|\]+$/g, '').trim();
 
       unassignedItems.push({
-        uniqueKey: `corr-${c.id}`,
+        // Un correctivo y una tarjeta TPM pueden compartir id (vienen de tablas distintas): la llave lleva código y posición
+        uniqueKey: `corr-${c.codigo || ''}-${c.id}-${cIdx}`,
         tipo: 'correctivo',
         item: c,
         category,
@@ -432,7 +450,7 @@ export default function PlannerTecnicosColumnas({
       // Preventives assigned to this tech
       tasks.forEach(t => {
         if (t.idtecs !== tech.id) return;
-        if (!matchesSearch({ code: t.code || t.csvId, title: t.title, maquina: t.maquina, planta: t.planta, tecnico: tech.name })) return;
+        if (!matchesSearch({ code: `${t.code || t.csvId || ''} ${t.codigoOT || ''}`, title: t.title, maquina: t.maquina, planta: t.planta, tecnico: tech.name })) return;
 
         const { category, dateLabel, dateStatus, rawTimestamp } = categorizeTask(t);
         const codeStr = t.code || t.csvId || `MP-${t.id}`;
@@ -440,7 +458,7 @@ export default function PlannerTecnicosColumnas({
         const cleanDuration = Math.round((t.durationHours || 0.5) * 10) / 10;
 
         techItems.push({
-          uniqueKey: `prev-${t.id}`,
+          uniqueKey: claveTarea(t),
           tipo: 'preventivo',
           item: t,
           category,
@@ -449,6 +467,7 @@ export default function PlannerTecnicosColumnas({
           dateStatus,
           code: codeStr,
           cleanCode,
+          codigoOT: t.codigoOT,
           title: t.title,
           maquina: t.maquina,
           planta: t.planta,
@@ -458,7 +477,7 @@ export default function PlannerTecnicosColumnas({
       });
 
       // Correctives assigned to this tech
-      correctiveRecords.forEach(c => {
+      correctiveRecords.forEach((c, cIdx) => {
         if (c.estado === 'Resuelta') return;
         if (!c.tecnico_asignado) return;
         const matchesName =
@@ -473,7 +492,7 @@ export default function PlannerTecnicosColumnas({
         const cleanCode = codeStr.replace(/^\[+|\]+$/g, '').trim();
 
         techItems.push({
-          uniqueKey: `corr-${c.id}`,
+          uniqueKey: `corr-${c.codigo || ''}-${c.id}-${cIdx}`,
           tipo: 'correctivo',
           item: c,
           category,
@@ -528,18 +547,13 @@ export default function PlannerTecnicosColumnas({
       };
     });
 
-    // Sort: Active technicians first (by most atrasadas descending, then totalCount desc), Inactive at the very end
+    // Orden: técnicos activos por abecedario (de izquierda a derecha); los inactivos al final, también por abecedario.
+    // "Pendientes por Asignar" va aparte y siempre de primero.
     return mapped.sort((a, b) => {
       if (a.isInactive !== b.isInactive) {
         return a.isInactive ? 1 : -1;
       }
-      if (b.atrasadas.length !== a.atrasadas.length) {
-        return b.atrasadas.length - a.atrasadas.length;
-      }
-      if (b.totalCount !== a.totalCount) {
-        return b.totalCount - a.totalCount;
-      }
-      return a.tech.name.localeCompare(b.tech.name);
+      return a.tech.name.localeCompare(b.tech.name, 'es', { sensitivity: 'base' });
     });
   }, [allValidTechs, tasks, correctiveRecords, searchQuery]);
 
@@ -549,10 +563,10 @@ export default function PlannerTecnicosColumnas({
   }, [techColumnsData]);
 
   // Reassignment handlers
-  const handleTaskReassign = (taskId: number, newTechIdStr: string) => {
+  const handleTaskReassign = (task: MaintenanceTask, newTechIdStr: string) => {
     const newTechId = parseInt(newTechIdStr, 10);
-    setAnimatingCardId(taskId);
-    onUpdateTaskTech(taskId, newTechId);
+    setAnimatingCardId(claveTarea(task));
+    onUpdateTaskTech(task, newTechId);
     setTimeout(() => setAnimatingCardId(null), 800);
   };
 
@@ -562,6 +576,11 @@ export default function PlannerTecnicosColumnas({
       onOpenCorrectivoDetail(item as CorrectiveRecord);
       return;
     }
+    if (tipo === 'preventivo' && onOpenPreventivoDetail) {
+      onOpenPreventivoDetail(item as MaintenanceTask);
+      return;
+    }
+    if (soloLectura) return;
     if (tipo === 'preventivo') {
       const t = item as MaintenanceTask;
       setPrevEditForm({
@@ -694,6 +713,11 @@ export default function PlannerTecnicosColumnas({
           </div>
 
           {/* Middle Group: Action Buttons (+ Correctivo & + TPM - Single +) */}
+          {soloLectura ? (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-600 whitespace-nowrap shrink-0" title="Vista solo de consulta: no se reasigna, crea ni cierra desde aquí">
+              <Eye className="w-3 h-3" /> Solo consulta
+            </span>
+          ) : (
           <div className="flex flex-row items-center gap-1.5 shrink-0 flex-nowrap">
             {/* + Correctivo Button */}
             <button
@@ -717,6 +741,7 @@ export default function PlannerTecnicosColumnas({
               <span>TPM</span>
             </button>
           </div>
+          )}
 
           {/* Right Group: Status Indicators Row (Compact & Cleaned) */}
           <div className="flex flex-row items-center gap-1.5 text-[11px] text-gray-600 shrink-0 flex-nowrap whitespace-nowrap">
@@ -750,7 +775,7 @@ export default function PlannerTecnicosColumnas({
         {/* COLUMN 1: PENDIENTES POR ASIGNAR (UNASSIGNED POOL) */}
         {/* =================================================================== */}
         <div
-          className="w-[235px] sm:w-[245px] flex-shrink-0 flex flex-col rounded-2xl border-2 border-dashed border-amber-300 overflow-hidden shadow-2xs"
+          className="w-[85vw] max-w-[340px] sm:w-[320px] md:w-[calc((100%-30px)/4)] md:min-w-[280px] md:max-w-none flex-shrink-0 flex flex-col rounded-2xl border-2 border-dashed border-amber-300 overflow-hidden shadow-2xs"
           style={{ height: isSubHeaderOpen ? 'calc(100vh - 150px)' : 'calc(100vh - 110px)' }}
         >
           
@@ -805,6 +830,7 @@ export default function PlannerTecnicosColumnas({
                 {/* 1. ATRASADAS (Collapsible) */}
                 {unassignedData.atrasadas.length > 0 && (
                   <TaskGroupSection
+                    soloLectura={soloLectura}
                     title="Atrasadas"
                     count={unassignedData.atrasadas.length}
                     variant="atrasadas"
@@ -822,6 +848,7 @@ export default function PlannerTecnicosColumnas({
                 {/* 2. HOY (Collapsible) */}
                 {unassignedData.hoy.length > 0 && (
                   <TaskGroupSection
+                    soloLectura={soloLectura}
                     title="Hoy"
                     count={unassignedData.hoy.length}
                     variant="hoy"
@@ -839,6 +866,7 @@ export default function PlannerTecnicosColumnas({
                 {/* 3. PRÓXIMAS (Collapsible) */}
                 {unassignedData.proximas.length > 0 && (
                   <TaskGroupSection
+                    soloLectura={soloLectura}
                     title="Próximas"
                     count={unassignedData.proximas.length}
                     variant="proximas"
@@ -879,7 +907,7 @@ export default function PlannerTecnicosColumnas({
           return (
             <div
               key={tech.id}
-              className={`w-[235px] sm:w-[245px] flex-shrink-0 flex flex-col ${palette.border} border rounded-2xl overflow-hidden shadow-2xs ${
+              className={`w-[85vw] max-w-[340px] sm:w-[320px] md:w-[calc((100%-30px)/4)] md:min-w-[280px] md:max-w-none flex-shrink-0 flex flex-col ${palette.border} border rounded-2xl overflow-hidden shadow-2xs ${
                 isInactive ? 'opacity-85 hover:opacity-100 transition-opacity' : ''
               }`}
               style={{ height: isSubHeaderOpen ? 'calc(100vh - 150px)' : 'calc(100vh - 110px)' }}
@@ -912,7 +940,7 @@ export default function PlannerTecnicosColumnas({
                   </div>
 
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
+                    {!soloLectura && <button
                       type="button"
                       onClick={() => onOpenPortalForTech?.(tech.id)}
                       className="px-1.5 py-0.5 rounded-lg bg-white/95 hover:bg-[#324354] text-gray-700 hover:text-white border border-gray-200 shadow-2xs text-[9px] font-bold flex items-center gap-0.5 transition-all cursor-pointer hover:shadow-xs active:scale-95"
@@ -920,7 +948,7 @@ export default function PlannerTecnicosColumnas({
                     >
                       <User className="w-2.5 h-2.5" />
                       <span>Ver</span>
-                    </button>
+                    </button>}
                     <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${palette.lightBadge} flex-shrink-0 shadow-2xs`}>
                       {totalCount} ord.
                     </span>
@@ -963,6 +991,7 @@ export default function PlannerTecnicosColumnas({
                     {/* 1. ATRASADAS (X) - Collapsible */}
                     {atrasadas.length > 0 && (
                       <TaskGroupSection
+                    soloLectura={soloLectura}
                         title="Atrasadas"
                         count={atrasadas.length}
                         variant="atrasadas"
@@ -980,6 +1009,7 @@ export default function PlannerTecnicosColumnas({
                     {/* 2. HOY (Y) - Collapsible */}
                     {hoy.length > 0 && (
                       <TaskGroupSection
+                    soloLectura={soloLectura}
                         title="Hoy"
                         count={hoy.length}
                         variant="hoy"
@@ -997,6 +1027,7 @@ export default function PlannerTecnicosColumnas({
                     {/* 3. PRÓXIMAS (Z) - Collapsible */}
                     {proximas.length > 0 && (
                       <TaskGroupSection
+                    soloLectura={soloLectura}
                         title="Próximas"
                         count={proximas.length}
                         variant="proximas"
@@ -1042,7 +1073,7 @@ export default function PlannerTecnicosColumnas({
                   </p>
                   <h3 className="text-white font-black text-sm font-mono tracking-tight">
                     {detailModalItem.tipo === 'preventivo'
-                      ? ((detailModalItem.item as MaintenanceTask).code || (detailModalItem.item as MaintenanceTask).csvId)
+                      ? `${(detailModalItem.item as MaintenanceTask).codigoOT ? `${(detailModalItem.item as MaintenanceTask).codigoOT} · ` : ''}${(detailModalItem.item as MaintenanceTask).code || (detailModalItem.item as MaintenanceTask).csvId}`
                       : (detailModalItem.item as CorrectiveRecord).codigo}
                   </h3>
                 </div>
@@ -1354,9 +1385,10 @@ interface TaskGroupSectionProps {
   isOpen: boolean;
   onToggle: () => void;
   animatingCardId: string | number | null;
-  onReassignTask: (taskId: number, newTechIdStr: string) => void;
+  onReassignTask: (task: MaintenanceTask, newTechIdStr: string) => void;
   onReassignCorrectivo: (corrId: number | string, newTechVal: string) => void;
   onOpenDetail: (tipo: 'preventivo' | 'correctivo', item: MaintenanceTask | CorrectiveRecord) => void;
+  soloLectura?: boolean;
 }
 
 function TaskGroupSection({
@@ -1371,6 +1403,7 @@ function TaskGroupSection({
   onReassignTask,
   onReassignCorrectivo,
   onOpenDetail,
+  soloLectura = false,
 }: TaskGroupSectionProps) {
 
   const headerStyles = {
@@ -1430,17 +1463,18 @@ function TaskGroupSection({
               technicians={technicians}
               isAnimating={
                 cardData.tipo === 'preventivo'
-                  ? animatingCardId === (cardData.item as MaintenanceTask).id
+                  ? animatingCardId === claveTarea(cardData.item as MaintenanceTask)
                   : animatingCardId === (cardData.item as CorrectiveRecord).id
               }
               onReassign={(newTechVal) => {
                 if (cardData.tipo === 'preventivo') {
-                  onReassignTask((cardData.item as MaintenanceTask).id, newTechVal);
+                  onReassignTask(cardData.item as MaintenanceTask, newTechVal);
                 } else {
                   onReassignCorrectivo((cardData.item as CorrectiveRecord).id, newTechVal);
                 }
               }}
               onOpenDetail={() => onOpenDetail(cardData.tipo, cardData.item)}
+              soloLectura={soloLectura}
             />
           ))}
         </div>
@@ -1459,6 +1493,7 @@ interface MaintenanceCardProps {
   isAnimating?: boolean;
   onReassign: (newTechIdStr: string) => void;
   onOpenDetail: () => void;
+  soloLectura?: boolean;
 }
 
 function MaintenanceCard({
@@ -1467,9 +1502,10 @@ function MaintenanceCard({
   isAnimating,
   onReassign,
   onOpenDetail,
+  soloLectura = false,
 }: MaintenanceCardProps) {
   
-  const { tipo, cleanCode, title, maquina, planta, durationHours, prioridad, currentTechId, dateLabel, dateStatus } = cardData;
+  const { tipo, cleanCode, codigoOT, title, maquina, planta, durationHours, prioridad, currentTechId, dateLabel, dateStatus } = cardData;
   const isCorrectivo = tipo === 'correctivo';
 
   // Date pill styling
@@ -1492,6 +1528,14 @@ function MaintenanceCard({
       {/* Top Line: Tag Badge, Execution Date/Deadline & Duration */}
       <div className="flex items-center justify-between gap-1">
         
+        {/* Primero el código único de la orden (PREV-xxxx); después el del plan */}
+        <div className="flex items-center gap-1 min-w-0">
+        {!isCorrectivo && codigoOT && (
+          <span className="px-1.5 py-0.5 rounded text-[8.5px] font-bold font-mono border tracking-tight leading-tight truncate max-w-[80px] bg-sky-50 text-sky-800 border-sky-200 shrink-0"
+            title={`Orden de trabajo ${codigoOT}`}>
+            {codigoOT}
+          </span>
+        )}
         {/* Code Tag Badge - sutil / discreto en gris */}
         <span
           className={`px-1.5 py-0.5 rounded text-[8.5px] font-medium font-mono border tracking-tight leading-tight truncate max-w-[95px] ${
@@ -1503,6 +1547,7 @@ function MaintenanceCard({
         >
           [{cleanCode}]
         </span>
+        </div>
 
         {/* Right Badges: Execution Date & Duration */}
         <div className="flex items-center gap-1 shrink-0">
@@ -1525,7 +1570,7 @@ function MaintenanceCard({
       <div
         onClick={onOpenDetail}
         className="cursor-pointer group-hover:text-blue-900 transition-colors"
-        title="Clic para ver detalle"
+        title={soloLectura ? 'Clic para ver el detalle (solo consulta)' : 'Clic para ver detalle'}
       >
         <h4 className="font-bold text-[10.5px] text-[#324354] leading-tight line-clamp-2">
           {title}
@@ -1548,7 +1593,7 @@ function MaintenanceCard({
         </div>
 
         {/* Compact Reassign Trigger Button */}
-        <div className="relative inline-flex items-center shrink-0">
+        {!soloLectura && <div className="relative inline-flex items-center shrink-0">
           <div className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#F6F3EE] hover:bg-[#eae5dc] border border-[#e2ded5] text-[9px] font-bold text-[#324354] transition-all cursor-pointer shadow-2xs">
             <span className="text-[9.5px]">⇄</span>
             <span>Reasignar</span>
@@ -1572,7 +1617,7 @@ function MaintenanceCard({
                 </option>
               ))}
           </select>
-        </div>
+        </div>}
 
       </div>
 

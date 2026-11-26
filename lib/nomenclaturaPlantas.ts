@@ -412,17 +412,59 @@ export function computeSemanasFromFrecuencia(frecuenciaDias?: number | null): st
   return String(semanas).padStart(2, '0');
 }
 
+/** Quién ejecuta el mantenimiento: MT = técnicos de mantenimiento, OP = producción (operativo) */
+export type Ejecutor = 'MT' | 'OP';
+export const EJECUTORES: { codigo: Ejecutor; nombre: string; detalle: string }[] = [
+  { codigo: 'MT', nombre: 'Mantenimiento', detalle: 'Lo ejecutan los técnicos de mantenimiento' },
+  { codigo: 'OP', nombre: 'Operativo (Producción)', detalle: 'Lo ejecuta producción: encargados de planta / operarios' },
+];
+export function normalizarEjecutor(v?: string | null): Ejecutor {
+  return String(v || '').trim().toUpperCase() === 'OP' ? 'OP' : 'MT';
+}
+
 /**
- * Extrae la nomenclatura existente entre corchetes o la calcula con la frecuencia adecuada
+ * Pone el ejecutor justo después de la periodicidad: [S01MSPRT30] → [S01MTMSPRT30].
+ * Si ya lo tiene lo reemplaza. La planta MTTO no se confunde con el ejecutor MT.
+ */
+function conEjecutor(inner: string, ejecutor: Ejecutor): string {
+  const m = inner.match(/^([A-Z]\d{2})(.*)$/);
+  if (!m) return inner;
+  let resto = m[2];
+  const tiene = /^OP/.test(resto) || /^MTMTTO/.test(resto) || (/^MT/.test(resto) && !/^MTTO/.test(resto));
+  if (tiene) resto = resto.slice(2);
+  return `${m[1]}${ejecutor}${resto}`;
+}
+
+/**
+ * Código de periodicidad a partir de la frecuencia en días:
+ * - D01 a D06: cada 1 a 6 días (D07 no existe: es S01)
+ * - S01 a S51: cada 1 a 51 semanas = días ÷ 7 redondeado (S52 no existe: es A01)
+ * - A01, A02…: cada 1, 2… años (desde 360 días)
+ * Sin frecuencia válida: S04.
+ */
+export function computePeriodicidad(frecuenciaDias?: number | null): string {
+  const d = Number(frecuenciaDias);
+  if (!d || isNaN(d) || d <= 0) return 'S04';
+  if (d < 7) return `D${String(Math.max(1, Math.round(d))).padStart(2, '0')}`;
+  const semanas = Math.max(1, Math.round(d / 7));
+  if (semanas >= 52 || d >= 360) return `A${String(Math.max(1, Math.round(d / 365))).padStart(2, '0')}`;
+  return `S${String(semanas).padStart(2, '0')}`;
+}
+
+/**
+ * Extrae la nomenclatura existente entre corchetes o la calcula con la frecuencia adecuada.
+ * Estructura: Periodicidad + Ejecutor + Planta + Tipo Intervención + Tiempo (ej. [S01OPMSPRT30]).
  */
 export function computeNomenclatura(
   planta?: string | null,
   tipoIntervencion?: string | null,
   duracionMinutos?: number | null,
   rawCodeOrTitle?: string | null,
-  frecuenciaDias?: number | null
+  frecuenciaDias?: number | null,
+  ejecutor?: string | null
 ): string {
-  const seccion = computeSemanasFromFrecuencia(frecuenciaDias);
+  const ej = normalizarEjecutor(ejecutor);
+  const periodicidad = computePeriodicidad(frecuenciaDias);
   let pCode = obtenerCodigoPlanta(planta);
   // Limpiar caracteres extraños en pCode si tiene comas o espacios
   pCode = pCode.replace(/[^A-Za-z0-9]/g, '');
@@ -443,16 +485,16 @@ export function computeNomenclatura(
     const match = String(rawCodeOrTitle).match(/\[([A-Z0-9_,\s-]+)\]/i);
     if (match && match[1]) {
       const inner = match[1].toUpperCase().replace(/\s+/g, '');
-      // Si la nomenclatura existente tiene S\d{2} y se suministró una frecuencia específica,
-      // actualizamos el prefijo de semanas (ej: si tenía S04 pero la frecuencia es 90d -> S12)
-      if (frecuenciaDias !== undefined && frecuenciaDias !== null && /^S\d{2}/.test(inner)) {
-        return `[S${seccion}${inner.slice(3).replace(/[^A-Za-z0-9]/g, '')}]`;
+      // Si la nomenclatura existente empieza por periodicidad (D/S/A + 2 dígitos) y se suministró la frecuencia,
+      // se recalcula el prefijo (ej: tenía S12 y la frecuencia es 90 días -> S13; 360 días -> A01)
+      if (frecuenciaDias !== undefined && frecuenciaDias !== null && /^[DSA]\d{2}/.test(inner)) {
+        return `[${conEjecutor(`${periodicidad}${inner.slice(3).replace(/[^A-Za-z0-9]/g, '')}`, ej)}]`;
       }
-      return `[${inner.replace(/[^A-Za-z0-9]/g, '')}]`;
+      return `[${conEjecutor(inner.replace(/[^A-Za-z0-9]/g, ''), ej)}]`;
     }
   }
 
-  return `[S${seccion}${pCode}${tCode}${dur}]`;
+  return `[${periodicidad}${ej}${pCode}${tCode}${dur}]`;
 }
 
 /**
@@ -462,8 +504,11 @@ export function cleanTaskTitle(title: string, nomenclature?: string): string {
   if (!title) return '';
   let clean = String(title).trim();
   if (nomenclature) {
-    const escNom = nomenclature.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    clean = clean.replace(new RegExp(escNom, 'gi'), '').trim();
+    const sinEj = nomenclature.replace(/^\[([A-Z]\d{2})(OP|MT)(?!TO)/i, '[$1');
+    for (const n of [nomenclature, sinEj]) {
+      const escNom = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      clean = clean.replace(new RegExp(escNom, 'gi'), '').trim();
+    }
   }
   clean = clean.replace(/\[\s*\]/g, '').replace(/\s{2,}/g, ' ').trim();
   return clean || String(title).trim();

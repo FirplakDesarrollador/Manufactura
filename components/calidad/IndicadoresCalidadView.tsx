@@ -233,13 +233,14 @@ interface IndicadoresCalidadViewProps {
     soloMs?: boolean;
     // Solo la sección de Reparación de Moldes (pestaña Indicadores de Calidad RMOLD)
     soloRmold?: boolean;
+    soloFv?: boolean;
     // Pestañas controladas desde la página (el Tablero de Control las muestra como su tercer nivel)
     tab?: MainTabKey;
     onTabChange?: (tab: MainTabKey) => void;
     ocultarPestanas?: boolean;
 }
 
-export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false, soloRmold = false, tab, onTabChange, ocultarPestanas = false }: IndicadoresCalidadViewProps) {
+export default function IndicadoresCalidadView({ showMainHeader = false, soloMs = false, soloRmold = false, soloFv = false, tab, onTabChange, ocultarPestanas = false }: IndicadoresCalidadViewProps) {
     const router = useRouter();
     const [userEmail, setUserEmail] = useState<string>('');
     
@@ -545,13 +546,18 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 2: MÁRMOL SINTÉTICO (MS) */}
                         {/* ------------------------------------------------------------- */}
-                        {!soloRmold && (
+                        {!soloRmold && !soloFv && (
                         <section id="marmol-sintetico" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
                             <CalidadMsDashboard powerBiUrl={POWERBI_URL_MS} />
                         </section>
                         )}
 
-                        {!soloMs && !soloRmold && (<>
+                        {soloFv && (
+                        <section id="fibra-vidrio-app" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
+                            <CalidadMsDashboard planta={PLANTAS_CALIDAD.fv} />
+                        </section>
+                        )}
+                        {!soloMs && !soloRmold && !soloFv && (<>
                         {/* LINEA DIVISORIA */}
                         <PlantDivider title="Fibra de Vidrio" plantKey="FV" />
 
@@ -802,7 +808,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
                         {/* ------------------------------------------------------------- */}
                         {/* PLANTA 7: REPARACIÓN DE MOLDES (RMOLD) — Calidad RMOLD (mismo tablero de MS) */}
                         {/* ------------------------------------------------------------- */}
-                        {!soloMs && (<>
+                        {!soloMs && !soloFv && (<>
                         {!soloRmold && <PlantDivider title="Reparación de Moldes" plantKey="RMOLD" />}
                         <section id="reparacion-moldes" className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-[#e2ded5] space-y-3">
                             <CalidadMsDashboard planta={PLANTAS_CALIDAD.rmold} />

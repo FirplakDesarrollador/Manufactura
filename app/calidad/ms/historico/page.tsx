@@ -39,6 +39,10 @@ interface HistoricoReporte {
     producto_id: number
     molde_manual?: string | null   // RMOLD: molde escrito a mano (no aparecía o estaba mal marcado)
     molde_escrito?: boolean | null
+    linea?: string | null               // FV
+    orden_fabricacion?: string | null   // FV
+    entrega_cedi?: boolean | null       // FV: pieza entregada a CEDI
+    fotos?: string[] | null             // FV: todas las fotos de la pieza (la primera es fotoUrl)
     defecto: any
     Molde?: string
     molde?: string
@@ -57,6 +61,13 @@ export default function HistoricoDefectosPage() {
     const [loading, setLoading] = useState(true)
     const [userEmail, setUserEmail] = useState<string | undefined>()
     const [reports, setReports] = useState<HistoricoReporte[]>([])
+    // FV: marcar o desmarcar la pieza como entregada a CEDI (como el botón "Entrega CEDI" de Power Apps)
+    const alternarCedi = async (r: HistoricoReporte) => {
+        const nuevo = !r.entrega_cedi
+        const { error } = await supabase.from(planta.tReportes).update({ entrega_cedi: nuevo }).eq('id', r.id)
+        if (error) { alert(`No se pudo marcar la entrega a CEDI: ${error.message}`); return }
+        setReports(prev => prev.map(x => (x.id === r.id ? { ...x, entrega_cedi: nuevo } : x)))
+    }
     const [searchTerm, setSearchTerm] = useState('')
     const [typeFilter, setTypeFilter] = useState<'TODOS' | 'LINEA' | 'SALDO' | 'DESTRUCCION' | 'SALDO_DESTRUCCION' | 'MOLDE'>('TODOS')
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -121,7 +132,7 @@ export default function HistoricoDefectosPage() {
                     producto_id,
                     defecto,
                     Molde,
-                    fotoUrl,${planta.conSerial ? ' molde_manual, molde_escrito,' : ''}
+                    fotoUrl,${planta.conSerial ? ' molde_manual, molde_escrito,' : ''}${planta.conLinea ? ' linea, orden_fabricacion, entrega_cedi, fotos,' : ''}
                     producto:${planta.tReferencias} (Referencia)
                 `), { count: 'exact' })
                 .order('created_at', { ascending: false })
@@ -671,6 +682,17 @@ export default function HistoricoDefectosPage() {
                                             {/* Referencia Producto */}
                                             <td className="px-5 py-3 whitespace-nowrap text-xs font-black text-[#254153]">
                                                 {report.producto?.Referencia || (report.molde_manual ? `${report.molde_manual} (escrito)` : 'Sin Referencia')}{report.molde_escrito && <span className="ml-1 text-[9px] font-black uppercase text-amber-800 bg-amber-100 border border-amber-300 rounded px-1" title="Molde escrito a mano (no aparecía o estaba mal marcado)">Manual</span>}
+                                                {planta.conLinea && (
+                                                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold text-gray-500" onClick={e => e.stopPropagation()}>
+                                                        {report.linea && <span>{report.linea}</span>}
+                                                        {report.orden_fabricacion && <span>· OF {report.orden_fabricacion}</span>}
+                                                        <button type="button" onClick={() => void alternarCedi(report)}
+                                                            title={report.entrega_cedi ? 'Entregada a CEDI (clic para desmarcar)' : 'Marcar como entregada a CEDI'}
+                                                            className={`px-1.5 rounded border text-[9px] font-black uppercase ${report.entrega_cedi ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-gray-400 border-gray-300 hover:text-[#254153]'}`}>
+                                                            {report.entrega_cedi ? '✓ CEDI' : 'CEDI'}
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </td>
 
                                             {/* Defectos */}
@@ -720,6 +742,7 @@ export default function HistoricoDefectosPage() {
                                                             alt="Evidencia"
                                                             className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                                                         />
+                                                        {(report.fotos?.length || 0) > 1 && <span className="absolute bottom-0 right-0 text-[9px] font-black bg-[#254153] text-white rounded-tl px-1">{report.fotos!.length}</span>}
                                                     </button>
                                                 ) : (
                                                     <span className="text-gray-300 text-xs">-</span>
@@ -868,6 +891,17 @@ export default function HistoricoDefectosPage() {
                                             <ZoomIn className="w-4 h-4" /> Ampliar foto
                                         </div>
                                     </div>
+                                    {(selectedDetailReport.fotos?.length || 0) > 1 && (
+                                        <div className="mt-2 grid grid-cols-5 gap-1.5">
+                                            {selectedDetailReport.fotos!.map((u, i) => (
+                                                <button key={i} type="button" onClick={() => setSelectedImage(u)} title={`Foto ${i + 1}`}
+                                                    className="aspect-square rounded overflow-hidden border border-gray-300 hover:border-[#254153]">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={u} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

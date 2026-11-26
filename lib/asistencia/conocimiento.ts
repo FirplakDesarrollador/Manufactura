@@ -216,7 +216,7 @@ export const MODULOS: Modulo[] = [
                 nombre: 'Gestor de Mantenimiento', ruta: '/mantenimiento/gestion-mantenimiento', que: 'Órdenes de trabajo, preventivos y técnicos.',
                 pestanas: [
                     { nombre: 'Planificador', que: 'Calendario de trabajos con buscador, "+ Correctivo", "+ TPM" e indicadores.' },
-                    { nombre: 'Portal Técnicos', que: 'Trabajos asignados a cada técnico.' },
+                    { nombre: 'Mis Tareas', que: 'Tablero de tareas del técnico con sesión (correctivos, TPM y preventivos asignados).' },
                     { nombre: 'Preventivo (PMP)', que: 'Plan de mantenimiento preventivo; genera las órdenes por calendario.' },
                     { nombre: 'Órdenes de Trabajo', que: 'Todas las OT (correctivas, TPM, preventivas).' },
                     { nombre: 'Indicadores', que: 'Disponibilidad, tiempos y cumplimiento.' },
@@ -236,6 +236,7 @@ export const MODULOS: Modulo[] = [
         consejos: ['Un mismo correctivo se abre en la misma ventana desde el Planificador o las Órdenes de Trabajo.'],
         conecta: ['Tarjetas de Anomalías TPM', 'Tablero de Control → Mantenimiento'],
     },
+    { id: 'notificaciones', nombre: 'Notificaciones', ruta: '/notificaciones', grupo: 'Consultas y soporte', que: 'Avisos para cada usuario: novedades, asignación de tareas, problemas y mantenimiento.', consejos: ['Módulo en desarrollo.'], estado: 'construccion' },
     { id: 'inventarios', nombre: 'Inventarios', ruta: '/inventarios', grupo: 'Consultas y soporte', que: 'Existencias de materias primas y producto.', consejos: ['Módulo en desarrollo.'], estado: 'construccion' },
     {
         id: 'consulta-sap', nombre: 'Consulta SAP', ruta: '/consulta-sap', grupo: 'Consultas y soporte',
