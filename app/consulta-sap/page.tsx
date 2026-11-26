@@ -7,7 +7,7 @@ import Header from '@/components/opt-sistemica/Header'
 import componentsData from './components_data.json'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer, Calendar, AlertTriangle, Camera } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Download, RefreshCw, Copy, Check, PackageSearch, Search, Loader2, Printer, Calendar, AlertTriangle, Camera, ArrowLeftRight } from 'lucide-react'
 import LiberacionMueblesView from '@/components/liberacion-muebles/LiberacionMueblesView'
 
 interface ComponentItem {
@@ -461,7 +461,7 @@ export default function ConsultaSAPPage() {
     const [loading, setLoading] = useState(true)
 
     // SubHeader Tabs: Consulta Ordenes vs Consulta por Producto vs Query - Semáforo vs Query - Ordenes Liberadas vs Query - Entregas Producción vs Liberación Muebles
-    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'consulta-producto' | 'query-semaforo' | 'query-ordenes-liberadas' | 'query-entregas-produccion' | 'liberacion-muebles'>('consulta-ordenes')
+    const [subHeaderTab, setSubHeaderTab] = useState<'consulta-ordenes' | 'consulta-producto' | 'query-semaforo' | 'query-ordenes-liberadas' | 'query-entregas-produccion' | 'liberacion-muebles' | 'solicitud-traslados-pedidos'>('consulta-ordenes')
 
     // Estados Consulta por Producto (Datos maestros de artículo) - Inicialmente Vacíos
     const [itemCodeInput, setItemCodeInput] = useState("")
@@ -1226,7 +1226,7 @@ export default function ConsultaSAPPage() {
     return (
         <div className={`${embebida ? 'min-h-0' : 'min-h-screen pb-1'} bg-[#F6F3EE] flex flex-col font-sans text-[#000000] select-none`}>
             {!embebida && <Header
-                title="Consulta SAP"
+                title="SAP"
                 subtitle="Módulo de Consulta"
                 userEmail={user?.email}
                 showLogout={true}
@@ -1312,6 +1312,19 @@ export default function ConsultaSAPPage() {
                     >
                         <Check size={16} />
                         <span>Liberación Muebles</span>
+                    </button>
+
+                    {/* 7. Solicitud de Traslados y Pedidos (en construcción) */}
+                    <button
+                        onClick={() => setSubHeaderTab('solicitud-traslados-pedidos')}
+                        className={`flex items-center gap-1.5 h-7 px-3 rounded-lg font-bold transition-all text-[11px] sm:text-xs cursor-pointer whitespace-nowrap ${
+                            subHeaderTab === 'solicitud-traslados-pedidos'
+                                ? 'bg-[#324354] text-white shadow-md'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                    >
+                        <ArrowLeftRight size={16} />
+                        <span>Solicitud de Traslados y Pedidos</span>
                     </button>
                 </div>
             </div>
@@ -3024,6 +3037,19 @@ export default function ConsultaSAPPage() {
             ) : subHeaderTab === 'liberacion-muebles' ? (
                 <main className="flex-1 max-w-[1700px] w-full mx-auto p-1 md:p-1.5 flex flex-col font-sans h-full min-h-0">
                     <LiberacionMueblesView />
+                </main>
+            ) : subHeaderTab === 'solicitud-traslados-pedidos' ? (
+                <main className="flex-1 max-w-[1700px] w-full mx-auto p-4 flex items-center justify-center font-sans">
+                    <div className="bg-white rounded-2xl border border-[#e2ded5] shadow-sm p-8 max-w-xl w-full text-center flex flex-col items-center gap-4">
+                        <div className="w-14 h-14 rounded-full bg-[#deb841]/20 text-[#7a5f0e] flex items-center justify-center">
+                            <ArrowLeftRight size={28} />
+                        </div>
+                        <div>
+                            <span className="inline-block px-3 py-1 rounded-full bg-[#deb841]/20 border border-[#deb841] text-[#7a5f0e] text-[11px] font-black uppercase tracking-wider">En construcción</span>
+                            <h2 className="text-xl font-black text-[#324354] mt-3">Solicitud de Traslados y Pedidos</h2>
+                            <p className="text-sm text-slate-500 mt-1">Desde aquí se podrán crear en SAP las solicitudes de traslado de materiales y los pedidos. Este módulo se desarrollará más adelante.</p>
+                        </div>
+                    </div>
                 </main>
             ) : null}
         </div>

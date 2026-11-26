@@ -239,7 +239,7 @@ export const MODULOS: Modulo[] = [
     { id: 'notificaciones', nombre: 'Notificaciones', ruta: '/notificaciones', grupo: 'Consultas y soporte', que: 'Avisos para cada usuario: novedades, asignación de tareas, problemas y mantenimiento.', consejos: ['Módulo en desarrollo.'], estado: 'construccion' },
     { id: 'inventarios', nombre: 'Inventarios', ruta: '/inventarios', grupo: 'Consultas y soporte', que: 'Existencias de materias primas y producto.', consejos: ['Módulo en desarrollo.'], estado: 'construccion' },
     {
-        id: 'consulta-sap', nombre: 'Consulta SAP', ruta: '/consulta-sap', grupo: 'Consultas y soporte',
+        id: 'consulta-sap', nombre: 'SAP', ruta: '/consulta-sap', grupo: 'Consultas y soporte',
         que: 'Consultas directas a SAP sin salir de la app.',
         pestanas: [
             { nombre: 'Consulta Órdenes', que: 'Una OF como en SAP: encabezado, componentes (requerido, consumido, bodega, método de emisión), resumen y anexos.' },

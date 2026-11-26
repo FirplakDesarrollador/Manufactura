@@ -330,7 +330,7 @@ export default function Header({
                 { label: 'Inventarios Cíclicos', path: '/inventarios-ciclicos' }
               ]
             },
-            { label: 'Consulta SAP', path: '/consulta-sap', icon: (
+            { label: 'SAP', path: '/consulta-sap', icon: (
               <IconoSap className="w-5 h-5" />
             )},
             { label: 'Talento Humano (Atajo)', path: 'https://talentohumano.vercel.app', icon: (
