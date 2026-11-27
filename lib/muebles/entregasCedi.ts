@@ -106,19 +106,44 @@ export async function cerrarEntregaCedi(planta: string, numero: number, usuario:
     if (error) throw new Error(FALTA_TABLA.test(error.message) ? 'Falta ejecutar cedi_entregas_muebles.sql en Supabase.' : error.message)
 }
 
+/** "Total CEDI" (27/11/2026) = suma por OF de las entregas de hoy YA CERRADAS (la en curso no entra), con su total */
+function totalCerradas(entregas: Entrega[]): { filas: (string | number)[][]; total: number } {
+    const porOf = new Map<string, ItemEntrega>()
+    for (const e of entregas) {
+        if (!e.cerradaAt) continue
+        for (const i of e.items) {
+            const a = porOf.get(i.of)
+            porOf.set(i.of, a ? { ...a, cantidad: a.cantidad + i.cantidad } : { ...i })
+        }
+    }
+    const items = [...porOf.values()].filter(i => i.cantidad !== 0).sort((a, b) => a.of.localeCompare(b.of))
+    return { filas: items.map(i => [Number(i.of) || i.of, i.sku, i.descripcion, i.cantidad]), total: items.reduce((t, i) => t + i.cantidad, 0) }
+}
+
 const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
 
-/** CSV: una fila por OF de cada entrega de hoy (columna Entrega) y al final lo que está en tránsito o en CEDI ("Total CEDI") */
-export function descargarCsvEntregas(nombre: string, entregas: Entrega[], total: (string | number)[][]) {
-    const lineas = [['Entrega', 'OF', 'SKU', 'Descripcion', 'Transito'].map(q).join(',')]
-    for (const e of entregas) for (const i of e.items) lineas.push([e.cerradaAt ? `Entrega ${e.numero}` : `Entrega ${e.numero} (en curso)`, i.of, i.sku, i.descripcion, i.cantidad].map(q).join(','))
-    for (const r of total) lineas.push(['Total CEDI', ...r].map(q).join(','))
-    const url = URL.createObjectURL(new Blob(['﻿' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
-    const a = document.createElement('a'); a.href = url; a.download = nombre; a.click()
+/** CSV separado por entregas (como las hojas del Excel): un .zip con un CSV por entrega de hoy ("Entrega 1.csv",
+ *  "Entrega 2.csv", … y la en curso) + "Total CEDI.csv"; columnas OF, SKU, Descripcion, Transito */
+export async function descargarCsvEntregas(nombre: string, entregas: Entrega[], total: (string | number)[][]) {
+    const csv = (filas: (string | number)[][]) => '﻿' + [['OF', 'SKU', 'Descripcion', 'Transito'], ...filas].map(r => r.map(q).join(',')).join('\r\n')
+    const JSZip = (await import('jszip')).default
+    const zip = new JSZip()
+    for (const e of entregas) {
+        if (!e.items.length) continue
+        const filas: (string | number)[][] = e.items.map(i => [i.of, i.sku, i.descripcion, i.cantidad])
+        filas.push(['', '', `Total entrega ${e.numero}${e.cerradaAt ? '' : ' (en curso)'}`, e.total])
+        zip.file(e.cerradaAt ? `Entrega ${e.numero}.csv` : `Entrega ${e.numero} (en curso).csv`, csv(filas))
+    }
+    void total
+    const tc = totalCerradas(entregas)
+    zip.file('Total CEDI.csv', csv([...tc.filas, ['', '', 'Total entregas cerradas', tc.total]]))
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = nombre.replace(/\.csv$/i, '.zip'); a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-/** Excel: una hoja por entrega de hoy + la hoja "Total CEDI" (4 columnas, tabla verde con filtros) */
+/** Excel: una hoja por entrega de hoy + la hoja "Total CEDI" = suma de las entregas cerradas (4 columnas, tabla verde) */
 export async function descargarExcelEntregas(nombre: string, entregas: Entrega[], total: (string | number)[][]) {
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
@@ -138,7 +163,14 @@ export async function descargarExcelEntregas(nombre: string, entregas: Entrega[]
     }
     const ws = wb.addWorksheet('Total CEDI')
     ws.columns = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }]
-    ws.addTable({ name: 'TotalCedi', ref: 'A1', headerRow: true, style: { theme: 'TableStyleMedium7', showRowStripes: true }, columns: columnas, rows: total.length ? total : [['', '', '', 0]] })
+    void total
+    const tc = totalCerradas(entregas)
+    ws.addTable({ name: 'TotalCedi', ref: 'A1', headerRow: true, style: { theme: 'TableStyleMedium7', showRowStripes: true }, columns: columnas, rows: tc.filas.length ? tc.filas : [['', '', '', 0]] })
+    const finT = Math.max(tc.filas.length, 1) + 2
+    ws.getCell(`C${finT}`).value = 'Total entregas cerradas'
+    ws.getCell(`C${finT}`).font = { bold: true }
+    ws.getCell(`D${finT}`).value = tc.total
+    ws.getCell(`D${finT}`).font = { bold: true }
     ws.views = [{ state: 'frozen', ySplit: 1 }]
     const buf = await wb.xlsx.writeBuffer()
     const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))

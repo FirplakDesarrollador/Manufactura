@@ -168,14 +168,26 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     // A entregar = en tránsito + recibido en CEDI (muebles). Verificado por OF hasta ese total; el resto, no verificado
     const aEntregar = (o: OrdenMueble) => (Number(o.transito) || 0) + (Number(o.cedi) || 0)
     const verificadoDe = (o: OrdenMueble) => Math.min(aEntregar(o), verif.porOf.get(String(o.orden_fabricacion)) || 0)
-    const totalAEntregar = filteredOrdenes.reduce((s, o) => s + aEntregar(o), 0)
-    const totalVerificado = filteredOrdenes.reduce((s, o) => s + verificadoDe(o), 0)
+    // Entrega que se ve (27/11/2026): por defecto la EN CURSO = OF despachadas después del último cierre de hoy más
+    // las que siguen en Tránsito (pendientes de recibir). Al cerrar la entrega y recibirla en CEDI salen de aquí.
+    // "Todas" muestra todas las OF en tránsito o en CEDI; #1, #2… las de cada entrega cerrada.
+    const [entregaSel, setEntregaSel] = useState<number | 'todas' | null>(null)
+    const ofsDeEntrega = (n: number) => new Set((entregasCedi.entregas.find(e => e.numero === n)?.items || []).map(i => i.of))
+    const baseLista = entregaSel === 'todas' ? filteredOrdenes
+        : entregaSel !== null ? filteredOrdenes.filter(o => ofsDeEntrega(entregaSel).has(String(o.orden_fabricacion)))
+            : (() => {
+                const enCursoOfs = new Set((entregaActual?.items || []).map(i => i.of))
+                return filteredOrdenes.filter(o => enCursoOfs.has(String(o.orden_fabricacion)) || (Number(o.transito) || 0) > 0)
+            })()
+    const totalAEntregar = baseLista.reduce((s, o) => s + aEntregar(o), 0)
+    const totalVerificado = baseLista.reduce((s, o) => s + verificadoDe(o), 0)
     const totalNoVerificado = totalAEntregar - totalVerificado
+    const totalEntregadoHoy = entregasCedi.entregas.reduce((s, e) => s + e.total, 0)
     // Filtro por verificación: clic en "Verificados" (OF con algo verificado) o "No verificados" (OF con algo sin verificar)
     const [filtroVerif, setFiltroVerif] = useState<'todos' | 'si' | 'no'>('todos')
     const soloNoVerificados = filtroVerif === 'no'
-    const ordenesLista = filtroVerif === 'no' ? filteredOrdenes.filter(o => verificadoDe(o) < aEntregar(o))
-        : filtroVerif === 'si' ? filteredOrdenes.filter(o => verificadoDe(o) > 0) : filteredOrdenes
+    const ordenesLista = filtroVerif === 'no' ? baseLista.filter(o => verificadoDe(o) < aEntregar(o))
+        : filtroVerif === 'si' ? baseLista.filter(o => verificadoDe(o) > 0) : baseLista
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30">
@@ -214,12 +226,12 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
             <div className="px-4 pt-2 bg-white">
 
                 {/* Órdenes a entregar · Total muebles a entregar · Verificados · No verificados (clic: filtra) */}
-                <div className="mt-2 px-1 flex flex-wrap items-center gap-2 text-[11px]">
+                <div className="mt-2 px-1 flex flex-nowrap items-center gap-1.5 text-[10px] overflow-x-auto no-scrollbar whitespace-nowrap [&>*]:shrink-0 [&>*]:px-2">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-black uppercase tracking-wide">
-                        <Warehouse size={13} /> Órdenes a entregar: <b className="text-indigo-900">{filteredOrdenes.length}</b>
+                        <Warehouse size={13} /> Órdenes: <b className="text-indigo-900">{baseLista.length}</b>
                     </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-black uppercase tracking-wide" title="Muebles en tránsito más los ya recibidos en CEDI">
-                        Total muebles a entregar: <b className="text-[#254153]">{totalAEntregar.toLocaleString('es-CO')}</b>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-black uppercase tracking-wide" title="Muebles en tránsito más los ya recibidos en CEDI de las órdenes que se ven">
+                        Muebles a entregar: <b className="text-[#254153]">{totalAEntregar.toLocaleString('es-CO')}</b>
                     </span>
                     <button type="button" onClick={() => setFiltroVerif(v => v === 'si' ? 'todos' : 'si')}
                         title={filtroVerif === 'si' ? 'Ver todas las órdenes' : 'Mostrar solo las órdenes con muebles verificados'}
@@ -234,13 +246,20 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                         {soloNoVerificados && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
                     </button>
                     {/* Entregas de hoy: las cerradas y la en curso */}
-                    <span className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-black uppercase tracking-wide"
-                        title="Entregas de hoy a CEDI (lo registrado en Tránsito entre cierres)">
-                        Entregas hoy:
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-black uppercase tracking-wide"
+                        title="Entregas de hoy a CEDI (lo registrado en Tránsito entre cierres). Clic: ver las órdenes de esa entrega">
+                        Entregas hoy <b className="text-[#254153]">{totalEntregadoHoy.toLocaleString('es-CO')}</b>:
+                        <button type="button" onClick={() => setEntregaSel('todas')}
+                            className={`px-1.5 rounded ${entregaSel === 'todas' ? 'bg-[#254153] text-white' : 'bg-white/70 text-[#254153] hover:bg-white'}`}>Todas</button>
                         {entregasCedi.entregas.filter(e => e.cerradaAt).map(e => (
-                            <b key={e.numero} className="px-1.5 rounded bg-white/70 text-[#254153]">#{e.numero}: {e.total}</b>
+                            <button type="button" key={e.numero} onClick={() => setEntregaSel(e.numero)}
+                                title={`Cerrada ${new Date(e.cerradaAt as string).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`}
+                                className={`px-1.5 rounded ${entregaSel === e.numero ? 'bg-[#254153] text-white' : 'bg-white/70 text-[#254153] hover:bg-white'}`}>#{e.numero}: {e.total}</button>
                         ))}
-                        {entregaActual && <b className="px-1.5 rounded bg-[#deb841] text-[#254153]">#{entregaActual.numero} en curso: {entregaActual.total}</b>}
+                        {entregaActual && (
+                            <button type="button" onClick={() => setEntregaSel(null)}
+                                className={`px-1.5 rounded ${entregaSel === null ? 'bg-[#deb841] text-[#254153] ring-2 ring-[#254153]/30' : 'bg-[#deb841]/50 text-[#254153] hover:bg-[#deb841]'}`}>#{entregaActual.numero} en curso: {entregaActual.total}</button>
+                        )}
                     </span>
                     {verif.error && <span className="normal-case text-[11px] text-[#d14747]">{verif.error}</span>}
                     {entregasCedi.error && <span className="normal-case text-[11px] text-[#d14747]">{entregasCedi.error}</span>}
