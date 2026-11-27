@@ -271,7 +271,8 @@ export default function Header({
                 { label: 'Respuesta Rápida Calidad (RRC)', path: '/ficha-rcc' },
                 { label: 'Criterios de Aceptación y Rechazo', path: '/calidad/criterios' },
                 { label: 'Plan de Vigilancia', path: '/calidad/vigilancia' },
-                { label: 'Quick Response Quality Control (QRQC)', path: '/calidad/qrqc' }
+                { label: 'Quick Response Quality Control (QRQC)', path: '/calidad/qrqc' },
+                { label: 'Consumos', path: '/calidad/consumos' }
               ]
             },
             { 
