@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { PlantaVigilanciaConfig, ProcesoVigilanciaInfo } from './types';
+import { PlantaVigilanciaConfig, PlantaVigilanciaKey, ProcesoVigilanciaInfo } from './types';
 import FormPinturaMs from './FormPinturaMs';
 import HistorialPinturaMs from './HistorialPinturaMs';
 import FormVaciadoMs from './FormVaciadoMs';
@@ -55,7 +55,8 @@ import {
     ChevronRight,
     ListFilter,
     Plus,
-    LayoutGrid
+    LayoutGrid,
+    BarChart3
 } from 'lucide-react';
 
 interface VigilanciaPlantaViewProps {

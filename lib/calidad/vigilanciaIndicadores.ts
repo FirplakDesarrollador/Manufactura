@@ -281,6 +281,16 @@ export const CATALOGO_ITEMS_VIGILANCIA: ProcesoVigilanciaMeta[] = [
 ];
 
 // Estructura de resultados calculados
+export type TipoPeriodoVigilancia = 'dia' | 'semana' | 'mes' | 'anio' | 'todo';
+
+export interface FiltroPeriodoVigilancia {
+    tipo: TipoPeriodoVigilancia;
+    fechaInicio: string | null;
+    fechaFin: string | null;
+}
+
+export type EstadoSemaforoVigilancia = 'excelente' | 'alerta' | 'critico' | 'sin_datos';
+
 export interface CumplimientoItemResult {
     columna: string;
     nombre: string;
@@ -289,7 +299,7 @@ export interface CumplimientoItemResult {
     cumplen: number;
     noCumplen: number;
     porcentaje: number;
-    estado: 'excelente' | 'alerta' | 'critico';
+    estado: EstadoSemaforoVigilancia;
 }
 
 export interface CumplimientoProcesoResult {
@@ -301,7 +311,7 @@ export interface CumplimientoProcesoResult {
     totalChequeos: number;
     chequeosCumplen: number;
     porcentaje: number;
-    estado: 'excelente' | 'alerta' | 'critico';
+    estado: EstadoSemaforoVigilancia;
     items: CumplimientoItemResult[];
 }
 
@@ -313,7 +323,7 @@ export interface CumplimientoPlantaResult {
     totalChequeos: number;
     chequeosCumplen: number;
     porcentaje: number;
-    estado: 'excelente' | 'alerta' | 'critico';
+    estado: EstadoSemaforoVigilancia;
     procesos: CumplimientoProcesoResult[];
 }
 
@@ -323,6 +333,14 @@ export interface TendenciaPunto {
     total: number;
 }
 
+export interface ItemCriticoInfo extends CumplimientoItemResult {
+    procesoId: string;
+    proceso: string;
+    plantaKey: PlantaVigilanciaKey;
+    planta: string;
+    tabla: string;
+}
+
 export interface DashboardVigilanciaData {
     cumplimientoGlobal: number;
     totalAuditorias: number;
@@ -330,8 +348,8 @@ export interface DashboardVigilanciaData {
     totalChequeosCumplen: number;
     itemsEnAlerta: number;
     plantas: CumplimientoPlantaResult[];
-    puntosCriticos: (CumplimientoItemResult & { proceso: string; planta: string })[];
-    mejoresItems: (CumplimientoItemResult & { proceso: string; planta: string })[];
+    puntosCriticos: ItemCriticoInfo[];
+    mejoresItems: ItemCriticoInfo[];
     tendenciaTemporal: TendenciaPunto[];
 }
 
@@ -343,40 +361,271 @@ export const PLANTA_NOMBRES: Record<PlantaVigilanciaKey, { nombre: string; codig
     moldes: { nombre: 'Moldes', codigo: 'RMOLD' }
 };
 
-export function clasificarSemaforo(porcentaje: number): 'excelente' | 'alerta' | 'critico' {
+export function clasificarSemaforo(porcentaje: number, totalEvaluaciones = 1): EstadoSemaforoVigilancia {
+    if (totalEvaluaciones <= 0) return 'sin_datos';
     if (porcentaje >= 90) return 'excelente';
     if (porcentaje >= 85) return 'alerta';
     return 'critico';
 }
 
+export interface RegistroVigilanciaCrudo {
+    fecha: string; // YYYY-MM-DD (zona horaria America/Bogota)
+    row: Record<string, any>;
+}
+
+export type RegistrosPorTabla = Record<string, RegistroVigilanciaCrudo[]>;
+
+export interface FiltroCalendarioPbi {
+    anios: number[];
+    meses: number[];
+    semanas: string[];
+    dias: string[];
+}
+
+function isoToFechaBogota(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(d);
+}
+
+function semanaIsoClave(fecha: string): string {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d));
+    const dia = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - dia);
+    const anio = t.getUTCFullYear();
+    const inicio = new Date(Date.UTC(anio, 0, 1));
+    const semana = Math.ceil(((t.getTime() - inicio.getTime()) / 86400000 + 1) / 7);
+    return `${anio}-S${String(semana).padStart(2, '0')}`;
+}
+
+/**
+ * Descarga una sola vez todos los registros crudos de las tablas pv_* para permitir
+ * filtrado instantáneo por Año, Mes, Semana y Día en el cliente (estilo Power BI).
+ */
+export async function cargarRegistrosCrudosVigilancia(): Promise<RegistrosPorTabla> {
+    const entries = await Promise.all(
+        CATALOGO_ITEMS_VIGILANCIA.map(async (proc) => {
+            try {
+                const { data, error } = await supabase.from(proc.tabla).select('*');
+                if (error || !data) {
+                    return [proc.tabla, [] as RegistroVigilanciaCrudo[]] as const;
+                }
+                const normalized: RegistroVigilanciaCrudo[] = data.map((row) => ({
+                    fecha: isoToFechaBogota(row.created_at) || '',
+                    row
+                }));
+                return [proc.tabla, normalized] as const;
+            } catch (err) {
+                console.warn(`Error cargando tabla ${proc.tabla}:`, err);
+                return [proc.tabla, [] as RegistroVigilanciaCrudo[]] as const;
+            }
+        })
+    );
+    return Object.fromEntries(entries);
+}
+
+/**
+ * Calcula sincrónicamente todo el tablero de indicadores aplicando los filtros de calendario PBI.
+ */
+export function calcularDashboardDesdeRegistros(
+    registrosPorTabla: RegistrosPorTabla,
+    filtro?: FiltroCalendarioPbi | null
+): DashboardVigilanciaData {
+    const anios = filtro?.anios ?? [];
+    const meses = filtro?.meses ?? [];
+    const semanas = filtro?.semanas ?? [];
+    const dias = filtro?.dias ?? [];
+
+    const pasaFecha = (fecha: string): boolean => {
+        if (!anios.length && !meses.length && !semanas.length && !dias.length) return true;
+        if (!fecha || fecha.length < 10) return false;
+        if (anios.length && !anios.includes(Number(fecha.slice(0, 4)))) return false;
+        if (meses.length && !meses.includes(Number(fecha.slice(5, 7)))) return false;
+        if (semanas.length && !semanas.includes(semanaIsoClave(fecha))) return false;
+        if (dias.length && !dias.includes(fecha)) return false;
+        return true;
+    };
+
+    const resultadosPorProceso: CumplimientoProcesoResult[] = CATALOGO_ITEMS_VIGILANCIA.map((proc) => {
+        const crudos = registrosPorTabla[proc.tabla] || [];
+        const filtrados = crudos.filter((r) => pasaFecha(r.fecha));
+
+        if (filtrados.length === 0) {
+            return {
+                id: proc.id,
+                nombre: proc.nombre,
+                tabla: proc.tabla,
+                plantaKey: proc.plantaKey,
+                totalRegistros: 0,
+                totalChequeos: 0,
+                chequeosCumplen: 0,
+                porcentaje: 0,
+                estado: 'sin_datos' as const,
+                items: proc.items.map((it) => ({
+                    columna: it.columna,
+                    nombre: it.nombre,
+                    descripcion: it.descripcion,
+                    totalEvaluaciones: 0,
+                    cumplen: 0,
+                    noCumplen: 0,
+                    porcentaje: 0,
+                    estado: 'sin_datos' as const
+                }))
+            };
+        }
+
+        const totalRegistros = filtrados.length;
+        let sumChequeos = 0;
+        let sumCumplen = 0;
+
+        const itemsCalculados: CumplimientoItemResult[] = proc.items.map((itemMeta) => {
+            let cumplenCount = 0;
+            let totalItemEval = 0;
+
+            for (const { row } of filtrados) {
+                const val = row[itemMeta.columna];
+                if (val !== undefined && val !== null) {
+                    totalItemEval++;
+                    if (val === true || val === 1 || val === 'true') {
+                        cumplenCount++;
+                    }
+                }
+            }
+
+            const pct = totalItemEval > 0 ? (cumplenCount / totalItemEval) * 100 : 0;
+            sumChequeos += totalItemEval;
+            sumCumplen += cumplenCount;
+
+            return {
+                columna: itemMeta.columna,
+                nombre: itemMeta.nombre,
+                descripcion: itemMeta.descripcion,
+                totalEvaluaciones: totalItemEval,
+                cumplen: cumplenCount,
+                noCumplen: totalItemEval - cumplenCount,
+                porcentaje: Number(pct.toFixed(1)),
+                estado: clasificarSemaforo(pct, totalItemEval)
+            };
+        });
+
+        const procPct = sumChequeos > 0 ? (sumCumplen / sumChequeos) * 100 : 0;
+
+        return {
+            id: proc.id,
+            nombre: proc.nombre,
+            tabla: proc.tabla,
+            plantaKey: proc.plantaKey,
+            totalRegistros,
+            totalChequeos: sumChequeos,
+            chequeosCumplen: sumCumplen,
+            porcentaje: Number(procPct.toFixed(1)),
+            estado: clasificarSemaforo(procPct, sumChequeos),
+            items: itemsCalculados
+        };
+    });
+
+    const plantKeys: PlantaVigilanciaKey[] = ['ms', 'fv', 'muebles', 'cefi', 'moldes'];
+    const plantasResult: CumplimientoPlantaResult[] = plantKeys.map((pKey) => {
+        const procesosPlanta = resultadosPorProceso.filter((p) => p.plantaKey === pKey);
+        const totalRegistros = procesosPlanta.reduce((acc, p) => acc + p.totalRegistros, 0);
+        const totalChequeos = procesosPlanta.reduce((acc, p) => acc + p.totalChequeos, 0);
+        const chequeosCumplen = procesosPlanta.reduce((acc, p) => acc + p.chequeosCumplen, 0);
+        const pct = totalChequeos > 0 ? (chequeosCumplen / totalChequeos) * 100 : 0;
+
+        return {
+            plantaKey: pKey,
+            nombre: PLANTA_NOMBRES[pKey].nombre,
+            codigoOficial: PLANTA_NOMBRES[pKey].codigo,
+            totalRegistros,
+            totalChequeos,
+            chequeosCumplen,
+            porcentaje: Number(pct.toFixed(1)),
+            estado: clasificarSemaforo(pct, totalChequeos),
+            procesos: procesosPlanta
+        };
+    });
+
+    const totalAuditorias = plantasResult.reduce((acc, p) => acc + p.totalRegistros, 0);
+    const totalChequeosGlobal = plantasResult.reduce((acc, p) => acc + p.totalChequeos, 0);
+    const totalCumplenGlobal = plantasResult.reduce((acc, p) => acc + p.chequeosCumplen, 0);
+    const cumplimientoGlobal =
+        totalChequeosGlobal > 0 ? Number(((totalCumplenGlobal / totalChequeosGlobal) * 100).toFixed(1)) : 0;
+
+    const allItemsFlattened: ItemCriticoInfo[] = [];
+    for (const pl of plantasResult) {
+        for (const pr of pl.procesos) {
+            for (const it of pr.items) {
+                if (it.totalEvaluaciones > 0) {
+                    allItemsFlattened.push({
+                        ...it,
+                        procesoId: pr.id,
+                        proceso: pr.nombre,
+                        plantaKey: pl.plantaKey,
+                        planta: pl.nombre,
+                        tabla: pr.tabla
+                    });
+                }
+            }
+        }
+    }
+
+    const puntosCriticos = [...allItemsFlattened]
+        .filter((it) => it.porcentaje < 90)
+        .sort((a, b) => a.porcentaje - b.porcentaje);
+
+    const mejoresItems = [...allItemsFlattened]
+        .filter((it) => it.totalEvaluaciones >= 1)
+        .sort((a, b) => b.porcentaje - a.porcentaje);
+
+    const itemsEnAlerta = allItemsFlattened.filter((it) => it.porcentaje < 85).length;
+
+    return {
+        cumplimientoGlobal,
+        totalAuditorias,
+        totalChequeos: totalChequeosGlobal,
+        totalChequeosCumplen: totalCumplenGlobal,
+        itemsEnAlerta,
+        plantas: plantasResult,
+        puntosCriticos,
+        mejoresItems,
+        tendenciaTemporal: []
+    };
+}
+
 /**
  * Consulta y procesa los indicadores de cumplimiento de cada item en todas las plantas.
- * Soporta filtrado opcional por días (ej: 7, 30, o null para todo el historial).
+ * Soporta filtrado por rango de fechas (Día, Semana, Mes, Año o Todo el histórico).
  */
-export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): Promise<DashboardVigilanciaData> {
-    const fechaLimite = diasFiltro
-        ? new Date(Date.now() - diasFiltro * 24 * 60 * 60 * 1000).toISOString()
-        : null;
+export async function cargarIndicadoresVigilancia(
+    filtro?: FiltroPeriodoVigilancia | null
+): Promise<DashboardVigilanciaData> {
+    const fechaInicio = filtro?.fechaInicio || null;
+    const fechaFin = filtro?.fechaFin || null;
 
     // Consultar todas las tablas en paralelo
     const resultadosPorProceso: CumplimientoProcesoResult[] = await Promise.all(
         CATALOGO_ITEMS_VIGILANCIA.map(async (proc) => {
             try {
                 let query = supabase.from(proc.tabla).select('*');
-                if (fechaLimite) {
-                    query = query.gte('created_at', fechaLimite);
+                if (fechaInicio) {
+                    query = query.gte('created_at', fechaInicio);
+                }
+                if (fechaFin) {
+                    query = query.lte('created_at', fechaFin);
                 }
                 const { data, error } = await query;
                 if (error || !data || data.length === 0) {
-                    const emptyItems = proc.items.map((it) => ({
+                    const emptyItems: CumplimientoItemResult[] = proc.items.map((it) => ({
                         columna: it.columna,
                         nombre: it.nombre,
                         descripcion: it.descripcion,
                         totalEvaluaciones: 0,
                         cumplen: 0,
                         noCumplen: 0,
-                        porcentaje: 100,
-                        estado: 'excelente' as const
+                        porcentaje: 0,
+                        estado: 'sin_datos'
                     }));
                     return {
                         id: proc.id,
@@ -386,8 +635,8 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
                         totalRegistros: 0,
                         totalChequeos: 0,
                         chequeosCumplen: 0,
-                        porcentaje: 100,
-                        estado: 'excelente' as const,
+                        porcentaje: 0,
+                        estado: 'sin_datos' as const,
                         items: emptyItems
                     };
                 }
@@ -410,7 +659,7 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
                         }
                     }
 
-                    const pct = totalItemEval > 0 ? (cumplenCount / totalItemEval) * 100 : 100;
+                    const pct = totalItemEval > 0 ? (cumplenCount / totalItemEval) * 100 : 0;
                     sumChequeos += totalItemEval;
                     sumCumplen += cumplenCount;
 
@@ -422,11 +671,11 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
                         cumplen: cumplenCount,
                         noCumplen: totalItemEval - cumplenCount,
                         porcentaje: Number(pct.toFixed(1)),
-                        estado: clasificarSemaforo(pct)
+                        estado: clasificarSemaforo(pct, totalItemEval)
                     };
                 });
 
-                const procPct = sumChequeos > 0 ? (sumCumplen / sumChequeos) * 100 : 100;
+                const procPct = sumChequeos > 0 ? (sumCumplen / sumChequeos) * 100 : 0;
 
                 return {
                     id: proc.id,
@@ -437,7 +686,7 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
                     totalChequeos: sumChequeos,
                     chequeosCumplen: sumCumplen,
                     porcentaje: Number(procPct.toFixed(1)),
-                    estado: clasificarSemaforo(procPct),
+                    estado: clasificarSemaforo(procPct, sumChequeos),
                     items: itemsCalculados
                 };
             } catch (err) {
@@ -450,8 +699,8 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
                     totalRegistros: 0,
                     totalChequeos: 0,
                     chequeosCumplen: 0,
-                    porcentaje: 100,
-                    estado: 'excelente' as const,
+                    porcentaje: 0,
+                    estado: 'sin_datos' as const,
                     items: proc.items.map((it) => ({
                         columna: it.columna,
                         nombre: it.nombre,
@@ -459,8 +708,8 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
                         totalEvaluaciones: 0,
                         cumplen: 0,
                         noCumplen: 0,
-                        porcentaje: 100,
-                        estado: 'excelente' as const
+                        porcentaje: 0,
+                        estado: 'sin_datos' as const
                     }))
                 };
             }
@@ -474,7 +723,7 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
         const totalRegistros = procesosPlanta.reduce((acc, p) => acc + p.totalRegistros, 0);
         const totalChequeos = procesosPlanta.reduce((acc, p) => acc + p.totalChequeos, 0);
         const chequeosCumplen = procesosPlanta.reduce((acc, p) => acc + p.chequeosCumplen, 0);
-        const pct = totalChequeos > 0 ? (chequeosCumplen / totalChequeos) * 100 : 100;
+        const pct = totalChequeos > 0 ? (chequeosCumplen / totalChequeos) * 100 : 0;
 
         return {
             plantaKey: pKey,
@@ -484,7 +733,7 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
             totalChequeos,
             chequeosCumplen,
             porcentaje: Number(pct.toFixed(1)),
-            estado: clasificarSemaforo(pct),
+            estado: clasificarSemaforo(pct, totalChequeos),
             procesos: procesosPlanta
         };
     });
@@ -494,35 +743,36 @@ export async function cargarIndicadoresVigilancia(diasFiltro?: number | null): P
     const totalChequeosGlobal = plantasResult.reduce((acc, p) => acc + p.totalChequeos, 0);
     const totalCumplenGlobal = plantasResult.reduce((acc, p) => acc + p.chequeosCumplen, 0);
     const cumplimientoGlobal =
-        totalChequeosGlobal > 0 ? Number(((totalCumplenGlobal / totalChequeosGlobal) * 100).toFixed(1)) : 100;
+        totalChequeosGlobal > 0 ? Number(((totalCumplenGlobal / totalChequeosGlobal) * 100).toFixed(1)) : 0;
 
     // Lista plana de todos los items para Pareto y puntos críticos
-    const allItemsFlattened: (CumplimientoItemResult & { proceso: string; planta: string })[] = [];
+    const allItemsFlattened: ItemCriticoInfo[] = [];
     for (const pl of plantasResult) {
         for (const pr of pl.procesos) {
             for (const it of pr.items) {
                 if (it.totalEvaluaciones > 0) {
                     allItemsFlattened.push({
                         ...it,
+                        procesoId: pr.id,
                         proceso: pr.nombre,
-                        planta: pl.nombre
+                        plantaKey: pl.plantaKey,
+                        planta: pl.nombre,
+                        tabla: pr.tabla
                     });
                 }
             }
         }
     }
 
-    // Puntos críticos: ordenar por menor cumplimiento
+    // Todos los puntos con oportunidad (< 90%) ordenados de menor a mayor (sin truncar antes de filtrar en UI)
     const puntosCriticos = [...allItemsFlattened]
         .filter((it) => it.porcentaje < 90)
-        .sort((a, b) => a.porcentaje - b.porcentaje)
-        .slice(0, 10);
+        .sort((a, b) => a.porcentaje - b.porcentaje);
 
-    // Mejores items: mayor cumplimiento con al menos 10 evaluaciones
+    // Mejores items
     const mejoresItems = [...allItemsFlattened]
-        .filter((it) => it.totalEvaluaciones >= 5)
-        .sort((a, b) => b.porcentaje - a.porcentaje)
-        .slice(0, 10);
+        .filter((it) => it.totalEvaluaciones >= 1)
+        .sort((a, b) => b.porcentaje - a.porcentaje);
 
     const itemsEnAlerta = allItemsFlattened.filter((it) => it.porcentaje < 85).length;
 
