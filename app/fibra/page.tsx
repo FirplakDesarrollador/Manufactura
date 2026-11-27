@@ -22,6 +22,8 @@ import TrasladosFibraModule from '@/components/fibra/traslados/TrasladosFibraMod
 import PlanosFibraModule from '@/components/fibra/planos/PlanosFibraModule'
 import MoldesFibraModule from '@/components/fibra/moldes/MoldesFibraModule'
 import { esKitReparacion } from '@/lib/fibra/kitReparacion'
+import HistoricosFibraModule from '@/components/fibra/historicos/HistoricosFibraModule'
+import { History } from 'lucide-react'
 
 
 
@@ -99,6 +101,23 @@ export default function FibraPage() {
                 ;(porModulo[modulo] ||= new Set()).add(String(p.orden_fabricacion))
             }
             setNovedadesProceso(Object.fromEntries(Object.entries(porModulo).map(([m, s]) => [m, s.size])))
+        }
+        contar()
+        const t = setInterval(contar, 5 * 60000)
+        return () => clearInterval(t)
+    }, [])
+
+    // Aviso de Administración (como en Mármol): OF abiertas de FV con "Falta(n) componente(s)" en Componentes entrega
+    // (revisión guardada en el servidor, revision_entrega_of)
+    const [faltantesAdmin, setFaltantesAdmin] = useState(0)
+    useEffect(() => {
+        const contar = async () => {
+            const { data: rev, error } = await supabase.from('revision_entrega_of').select('orden_fabricacion').eq('estado', 'faltante')
+            if (error) return
+            const ofs = [...new Set((rev || []).map(r => String(r.orden_fabricacion).trim()))]
+            if (!ofs.length) { setFaltantesAdmin(0); return }
+            const { data: abiertas, error: errOf } = await supabase.from('ordenes_fabricacion_fv').select('orden_fabricacion').in('orden_fabricacion', ofs)
+            if (!errOf) setFaltantesAdmin(new Set((abiertas || []).map(o => String(o.orden_fabricacion))).size)
         }
         contar()
         const t = setInterval(contar, 5 * 60000)
@@ -430,7 +449,7 @@ export default function FibraPage() {
                             <button
                                 onClick={() => setActiveModule('administracion')}
                                 title={sidebarOpen ? undefined : 'Administración'}
-                                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'administracion'
+                                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'administracion'
                                     ? 'bg-[#254153] text-white'
                                     : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
                                     }`}
@@ -442,8 +461,27 @@ export default function FibraPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 13.5v1.5M18 21v1.5M21.9 15.75l-1.3.75M15.4 19.5l-1.3.75M14.1 15.75l1.3.75M20.6 19.5l1.3.75" />
                                 </svg>
                                 <span>Administración</span>
+                                {faltantesAdmin > 0 && (
+                                    <b title={`${faltantesAdmin} OF con componentes faltantes para la entrega`}
+                                        className={`min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow ${sidebarOpen ? 'ml-auto' : 'absolute -top-1 right-0.5'}`}>
+                                        {faltantesAdmin > 99 ? '99+' : faltantesAdmin}
+                                    </b>
+                                )}
                             </button>
                         )}
+
+                        {/* Históricos: todas las órdenes FV (abiertas y cerradas) con su trazabilidad; solo consulta */}
+                        <button
+                            onClick={() => setActiveModule('historicos')}
+                            title={sidebarOpen ? undefined : 'Históricos'}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-xs w-full ${activeModule === 'historicos'
+                                ? 'bg-[#254153] text-white'
+                                : 'text-gray-700 hover:bg-[#254153]/10 hover:text-[#254153]'
+                                }`}
+                        >
+                            <History className="w-4 h-4" />
+                            <span>Históricos</span>
+                        </button>
 
                         {/* Planos: los ve cualquier usuario de la planta; cargarlos pide el permiso fibra.planos */}
                         <button
@@ -519,6 +557,8 @@ export default function FibraPage() {
                     <div className="h-full overflow-y-auto">
                         {activeModule === 'traslados' ? (
                             <TrasladosFibraModule />
+                        ) : activeModule === 'historicos' ? (
+                            <HistoricosFibraModule />
                         ) : activeModule === 'mapa' ? (
                             <MapaProcesosFibraModule />
                         ) : activeModule === 'moldes' ? (

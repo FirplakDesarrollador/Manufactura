@@ -24,6 +24,10 @@ const AVAILABLE_PERMISSIONS: Record<string, string[] | boolean> = {
     modulos: ['cedi', 'pulido', 'acabado', 'empaque', 'pintura', 'vaciado', 'desmolde', 'digitado', 'prensado', 'dashboard', 'tvacabado', 'parametros', 'reparacion', 'contramoldes', 'administracion'],
     superficies: ['pulido', 'reparacion', 'digitado', 'cedi', 'dashboard', 'parametros', 'administracion'],
     muebles: ['cedi', 'corte', 'panel', 'empaque', 'enchape', 'defectos', 'digitado', 'transito', 'dashboard', 'inspeccion', 'administracion'],
+    // Semielaborados: un permiso por tipo y proceso (operarios distintos por tipo) + Administración de todos los tipos
+    semielaborados: ['cajas_corte', 'cajas_digitado', 'cajas_transito', 'cajas_almacen',
+        'herrajes_herrajes', 'herrajes_digitado', 'herrajes_transito', 'herrajes_almacen',
+        'motobombas_ensamble', 'motobombas_digitado', 'motobombas_transito', 'motobombas_cedi', 'administracion'],
     calidad: ['ms', 'editar', 'eliminar', 'configurar_defectos', 'saldos_y_destrucciones'],
     hora_a_hora: true,
     ficha_rcc: ['acceso_general', 'administrador', 'contingencias', 'asistencia', 'editar_fichas_administrador'],
@@ -50,6 +54,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     fibra: 'Control de Piso (Fibra)',
     modulos: 'Control de Piso (Mármol)',
     muebles: 'Control de Piso (Muebles)',
+    semielaborados: 'Control de Piso (Semielaborados)',
     superficies: 'Control de Piso (Superficies RTM)',
     calidad: 'Calidad MS',
     hora_a_hora: 'Hora a Hora',
@@ -89,7 +94,10 @@ const SUBMODULO_LABELS: Record<string, string> = {
     indicadores: 'Indicadores',
     maquinas: 'Máquinas y Equipos (ver)',
     maquinas_editar: 'Máquinas y Equipos (editar)',
-    configuracion: 'Configuración (turnos y cuadrilla)'
+    configuracion: 'Configuración (turnos y cuadrilla)',
+    cajas_corte: 'Cajas · Corte', cajas_digitado: 'Cajas · Digitado', cajas_transito: 'Cajas · Tránsito', cajas_almacen: 'Cajas · Almacén',
+    herrajes_herrajes: 'Herrajes FV · Herrajes', herrajes_digitado: 'Herrajes FV · Digitado', herrajes_transito: 'Herrajes FV · Tránsito', herrajes_almacen: 'Herrajes FV · Almacén',
+    motobombas_ensamble: 'Kits motobomba · Ensamble', motobombas_digitado: 'Kits motobomba · Digitado', motobombas_transito: 'Kits motobomba · Tránsito', motobombas_cedi: 'Kits motobomba · CEDI'
 };
 
 export default function UsuariosConfiguracionPage() {

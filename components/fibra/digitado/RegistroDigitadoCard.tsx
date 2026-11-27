@@ -5,6 +5,7 @@ import { RegistroTrazabilidad } from '@/types/pintura'
 import { registrarDigitado, reversarDigitado } from '@/lib/supabase/queries/fibra_digitado'
 import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
 import EstadoEntregaOf from '../EstadoEntregaOf'
+import AvisoTrasladoOf from '@/components/fibra/AvisoTrasladoOf'
 import { Keyboard, Send, Eraser, Loader2 } from 'lucide-react'
 
 interface RegistroDigitadoCardProps {
@@ -90,6 +91,7 @@ export default function RegistroDigitadoCard({ registro, usuarioEmail, onRefresh
                     {(registro.estado === 'Empaque' || registro.estado === 'Transito') && (
                         <div className="mt-2 px-2 py-1.5 rounded-lg bg-[#F6F3EE] border border-[#e2ded5]">
                             <EstadoEntregaOf of={registro.orden_fabricacion} desde={registro.estado === 'Transito' ? registro.digitado_fecha : registro.empaque_fecha} />
+                            <AvisoTrasladoOf of={registro.orden_fabricacion} />
                         </div>
                     )}
                 </div>

@@ -6,6 +6,7 @@ import { ArrowRightLeft, ChevronDown, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { OrdenMueble } from '@/types/muebles'
 import { supabase } from '@/lib/supabase'
+import { tipoDeSku, tipoSemi } from '@/lib/semielaborados/datos'
 
 // Administración Muebles / CEFI: mover unidades de la OF entre procesos, HACIA ADELANTE o HACIA ATRÁS (devolución),
 // por cantidades (como se lleva Muebles). Se elige Desde (proceso con unidades), Hasta y Cantidad.
@@ -32,13 +33,24 @@ type Props = { orden: OrdenMueble; planta: string; usuarioNombre: string; userEm
 
 const FLUJO_SEMIELABORADOS = ['programado', 'corte', 'digitado', 'transito', 'cedi']
 
+// Muebles / CEFI: cada etapa = estado en que queda la unidad (como el Control de Piso MS)
+const NOMBRE_ESTACION: Record<string, string> = {}
+
 // Panel: dónde está cada unidad, destino, cantidad y botón Mover
 export default function MoverOfMuebles({ orden, planta, usuarioNombre, userEmail, onHecho, variante }: Props) {
     const esCefi = (planta || orden.planta || '').toLowerCase().includes('cefi')
-    // CEFI no usa Empaque
+    // Empaque ya no es un proceso (CEFI nunca; Muebles desde 26/11/2026). Solo se muestra si una OF aún tiene unidades ahí.
     const flujo = useMemo(() => variante === 'semielaborados'
-        ? FLUJO.filter(e => FLUJO_SEMIELABORADOS.includes(e.id)).map(e => e.id === 'cedi' ? { ...e, label: 'Almacén' } : e)
-        : FLUJO.filter(e => !(esCefi && e.id === 'empaque')), [esCefi, variante])
+        // Nombres del tipo de semielaborado (Cajas: Corte/Almacén; Herrajes FV: Herrajes/Almacén; Kits motobomba: Ensamble/CEDI)
+        ? FLUJO.filter(e => FLUJO_SEMIELABORADOS.includes(e.id)).map(e => {
+            const n = tipoSemi(tipoDeSku(orden.producto_sku)).procesos
+            return e.id === 'corte' ? { ...e, label: n.Corte } : e.id === 'cedi' ? { ...e, label: n.Almacen } : e
+        })
+        : FLUJO.filter(e => e.id !== 'empaque' || (Number(orden.empaque) || 0) > 0).map(e => ({ ...e, label: NOMBRE_ESTACION[e.id] || e.label })),
+        [variante, orden.producto_sku, orden.empaque])
+    // Muebles: al registrar Digitado (hacia adelante o devolución) va también Empaque con la misma cantidad,
+    // para que las cuentas de la vista sigan cuadrando (CEFI no lo necesita)
+    const empaqueAuto = !esCefi && variante !== 'semielaborados' && !flujo.some(e => e.id === 'empaque')
     const cant = (e: Etapa) => Math.max(0, Number(orden[e.campo]) || 0)
 
     // Desde: por defecto el proceso más avanzado (sin contar CEDI) que tenga unidades; Hasta: el siguiente
@@ -69,6 +81,13 @@ export default function MoverOfMuebles({ orden, planta, usuarioNombre, userEmail
             const [de, a] = haciaAtras ? [iHasta + 1, iDesde] : [iDesde + 1, iHasta]
             const filas = []
             for (let k = de; k <= a; k++) {
+                if (empaqueAuto && flujo[k].id === 'digitado') filas.push({
+                    orden_fabricacion: String(orden.orden_fabricacion), cantidad: haciaAtras ? -aMover : aMover,
+                    creado_por: userEmail || usuarioNombre, proceso: 'Empaque',
+                    cedula_operario: 'EMPAQUE_AUTO',
+                    nombre_operario: `Administración: ${usuarioNombre} (Empaque automático${haciaAtras ? ', devolución' : ''})`,
+                    fecha_inicio: ahora, taladro: 'NO APLICA', created_at: ahora,
+                })
                 filas.push({
                     orden_fabricacion: String(orden.orden_fabricacion), cantidad: haciaAtras ? -aMover : aMover,
                     creado_por: userEmail || usuarioNombre, proceso: flujo[k].proceso,

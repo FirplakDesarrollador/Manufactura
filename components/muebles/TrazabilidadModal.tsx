@@ -65,7 +65,9 @@ export default function TrazabilidadModal({
                 break
             case 'Digitado':
                 const isCefiOrd = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF')
-                avail = isCefiOrd ? ((orden.inspeccion || 0) + (orden.empaque || 0)) : (orden.empaque || 0)
+                // Sin proceso Empaque (CEFI siempre; Muebles desde 26/11/2026): se digita lo que sale de Inspección
+                void isCefiOrd
+                avail = (orden.inspeccion || 0) + (orden.empaque || 0)
                 break
             case 'Transito':
                 avail = orden.digitado || 0
@@ -173,6 +175,23 @@ export default function TrazabilidadModal({
 
         setLoading(true)
         try {
+            // Muebles ya no tiene proceso Empaque: al digitar lo que viene de Inspección se registra también su Empaque
+            // (automático), para que las cuentas de la vista (Inspección → Empaque → Digitado) sigan cuadrando.
+            // CEFI no lo necesita (la vista ya lo resuelve así desde siempre).
+            const esCefiOf = (orden.planta || '').toLowerCase().includes('cefi') || (orden.producto_sku || '').toUpperCase().startsWith('VCEF')
+            const empaqueAuto = proceso === 'Digitado' && !esCefiOf ? Math.max(0, cantidad - (orden.empaque || 0)) : 0
+            if (empaqueAuto > 0) {
+                await registrarTrazabilidadMueble({
+                    orden_fabricacion: orden.orden_fabricacion,
+                    creado_por: usuarioNombre,
+                    cantidad: empaqueAuto,
+                    proceso: 'Empaque',
+                    cedula_operario: 'EMPAQUE_AUTO',
+                    nombre_operario: `Automático al digitar (${usuarioNombre})`,
+                    fecha_inicio: new Date().toISOString(),
+                    taladro: 'NO APLICA'
+                })
+            }
             await registrarTrazabilidadMueble({
                 orden_fabricacion: orden.orden_fabricacion,
                 creado_por: usuarioNombre,

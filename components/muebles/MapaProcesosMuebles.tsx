@@ -9,6 +9,7 @@ import { OrdenMueble } from '@/types/muebles'
 // uno (OF abiertas, query_of_muebles). Clic en un proceso: abajo sus OF. Solo consulta.
 type Paso = { id: string; campo: keyof OrdenMueble; label: string; color: string }
 
+// Nombre = estado en que está la unidad (como el Control de Piso MS); campo = dato de la vista
 const PASOS: Paso[] = [
     { id: 'programado', campo: 'por_cortar', label: 'Programado', color: 'bg-slate-100 text-[#324354] border-slate-300' },
     { id: 'corte', campo: 'corte', label: 'Corte', color: 'bg-[#deb841]/15 text-[#7a5f0e] border-[#deb841]/60' },
@@ -22,7 +23,9 @@ const PASOS: Paso[] = [
 
 export default function MapaProcesosMuebles({ plantaMuebles }: { plantaMuebles: string }) {
     const esCefi = plantaMuebles.toLowerCase() === 'cefi'
-    const pasos = useMemo(() => PASOS.filter(p => !(esCefi && p.id === 'empaque')), [esCefi])
+    // Empaque ya no es un proceso (CEFI nunca; Muebles desde 26/11/2026)
+    void esCefi
+    const pasos = useMemo(() => PASOS.filter(p => p.id !== 'empaque'), [])
     const [ordenes, setOrdenes] = useState<OrdenMueble[] | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [elegido, setElegido] = useState<string | null>(null)

@@ -74,6 +74,7 @@ interface SemaforoItem {
     cantPendItem: string | null;
     cantTotal: string;
     disponiblePt01: string;
+    disponiblePt08: string;
     fechaCreacionOp: string;
     estado: string;
     fechaRecomendadaLiberacion: string;
@@ -893,6 +894,7 @@ export default function ConsultaSAPPage() {
                 "Cant. Pend. Item": item.cantPendItem,
                 "Cantidad total": item.cantTotal,
                 "Disponible PT01": item.disponiblePt01,
+                "Disponible PT08": item.disponiblePt08,
                 "Fecha Creación OP": item.fechaCreacionOp,
                 "Estado": item.estado,
                 "Fecha Recomendada Liberación": item.fechaRecomendadaLiberacion,
@@ -999,9 +1001,9 @@ export default function ConsultaSAPPage() {
             toast.dismiss(toastId);
         }
 
-        const headerText = "Originnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\tDisponible PT01\tFecha Creación OP\tEstado\tFecha Recomendada Liberación\tFecha Real Liberación\tConsumo Para Liberar\tColor Liberación Txt\tColor Liberación\tCumplimiento Liberación\tFecha Entrega Lote\tFecha Recomendada de Entrega\tFecha Cierre OP\tFecha Ideal Entrega Producción\tConsumo Amortiguador Planta\tColor Producción Txt\tColor Producción\tCumplimiento Planta\tDias Retrazo Firplak\tColor Firplak Txt\tColor Firplak\tCumplimiento Firplak\tFecha Prometida Entrega Item\tDestino\tNumLote\tMolde\tCapacidad Molde\tFecha Carga Molde\tAmortiguador\tCliente\n";
+        const headerText = "Originnum\tNro OP\tSKU\tDescripción Artículo\tPlanta\tFamilia\tTipo Orden\tCant. Pendiente\tCant. Pend. Item\tCantidad total\tDisponible PT01\tDisponible PT08\tFecha Creación OP\tEstado\tFecha Recomendada Liberación\tFecha Real Liberación\tConsumo Para Liberar\tColor Liberación Txt\tColor Liberación\tCumplimiento Liberación\tFecha Entrega Lote\tFecha Recomendada de Entrega\tFecha Cierre OP\tFecha Ideal Entrega Producción\tConsumo Amortiguador Planta\tColor Producción Txt\tColor Producción\tCumplimiento Planta\tDias Retrazo Firplak\tColor Firplak Txt\tColor Firplak\tCumplimiento Firplak\tFecha Prometida Entrega Item\tDestino\tNumLote\tMolde\tCapacidad Molde\tFecha Carga Molde\tAmortiguador\tCliente\n";
         // Celdas sin dato se copian vacías (antes salía el texto "null")
-        const columnas: Array<keyof SemaforoItem> = ['originnum', 'nroOp', 'sku', 'descripcion', 'planta', 'familia', 'tipoOrden', 'cantPendiente', 'cantPendItem', 'cantTotal', 'disponiblePt01', 'fechaCreacionOp', 'estado', 'fechaRecomendadaLiberacion', 'fechaRealLiberacion', 'consumoParaLiberar', 'colorLiberacionTxt', 'colorLiberacion', 'cumplimientoLiberacion', 'fechaEntregaLote', 'fechaRecomendadaEntrega', 'fechaCierreOp', 'fechaIdealEntregaProduccion', 'consumoAmortiguadorPlanta', 'colorProduccionTxt', 'colorProduccion', 'cumplimientoPlanta', 'diasRetrazoFirplak', 'colorFirplakTxt', 'colorFirplak', 'cumplimientoFirplak', 'fechaPrometidaEntregaItem', 'destino', 'numLote', 'molde', 'capacidadMolde', 'fechaCargaMolde', 'amortiguador', 'cliente'];
+        const columnas: Array<keyof SemaforoItem> = ['originnum', 'nroOp', 'sku', 'descripcion', 'planta', 'familia', 'tipoOrden', 'cantPendiente', 'cantPendItem', 'cantTotal', 'disponiblePt01', 'disponiblePt08', 'fechaCreacionOp', 'estado', 'fechaRecomendadaLiberacion', 'fechaRealLiberacion', 'consumoParaLiberar', 'colorLiberacionTxt', 'colorLiberacion', 'cumplimientoLiberacion', 'fechaEntregaLote', 'fechaRecomendadaEntrega', 'fechaCierreOp', 'fechaIdealEntregaProduccion', 'consumoAmortiguadorPlanta', 'colorProduccionTxt', 'colorProduccion', 'cumplimientoPlanta', 'diasRetrazoFirplak', 'colorFirplakTxt', 'colorFirplak', 'cumplimientoFirplak', 'fechaPrometidaEntregaItem', 'destino', 'numLote', 'molde', 'capacidadMolde', 'fechaCargaMolde', 'amortiguador', 'cliente'];
         const rowsText = dataToCopy.map(item => columnas.map(c => item[c] ?? '').join('\t')).join('\n');
 
         try {

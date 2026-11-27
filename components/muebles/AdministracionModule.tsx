@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
 import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
+import EncabezadoMuebles from './EncabezadoMuebles'
 import { supabase } from '@/lib/supabase'
+import { useFechasSemaforoMuebles } from '@/lib/muebles/fechasSemaforo'
 import OrderCard from './OrderCard'
 import EditOrderModal from './EditOrderModal'
 import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
@@ -36,6 +38,8 @@ interface AdministracionModuleProps {
 export default function AdministracionModule({ userEmail, turno, usuarioNombre, plantaMuebles }: AdministracionModuleProps) {
     const [ordenes, setOrdenes] = useState<OrdenMueble[]>([])
     const [metricas, setMetricas] = useState<MetricasMuebles | null>(null)
+    // m² y ml de lo registrado hoy por proceso (cada OF aporta unidades × m²/unidad y × ml/unidad)
+    const [medidasHoy, setMedidasHoy] = useState<Record<string, { m2: number; ml: number; und: number; pzs: number }>>({})
     const [loading, setLoading] = useState(true)
     const [isSyncing, setIsSyncing] = useState(false)
     const [searchText, setSearchText] = useState('')
@@ -74,6 +78,55 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         loadData()
     }, [loadData])
 
+    useEffect(() => {
+        let vivo = true
+        ;(async () => {
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+            const { data: regs, error } = await supabase.from('trazabilidad_muebles').select('orden_fabricacion, proceso, cantidad')
+                .gte('created_at', hoy.toISOString()).limit(10000)
+            if (error || !regs?.length || !vivo) return
+            const ofs = [...new Set(regs.map(r => String(r.orden_fabricacion)))]
+            const porUnidad = new Map<string, { m2: number; ml: number; ppm: number; cefi: boolean }>()
+            for (let i = 0; i < ofs.length; i += 150) {
+                const { data } = await supabase.from('query_of_muebles').select('orden_fabricacion, cantidad, canto, rh_metros, piezas, planta, producto_sku')
+                    .in('orden_fabricacion', ofs.slice(i, i + 150))
+                for (const o of data || []) {
+                    if (o.planta !== plantaMuebles) continue
+                    const c = Number(o.cantidad) || 0
+                    // CEFI registra piezas; Muebles registra muebles (ppm = piezas por mueble)
+                    const cefi = String(o.planta || '').toLowerCase().includes('cefi') || String(o.producto_sku || '').toUpperCase().startsWith('VCEF')
+                    if (c > 0) porUnidad.set(String(o.orden_fabricacion), { m2: (Number(o.rh_metros) || 0) / c, ml: (Number(o.canto) || 0) / c, ppm: (Number(o.piezas) || 0) / c, cefi })
+                }
+            }
+            const total: Record<string, { m2: number; ml: number; und: number; pzs: number }> = {}
+            for (const r of regs) {
+                const u = porUnidad.get(String(r.orden_fabricacion))
+                if (!u) continue
+                const p = String(r.proceso || '').toLowerCase()
+                const t = (total[p] ||= { m2: 0, ml: 0, und: 0, pzs: 0 })
+                const n = Number(r.cantidad) || 0
+                t.m2 += n * u.m2
+                t.ml += n * u.ml
+                if (u.cefi) { t.pzs += n; t.und += u.ppm ? n / u.ppm : 0 } else { t.und += n; t.pzs += n * u.ppm }
+            }
+            if (vivo) setMedidasHoy(total)
+        })()
+        return () => { vivo = false }
+    }, [plantaMuebles, ordenes])
+
+    // El indicador del día trae solo una medida por proceso (m² en Corte, Inspección y Empaque; ml en Enchape): esa se
+    // muestra tal cual y la otra se saca con la misma proporción m²/ml de lo registrado hoy en ese proceso.
+    const medida = (proceso: string, base: 'm2' | 'ml', valorBase: any): { m2: string; ml: string } => {
+        const v = Number(valorBase) || 0
+        const h = medidasHoy[proceso]
+        const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString('es-CO')
+        if (base === 'm2') return { m2: fmt(v), ml: h && h.m2 > 0 ? fmt(v * h.ml / h.m2) : v ? '—' : '0' }
+        return { ml: fmt(v), m2: h && h.ml > 0 ? fmt(v * h.m2 / h.ml) : v ? '—' : '0' }
+    }
+    const mCorte = medida('corte', 'm2', metricas?.corte_m2)
+    const mEnchape = medida('enchape', 'ml', metricas?.enchape_ml)
+    const mInspeccion = medida('inspeccion', 'm2', metricas?.inspeccion_m2)
+
     const handleClearFilters = () => {
         setSearchText('')
         setStartDate('')
@@ -82,6 +135,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         setSelectedEstado('todas')
     }
 
+    const semaforoOrden = useFechasSemaforoMuebles()
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
         return ordenes.filter((orden) => {
@@ -108,22 +162,22 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
                 ? orden.fecha_entrega_estimada 
                 : orden.created_at
             
-            const ordenDate = ordenDateStr ? new Date(ordenDateStr).getTime() : 0
-            const start = startDate ? new Date(startDate).getTime() : 0
-            const end = endDate ? new Date(endDate).getTime() : 0
-
-            let matchesDate = true
-            if (start && end) {
-                matchesDate = ordenDate >= start && ordenDate <= end + 86400000 // include full end day
-            } else if (start) {
-                matchesDate = ordenDate >= start
-            } else if (end) {
-                matchesDate = ordenDate <= end + 86400000
-            }
+            // Ese día exacto (por texto aaaa-mm-dd, sin corrimiento de zona horaria)
+            const matchesDate = !startDate || String(ordenDateStr || '').slice(0, 10) === startDate
 
             return matchesPlanta && matchesEstado && matchesSearch && matchesDate
         })
-    }, [ordenes, searchText, startDate, endDate, dateType, selectedPlanta, selectedEstado])
+            // Orden como Fibra: fecha de entrega del lote → fecha ideal de producción (Nivel de servicio) → entrega
+            // estimada; la más próxima primero y sin fecha al final
+            .map(o => {
+                const f = semaforoOrden?.mapa.get(String(o.orden_fabricacion).trim())
+                const raw = f?.lote || f?.idealW || o.fecha_entrega_estimada
+                const t = raw ? new Date(raw).getTime() : NaN
+                return { o, t: isNaN(t) ? Infinity : t }
+            })
+            .sort((a, b) => a.t - b.t)
+            .map(x => x.o)
+    }, [ordenes, searchText, startDate, endDate, dateType, selectedPlanta, selectedEstado, semaforoOrden])
 
     const handleSyncSAP = async () => {
         if (!confirm('¿Desea cargar y sincronizar las órdenes de Muebles y Cefi desde SAP Service Layer?')) {
@@ -199,6 +253,33 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         }
     }
 
+    // Resumen superior: mismo cálculo que los recuadros de cada tarjeta (OrderCard), sumado sobre las OF filtradas
+    const resumenEstados = useMemo(() => {
+        const campos: { k: string; t: string; ayuda: string; leer: (o: any) => number }[] = [
+            { k: 'cantidad', t: 'Cantidad', ayuda: 'Cantidad total de las OF', leer: o => Number(o.cantidad) || 0 },
+            { k: 'por_cortar', t: 'Programado', ayuda: 'Aún sin cortar', leer: o => Number(o.por_cortar) || 0 },
+            { k: 'corte', t: 'Corte', ayuda: 'Cortados, esperando enchape', leer: o => Number(o.corte) || 0 },
+            { k: 'enchape', t: 'Enchape', ayuda: 'Enchapados, esperando inspección', leer: o => Number(o.enchape) || 0 },
+            { k: 'inspeccion', t: 'Inspección', ayuda: 'Inspeccionados, esperando digitado', leer: o => (Number(o.inspeccion) || 0) + (Number(o.empaque) || 0) },
+            { k: 'reponer', t: 'Pzs a reponer', ayuda: 'Piezas sueltas por reponer', leer: o => Number(o.por_reponer) || 0 },
+            { k: 'digitado', t: 'Digitado', ayuda: 'Digitados, esperando tránsito', leer: o => Number(o.digitado) || 0 },
+            { k: 'transito', t: 'Tránsito', ayuda: 'En tránsito, por recibir en CEDI', leer: o => Number(o.transito) || 0 },
+            { k: 'cedi', t: 'CEDI', ayuda: 'Recibidos en CEDI', leer: o => Number(o.cedi) || 0 },
+        ]
+        const esCefi = (o: any) => (o.planta || '').toLowerCase().includes('cefi') || (o.producto_sku || '').toUpperCase().startsWith('VCEF')
+        return campos.map(c => {
+            let v = 0, otra = 0
+            for (const o of filteredOrdenes) {
+                const n = c.leer(o); v += n
+                if (c.k === 'reponer') continue
+                const ppm = (Number(o.piezas) || 0) / (Number(o.cantidad) || 1)
+                otra += esCefi(o) ? (ppm ? n / ppm : 0) : n * ppm
+            }
+            const cefi = plantaMuebles === 'Cefi'
+            return { k: c.k, t: c.t, ayuda: c.ayuda, v, sub: c.k === 'reponer' ? 'piezas' : `${Math.round(otra).toLocaleString('es-CO')} ${cefi ? 'und' : 'pzs'}` }
+        })
+    }, [filteredOrdenes, plantaMuebles])
+
     const stats = useMemo(() => {
         const totalProgramadoMuebles = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0)
         const totalProgramadoPiezas = filteredOrdenes.reduce((sum, o) => sum + (Number(o.piezas) || 0), 0)
@@ -225,167 +306,32 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
     return (
         <div className="h-full flex flex-col bg-white">
-            <div className="bg-white p-3 border-b border-gray-200">
-                <div className="max-w-[1400px] mx-auto flex flex-col gap-3">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-bold text-blue-600 uppercase">Filtrar ordenes:</span>
-                            <div className="flex items-center gap-1">
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Rango de Fechas:</span>
-                                    <div className="flex items-center gap-1">
-                                        <button 
-                                            onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
-                                            className={`p-2 rounded-lg text-white transition-all shadow-sm ${dateType === 'entrega' ? 'bg-indigo-600' : 'bg-purple-600'}`}
-                                            title={dateType === 'entrega' ? 'Filtrando por Fecha de Entrega' : 'Filtrando por Fecha de Creación'}
-                                        >
-                                            <Calendar size={18} />
-                                        </button>
-                                        <input
-                                            type="date"
-                                            value={startDate}
-                                            onChange={(e) => setStartDate(e.target.value)}
-                                            className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-gray-400 font-bold text-[10px]">A</span>
-                                        <input
-                                            type="date"
-                                            value={endDate}
-                                            onChange={(e) => setEndDate(e.target.value)}
-                                            className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Buscar:</span>
-                                    <div className="relative w-48">
-                                        <input
-                                            type="text"
-                                            placeholder="Sku / Of / Pedido / Cliente"
-                                            value={searchText}
-                                            onChange={(e) => setSearchText(e.target.value)}
-                                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Planta:</span>
-                                    <select
-                                        value={selectedPlanta}
-                                        onChange={(e) => setSelectedPlanta(e.target.value)}
-                                        className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 cursor-pointer"
-                                    >
-                                        <option value="todas">TODAS LAS PLANTAS</option>
-                                        <option value="Muebles">MUEBLES</option>
-                                        <option value="Cefi">CEFI</option>
-                                    </select>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Estado:</span>
-                                    <select
-                                        value={selectedEstado}
-                                        onChange={(e) => setSelectedEstado(e.target.value)}
-                                        className="px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 cursor-pointer"
-                                    >
-                                        <option value="todas">TODOS LOS ESTADOS</option>
-                                        <option value="abierta">ABIERTAS</option>
-                                        <option value="cerrada">CERRADAS</option>
-                                    </select>
-                                </div>
-
-                                <div className="flex flex-col gap-0.5 ml-4">
-                                    <span className="text-[9px] text-gray-400 font-bold ml-1 uppercase">Exportar:</span>
-                                    <button
-                                        onClick={handleDownloadExcel}
-                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm font-bold text-xs"
-                                    >
-                                        <Download size={18} />
-                                        DESCARGAR EXCEL
-                                    </button>
-                                </div>
-
-                                <button
-                                    onClick={handleClearFilters}
-                                    className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-sm self-end mb-0.5"
-                                    title="Limpiar filtros"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 flex-1">
-                            <MetricBox title="Corte" metrics={[
-                                { label: 'Muebles', val: metricas?.cortados },
-                                { label: 'Piezas', val: metricas?.corte_piezas },
-                                { label: 'm2', val: metricas?.corte_m2 }
-                            ]} />
-                            <MetricBox title="Enchape" metrics={[
-                                { label: 'Muebles', val: metricas?.enchapados },
-                                { label: 'Piezas', val: metricas?.enchape_piezas },
-                                { label: 'ml', val: metricas?.enchape_ml }
-                            ]} />
-                            <MetricBox title="Inspeccion" metrics={[
-                                { label: 'Muebles', val: metricas?.inspeccion },
-                                { label: 'Piezas', val: metricas?.inspeccion_piezas },
-                                { label: 'm2', val: metricas?.inspeccion_m2 }
-                            ]} />
-                            <MetricBox title="Empaque" metrics={[
-                                { label: 'Muebles', val: metricas?.empacados },
-                                { label: 'Piezas', val: metricas?.empaque_piezas },
-                                { label: 'm2', val: metricas?.empaque_m2 }
-                            ]} />
-                            
-                            <div className="flex gap-1">
-                                <SingleMetricBox label="Reparaciones" val={metricas?.reparaciones} color="red" />
-                                <SingleMetricBox label="Reposiciones" val={metricas?.reposiciones} color="red" />
-                                <SingleMetricBox label="Digitado" val={metricas?.digitado} color="teal" />
-                                <SingleMetricBox label="Transito" val={metricas?.transito} color="teal" />
-                                <SingleMetricBox label="Cedi" val={metricas?.cedi} color="teal" />
-                                <SingleMetricBox label="% Calidad" val={metricas?.p_calidad} color="blue" />
-                                <SingleMetricBox label="% Rechazado" val={metricas?.p_rechazado} color="blue" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="text-[11px] font-bold text-indigo-600">
-                                ORDENES ENCONTRADAS: <span className="text-gray-900">{filteredOrdenes.length}</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={loadData} className="p-1.5 bg-gray-100 text-indigo-600 rounded shadow-sm hover:bg-gray-200">
-                                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                                </button>
-                                <button onClick={handleSyncSAP} className="p-1.5 bg-orange-100 text-orange-600 rounded shadow-sm hover:bg-orange-200">
-                                    <ArrowUpFromLine size={18} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <SummaryBox title="Cantidad" color="blue" metrics={[
-                                { label: 'Muebles', val: stats.programado.muebles },
-                                { label: 'Piezas', val: stats.programado.piezas }
-                            ]} />
-                            <SummaryBox title="Pendiente" color="orange" metrics={[
-                                { label: 'Muebles', val: stats.pendiente.muebles },
-                                { label: 'Piezas', val: stats.pendiente.piezas }
-                            ]} />
-                            <SummaryBox title="Reposiciones" color="red" metrics={[
-                                { label: 'Pend.', val: stats.reposiciones.muebles },
-                                { label: 'Realiz.', val: stats.reposiciones.piezas }
-                            ]} />
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
+            <EncabezadoMuebles
+                ordenes={ordenes}
+                plantaMuebles={plantaMuebles}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                fecha={startDate}
+                setFecha={setStartDate}
+                dateType={dateType}
+                setDateType={setDateType}
+                onRefresh={loadData}
+                loading={loading}
+                calidad={metricas?.p_calidad ?? null}
+                version={ordenes}
+                acciones={
+                    <button type="button" onClick={handleSyncSAP} title="Cargar órdenes de SAP" className="h-9 w-9 shrink-0 flex items-center justify-center bg-orange-100 text-orange-600 rounded-lg border border-orange-200 hover:bg-orange-200">
+                        <ArrowUpFromLine size={16} />
+                    </button>
+                }
+            />
 
             <div className="flex-1 overflow-y-auto bg-gray-50">
                 <div className="max-w-[1400px] mx-auto p-4">
+                    <div className="mb-3 text-indigo-600 text-xs font-bold uppercase tracking-wider">
+                        Órdenes: <span className="text-gray-900">{filteredOrdenes.length}</span>
+                    </div>
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
                             <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -475,13 +421,13 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
 function MetricBox({ title, metrics }: { title: string, metrics: { label: string, val: any }[] }) {
     return (
-        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col min-w-[120px]">
+        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col min-w-[180px] shrink-0">
             <div className="bg-gray-100 text-[10px] font-black text-center py-0.5 uppercase text-gray-600">{title}</div>
             <div className="flex divide-x divide-gray-100 bg-white">
                 {metrics.map((m, i) => (
-                    <div key={i} className="flex-1 px-2 py-1 flex flex-col items-center">
+                    <div key={i} className="flex-1 px-1.5 py-0.5 flex flex-col items-center leading-tight">
                         <span className="text-[8px] font-bold text-gray-400 uppercase">{m.label}</span>
-                        <span className="text-[11px] font-black text-gray-800">{m.val || 0}</span>
+                        <span className="text-[11px] font-black text-gray-800 whitespace-nowrap">{m.val || 0}</span>
                     </div>
                 ))}
             </div>
@@ -496,7 +442,7 @@ function SingleMetricBox({ label, val, color }: { label: string, val: any, color
         blue: 'border-blue-200 text-blue-600 bg-blue-50'
     }
     return (
-        <div className={`border rounded-lg px-2 py-1 flex flex-col items-center min-w-[70px] ${colorClasses[color]}`}>
+        <div className={`border rounded-lg px-2 py-1 flex flex-col items-center justify-center min-w-[70px] shrink-0 ${colorClasses[color]}`}>
             <span className="text-[8px] font-bold uppercase text-center leading-tight">{label}</span>
             <span className="text-[11px] font-black">{val || 0}</span>
         </div>
@@ -511,11 +457,11 @@ function SummaryBox({ title, color, metrics }: { title: string, color: 'blue' | 
     }
     const theme = colorClasses[color]
     return (
-        <div className={`border rounded-xl overflow-hidden min-w-[140px] shadow-sm ${theme.border}`}>
+        <div className={`border rounded-lg overflow-hidden min-w-[120px] shadow-sm ${theme.border}`}>
             <div className={`${theme.header} text-white text-[10px] font-black text-center py-0.5 uppercase`}>{title}</div>
             <div className="flex divide-x divide-gray-50 bg-white">
                 {metrics.map((m, i) => (
-                    <div key={i} className="flex-1 px-3 py-1.5 flex flex-col items-center">
+                    <div key={i} className="flex-1 px-2 py-0.5 flex flex-col items-center leading-tight">
                         <span className={`text-[8px] font-bold uppercase ${theme.text}`}>{m.label}</span>
                         <span className="text-sm font-black text-gray-900">{m.val || 0}</span>
                     </div>

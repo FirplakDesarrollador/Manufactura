@@ -3,11 +3,15 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { OrdenMueble, TrazabilidadRecord } from '@/types/muebles'
 import { getOrdenesMuebles, getTrazabilidadMueblesHoy, registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
+import EncabezadoMuebles from './EncabezadoMuebles'
 import OrderCard from './OrderCard'
+import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
+import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
+import { useVerificacionesCedi, BotonVerificado, ConfirmarVerificado, CascoDiablo } from './VerificadoCedi'
 import TrazabilidadModal from './TrazabilidadModal'
 import {
     Search, Eraser, Loader2, Calendar, ArrowLeftRight,
-    ArrowLeft, FileSpreadsheet, FileCode, Warehouse
+    ArrowLeft, FileSpreadsheet, FileCode, Warehouse, ClipboardList
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
@@ -28,6 +32,8 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
     const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [trazabilidadDe, setTrazabilidadDe] = useState<OrdenMueble | null>(null)
+    const [verificarDe, setVerificarDe] = useState<OrdenMueble | null>(null)
     const [moving, setMoving] = useState(false)
 
     const loadData = useCallback(async () => {
@@ -151,84 +157,48 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     })
 
     const selectedOrder = ordenes.find(o => o.id === selectedOrderId) ?? null
+    // Verificación física de CEDI (casco con cachos): total por OF y total del día
+    const verif = useVerificacionesCedi(filteredOrdenes.map(o => String(o.orden_fabricacion)), plantaMuebles)
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30">
-            {/* Header / Filtros + Stats */}
-            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
-                <div className="flex flex-wrap items-center gap-4">
-
-                    {/* Filtros */}
-                    <div className="flex items-center gap-2 flex-1 min-w-[300px]">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="SKU / OF / Pedido / Cliente"
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                        <button className="p-2 bg-indigo-600 text-white rounded-lg" title="Filtrar por fecha">
-                            <Calendar size={18} />
-                        </button>
-                        <button
-                            onClick={() => { setSearchText(''); setFechaFiltro(null) }}
-                            className="p-2 bg-orange-500 text-white rounded-lg"
-                            title="Limpiar filtros"
-                        >
-                            <Eraser size={18} />
-                        </button>
-                    </div>
-
-                    {/* Stats globales */}
-                    <div className="flex gap-2">
-                        <StatCard label="Digitado" value={totalDigitado} color="blue" />
-                        <StatCard label="Transito" value={totalTransito} color="orange" />
-                        <StatCard label="CEDI Hoy" value={totalCediHoy}  color="green" />
-                    </div>
-
-                    {/* Acciones */}
-                    <div className="flex gap-4 items-center pl-4 border-l border-slate-200">
-                        <button
-                            onClick={handleMoveAllToCedi}
-                            disabled={moving}
-                            className="flex flex-col items-center justify-center p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 border border-indigo-100 disabled:opacity-50"
-                        >
-                            {moving ? <Loader2 className="animate-spin" size={20} /> : <ArrowLeftRight size={20} />}
-                            <span className="text-[9px] font-black uppercase mt-1">Mover a CEDI</span>
-                        </button>
-
-                        <div className="h-10 w-px bg-slate-200 mx-1" />
-
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[9px] font-black text-slate-400 uppercase text-center">Exportar Reporte</span>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={handleExportExcel}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all shadow-md shadow-green-100 active:scale-95"
-                                    title="Exportar a Excel"
-                                >
-                                    <FileSpreadsheet size={16} />
-                                    <span className="text-[10px] font-black uppercase">Excel</span>
-                                </button>
-                                <button
-                                    onClick={handleExportCSV}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg transition-all shadow-md shadow-slate-200 active:scale-95"
-                                    title="Exportar a CSV"
-                                >
-                                    <FileCode size={16} />
-                                    <span className="text-[10px] font-black uppercase">CSV</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
+            <EncabezadoMuebles
+                ordenes={ordenes}
+                plantaMuebles={plantaMuebles}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                fecha={fechaFiltro || ''}
+                setFecha={v => setFechaFiltro(v || null)}
+                onRefresh={() => loadData()}
+                loading={loading}
+                version={ordenes}
+                resaltado="transito"
+                acciones={<>
+                    <button type="button" onClick={handleMoveAllToCedi} disabled={moving} title="Pasar todo lo que está en tránsito a CEDI"
+                        className="h-9 px-3 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 disabled:opacity-50">
+                        {moving ? <Loader2 className="animate-spin" size={15} /> : <ArrowLeftRight size={15} />} Mover a CEDI
+                    </button>
+                    <button type="button" onClick={handleExportExcel} title="Exportar a Excel"
+                        className="h-9 px-3 shrink-0 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
+                        <FileSpreadsheet size={15} /> Excel
+                    </button>
+                    <button type="button" onClick={handleExportCSV} title="Exportar a CSV"
+                        className="h-9 px-3 shrink-0 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
+                        <FileCode size={15} /> CSV
+                    </button>
+                </>}
+            />
+            <div className="px-4 pt-2 bg-white">
 
                 <div className="mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1">
                     <Warehouse size={12} />
-                    Ordenes encontradas: {filteredOrdenes.length}
+                    Órdenes por recibir o en CEDI: {filteredOrdenes.length}
+                    <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 normal-case tracking-normal text-[11px]"
+                        title="Unidades verificadas físicamente hoy en CEDI">
+                        <CascoDiablo size={14} /> Verificado hoy: <b className="text-emerald-900">{verif.hoy.toLocaleString('es-CO')}</b>
+                    </span>
+                    {verif.error && <span className="ml-2 normal-case tracking-normal text-[11px] text-[#d14747]">{verif.error}</span>}
                 </div>
             </div>
 
@@ -257,6 +227,20 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                                             setIsModalOpen(true)
                                         }}
                                         proceso="Cedi"
+                                        franja={
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <button type="button" onClick={() => setTrazabilidadDe(o)}
+                                            className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#254153] text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-slate-50">
+                                            <ClipboardList size={16} /> Trazabilidad
+                                        </button>
+                                                <div className="flex-1 min-w-[220px]">
+                                                    <EstadoEntregaOf of={o.orden_fabricacion} />
+                                                </div>
+                                                <div className="ml-auto">
+                                                    <BotonVerificado orden={o} verificado={verif.porOf.get(String(o.orden_fabricacion)) || 0} onClick={() => setVerificarDe(o)} />
+                                                </div>
+                                            </div>
+                                        }
                                     />
                                 </div>
                             ))
@@ -286,6 +270,21 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                     </div>
                 )}
             </div>
+
+            {trazabilidadDe && (
+                <HistorialTrazabilidadModal orden={trazabilidadDe} onClose={() => setTrazabilidadDe(null)} onSuccess={() => loadData()} />
+            )}
+
+            {verificarDe && (
+                <ConfirmarVerificado
+                    orden={verificarDe}
+                    planta={plantaMuebles}
+                    verificado={verif.porOf.get(String(verificarDe.orden_fabricacion)) || 0}
+                    usuario={userEmail || usuarioNombre}
+                    onCerrar={() => setVerificarDe(null)}
+                    onHecho={() => { setVerificarDe(null); verif.recargar() }}
+                />
+            )}
 
             {/* Modal Trazabilidad */}
             {selectedOrden && (
