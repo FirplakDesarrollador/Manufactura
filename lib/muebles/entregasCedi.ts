@@ -122,58 +122,73 @@ function totalCerradas(entregas: Entrega[]): { filas: (string | number)[][]; tot
 
 const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
 
+const NOTA_TOTAL = 'Solo entregas cerradas (no incluye la entrega en curso)'
+const etiquetaEntrega = (e: Entrega) => `Total entrega ${e.numero}${e.cerradaAt
+    ? ` · cerrada ${new Date(e.cerradaAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}` : ' (en curso)'}`
+
 /** CSV separado por entregas (como las hojas del Excel): un .zip con un CSV por entrega de hoy ("Entrega 1.csv",
- *  "Entrega 2.csv", … y la en curso) + "Total CEDI.csv"; columnas OF, SKU, Descripcion, Transito */
+ *  "Entrega 2.csv", … y la en curso) + "Total CEDI.csv"; columnas OF, SKU, Descripcion, Transito. El total va arriba a
+ *  la derecha (columnas F y G del primer renglón), igual que en el Excel. */
 export async function descargarCsvEntregas(nombre: string, entregas: Entrega[], total: (string | number)[][]) {
-    const csv = (filas: (string | number)[][]) => '﻿' + [['OF', 'SKU', 'Descripcion', 'Transito'], ...filas].map(r => r.map(q).join(',')).join('\r\n')
+    void total
+    const csv = (filas: (string | number)[][], resumen: (string | number)[][]) => '\ufeff' + [['OF', 'SKU', 'Descripcion', 'Transito'], ...filas]
+        .map((r, i) => (resumen[i] ? [...r, ...Array(4 - r.length).fill(''), '', ...resumen[i]] : r).map(q).join(',')).join('\r\n')
     const JSZip = (await import('jszip')).default
     const zip = new JSZip()
     for (const e of entregas) {
         if (!e.items.length) continue
-        const filas: (string | number)[][] = e.items.map(i => [i.of, i.sku, i.descripcion, i.cantidad])
-        filas.push(['', '', `Total entrega ${e.numero}${e.cerradaAt ? '' : ' (en curso)'}`, e.total])
-        zip.file(e.cerradaAt ? `Entrega ${e.numero}.csv` : `Entrega ${e.numero} (en curso).csv`, csv(filas))
+        zip.file(e.cerradaAt ? `Entrega ${e.numero}.csv` : `Entrega ${e.numero} (en curso).csv`,
+            csv(e.items.map(i => [i.of, i.sku, i.descripcion, i.cantidad]), [[etiquetaEntrega(e), e.total]]))
     }
-    void total
     const tc = totalCerradas(entregas)
-    zip.file('Total CEDI.csv', csv([...tc.filas, ['', '', 'Total entregas cerradas', tc.total]]))
+    zip.file('Total CEDI.csv', csv(tc.filas.length ? tc.filas : [['', '', '', 0]], [['Total entregas cerradas', tc.total], [NOTA_TOTAL]]))
     const blob = await zip.generateAsync({ type: 'blob' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = nombre.replace(/\.csv$/i, '.zip'); a.click()
+    const link = document.createElement('a'); link.href = url; link.download = nombre.replace(/\.csv$/i, '.zip'); link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-/** Excel: una hoja por entrega de hoy + la hoja "Total CEDI" = suma de las entregas cerradas (4 columnas, tabla verde) */
+/** Excel: una hoja por entrega de hoy + la hoja "Total CEDI" = suma de las entregas cerradas (4 columnas, tabla verde).
+ *  El total de cada hoja va arriba a la derecha (F1:G1); en "Total CEDI" con la nota de que es solo lo cerrado. */
 export async function descargarExcelEntregas(nombre: string, entregas: Entrega[], total: (string | number)[][]) {
+    void total
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
     const columnas = [{ name: 'OF', filterButton: true }, { name: 'SKU', filterButton: true }, { name: 'Descripcion', filterButton: true }, { name: 'Transito', filterButton: true }]
+    const anchos = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }, { width: 3 }, { width: 34 }, { width: 10 }]
+    const ponerTotal = (h: any, etiqueta: string, valor: number, nota?: string) => {
+        const borde = { style: 'thin', color: { argb: 'FFDEB841' } }
+        for (const [celda, v] of [['F1', etiqueta], ['G1', valor]] as const) {
+            const c = h.getCell(celda)
+            c.value = v
+            c.font = { bold: true, color: { argb: 'FF254153' }, size: celda === 'G1' ? 14 : 11 }
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4D6' } }
+            c.border = { top: borde, bottom: borde, left: borde, right: borde }
+            c.alignment = { vertical: 'middle', horizontal: celda === 'G1' ? 'center' : 'left' }
+        }
+        if (nota) {
+            const n = h.getCell('F2')
+            n.value = nota
+            n.font = { italic: true, size: 9, color: { argb: 'FF7A5F0E' } }
+        }
+    }
     for (const e of entregas) {
         if (!e.items.length) continue
         const h = wb.addWorksheet(e.cerradaAt ? `Entrega ${e.numero}` : `Entrega ${e.numero} (en curso)`)
-        h.columns = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }]
+        h.columns = anchos
         h.addTable({ name: `Entrega${e.numero}`, ref: 'A1', headerRow: true, style: { theme: 'TableStyleMedium7', showRowStripes: true },
             columns: columnas, rows: e.items.map(i => [Number(i.of) || i.of, i.sku, i.descripcion, i.cantidad]) })
-        const fin = e.items.length + 2
-        h.getCell(`C${fin}`).value = `Total entrega ${e.numero}${e.cerradaAt ? ` · cerrada ${new Date(e.cerradaAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}` : ' (en curso)'}`
-        h.getCell(`C${fin}`).font = { bold: true }
-        h.getCell(`D${fin}`).value = e.total
-        h.getCell(`D${fin}`).font = { bold: true }
+        ponerTotal(h, etiquetaEntrega(e), e.total)
         h.views = [{ state: 'frozen', ySplit: 1 }]
     }
     const ws = wb.addWorksheet('Total CEDI')
-    ws.columns = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }]
-    void total
+    ws.columns = anchos
     const tc = totalCerradas(entregas)
     ws.addTable({ name: 'TotalCedi', ref: 'A1', headerRow: true, style: { theme: 'TableStyleMedium7', showRowStripes: true }, columns: columnas, rows: tc.filas.length ? tc.filas : [['', '', '', 0]] })
-    const finT = Math.max(tc.filas.length, 1) + 2
-    ws.getCell(`C${finT}`).value = 'Total entregas cerradas'
-    ws.getCell(`C${finT}`).font = { bold: true }
-    ws.getCell(`D${finT}`).value = tc.total
-    ws.getCell(`D${finT}`).font = { bold: true }
+    ponerTotal(ws, 'Total entregas cerradas', tc.total, NOTA_TOTAL)
     ws.views = [{ state: 'frozen', ySplit: 1 }]
     const buf = await wb.xlsx.writeBuffer()
     const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-    const a = document.createElement('a'); a.href = url; a.download = nombre; a.click()
+    const link = document.createElement('a'); link.href = url; link.download = nombre; link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

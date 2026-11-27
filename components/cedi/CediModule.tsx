@@ -4,12 +4,12 @@ import React, { useState, useEffect } from 'react'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from '@/lib/supabase/queries/pintura'
 import { moverTransitoACedi } from '@/lib/supabase/queries/cedi'
-import { Search, Eraser, Loader2, Calendar, Info, FileSpreadsheet, ArrowLeftRight, FileCode, ArrowLeft, ChevronsUpDown, Warehouse } from 'lucide-react'
+import { Search, Eraser, Loader2, Calendar, Info, FileSpreadsheet, ArrowLeftRight, FileCode, ArrowLeft, ChevronsUpDown, Warehouse, RefreshCw } from 'lucide-react'
 import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
 import { OrderProcessesPanel } from '../administracion/AdministracionModule'
 import { useVerificacionesCedi, BotonVerificado, ConfirmarVerificado, CascoDiablo } from '@/components/muebles/VerificadoCedi'
 import { useEntregasCedi, descargarCsvEntregas, descargarExcelEntregas } from '@/lib/muebles/entregasCedi'
-import { BotonCerrarEntrega, ChipEntregasHoy } from '@/components/muebles/EntregasCediUi'
+import { BotonCerrarEntrega, ChipEntregasHoy, filtrarPorEntrega, SeleccionEntrega } from '@/components/muebles/EntregasCediUi'
 import CediList from './CediList'
 import OrdenCard from '../pintura/OrdenCard'
 import * as XLSX from 'xlsx'
@@ -137,11 +137,14 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
     const entregasCedi = useEntregasCedi('MS', registros)
     const aEntregar = (o: OrdenFabricacion) => (Number(o.transito) || 0) + (Number(o.cedi) || 0)
     const verificadoDe = (o: OrdenFabricacion) => Math.min(aEntregar(o), verif.porOf.get(String(o.orden_fabricacion)) || 0)
-    const totalAEntregar = filteredOrdenes.reduce((t, o) => t + aEntregar(o), 0)
-    const totalVerificado = filteredOrdenes.reduce((t, o) => t + verificadoDe(o), 0)
+    // Entrega que se ve (por defecto la en curso; al cerrarla queda en 0); los contadores siguen esa selección
+    const [entregaSel, setEntregaSel] = useState<SeleccionEntrega>(null)
+    const baseLista = filtrarPorEntrega(filteredOrdenes, entregasCedi.entregas, entregaSel)
+    const totalAEntregar = baseLista.reduce((t, o) => t + aEntregar(o), 0)
+    const totalVerificado = baseLista.reduce((t, o) => t + verificadoDe(o), 0)
     const totalNoVerificado = totalAEntregar - totalVerificado
-    const ordenesLista = filtroVerif === 'no' ? filteredOrdenes.filter(o => verificadoDe(o) < aEntregar(o))
-        : filtroVerif === 'si' ? filteredOrdenes.filter(o => verificadoDe(o) > 0) : filteredOrdenes
+    const ordenesLista = filtroVerif === 'no' ? baseLista.filter(o => verificadoDe(o) < aEntregar(o))
+        : filtroVerif === 'si' ? baseLista.filter(o => verificadoDe(o) > 0) : baseLista
     const alternarTraz = (id: number) => setTrazAbierta(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
     return (
@@ -208,12 +211,18 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                                 </button>
                             </div>
                         </div>
+                        {/* Actualizar: vuelve a leer órdenes, piezas, entregas y verificaciones */}
+                        <button type="button" onClick={() => { loadData(); entregasCedi.recargar(); verif.recargar() }} disabled={loading}
+                            title="Actualizar datos (órdenes, entregas y verificaciones)"
+                            className="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 disabled:opacity-50">
+                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        </button>
                     </div>
                 </div>
                 {/* Órdenes a entregar · Piezas a entregar · Verificadas · No verificadas (clic: filtra) */}
                 <div className="mt-2 px-1 flex flex-wrap items-center gap-2 text-[11px]">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-black uppercase tracking-wide">
-                        <Warehouse size={13} /> Órdenes a entregar: <b className="text-indigo-900">{filteredOrdenes.length}</b>
+                        <Warehouse size={13} /> Órdenes: <b className="text-indigo-900">{baseLista.length}</b>
                     </span>
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-black uppercase tracking-wide" title="Piezas en tránsito más las ya recibidas en CEDI">
                         Piezas a entregar: <b className="text-[#254153]">{totalAEntregar.toLocaleString('es-CO')}</b>
@@ -230,7 +239,7 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                         No verificadas: <b>{totalNoVerificado.toLocaleString('es-CO')}</b>
                         {filtroVerif === 'no' && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
                     </button>
-                    <ChipEntregasHoy entregas={entregasCedi.entregas} error={entregasCedi.error} />
+                    <ChipEntregasHoy entregas={entregasCedi.entregas} error={entregasCedi.error} seleccion={entregaSel} onSeleccion={setEntregaSel} />
                     {verif.error && <span className="normal-case text-[11px] text-[#d14747]">{verif.error}</span>}
                 </div>
             </div>
