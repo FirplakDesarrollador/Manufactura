@@ -8,8 +8,8 @@ import { getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
 
 // Encabezado único de Control de Piso Muebles / CEFI (Administración y todos los módulos de proceso), 26/11/2026:
 //  - Barra: buscador · fecha (entrega/creación) · acciones del módulo · actualizar · % Calidad.
-//  - Un renglón con 9 recuadros = unidades que ESTÁN en cada estado (suma de las OF que se ven; mismo cálculo que
-//    las tarjetas) + "Entregas hoy" (lo recibido hoy en CEDI: muebles, piezas, m² y m).
+//  - Un renglón con 9 recuadros = unidades que ESTÁN en cada estado: todas las OF abiertas de la planta (filtradas por
+//    el buscador y la fecha), iguales en todas las pestañas; mismo cálculo que las tarjetas + "Entregas hoy" (lo recibido hoy en CEDI: muebles, piezas, m² y m).
 
 type Medidas = { m2: number; ml: number; und: number; pzs: number }
 
@@ -69,10 +69,12 @@ type Props = {
     acciones?: React.ReactNode
     /** Recargar "Entregas hoy" cuando cambie (p. ej. la lista de órdenes) */
     version?: unknown
+    /** Estado que trabaja este módulo (como en las tarjetas): se resalta en amarillo con "Pendiente" */
+    resaltado?: string
 }
 
 export default function EncabezadoMuebles({ ordenes, plantaMuebles, searchText, setSearchText, placeholder, fecha, setFecha,
-    dateType = 'entrega', setDateType, onRefresh, loading, calidad, acciones, version }: Props) {
+    dateType = 'entrega', setDateType, onRefresh, loading, calidad, acciones, version, resaltado }: Props) {
     const [hoy, setHoy] = useState<Record<string, Medidas>>({})
     // % Calidad: si el módulo no lo trae (CEDI), se lee del indicador del día
     const [calidadPropia, setCalidadPropia] = useState<number | string | null>(null)
@@ -102,9 +104,19 @@ export default function EncabezadoMuebles({ ordenes, plantaMuebles, searchText, 
             { k: 'cedi', t: 'CEDI', ayuda: 'Recibidos en CEDI', leer: o => Number(o.cedi) || 0 },
         ]
         const cefi = plantaMuebles === 'Cefi'
+        // Iguales en todas las pestañas: todas las OF abiertas de la planta, filtradas solo por el buscador y la fecha
+        // de esta barra (no por el proceso de cada módulo)
+        const q = searchText.trim().toLowerCase()
+        const visibles = ordenes.filter(o => {
+            const okTexto = !q || [o.orden_fabricacion, o.numero_pedido, o.producto_sku, o.producto_descripcion, o.cliente]
+                .some(x => String(x || '').toLowerCase().includes(q))
+            const f = dateType === 'entrega' ? o.fecha_entrega_estimada : o.created_at
+            const okFecha = !fecha || String(f || '').slice(0, 10) === fecha
+            return okTexto && okFecha
+        })
         return campos.map(c => {
             let v = 0, otra = 0
-            for (const o of ordenes) {
+            for (const o of visibles) {
                 const n = c.leer(o); v += n
                 if (c.k === 'reponer') continue
                 const ppm = (Number(o.piezas) || 0) / (Number(o.cantidad) || 1)
@@ -112,7 +124,7 @@ export default function EncabezadoMuebles({ ordenes, plantaMuebles, searchText, 
             }
             return { ...c, v, sub: c.k === 'reponer' ? 'piezas' : `${Math.round(otra).toLocaleString('es-CO')} ${cefi ? 'und' : 'pzs'}` }
         })
-    }, [ordenes, plantaMuebles])
+    }, [ordenes, plantaMuebles, searchText, fecha, dateType])
 
     const entregas = hoy.cedi
     return (
@@ -152,10 +164,12 @@ export default function EncabezadoMuebles({ ordenes, plantaMuebles, searchText, 
                         <div key={r.k} title={r.ayuda}
                             className={`rounded-md border px-1 py-1.5 h-[68px] text-center flex flex-col justify-center gap-0.5 min-w-0 ${
                                 r.k === 'cantidad' ? 'bg-[#254153] border-[#254153]'
+                                    : r.k === resaltado ? 'bg-[#deb841]/20 border-[#deb841]'
                                     : r.k === 'cedi' ? 'bg-emerald-50 border-emerald-200'
                                         : r.k === 'reponer' && r.v > 0 ? 'bg-red-50 border-red-200'
                                             : 'bg-white border-slate-200'}`}>
-                            <p className={`text-[8px] sm:text-[9px] font-black uppercase leading-none whitespace-nowrap ${r.k === 'cantidad' ? 'text-white/80' : 'text-slate-500'}`}>{r.t}</p>
+                            {r.k === resaltado && <span className="mx-auto px-1.5 rounded-full bg-[#deb841] text-[#254153] text-[7px] font-black uppercase leading-[12px] whitespace-nowrap">Pendiente</span>}
+                            <p className={`text-[8px] sm:text-[9px] font-black uppercase leading-none whitespace-nowrap ${r.k === 'cantidad' ? 'text-white/80' : r.k === resaltado ? 'text-[#7a5f0e]' : 'text-slate-500'}`}>{r.t}</p>
                             <p className={`text-base font-black leading-tight ${r.k === 'cantidad' ? 'text-white' : r.k === 'reponer' && r.v > 0 ? 'text-red-700' : r.v ? 'text-[#254153]' : 'text-slate-300'}`}>{r.v.toLocaleString('es-CO')}</p>
                             {r.v !== 0 && r.k !== 'inspeccion' && <p className={`text-[9px] font-bold leading-none opacity-60 ${r.k === 'cantidad' ? 'text-white' : 'text-slate-500'}`}>{r.sub}</p>}
                         </div>

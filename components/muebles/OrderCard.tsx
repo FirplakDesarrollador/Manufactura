@@ -106,6 +106,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
 
     // Unidades por proceso (columnas como en Fibra); la del proceso de esta pantalla resaltada
     // El recuadro que alimenta el proceso de esta pantalla se resalta como "Pendiente" (Administración y Corte: Programado)
+    // Recuadro que trabaja este módulo: amarillo, igual que en el encabezado (sin la etiqueta "Pendiente" en la tarjeta)
     const resaltado = proceso === 'CEDI' ? 'transito' : proceso === 'Transito' ? 'digitado' : proceso === 'Digitado' ? 'inspeccion'
         : proceso === 'Empaque' ? 'inspeccion' : proceso === 'Inspeccion' ? 'enchape' : proceso === 'Enchape' ? 'corte' : 'por_cortar'
     // Lógica del Control de Piso MS (26/11/2026): cada recuadro es el estado en que está la unidad (último proceso
@@ -216,9 +217,6 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                                         : c.k === 'cedi' ? 'bg-emerald-50 border-emerald-200'
                                             : c.k === 'reponer' && Number(c.v) > 0 ? 'bg-red-50 border-red-200'
                                                 : 'bg-white border-slate-200'}`}>
-                                {c.k === resaltado && (
-                                    <span className="mx-auto mb-0.5 px-1.5 rounded-full bg-[#deb841] text-[#254153] text-[7px] font-black uppercase leading-[12px] whitespace-nowrap">Pendiente</span>
-                                )}
                                 <p className={`text-[8px] sm:text-[9px] font-black uppercase leading-none ${c.k === 'cantidad' ? 'text-white/80' : c.k === resaltado ? 'text-[#7a5f0e]' : 'text-slate-500'}`}>{c.t}</p>
                                 <p className={`text-base font-black leading-tight mt-0.5 ${c.k === 'cantidad' ? 'text-white' : c.k === resaltado ? 'text-[#254153]' : Number(c.v) ? (c.k === 'reponer' ? 'text-red-700' : 'text-[#254153]') : 'text-slate-300'}`}>{c.v}</p>
                                 {c.k === 'reponer' && (

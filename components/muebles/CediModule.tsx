@@ -157,7 +157,7 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
         <div className="h-full flex flex-col bg-slate-50/30">
             {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
             <EncabezadoMuebles
-                ordenes={filteredOrdenes}
+                ordenes={ordenes}
                 plantaMuebles={plantaMuebles}
                 searchText={searchText}
                 setSearchText={setSearchText}
@@ -166,6 +166,7 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                 onRefresh={() => loadData()}
                 loading={loading}
                 version={ordenes}
+                resaltado="transito"
                 acciones={<>
                     <button type="button" onClick={handleMoveAllToCedi} disabled={moving} title="Pasar todo lo que está en tránsito a CEDI"
                         className="h-9 px-3 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 disabled:opacity-50">
@@ -185,7 +186,7 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
 
                 <div className="mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1">
                     <Warehouse size={12} />
-                    Ordenes encontradas: {filteredOrdenes.length}
+                    Órdenes por recibir o en CEDI: {filteredOrdenes.length}
                 </div>
             </div>
 

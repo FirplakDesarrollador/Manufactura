@@ -159,7 +159,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
         <div className="h-full flex flex-col bg-white">
             {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
             <EncabezadoMuebles
-                ordenes={filteredOrdenes}
+                ordenes={ordenes}
                 plantaMuebles={plantaMuebles}
                 searchText={searchText}
                 setSearchText={setSearchText}
@@ -171,6 +171,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                 loading={loading}
                 calidad={metricas?.p_calidad ?? null}
                 version={ordenes}
+                resaltado="enchape"
                 acciones={<button type="button" onClick={() => setPidiendoTaladro({ tipo: 'defecto', orden: null })} title="Reportar Defecto / Calidad"
                     className="h-9 px-3 shrink-0 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
                     <AlertTriangle size={15} /> Reportar defecto
@@ -185,7 +186,7 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                             <div className="flex items-center justify-between mb-4">
                                 <div className="text-emerald-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                                     <CheckCircle size={14} />
-                                    ORDENES EN INSPECCIÓN: {filteredOrdenes.length}
+                                    ÓRDENES POR INSPECCIONAR (EN ENCHAPE): {filteredOrdenes.length}
                                 </div>
                                 {syncing && (
                                     <div className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold uppercase tracking-widest animate-in fade-in duration-300">

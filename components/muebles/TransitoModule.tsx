@@ -90,7 +90,7 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
         <div className="h-full flex flex-col bg-white">
             {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
             <EncabezadoMuebles
-                ordenes={filteredOrdenes}
+                ordenes={ordenes}
                 plantaMuebles={plantaMuebles}
                 searchText={searchText}
                 setSearchText={setSearchText}
@@ -102,6 +102,7 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
                 loading={loading}
                 calidad={metricas?.p_calidad ?? null}
                 version={ordenes}
+                resaltado="digitado"
             />
 
             {/* Main Content Area */}
@@ -110,7 +111,7 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
                     <div className="flex items-center justify-between mb-4">
                         <div className="text-indigo-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                             <Truck size={14} />
-                            ORDENES EN TRÁNSITO: {filteredOrdenes.length}
+                            ÓRDENES POR PASAR A TRÁNSITO (EN DIGITADO): {filteredOrdenes.length}
                         </div>
                     </div>
 

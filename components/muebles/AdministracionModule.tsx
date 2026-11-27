@@ -308,7 +308,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         <div className="h-full flex flex-col bg-white">
             {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
             <EncabezadoMuebles
-                ordenes={filteredOrdenes}
+                ordenes={ordenes}
                 plantaMuebles={plantaMuebles}
                 searchText={searchText}
                 setSearchText={setSearchText}

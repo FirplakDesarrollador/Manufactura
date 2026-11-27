@@ -141,7 +141,7 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
         <div className="h-full flex flex-col bg-white">
             {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
             <EncabezadoMuebles
-                ordenes={filteredOrdenes}
+                ordenes={ordenes}
                 plantaMuebles={plantaMuebles}
                 searchText={searchText}
                 setSearchText={setSearchText}
@@ -153,6 +153,7 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
                 loading={loading}
                 calidad={metricas?.p_calidad ?? null}
                 version={ordenes}
+                resaltado="por_cortar"
             />
 
             {/* Main Content Area */}

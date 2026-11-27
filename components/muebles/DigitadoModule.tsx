@@ -114,7 +114,7 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
         <div className="h-full flex flex-col bg-white">
             {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
             <EncabezadoMuebles
-                ordenes={filteredOrdenes}
+                ordenes={ordenes}
                 plantaMuebles={plantaMuebles}
                 searchText={searchText}
                 setSearchText={setSearchText}
@@ -126,6 +126,7 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
                 loading={loading}
                 calidad={metricas?.p_calidad ?? null}
                 version={ordenes}
+                resaltado="inspeccion"
                 acciones={<button type="button" onClick={() => actualizarTodasEnPantalla((plantaMuebles || '').toLowerCase() === 'cefi' ? 'CEFI' : 'MBL')} disabled={revisando}
                     title="Actualizar los componentes para la entrega de todas las órdenes en pantalla (consulta SAP en bloque)"
                     className="h-9 px-3 shrink-0 bg-[#254153] hover:bg-[#1a3040] text-white rounded-lg font-bold text-xs flex items-center gap-1.5 disabled:opacity-60">
@@ -139,7 +140,7 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
                     <div className="flex items-center justify-between mb-4">
                         <div className="text-cyan-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                             <FileText size={14} />
-                            ORDENES EN DIGITADO: {filteredOrdenes.length}
+                            ÓRDENES POR DIGITAR (EN INSPECCIÓN): {filteredOrdenes.length}
                             {conFaltantes > 0 && (
                                 <span className="ml-2 flex items-center gap-1.5 normal-case tracking-normal text-[#d14747]" title="Órdenes con componentes faltantes para la entrega (SAP); se muestran primero">
                                     <b className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#d14747] text-white text-[10px] font-black leading-[18px] text-center shadow">{conFaltantes > 99 ? '99+' : conFaltantes}</b>
