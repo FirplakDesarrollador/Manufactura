@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import IconoDesmanchado from './IconoDesmanchado'
 import { 
     Search, 
     X, 
@@ -24,7 +25,8 @@ export interface CargaMoldesRow {
     moldesHabilitados: number
     moldesDisponibles: number
     moldesEnUso: number
-    moldesEnReparacion: number
+    moldesEnReparacion: number      // solo reparación real (sin desmanchado)
+    moldesDesmanchado: number       // Por desmanchar o en reparación por desmanchado
     moldesEnFabricacion: number
     totalOrdenes: number
     piezasProgramadas: number
@@ -32,7 +34,37 @@ export interface CargaMoldesRow {
 }
 
 type SortField = keyof CargaMoldesRow
-type FilterOption = 'all' | 'reparacion' | 'no_disponible' | 'programado' | 'alta_carga'
+type FilterOption = 'all' | 'reparacion' | 'desmanchado' | 'no_disponible' | 'programado' | 'alta_carga'
+
+const clave = (s: string | null | undefined) => (s || '').trim().toLowerCase()
+
+// Reparación vs. desmanchado por SKU de molde, contando molde por molde:
+//  - Desmanchado: estado "Por desmanchar", o "En reparacion" con una reparación de desmanchado abierta en
+//    Registro moldes (BD_moldes: "Límite de vueltas alcanzado" / "Desmanchado", sin entregar).
+//  - Reparación: los demás moldes "En reparacion" (daños reales).
+type ConteoSku = { reparacion: number; desmanchado: number; desmanchadoEnReparacion: number }
+async function conteoReparacionPorSku(): Promise<Map<string, ConteoSku>> {
+    const [vistaRes, bdRes] = await Promise.all([
+        supabase.from('query_moldes').select('id, serial, estado, molde_sku, tipo_molde_sku')
+            .in('estado', ['En reparacion', 'Por desmanchar']),
+        supabase.from('BD_moldes').select('"CODIGO MOLDE", ESTADO, "DEFECTOS A REPARAR"').not('ESTADO', 'ilike', '%entregado%')
+    ])
+    if (vistaRes.error) throw vistaRes.error
+    const desmanche = new Set(((bdRes.data || []) as Record<string, string | null>[])
+        .filter(r => !/destru/i.test(r['ESTADO'] || '') && /vueltas|desmanch/i.test(r['DEFECTOS A REPARAR'] || ''))
+        .map(r => clave(r['CODIGO MOLDE'])))
+    const conteo = new Map<string, ConteoSku>()
+    for (const m of (vistaRes.data || []) as { serial: string; estado: string; molde_sku: string | null; tipo_molde_sku: string | null }[]) {
+        const sku = clave(m.molde_sku || m.tipo_molde_sku)
+        if (!sku) continue
+        const c = conteo.get(sku) || { reparacion: 0, desmanchado: 0, desmanchadoEnReparacion: 0 }
+        if (m.estado === 'Por desmanchar') c.desmanchado++
+        else if (desmanche.has(clave(m.serial))) { c.desmanchado++; c.desmanchadoEnReparacion++ }
+        else c.reparacion++
+        conteo.set(sku, c)
+    }
+    return conteo
+}
 
 export default function CargaMoldesTable() {
     const [data, setData] = useState<CargaMoldesRow[]>([])
@@ -49,31 +81,40 @@ export default function CargaMoldesTable() {
         setLoading(true)
         setErrorMsg(null)
         try {
-            const { data: result, error } = await supabase
-                .from('query_carga_moldes')
-                .select('*')
-                
+            const [{ data: result, error }, conteo] = await Promise.all([
+                supabase.from('query_carga_moldes').select('*'),
+                conteoReparacionPorSku().catch(e => { console.error('No se pudo separar reparación y desmanchado:', e); return null })
+            ])
+
             if (error) {
                 console.error("Error fetching carga moldes:", error)
                 setErrorMsg("No se pudieron cargar los datos de carga de moldes.")
             }
             
             if (result && result.length > 0) {
-                const normalized: CargaMoldesRow[] = result.map((row: any) => ({
-                    moldeSku: row.molde_sku || row.moldeSku || row.sku || '',
+                const normalized: CargaMoldesRow[] = result.map((row: any) => {
+                    const sku = row.molde_sku || row.moldeSku || row.sku || ''
+                    const repVista = Number(row.moldes_en_reparacion ?? row.moldesEnReparacion ?? row.reparacion ?? 0)
+                    // Reparación real = la de la vista menos los moldes en reparación por desmanchado
+                    // (si no se pudo leer el detalle, se deja lo que trae la vista)
+                    const c = conteo?.get(clave(sku)) ?? null
+                    return {
+                    moldeSku: sku,
                     moldeDescripcion: row.molde_descripcion || row.moldeDescripcion || row.descripcion || '',
                     moldesTotales: Number(row.moldes_totales ?? row.moldesTotales ?? row.totales ?? 0),
                     moldesHabilitados: Number(row.moldes_habilitados ?? row.moldesHabilitados ?? 0),
                     moldesDisponibles: Number(row.moldes_disponibles ?? row.moldesDisponibles ?? row.disponibles ?? 0),
                     moldesEnUso: Number(row.moldes_en_uso ?? row.moldesEnUso ?? row.en_uso ?? 0),
-                    moldesEnReparacion: Number(row.moldes_en_reparacion ?? row.moldesEnReparacion ?? row.reparacion ?? 0),
+                    moldesEnReparacion: c ? Math.max(0, repVista - c.desmanchadoEnReparacion) : repVista,
+                    moldesDesmanchado: c ? c.desmanchado : 0,
                     moldesEnFabricacion: Number(row.moldes_en_fabricacion ?? row.moldesEnFabricacion ?? row.fabricacion ?? 0),
                     totalOrdenes: Number(row.total_ordenes ?? row.totalOrdenes ?? row.ordenes ?? 0),
                     piezasProgramadas: Number(row.piezas_programadas ?? row.piezasProgramadas ?? row.programado ?? 0),
-                    promedioVueltas: row.promedio_vueltas != null 
-                        ? Number(row.promedio_vueltas) 
+                    promedioVueltas: row.promedio_vueltas != null
+                        ? Number(row.promedio_vueltas)
                         : (row.vueltas != null ? Number(row.vueltas) : null)
-                }))
+                    }
+                })
                 setData(normalized)
             } else {
                 setData([])
@@ -116,6 +157,8 @@ export default function CargaMoldesTable() {
         // 2. Filtros de estado rápido
         if (filterOption === 'reparacion') {
             result = result.filter(row => row.moldesEnReparacion > 0)
+        } else if (filterOption === 'desmanchado') {
+            result = result.filter(row => row.moldesDesmanchado > 0)
         } else if (filterOption === 'no_disponible') {
             result = result.filter(row => row.moldesDisponibles === 0 && row.piezasProgramadas > 0)
         } else if (filterOption === 'programado') {
@@ -155,6 +198,7 @@ export default function CargaMoldesTable() {
         const totalDisponibles = filteredAndSortedData.reduce((acc, r) => acc + r.moldesDisponibles, 0)
         const totalEnUso = filteredAndSortedData.reduce((acc, r) => acc + r.moldesEnUso, 0)
         const totalReparacion = filteredAndSortedData.reduce((acc, r) => acc + r.moldesEnReparacion, 0)
+        const totalDesmanchado = filteredAndSortedData.reduce((acc, r) => acc + r.moldesDesmanchado, 0)
         const totalFabricacion = filteredAndSortedData.reduce((acc, r) => acc + r.moldesEnFabricacion, 0)
         const totalOrdenes = filteredAndSortedData.reduce((acc, r) => acc + r.totalOrdenes, 0)
         const totalProgramadas = filteredAndSortedData.reduce((acc, r) => acc + r.piezasProgramadas, 0)
@@ -171,6 +215,7 @@ export default function CargaMoldesTable() {
             totalDisponibles,
             totalEnUso,
             totalReparacion,
+            totalDesmanchado,
             totalFabricacion,
             totalOrdenes,
             totalProgramadas,
@@ -182,7 +227,7 @@ export default function CargaMoldesTable() {
     const exportToCSV = () => {
         if (filteredAndSortedData.length === 0) return
 
-        const headers = ['SKU', 'Descripción', 'Moldes Totales', 'Disponibles', 'En Uso', 'Reparación', 'Fabricación', 'Órdenes Pendientes', 'Piezas Programadas', 'Promedio Vueltas']
+        const headers = ['SKU', 'Descripción', 'Moldes Totales', 'Disponibles', 'En Uso', 'Reparación', 'Desmanchado', 'Fabricación', 'Órdenes Pendientes', 'Piezas Programadas', 'Promedio Vueltas']
         const rows = filteredAndSortedData.map(r => [
             `"${r.moldeSku}"`,
             `"${r.moldeDescripcion.replace(/"/g, '""')}"`,
@@ -190,6 +235,7 @@ export default function CargaMoldesTable() {
             r.moldesDisponibles,
             r.moldesEnUso,
             r.moldesEnReparacion,
+            r.moldesDesmanchado,
             r.moldesEnFabricacion,
             r.totalOrdenes,
             r.piezasProgramadas,
@@ -218,7 +264,7 @@ export default function CargaMoldesTable() {
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col animate-in fade-in duration-300">
             {/* KPI Summary Cards Bar */}
-            <div className="p-4 bg-gray-50/80 border-b border-gray-200 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            <div className="p-4 bg-gray-50/80 border-b border-gray-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-3">
                 <div className="bg-white p-2.5 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between">
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
                         <Box size={12} className="text-[#324354]" /> Tipos Molde
@@ -252,6 +298,13 @@ export default function CargaMoldesTable() {
                         <Wrench size={12} className="text-rose-600" /> Reparación
                     </span>
                     <span className="text-base font-extrabold text-rose-700 mt-1">{metrics.totalReparacion}</span>
+                </div>
+
+                <div className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-200/60 shadow-2xs flex flex-col justify-between" title="Por desmanchar o en reparación por desmanchado (Registro moldes)">
+                    <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1">
+                        <IconoDesmanchado className="w-3 h-3 text-sky-600" /> Desmanchado
+                    </span>
+                    <span className="text-base font-extrabold text-sky-700 mt-1">{metrics.totalDesmanchado}</span>
                 </div>
 
                 <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200/60 shadow-2xs flex flex-col justify-between">
@@ -311,6 +364,7 @@ export default function CargaMoldesTable() {
                             <option value="programado">Con Programación (&gt; 0)</option>
                             <option value="alta_carga">Alta Carga (&ge; 8 Vueltas)</option>
                             <option value="reparacion">Con Moldes en Reparación</option>
+                            <option value="desmanchado">Con Moldes en Desmanchado</option>
                             <option value="no_disponible">Sin Moldes Disponibles</option>
                         </select>
                     </div>
@@ -402,6 +456,13 @@ export default function CargaMoldesTable() {
                                 >
                                     Reparación {renderSortIcon('moldesEnReparacion')}
                                 </th>
+                                <th
+                                    onClick={() => handleSort('moldesDesmanchado')}
+                                    className="px-4 py-3 border-b border-gray-200 text-center cursor-pointer hover:bg-gray-200/70 transition-colors group"
+                                    title="Por desmanchar o en reparación por desmanchado"
+                                >
+                                    Desmanchado {renderSortIcon('moldesDesmanchado')}
+                                </th>
                                 <th 
                                     onClick={() => handleSort('moldesEnFabricacion')}
                                     className="px-4 py-3 border-b border-gray-200 text-center cursor-pointer hover:bg-gray-200/70 transition-colors group"
@@ -431,7 +492,7 @@ export default function CargaMoldesTable() {
                         <tbody className="divide-y divide-gray-100 bg-white">
                             {filteredAndSortedData.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="px-4 py-12 text-center text-gray-500">
+                                    <td colSpan={11} className="px-4 py-12 text-center text-gray-500">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Box size={32} className="text-gray-300" />
                                             <p className="font-semibold text-gray-600">No se encontraron registros de moldes</p>
@@ -515,6 +576,17 @@ export default function CargaMoldesTable() {
                                                 )}
                                             </td>
 
+                                            {/* Desmanchado */}
+                                            <td className="px-4 py-2.5 text-center font-bold">
+                                                {row.moldesDesmanchado > 0 ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-sky-100 text-sky-800 font-extrabold">
+                                                        <IconoDesmanchado className="w-3 h-3" /> {row.moldesDesmanchado}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400 font-normal">0</span>
+                                                )}
+                                            </td>
+
                                             {/* Fabricación */}
                                             <td className="px-4 py-2.5 text-center font-medium text-gray-600">
                                                 {row.moldesEnFabricacion > 0 ? (
@@ -578,6 +650,9 @@ export default function CargaMoldesTable() {
                                     </td>
                                     <td className="px-4 py-3 text-center text-rose-700">
                                         {metrics.totalReparacion}
+                                    </td>
+                                    <td className="px-4 py-3 text-center text-sky-700">
+                                        {metrics.totalDesmanchado}
                                     </td>
                                     <td className="px-4 py-3 text-center text-blue-700">
                                         {metrics.totalFabricacion}
