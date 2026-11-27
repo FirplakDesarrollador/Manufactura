@@ -11,7 +11,7 @@
 // El técnico se asigna con las reglas únicas de lib/mantenimiento/asignacionTecnicos.ts.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { obtenerCodigoPlanta } from '@/lib/nomenclaturaPlantas';
+import { obtenerCodigoPlanta, type NomenclaturaPlanta } from '@/lib/nomenclaturaPlantas';
 import { elegirTecnico, sumarCarga, ordenPrioridad, type TecnicoAsignable, type CargaPorTecnico } from '@/lib/mantenimiento/asignacionTecnicos';
 
 const DIA_MS = 86400000;
@@ -40,9 +40,9 @@ async function traerTodo<T>(consulta: () => any, tam = 1000): Promise<T[]> {
 }
 
 /** "MS, CEFI" → ['MS','CEFI'] (códigos oficiales) */
-export function plantasDeTexto(v: unknown): string[] {
+export function plantasDeTexto(v: unknown, catalogo?: NomenclaturaPlanta[]): string[] {
   const partes = String(v ?? '').split(',').map(s => s.trim()).filter(Boolean);
-  return [...new Set(partes.map(p => (obtenerCodigoPlanta(p) || p).toUpperCase()))];
+  return [...new Set(partes.map(p => (obtenerCodigoPlanta(p, catalogo && catalogo.length ? catalogo : undefined) || p).toUpperCase()))];
 }
 
 export type ResultadoGeneracion = {
@@ -79,11 +79,15 @@ export async function generarPreventivos(supabase: SupabaseClient, ahora: Date =
     .select('*').eq('activo', true).order('id', { ascending: true });
   if (errPlanes || !planes) throw new Error(errPlanes?.message || 'No se pudieron leer los planes preventivos');
 
+  // Catálogo de plantas de Configuración (la lista fija del código no tiene todas: p. ej. "Obras Civiles" → OC)
+  const { data: catPlantas } = await supabase.from('nomenclatura_plantas').select('*');
+  const catalogo = (catPlantas || []) as NomenclaturaPlanta[];
+
   // 3. Técnicos (reglas de asignación)
   const { data: tecData } = await supabase.from('mantenimiento_tecnicos').select('*');
   const tecnicos: TecnicoAsignable[] = (tecData || []).map((t: any) => ({
     id: t.id, nombre: t.nombre || '', ejecutor: t.ejecutor,
-    plantas: plantasDeTexto(t.especialidad || t.planta),
+    plantas: plantasDeTexto(t.especialidad || t.planta, catalogo),
     turno: t.activo === false ? 'INACTIVO' : (t.modalidad_operativa || t.turno || 'PR'),
     capacidadHoras: parseFloat(t.capacidad_horas) || null, activo: t.activo !== false,
     pctProduccion: t.pct_produccion != null ? Number(t.pct_produccion) : null,
@@ -167,7 +171,7 @@ export async function generarPreventivos(supabase: SupabaseClient, ahora: Date =
       const pPlanta = (plantaDeMaquina(p) || p.planta || 'MS').trim();
       const horas = (Number(p.duracion_minutos) || 60) / 60;
       const asig = elegirTecnico(
-        { ejecutor: p.ejecutor, plantas: plantasDeTexto(pPlanta), turno: p.tipo_intervencion || p.turno_requerido, horas },
+        { ejecutor: p.ejecutor, plantas: plantasDeTexto(pPlanta, catalogo), turno: p.tipo_intervencion || p.turno_requerido, horas },
         tecnicos, carga
       );
       const tec = asig.id ? tecnicos.find(t => t.id === asig.id) : null;

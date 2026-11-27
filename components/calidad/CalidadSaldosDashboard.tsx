@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Plus, Search, X } from 'lucide-react';
 import {
     ResponsiveContainer,
     ComposedChart,
@@ -247,15 +247,30 @@ export default function CalidadSaldosDashboard() {
     }, [pareto, colorCausa]);
     const causaEnAnillo = selCausa && anillo.some(a => a.name === selCausa) ? selCausa : selCausa ? anillo[anillo.length - 1]?.name : null;
 
-    // Detalle de piezas: periodo y causa (la referencia elegida se resalta)
+    // Detalle de piezas: periodo y causa (la referencia elegida se resalta). Orden por columna con flechas (clic en el
+    // encabezado; segundo clic invierte). Por defecto: fecha más reciente primero.
+    type CampoOrden = 'fecha' | 'tipo' | 'referencia' | 'causa' | 'cantidad' | 'costo';
+    const [orden, setOrden] = useState<{ campo: CampoOrden; asc: boolean }>({ campo: 'fecha', asc: false });
+    const ordenarPor = (campo: CampoOrden) => setOrden(o => o.campo === campo ? { campo, asc: !o.asc } : { campo, asc: campo === 'referencia' || campo === 'causa' || campo === 'tipo' });
     const detalle = useMemo(() => {
         const q = busqueda.trim().toUpperCase();
+        const dir = orden.asc ? 1 : -1;
+        const comparar = (a: EventoSD, b: EventoSD) => {
+            switch (orden.campo) {
+                case 'cantidad': return (a.cantidad - b.cantidad) * dir;
+                case 'costo': return ((a.sinCosto ? -1 : a.costo) - (b.sinCosto ? -1 : b.costo)) * dir;
+                case 'tipo': return a.tipo.localeCompare(b.tipo) * dir;
+                case 'referencia': return a.referencia.localeCompare(b.referencia, 'es') * dir;
+                case 'causa': return a.causa.localeCompare(b.causa, 'es') * dir;
+                default: return a.fecha.localeCompare(b.fecha) * dir;
+            }
+        };
         return filtrados
             .filter(e => enPeriodo(e) && conCausa(e))
             .filter(e => !q || e.referencia.includes(q) || e.causa.includes(q) || e.sku.includes(q) || e.responsable.includes(q))
-            .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.costo - a.costo);
+            .sort((a, b) => comparar(a, b) || b.fecha.localeCompare(a.fecha) || b.costo - a.costo);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtrados, selPeriodo, selCausa, busqueda]);
+    }, [filtrados, selPeriodo, selCausa, busqueda, orden]);
 
     // Columnas de las gráficas de tiempo (saldo y destrucción apilados + acumulado)
     // diasCero: días que deben verse aunque no tengan saldos ni destrucciones (columna en 0)
@@ -778,12 +793,48 @@ export default function CalidadSaldosDashboard() {
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 text-[10px] border-b border-slate-200">
                                 <tr>
-                                    <th className="py-1 px-1.5">Fecha</th>
-                                    <th className="py-1 px-1.5">Tipo</th>
-                                    <th className="py-1 px-1.5">Referencia</th>
-                                    <th className="py-1 px-1.5">Causa</th>
-                                    <th className="py-1 px-1.5 text-right">Pzs</th>
-                                    <th className="py-1 px-1.5 text-right pr-2">Costo</th>
+                                    <th className="py-1 px-1.5">
+                                        <button type="button" onClick={() => ordenarPor('fecha')} title="Ordenar"
+                                            className={`inline-flex items-center gap-0.5 hover:text-[#324354] ${orden.campo === 'fecha' ? 'text-[#324354]' : ''}`}>
+                                            Fecha
+                                            {orden.campo === 'fecha' ? (orden.asc ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                                        </button>
+                                    </th>
+                                    <th className="py-1 px-1.5">
+                                        <button type="button" onClick={() => ordenarPor('tipo')} title="Ordenar"
+                                            className={`inline-flex items-center gap-0.5 hover:text-[#324354] ${orden.campo === 'tipo' ? 'text-[#324354]' : ''}`}>
+                                            Tipo
+                                            {orden.campo === 'tipo' ? (orden.asc ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                                        </button>
+                                    </th>
+                                    <th className="py-1 px-1.5">
+                                        <button type="button" onClick={() => ordenarPor('referencia')} title="Ordenar"
+                                            className={`inline-flex items-center gap-0.5 hover:text-[#324354] ${orden.campo === 'referencia' ? 'text-[#324354]' : ''}`}>
+                                            Referencia
+                                            {orden.campo === 'referencia' ? (orden.asc ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                                        </button>
+                                    </th>
+                                    <th className="py-1 px-1.5">
+                                        <button type="button" onClick={() => ordenarPor('causa')} title="Ordenar"
+                                            className={`inline-flex items-center gap-0.5 hover:text-[#324354] ${orden.campo === 'causa' ? 'text-[#324354]' : ''}`}>
+                                            Causa
+                                            {orden.campo === 'causa' ? (orden.asc ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                                        </button>
+                                    </th>
+                                    <th className="py-1 px-1.5 text-right">
+                                        <button type="button" onClick={() => ordenarPor('cantidad')} title="Ordenar"
+                                            className={`inline-flex items-center gap-0.5 hover:text-[#324354] ${orden.campo === 'cantidad' ? 'text-[#324354]' : ''}`}>
+                                            Pzs
+                                            {orden.campo === 'cantidad' ? (orden.asc ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                                        </button>
+                                    </th>
+                                    <th className="py-1 px-1.5 text-right pr-2">
+                                        <button type="button" onClick={() => ordenarPor('costo')} title="Ordenar"
+                                            className={`inline-flex items-center gap-0.5 hover:text-[#324354] ${orden.campo === 'costo' ? 'text-[#324354]' : ''}`}>
+                                            Costo
+                                            {orden.campo === 'costo' ? (orden.asc ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                                        </button>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">

@@ -25,7 +25,10 @@ export async function getOrdenesMuebles(planta?: string, soloPendientes: boolean
     return data as unknown as OrdenMueble[]
 }
 
-export async function getMetricasMueblesHoy(turno?: string) {
+// Indicadores del día. La vista metricas_turno_dia_muebles es pesada y a veces la base la corta por tiempo: NUNCA
+// debe bloquear la carga de las órdenes (antes un error aquí dejaba la pantalla en 0 órdenes). Máximo 4 s; si no
+// responde o falla, se devuelve vacío y las órdenes se muestran igual.
+export async function getMetricasMueblesHoy(turno?: string): Promise<MetricasMuebles[]> {
     const today = new Date().toISOString().split('T')[0]
     let query = supabase
         .from('metricas_turno_dia_muebles')
@@ -37,10 +40,18 @@ export async function getMetricasMueblesHoy(turno?: string) {
         query = query.eq('turno', turno)
     }
 
-    const { data, error } = await query
-
-    if (error) throw error
-    return data as MetricasMuebles[]
+    try {
+        const r = await Promise.race([
+            Promise.resolve(query),
+            new Promise<null>(res => setTimeout(() => res(null), 4000)),
+        ])
+        if (!r) { console.warn('Indicadores de Muebles: la consulta tardó más de 4 s; se muestran las órdenes sin ellos.'); return [] }
+        if (r.error) { console.warn('Indicadores de Muebles no disponibles:', r.error.message); return [] }
+        return (r.data || []) as MetricasMuebles[]
+    } catch (e) {
+        console.warn('Indicadores de Muebles no disponibles:', e)
+        return []
+    }
 }
 
 export async function registrarTrazabilidadMueble(payload: {

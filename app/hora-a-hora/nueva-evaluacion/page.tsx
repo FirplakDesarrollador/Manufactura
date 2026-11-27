@@ -19,6 +19,21 @@ import { toast } from "sonner";
 import Header from "@/components/opt-sistemica/Header";
 import { createClient } from "@/lib/supabase/client";
 import SubHeader from "@/components/hora-a-hora/SubHeader";
+import { leerBorradorNube, oirGuardado, estadoGuardado, type EstadoGuardado } from "@/lib/horaHoraBorrador";
+
+// Indicador del borrador: "✓ Guardado hh:mm" (en el celular y en la nube) o el aviso si no se pudo guardar
+function IndicadorGuardado() {
+    const [e, setE] = useState<EstadoGuardado>(estadoGuardado());
+    useEffect(() => oirGuardado(setE), []);
+    if (!e.ultimo && !e.error) return null;
+    const hora = e.ultimo ? new Date(e.ultimo).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" }) : "";
+    const nube = e.nube === "ok" ? " · copia en la nube ✓" : e.nube === "pendiente" ? " · subiendo a la nube…" : e.nube === "sin_tabla" ? " · sin copia en la nube (falta hora_hora_borradores.sql)" : e.nube === "error" ? " · sin internet: copia en la nube pendiente" : "";
+    return (
+        <div className={`mb-3 rounded-lg border px-3 py-1.5 text-xs font-semibold ${e.error ? "border-red-300 bg-red-50 text-[#d14747]" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+            {e.error ? e.error : <>✓ Guardado en este celular {hora}{nube}</>}
+        </div>
+    );
+}
 
 const STEPS = [
     { id: 0, title: "Generales" },
@@ -43,8 +58,19 @@ export default function NuevaEvaluacion() {
     useEffect(() => {
         // Libera espacio del equipo (copias viejas ya subidas) para que el borrador se pueda guardar
         import("@/lib/db/horaHora").then(m => m.limpiarCopiasSubidas()).catch(() => 0);
-        Promise.resolve(useStore.persist.rehydrate()).finally(() => {
-            const s = useStore.getState();
+        Promise.resolve(useStore.persist.rehydrate()).finally(async () => {
+            let s = useStore.getState();
+            // El celular no tiene borrador (Android lo pudo borrar): se busca la copia en la nube del usuario
+            if (!s.evaluacionActual) {
+                try {
+                    const nube = await leerBorradorNube();
+                    const d = nube?.datos?.state ?? nube?.datos;
+                    if (d?.evaluacionActual) {
+                        useStore.setState({ evaluacionActual: d.evaluacionActual, paso: d.paso ?? 0, ...(d.cronometro ? { cronometro: d.cronometro } : {}) });
+                        s = useStore.getState();
+                    }
+                } catch { /* sin internet: se sigue sin borrador */ }
+            }
             if (s.evaluacionActual) setRecuperado(true);
             else if (s.paso !== 0) s.setPaso(0);
             setListo(true);
@@ -169,6 +195,7 @@ export default function NuevaEvaluacion() {
                         </button>
                     </div>
                 )}
+                {listo && evaluacionActual && <IndicadorGuardado />}
                 {errorGuardado && (
                     <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-[#d14747]">
                         <AlertCircle size={18} className="shrink-0 mt-0.5" />

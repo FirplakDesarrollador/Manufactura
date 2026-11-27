@@ -44,7 +44,7 @@ export default function ReglasMedicionView() {
             .then(({ data }) => setPersonal((data || []).map(e => ({ nombre: limpio(e.nombreCompleto), planta: norm(e.planta) }))));
     }, []);
     const enPersonal = new Set(personal.map(p => norm(p.nombre)));
-    const [nuevaPersona, setNuevaPersona] = useState<Record<RolSP, string>>({ 'Líder': '', 'Supervisor': '', 'Jefe': '', 'Gerente': '' });
+    const [nuevaPersona, setNuevaPersona] = useState<Record<RolSP, string>>({ 'Líder': '', 'Supervisor': '', 'Jefe': '', 'Gerente': '', 'Especialista': '' });
 
     useEffect(() => {
         (async () => {
@@ -431,7 +431,7 @@ export default function ReglasMedicionView() {
             </div>
 
             {/* Personas por rol */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3">
                 {ROLES_SP.map(rol => (
                     <div key={rol} className="rounded-xl border border-slate-200 p-3">
                         <div className="flex items-center justify-between mb-2">
@@ -440,10 +440,11 @@ export default function ReglasMedicionView() {
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                             {(r.personas[rol] || []).map((n, k) => (
-                                <span key={`${n}-${k}`} className={`flex items-center gap-1 text-[11px] font-semibold border rounded-lg px-2 py-0.5 ${personaOculta(r, n) ? 'bg-slate-100 border-dashed border-slate-300 text-slate-400' : 'bg-[#F6F3EE] border-[#e2ded5] text-[#324354]'}`}
+                                <span key={`${n}-${k}`} className={`flex flex-wrap items-center gap-1 max-w-full text-[11px] font-semibold border rounded-lg px-2 py-0.5 ${personaOculta(r, n) ? 'bg-slate-100 border-dashed border-slate-300 text-slate-400' : 'bg-[#F6F3EE] border-[#e2ded5] text-[#324354]'}`}
                                     title={personaOculta(r, n) ? 'Oculta: no se mide ni sale en el tablero' : undefined}>
                                     {personaOculta(r, n) && <EyeOff size={11} />}
-                                    <span className={personaOculta(r, n) ? 'line-through' : ''}>{n}</span>
+                                    {/* Con muchas plantas: el nombre en un renglón y las plantas en el siguiente (no se sale del recuadro) */}
+                                    <span className={`${personaOculta(r, n) ? 'line-through' : ''} ${plantasDePersona(r, n).length > 2 ? 'basis-full' : ''}`}>{n}</span>
                                     {personal.length > 0 && !enPersonal.has(norm(n)) && (
                                         <span title="No está activo en la base de personal (Talento Humano): revise el nombre o retírelo" className="text-[#d14747]"><AlertTriangle size={11} /></span>
                                     )}

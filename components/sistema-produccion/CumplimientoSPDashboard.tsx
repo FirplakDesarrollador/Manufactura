@@ -37,7 +37,7 @@ const fechaLocal = (v: string | null | undefined) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const rolTablero = (r: RolSP): Rol => (r === 'Gerente' ? 'Otro' : r);
-const ROLES = ['Jefe', 'Supervisor', 'Líder'] as const;
+const ROLES = ['Jefe', 'Supervisor', 'Líder', 'Especialista'] as const;
 
 type Gran = 'dia' | 'semana' | 'mes' | 'anio';
 type Rol = typeof ROLES[number] | 'Otro';
@@ -783,7 +783,7 @@ export default function CumplimientoSPDashboard({ altoPx }: { altoPx?: number } 
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                             <h3 className="min-w-0 truncate text-xs sm:text-sm font-black text-slate-800">Cumplimiento por Persona</h3>
                             <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px] shrink-0">
-                                {([['todos', 'Todos'], ['Jefe', 'Jefes'], ['Supervisor', 'Supervisores'], ['Líder', 'Líderes']] as const).map(([r, t]) => (
+                                {([['todos', 'Todos'], ['Jefe', 'Jefes'], ['Supervisor', 'Supervisores'], ['Especialista', 'Especialistas'], ['Líder', 'Líderes']] as const).map(([r, t]) => (
                                     <button key={r} onClick={() => setRol(r)}
                                         className={`px-1.5 py-0.5 rounded-md font-bold transition-all ${rol === r ? 'bg-[#324354] text-white shadow-xs' : 'text-slate-600 hover:text-black'}`}>{t}</button>
                                 ))}

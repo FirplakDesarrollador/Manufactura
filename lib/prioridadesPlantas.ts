@@ -18,6 +18,7 @@ export interface SemaforoRow {
     cantPendItem: string | null;
     cantTotal: string;
     disponiblePt01: string;
+    disponiblePt08: string;
     fechaCreacionOp: string;
     estado: string;
     fechaRecomendadaLiberacion: string;
@@ -68,6 +69,7 @@ const COLUMNS: ColumnDef[] = [
     { key: "cantPendItem", header: "Cant. Pend. Item" },
     { key: "cantTotal", header: "Cantidad total" },
     { key: "disponiblePt01", header: "Disponible PT01" },
+    { key: "disponiblePt08", header: "Disponible PT08" },
     { key: "fechaCreacionOp", header: "Fecha Creación OP" },
     { key: "estado", header: "Estado" },
     { key: "fechaRecomendadaLiberacion", header: "Fecha Recomendada Liberación" },
@@ -107,7 +109,7 @@ const DATE_KEYS = new Set<ColKey>([
     "fechaPrometidaEntregaItem",
 ]);
 
-const NUM_KEYS_SEMAFORO = new Set<ColKey>(["cantPendiente", "cantPendItem", "cantTotal", "disponiblePt01"]);
+const NUM_KEYS_SEMAFORO = new Set<ColKey>(["cantPendiente", "cantPendItem", "cantTotal", "disponiblePt01", "disponiblePt08"]);
 
 const VISIBLE_SEMAFORO_KEYS: ColKey[] = [
     "originnum", "nroOp", "descripcion", "planta", "familia", "tipoOrden", "cantPendiente",

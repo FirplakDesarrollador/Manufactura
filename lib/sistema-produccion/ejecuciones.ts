@@ -204,12 +204,9 @@ export function calcularCupos(ejecuciones: Ejecucion[], reglas: ReglasSP, desde:
                 const enSemana = hechas.filter(e => e.fecha >= lunes && e.fecha <= domingo)
                 const conFestivo = semanasFestivo.has(semanaDe(lunes).clave)
                 const completa = conFestivo && fr.festivo != null ? fr.festivo : fr.semana
-                let exigidos = completa
-                if (domingo >= hoy) {
-                    // Semana en curso: proporcional a los días hábiles (lunes a viernes) ya transcurridos, hoy incluido
-                    const dias = Math.min(5, Math.max(0, Math.round((Date.parse(hoy) - Date.parse(lunes)) / 86400000) + 1))
-                    exigidos = Math.max(Math.floor((completa * dias) / 5), Math.min(enSemana.length, completa))
-                }
+                // Semana en curso: se mide de una vez contra la meta COMPLETA de la semana (decisión 27/11/2026; antes era
+                // proporcional a los días hábiles transcurridos). Ej.: Hora-Hora 3 / semana con 2 hechas → 2/3 desde el lunes.
+                const exigidos = completa
                 // Frecuencia diaria (≥ días hábiles de la semana, ej. Bitácora o RRC 5 / semana): cada día hábil es una vez exigida
                 const habiles = diasHabiles(lunes)
                 const diaria = completa >= habiles.length && habiles.length > 0
