@@ -5,6 +5,7 @@ import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
 import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
 import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
+import EncabezadoMuebles from './EncabezadoMuebles'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
 import ModalReportarDefectoMueble from './ModalReportarDefectoMueble'
@@ -32,6 +33,8 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
     const [defectoSelectedOrden, setDefectoSelectedOrden] = useState<OrdenMueble | null>(null)
     const [operarioInfo, setOperarioInfo] = useState<{ cedula: string, nombre: string } | null>(null)
     const [taladro, setTaladro] = useState<string>('')
+    // Primero se ven las OF; al elegir una (o Reportar defecto) se escoge el taladro en una ventanita
+    const [pidiendoTaladro, setPidiendoTaladro] = useState<{ tipo: 'registrar' | 'defecto'; orden: OrdenMueble | null } | null>(null)
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -100,12 +103,22 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
     }
 
     const handleSelectOrden = (orden: OrdenMueble) => {
-        if (!taladro) {
-            setNotification({ message: '¡Por favor selecciona el taladro en el menú superior!', type: 'error' })
-            return
+        setPidiendoTaladro({ tipo: 'registrar', orden })
+    }
+
+    // Taladro elegido: sigue con la acción pendiente (registrar inspección o reportar defecto)
+    const elegirTaladro = (t: string) => {
+        const p = pidiendoTaladro
+        setTaladro(t)
+        setPidiendoTaladro(null)
+        if (!p) return
+        if (p.tipo === 'registrar' && p.orden) {
+            setSelectedOrdenes([p.orden])
+            setIsModalOpen(true)
+        } else {
+            setDefectoSelectedOrden(p.orden)
+            setIsDefectoModalOpen(true)
         }
-        setSelectedOrdenes([orden])
-        setIsModalOpen(true)
     }
 
     const clearSelection = () => {
@@ -144,107 +157,30 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
 
     return (
         <div className="h-full flex flex-col bg-white">
-            {/* Controls & Metrics Header */}
-            <div className="bg-gray-50 p-4 border-b border-gray-200">
-                <div className="max-w-7xl mx-auto flex flex-col gap-4">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                        {/* Search and Date Filter */}
-                        <div className="flex items-center gap-2 flex-1">
-                            <div className="relative group">
-                                <button 
-                                    onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
-                                    className={`p-2 rounded-lg text-white transition-colors duration-200 flex items-center gap-1 ${dateType === 'entrega' ? 'bg-emerald-600' : 'bg-purple-600'}`}
-                                    title={dateType === 'entrega' ? 'Filtrando por Fecha Entrega' : 'Filtrando por Fecha Creación'}
-                                >
-                                    <Calendar size={20} />
-                                    <span className="text-[10px] font-bold hidden sm:inline uppercase">{dateType}</span>
-                                </button>
-                            </div>
-                            
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar en Inspección..."
-                                    value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-
-                            {/* Taladro Selection (Required in Flutter) */}
-                            <div className="relative min-w-[180px]">
-                                <select 
-                                    value={taladro}
-                                    onChange={(e) => setTaladro(e.target.value)}
-                                    className={`w-full pl-4 pr-10 py-2 bg-white border ${!taladro ? 'border-orange-500 ring-2 ring-orange-100' : 'border-gray-300'} rounded-lg text-sm appearance-none focus:ring-2 focus:ring-emerald-500 outline-none font-medium`}
-                                >
-                                    <option value="">Seleccione Taladro</option>
-                                    {taladroOptions.map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-                            </div>
-
-                            <button
-                                onClick={() => {
-                                    if (!taladro) {
-                                        setNotification({ message: '¡Por favor selecciona el taladro en el menú superior!', type: 'error' })
-                                        return
-                                    }
-                                    if (filteredOrdenes.length > 0) {
-                                        handleSelectOrden(filteredOrdenes[0])
-                                    } else {
-                                        setDefectoSelectedOrden(null)
-                                        setIsDefectoModalOpen(true)
-                                    }
-                                }}
-                                className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                title="Reportar Defecto / Calidad"
-                            >
-                                <AlertTriangle size={16} />
-                                <span className="hidden sm:inline">REPORTAR DEFECTO</span>
-                            </button>
-
-                            <button
-                                onClick={handleClearFilters}
-                                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
-                            
-                            <button
-                                onClick={() => loadData()}
-                                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                                title="Actualizar datos"
-                            >
-                                <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                            </button>
-                        </div>
-
-                        {/* Inspection Specific Metrics */}
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 lg:pb-0 shrink-0">
-                            <MetricCard title="Enchape" value={sumEnchape} bgColor="bg-indigo-600" />
-                            <MetricCard title="Inspección" value={sumInspeccion} bgColor="bg-emerald-600" />
-                            <MetricCard title="Insp. hoy" value={metricas?.inspeccion || 0} bgColor="bg-gray-400" />
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
+            <EncabezadoMuebles
+                ordenes={filteredOrdenes}
+                plantaMuebles={plantaMuebles}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                fecha={selectedDate}
+                setFecha={setSelectedDate}
+                dateType={dateType}
+                setDateType={setDateType}
+                onRefresh={() => loadData()}
+                loading={loading}
+                calidad={metricas?.p_calidad ?? null}
+                version={ordenes}
+                acciones={<button type="button" onClick={() => setPidiendoTaladro({ tipo: 'defecto', orden: null })} title="Reportar Defecto / Calidad"
+                    className="h-9 px-3 shrink-0 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
+                    <AlertTriangle size={15} /> Reportar defecto
+                </button>}
+            />
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto bg-gray-50/50">
                 <div className="max-w-7xl mx-auto p-4">
-                    {!taladro ? (
-                        <div className="flex flex-col items-center justify-center py-32 text-orange-500 gap-4">
-                            <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center animate-pulse">
-                                <AlertCircle size={48} />
-                            </div>
-                            <h2 className="text-2xl font-bold uppercase tracking-tight">¡Debes seleccionar el taladro!</h2>
-                            <p className="text-gray-500 font-medium">Por favor selecciona la máquina en el menú superior para ver las órdenes.</p>
-                        </div>
-                    ) : (
+                    {(
                         <>
                             <div className="flex items-center justify-between mb-4">
                                 <div className="text-emerald-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
@@ -289,6 +225,32 @@ export default function InspeccionModule({ userEmail, turno, usuarioNombre, plan
                     )}
                 </div>
             </div>
+
+            {pidiendoTaladro && (
+                <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3"
+                    onMouseDown={e => { if (e.target === e.currentTarget) setPidiendoTaladro(null) }}>
+                    <div className="bg-white rounded-2xl border-2 border-[#324354] shadow-2xl w-full max-w-sm p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                                <span className="text-xs font-black uppercase bg-[#324354]/10 text-[#324354] px-2.5 py-1 rounded-md">
+                                    {pidiendoTaladro.tipo === 'defecto' ? 'Reportar defecto' : 'Registrar inspección'}
+                                </span>
+                                {pidiendoTaladro.orden && <p className="text-xl font-black text-[#324354] mt-2">OF {pidiendoTaladro.orden.orden_fabricacion}</p>}
+                                <p className="text-sm font-bold text-slate-500 mt-1">¿Con qué taladro?</p>
+                            </div>
+                            <button type="button" onClick={() => setPidiendoTaladro(null)} className="p-1 rounded-full hover:bg-slate-100 text-slate-500" title="Cerrar"><X size={20} /></button>
+                        </div>
+                        <div className="grid gap-2">
+                            {taladroOptions.map(opt => (
+                                <button key={opt} type="button" onClick={() => elegirTaladro(opt)}
+                                    className={`h-12 rounded-xl border-2 text-base font-black transition-colors ${opt === taladro ? 'bg-[#254153] border-[#254153] text-white' : 'bg-white border-slate-200 text-[#254153] hover:border-[#254153]'}`}>
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Trazabilidad Modal */}
             {selectedOrdenes.length > 0 && (

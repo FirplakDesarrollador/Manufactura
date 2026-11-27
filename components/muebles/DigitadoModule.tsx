@@ -4,9 +4,11 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
 import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
 import MetricCard from '../pintura/MetricCard'
+import EncabezadoMuebles from './EncabezadoMuebles'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
-import { Search, X, Calendar, RefreshCw, Filter, FileText } from 'lucide-react'
+import { Search, X, Calendar, RefreshCw, Filter, FileText, Undo2, Send } from 'lucide-react'
+import DevolverInspeccionMuebles from './DevolverInspeccionMuebles'
 import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
 import ResumenFaltantes from '../fibra/ResumenFaltantes'
 import { actualizarTodasEnPantalla, useRevisionEnCurso, useVersionRevision, tieneFaltantes, fijarGrupo, useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
@@ -35,6 +37,7 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
     const [dateType, setDateType] = useState<'entrega' | 'creacion'>('entrega')
     const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [devolverOrden, setDevolverOrden] = useState<OrdenMueble | null>(null)
     // Componentes para la entrega (misma revisión de SAP que MS y FV)
     const revisando = useRevisionEnCurso()
     const versionRevision = useVersionRevision()
@@ -102,80 +105,33 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
 
     // Calculate WIP sums for this stage
     const isCefiPlant = (plantaMuebles || '').toLowerCase() === 'cefi'
-    const sumPrevStage = filteredOrdenes.reduce((sum, o) => {
-        if (isCefiPlant) {
-            return sum + (o.inspeccion || 0) + (o.empaque || 0)
-        }
-        return sum + (o.empaque || 0)
-    }, 0)
+    void isCefiPlant
+    // Sin proceso Empaque: lo que espera Digitado sale de Inspección (y lo que hubiera quedado en Empaque)
+    const sumPrevStage = filteredOrdenes.reduce((sum, o) => sum + (o.inspeccion || 0) + (o.empaque || 0), 0)
     const sumDigitado = filteredOrdenes.reduce((sum, o) => sum + (o.digitado || 0), 0)
 
     return (
         <div className="h-full flex flex-col bg-white">
-            {/* Controls & Metrics Header */}
-            <div className="bg-gray-50 p-4 border-b border-gray-200">
-                <div className="max-w-7xl mx-auto flex flex-col gap-4">
-                    <div className="flex flex-col md:flex-row md:items-center gap-4">
-                        {/* Search and Date Filter */}
-                        <div className="flex items-center gap-2 flex-1">
-                            <div className="relative group">
-                                <button 
-                                    onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
-                                    className={`p-2 rounded-lg text-white transition-colors duration-200 flex items-center gap-1 ${dateType === 'entrega' ? 'bg-cyan-600' : 'bg-purple-600'}`}
-                                >
-                                    <Calendar size={20} />
-                                    <span className="text-[10px] font-bold hidden sm:inline uppercase">{dateType}</span>
-                                </button>
-                            </div>
-                            
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar en Digitado..."
-                                    value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none"
-                                />
-                            </div>
-
-                            <button
-                                onClick={handleClearFilters}
-                                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
-                            
-                            <button
-                                onClick={loadData}
-                                className="p-2 bg-cyan-100 text-cyan-600 rounded-lg hover:bg-cyan-200 transition-colors"
-                            >
-                                <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                            </button>
-                            <button
-                                onClick={() => actualizarTodasEnPantalla((plantaMuebles || '').toLowerCase() === 'cefi' ? 'CEFI' : 'MBL')}
-                                disabled={revisando}
-                                title="Actualizar los componentes para la entrega de todas las órdenes en pantalla (consulta SAP en bloque; el servidor la actualiza sola: faltantes cada hora, OK cada 3 horas)"
-                                className="h-9 px-4 rounded-lg bg-[#324354] hover:bg-[#254153] text-white text-xs font-bold uppercase tracking-wide flex items-center gap-2 shrink-0 shadow-sm disabled:opacity-60"
-                            >
-                                <RefreshCw size={15} className={revisando ? 'animate-spin' : ''} />
-                                <span className="hidden sm:inline">{revisando ? 'Revisando componentes…' : 'Actualizar componentes'}</span>
-                            </button>
-                        </div>
-
-                        {/* Digitado Specific Metrics */}
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0 shrink-0">
-                            <MetricCard 
-                                title={isCefiPlant ? "Por Digitar" : "Empaque"} 
-                                value={sumPrevStage} 
-                                bgColor={isCefiPlant ? "bg-emerald-600" : "bg-amber-600"} 
-                            />
-                            <MetricCard title="Digitado" value={sumDigitado} bgColor="bg-cyan-600" />
-                            <MetricCard title="Digitado hoy" value={metricas?.digitado || 0} bgColor="bg-gray-400" />
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
+            <EncabezadoMuebles
+                ordenes={filteredOrdenes}
+                plantaMuebles={plantaMuebles}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                fecha={selectedDate}
+                setFecha={setSelectedDate}
+                dateType={dateType}
+                setDateType={setDateType}
+                onRefresh={() => loadData()}
+                loading={loading}
+                calidad={metricas?.p_calidad ?? null}
+                version={ordenes}
+                acciones={<button type="button" onClick={() => actualizarTodasEnPantalla((plantaMuebles || '').toLowerCase() === 'cefi' ? 'CEFI' : 'MBL')} disabled={revisando}
+                    title="Actualizar los componentes para la entrega de todas las órdenes en pantalla (consulta SAP en bloque)"
+                    className="h-9 px-3 shrink-0 bg-[#254153] hover:bg-[#1a3040] text-white rounded-lg font-bold text-xs flex items-center gap-1.5 disabled:opacity-60">
+                    <RefreshCw size={15} className={revisando ? 'animate-spin' : ''} /> {revisando ? 'Revisando…' : 'Actualizar componentes'}
+                </button>}
+            />
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto bg-gray-50/50">
@@ -220,8 +176,19 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
                                         proceso="Digitado"
                                     />
                                     {/* Franja de componentes para la entrega (SAP), pegada debajo de la tarjeta */}
-                                    <div className="mx-3 -mt-0.5 rounded-b-xl border-2 border-t-0 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1 flex items-center">
+                                    <div className="mx-3 -mt-0.5 rounded-b-xl border-2 border-t-0 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1.5 flex flex-wrap items-center gap-2">
                                         <EstadoEntregaOf of={orden.orden_fabricacion} />
+                                        <div className="ml-auto flex items-center gap-2">
+                                            <button type="button" onClick={() => setDevolverOrden(orden)} disabled={(orden.inspeccion || 0) <= 0}
+                                                title="Devolver unidades por digitar a Inspección"
+                                                className="h-9 px-4 rounded-lg bg-white border border-amber-400 text-amber-700 hover:bg-amber-50 text-xs sm:text-sm font-bold flex items-center gap-1.5 disabled:opacity-40">
+                                                <Undo2 size={16} /> Devolver a Inspección
+                                            </button>
+                                            <button type="button" onClick={() => { setSelectedOrden(orden); setIsModalOpen(true) }}
+                                                className="h-9 px-4 rounded-lg bg-[#254153] hover:bg-[#1a3040] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5">
+                                                <Send size={16} /> Registrar Digitado
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -229,6 +196,16 @@ export default function DigitadoModule({ userEmail, turno, usuarioNombre, planta
                     )}
                 </div>
             </div>
+
+            {devolverOrden && (
+                <DevolverInspeccionMuebles
+                    orden={devolverOrden}
+                    usuarioNombre={usuarioNombre || 'Usuario'}
+                    userEmail={userEmail}
+                    onCerrar={() => setDevolverOrden(null)}
+                    onHecho={() => { setDevolverOrden(null); loadData() }}
+                />
+            )}
 
             {/* Trazabilidad Modal */}
             {selectedOrden && (

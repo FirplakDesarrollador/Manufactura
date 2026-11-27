@@ -84,10 +84,6 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
             const cuenta: Record<string, number> = {}
             const sumar = (m: string) => { cuenta[m] = (cuenta[m] || 0) + 1 }
             for (const o of q || []) {
-                if ((o.por_cortar || 0) > 0) sumar('corte')
-                if ((o.corte || 0) > 0) sumar('enchape')
-                if ((o.enchape || 0) > 0) sumar('inspeccion')
-                if (planta !== 'Cefi' && (o.inspeccion || 0) > 0) sumar('empaque')
             }
             setNovedadesProceso(cuenta)
         }
@@ -139,7 +135,8 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
     }, [router])
 
     useEffect(() => {
-        if (planta === 'Cefi' && activeModule === 'empaque') {
+        // Empaque ya no es un proceso (CEFI nunca lo usó; Muebles desde 26/11/2026)
+        if (activeModule === 'empaque') {
             setActiveModule('corte')
         }
     }, [planta, activeModule])
@@ -240,9 +237,8 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
     ]
 
     const filteredMenuItems = menuItems.filter(item => {
-        // En planta Cefi no se utiliza el ámbito/módulo de Empaque
-        const isCefi = planta === 'Cefi';
-        if (isCefi && item.id === 'empaque') {
+        // Empaque ya no es un proceso en Muebles ni en CEFI
+        if (item.id === 'empaque') {
             return false;
         }
 

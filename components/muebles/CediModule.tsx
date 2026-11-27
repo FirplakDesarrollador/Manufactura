@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { OrdenMueble, TrazabilidadRecord } from '@/types/muebles'
 import { getOrdenesMuebles, getTrazabilidadMueblesHoy, registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
+import EncabezadoMuebles from './EncabezadoMuebles'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
 import {
@@ -154,77 +155,33 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30">
-            {/* Header / Filtros + Stats */}
-            <div className="p-4 bg-white border-b border-slate-200 shadow-sm">
-                <div className="flex flex-wrap items-center gap-4">
-
-                    {/* Filtros */}
-                    <div className="flex items-center gap-2 flex-1 min-w-[300px]">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="SKU / OF / Pedido / Cliente"
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                        <button className="p-2 bg-indigo-600 text-white rounded-lg" title="Filtrar por fecha">
-                            <Calendar size={18} />
-                        </button>
-                        <button
-                            onClick={() => { setSearchText(''); setFechaFiltro(null) }}
-                            className="p-2 bg-orange-500 text-white rounded-lg"
-                            title="Limpiar filtros"
-                        >
-                            <Eraser size={18} />
-                        </button>
-                    </div>
-
-                    {/* Stats globales */}
-                    <div className="flex gap-2">
-                        <StatCard label="Digitado" value={totalDigitado} color="blue" />
-                        <StatCard label="Transito" value={totalTransito} color="orange" />
-                        <StatCard label="CEDI Hoy" value={totalCediHoy}  color="green" />
-                    </div>
-
-                    {/* Acciones */}
-                    <div className="flex gap-4 items-center pl-4 border-l border-slate-200">
-                        <button
-                            onClick={handleMoveAllToCedi}
-                            disabled={moving}
-                            className="flex flex-col items-center justify-center p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 border border-indigo-100 disabled:opacity-50"
-                        >
-                            {moving ? <Loader2 className="animate-spin" size={20} /> : <ArrowLeftRight size={20} />}
-                            <span className="text-[9px] font-black uppercase mt-1">Mover a CEDI</span>
-                        </button>
-
-                        <div className="h-10 w-px bg-slate-200 mx-1" />
-
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[9px] font-black text-slate-400 uppercase text-center">Exportar Reporte</span>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={handleExportExcel}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all shadow-md shadow-green-100 active:scale-95"
-                                    title="Exportar a Excel"
-                                >
-                                    <FileSpreadsheet size={16} />
-                                    <span className="text-[10px] font-black uppercase">Excel</span>
-                                </button>
-                                <button
-                                    onClick={handleExportCSV}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg transition-all shadow-md shadow-slate-200 active:scale-95"
-                                    title="Exportar a CSV"
-                                >
-                                    <FileCode size={16} />
-                                    <span className="text-[10px] font-black uppercase">CSV</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
+            <EncabezadoMuebles
+                ordenes={filteredOrdenes}
+                plantaMuebles={plantaMuebles}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                fecha={fechaFiltro || ''}
+                setFecha={v => setFechaFiltro(v || null)}
+                onRefresh={() => loadData()}
+                loading={loading}
+                version={ordenes}
+                acciones={<>
+                    <button type="button" onClick={handleMoveAllToCedi} disabled={moving} title="Pasar todo lo que está en tránsito a CEDI"
+                        className="h-9 px-3 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 disabled:opacity-50">
+                        {moving ? <Loader2 className="animate-spin" size={15} /> : <ArrowLeftRight size={15} />} Mover a CEDI
+                    </button>
+                    <button type="button" onClick={handleExportExcel} title="Exportar a Excel"
+                        className="h-9 px-3 shrink-0 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
+                        <FileSpreadsheet size={15} /> Excel
+                    </button>
+                    <button type="button" onClick={handleExportCSV} title="Exportar a CSV"
+                        className="h-9 px-3 shrink-0 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
+                        <FileCode size={15} /> CSV
+                    </button>
+                </>}
+            />
+            <div className="px-4 pt-2 bg-white">
 
                 <div className="mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1">
                     <Warehouse size={12} />

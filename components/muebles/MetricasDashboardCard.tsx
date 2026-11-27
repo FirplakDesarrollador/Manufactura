@@ -40,7 +40,7 @@ export default function MetricasDashboardCard({ metricas }: MetricasDashboardCar
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 <ProcessBox title="Corte" metrics={[
                     { label: 'Uni', val: metricas.cortados },
                     { label: 'Pzs', val: metricas.corte_piezas },
@@ -50,7 +50,7 @@ export default function MetricasDashboardCard({ metricas }: MetricasDashboardCar
                 <ProcessBox title="Enchape" metrics={[
                     { label: 'Uni', val: metricas.enchapados },
                     { label: 'Pzs', val: metricas.enchape_piezas },
-                    { label: 'ml', val: metricas.enchape_ml }
+                    { label: 'm', val: metricas.enchape_ml }
                 ]} color="emerald" />
 
                 <ProcessBox title="Inspección" metrics={[
@@ -59,11 +59,6 @@ export default function MetricasDashboardCard({ metricas }: MetricasDashboardCar
                     { label: 'm2', val: metricas.inspeccion_m2 }
                 ]} color="amber" />
 
-                <ProcessBox title="Empaque" metrics={[
-                    { label: 'Uni', val: metricas.empacados },
-                    { label: 'Pzs', val: metricas.empaque_piezas },
-                    { label: 'm2', val: metricas.empaque_m2 }
-                ]} color="indigo" />
             </div>
 
             {/* Quality & Logistics Row */}

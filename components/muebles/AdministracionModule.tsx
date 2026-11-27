@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { OrdenMueble, MetricasMuebles } from '@/types/muebles'
 import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
+import EncabezadoMuebles from './EncabezadoMuebles'
 import { supabase } from '@/lib/supabase'
+import { useFechasSemaforoMuebles } from '@/lib/muebles/fechasSemaforo'
 import OrderCard from './OrderCard'
 import EditOrderModal from './EditOrderModal'
 import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
@@ -36,6 +38,8 @@ interface AdministracionModuleProps {
 export default function AdministracionModule({ userEmail, turno, usuarioNombre, plantaMuebles }: AdministracionModuleProps) {
     const [ordenes, setOrdenes] = useState<OrdenMueble[]>([])
     const [metricas, setMetricas] = useState<MetricasMuebles | null>(null)
+    // m² y ml de lo registrado hoy por proceso (cada OF aporta unidades × m²/unidad y × ml/unidad)
+    const [medidasHoy, setMedidasHoy] = useState<Record<string, { m2: number; ml: number; und: number; pzs: number }>>({})
     const [loading, setLoading] = useState(true)
     const [isSyncing, setIsSyncing] = useState(false)
     const [searchText, setSearchText] = useState('')
@@ -74,6 +78,55 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         loadData()
     }, [loadData])
 
+    useEffect(() => {
+        let vivo = true
+        ;(async () => {
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+            const { data: regs, error } = await supabase.from('trazabilidad_muebles').select('orden_fabricacion, proceso, cantidad')
+                .gte('created_at', hoy.toISOString()).limit(10000)
+            if (error || !regs?.length || !vivo) return
+            const ofs = [...new Set(regs.map(r => String(r.orden_fabricacion)))]
+            const porUnidad = new Map<string, { m2: number; ml: number; ppm: number; cefi: boolean }>()
+            for (let i = 0; i < ofs.length; i += 150) {
+                const { data } = await supabase.from('query_of_muebles').select('orden_fabricacion, cantidad, canto, rh_metros, piezas, planta, producto_sku')
+                    .in('orden_fabricacion', ofs.slice(i, i + 150))
+                for (const o of data || []) {
+                    if (o.planta !== plantaMuebles) continue
+                    const c = Number(o.cantidad) || 0
+                    // CEFI registra piezas; Muebles registra muebles (ppm = piezas por mueble)
+                    const cefi = String(o.planta || '').toLowerCase().includes('cefi') || String(o.producto_sku || '').toUpperCase().startsWith('VCEF')
+                    if (c > 0) porUnidad.set(String(o.orden_fabricacion), { m2: (Number(o.rh_metros) || 0) / c, ml: (Number(o.canto) || 0) / c, ppm: (Number(o.piezas) || 0) / c, cefi })
+                }
+            }
+            const total: Record<string, { m2: number; ml: number; und: number; pzs: number }> = {}
+            for (const r of regs) {
+                const u = porUnidad.get(String(r.orden_fabricacion))
+                if (!u) continue
+                const p = String(r.proceso || '').toLowerCase()
+                const t = (total[p] ||= { m2: 0, ml: 0, und: 0, pzs: 0 })
+                const n = Number(r.cantidad) || 0
+                t.m2 += n * u.m2
+                t.ml += n * u.ml
+                if (u.cefi) { t.pzs += n; t.und += u.ppm ? n / u.ppm : 0 } else { t.und += n; t.pzs += n * u.ppm }
+            }
+            if (vivo) setMedidasHoy(total)
+        })()
+        return () => { vivo = false }
+    }, [plantaMuebles, ordenes])
+
+    // El indicador del día trae solo una medida por proceso (m² en Corte, Inspección y Empaque; ml en Enchape): esa se
+    // muestra tal cual y la otra se saca con la misma proporción m²/ml de lo registrado hoy en ese proceso.
+    const medida = (proceso: string, base: 'm2' | 'ml', valorBase: any): { m2: string; ml: string } => {
+        const v = Number(valorBase) || 0
+        const h = medidasHoy[proceso]
+        const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString('es-CO')
+        if (base === 'm2') return { m2: fmt(v), ml: h && h.m2 > 0 ? fmt(v * h.ml / h.m2) : v ? '—' : '0' }
+        return { ml: fmt(v), m2: h && h.ml > 0 ? fmt(v * h.m2 / h.ml) : v ? '—' : '0' }
+    }
+    const mCorte = medida('corte', 'm2', metricas?.corte_m2)
+    const mEnchape = medida('enchape', 'ml', metricas?.enchape_ml)
+    const mInspeccion = medida('inspeccion', 'm2', metricas?.inspeccion_m2)
+
     const handleClearFilters = () => {
         setSearchText('')
         setStartDate('')
@@ -82,6 +135,7 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         setSelectedEstado('todas')
     }
 
+    const semaforoOrden = useFechasSemaforoMuebles()
     const filteredOrdenes = useMemo(() => {
         const search = searchText.toLowerCase()
         return ordenes.filter((orden) => {
@@ -113,7 +167,17 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
             return matchesPlanta && matchesEstado && matchesSearch && matchesDate
         })
-    }, [ordenes, searchText, startDate, endDate, dateType, selectedPlanta, selectedEstado])
+            // Orden como Fibra: fecha de entrega del lote → fecha ideal de producción (Nivel de servicio) → entrega
+            // estimada; la más próxima primero y sin fecha al final
+            .map(o => {
+                const f = semaforoOrden?.mapa.get(String(o.orden_fabricacion).trim())
+                const raw = f?.lote || f?.idealW || o.fecha_entrega_estimada
+                const t = raw ? new Date(raw).getTime() : NaN
+                return { o, t: isNaN(t) ? Infinity : t }
+            })
+            .sort((a, b) => a.t - b.t)
+            .map(x => x.o)
+    }, [ordenes, searchText, startDate, endDate, dateType, selectedPlanta, selectedEstado, semaforoOrden])
 
     const handleSyncSAP = async () => {
         if (!confirm('¿Desea cargar y sincronizar las órdenes de Muebles y Cefi desde SAP Service Layer?')) {
@@ -189,6 +253,33 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
         }
     }
 
+    // Resumen superior: mismo cálculo que los recuadros de cada tarjeta (OrderCard), sumado sobre las OF filtradas
+    const resumenEstados = useMemo(() => {
+        const campos: { k: string; t: string; ayuda: string; leer: (o: any) => number }[] = [
+            { k: 'cantidad', t: 'Cantidad', ayuda: 'Cantidad total de las OF', leer: o => Number(o.cantidad) || 0 },
+            { k: 'por_cortar', t: 'Programado', ayuda: 'Aún sin cortar', leer: o => Number(o.por_cortar) || 0 },
+            { k: 'corte', t: 'Corte', ayuda: 'Cortados, esperando enchape', leer: o => Number(o.corte) || 0 },
+            { k: 'enchape', t: 'Enchape', ayuda: 'Enchapados, esperando inspección', leer: o => Number(o.enchape) || 0 },
+            { k: 'inspeccion', t: 'Inspección', ayuda: 'Inspeccionados, esperando digitado', leer: o => (Number(o.inspeccion) || 0) + (Number(o.empaque) || 0) },
+            { k: 'reponer', t: 'Pzs a reponer', ayuda: 'Piezas sueltas por reponer', leer: o => Number(o.por_reponer) || 0 },
+            { k: 'digitado', t: 'Digitado', ayuda: 'Digitados, esperando tránsito', leer: o => Number(o.digitado) || 0 },
+            { k: 'transito', t: 'Tránsito', ayuda: 'En tránsito, por recibir en CEDI', leer: o => Number(o.transito) || 0 },
+            { k: 'cedi', t: 'CEDI', ayuda: 'Recibidos en CEDI', leer: o => Number(o.cedi) || 0 },
+        ]
+        const esCefi = (o: any) => (o.planta || '').toLowerCase().includes('cefi') || (o.producto_sku || '').toUpperCase().startsWith('VCEF')
+        return campos.map(c => {
+            let v = 0, otra = 0
+            for (const o of filteredOrdenes) {
+                const n = c.leer(o); v += n
+                if (c.k === 'reponer') continue
+                const ppm = (Number(o.piezas) || 0) / (Number(o.cantidad) || 1)
+                otra += esCefi(o) ? (ppm ? n / ppm : 0) : n * ppm
+            }
+            const cefi = plantaMuebles === 'Cefi'
+            return { k: c.k, t: c.t, ayuda: c.ayuda, v, sub: c.k === 'reponer' ? 'piezas' : `${Math.round(otra).toLocaleString('es-CO')} ${cefi ? 'und' : 'pzs'}` }
+        })
+    }, [filteredOrdenes, plantaMuebles])
+
     const stats = useMemo(() => {
         const totalProgramadoMuebles = filteredOrdenes.reduce((sum, o) => sum + (o.cantidad || 0), 0)
         const totalProgramadoPiezas = filteredOrdenes.reduce((sum, o) => sum + (Number(o.piezas) || 0), 0)
@@ -215,94 +306,32 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
     return (
         <div className="h-full flex flex-col bg-white">
-            {/* Encabezado compacto (26/11/2026): un renglón de filtros y otro de indicadores. Sin fecha final ni filtro de
-                estado (Administración solo carga OF abiertas); la fecha filtra ese día exacto, como en Fibra. */}
-            <div className="bg-white px-3 py-2 border-b border-gray-200">
-                <div className="max-w-[1400px] mx-auto flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative flex-1 min-w-[180px] max-w-[420px]">
-                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Sku / Of / Pedido / Cliente"
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                className="w-full h-8 pl-8 pr-3 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                        <button
-                            onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
-                            className={`h-8 w-8 flex items-center justify-center rounded-lg text-white shadow-sm shrink-0 ${dateType === 'entrega' ? 'bg-indigo-600' : 'bg-purple-600'}`}
-                            title={dateType === 'entrega' ? 'Filtrando por fecha de entrega (clic: fecha de creación)' : 'Filtrando por fecha de creación (clic: fecha de entrega)'}
-                        >
-                            <Calendar size={16} />
-                        </button>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            title={dateType === 'entrega' ? 'Fecha de entrega' : 'Fecha de creación'}
-                            className="h-8 px-2 bg-gray-50 border border-gray-300 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                        <div className="text-[11px] font-bold text-indigo-600 whitespace-nowrap">
-                            ÓRDENES: <span className="text-gray-900">{filteredOrdenes.length}</span>
-                        </div>
-                        <button onClick={loadData} title="Actualizar" className="h-8 w-8 flex items-center justify-center bg-gray-100 text-indigo-600 rounded-lg shadow-sm hover:bg-gray-200">
-                            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                        </button>
-                        <button onClick={handleSyncSAP} title="Cargar órdenes de SAP" className="h-8 w-8 flex items-center justify-center bg-orange-100 text-orange-600 rounded-lg shadow-sm hover:bg-orange-200">
-                            <ArrowUpFromLine size={16} />
-                        </button>
-                        <div className="flex gap-2 ml-auto">
-                            <SummaryBox title="Cantidad" color="blue" metrics={[
-                                { label: 'Muebles', val: stats.programado.muebles },
-                                { label: 'Piezas', val: stats.programado.piezas }
-                            ]} />
-                            <SummaryBox title="Pendiente" color="orange" metrics={[
-                                { label: 'Muebles', val: stats.pendiente.muebles },
-                                { label: 'Piezas', val: stats.pendiente.piezas }
-                            ]} />
-                            <SummaryBox title="Reposiciones" color="red" metrics={[
-                                { label: 'Pend.', val: stats.reposiciones.muebles },
-                                { label: 'Realiz.', val: stats.reposiciones.piezas }
-                            ]} />
-                        </div>
-                    </div>
-
-                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                        <MetricBox title="Corte" metrics={[
-                            { label: 'Muebles', val: metricas?.cortados },
-                            { label: 'Piezas', val: metricas?.corte_piezas },
-                            { label: 'm2', val: metricas?.corte_m2 }
-                        ]} />
-                        <MetricBox title="Enchape" metrics={[
-                            { label: 'Muebles', val: metricas?.enchapados },
-                            { label: 'Piezas', val: metricas?.enchape_piezas },
-                            { label: 'ml', val: metricas?.enchape_ml }
-                        ]} />
-                        <MetricBox title="Inspeccion" metrics={[
-                            { label: 'Muebles', val: metricas?.inspeccion },
-                            { label: 'Piezas', val: metricas?.inspeccion_piezas },
-                            { label: 'm2', val: metricas?.inspeccion_m2 }
-                        ]} />
-                        <MetricBox title="Empaque" metrics={[
-                            { label: 'Muebles', val: metricas?.empacados },
-                            { label: 'Piezas', val: metricas?.empaque_piezas },
-                            { label: 'm2', val: metricas?.empaque_m2 }
-                        ]} />
-                        <SingleMetricBox label="Reparaciones" val={metricas?.reparaciones} color="red" />
-                        <SingleMetricBox label="Reposiciones" val={metricas?.reposiciones} color="red" />
-                        <SingleMetricBox label="Digitado" val={metricas?.digitado} color="teal" />
-                        <SingleMetricBox label="Transito" val={metricas?.transito} color="teal" />
-                        <SingleMetricBox label="Cedi" val={metricas?.cedi} color="teal" />
-                        <SingleMetricBox label="% Calidad" val={metricas?.p_calidad} color="blue" />
-                        <SingleMetricBox label="% Rechazado" val={metricas?.p_rechazado} color="blue" />
-                    </div>
-                </div>
-            </div>
+            {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
+            <EncabezadoMuebles
+                ordenes={filteredOrdenes}
+                plantaMuebles={plantaMuebles}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                fecha={startDate}
+                setFecha={setStartDate}
+                dateType={dateType}
+                setDateType={setDateType}
+                onRefresh={loadData}
+                loading={loading}
+                calidad={metricas?.p_calidad ?? null}
+                version={ordenes}
+                acciones={
+                    <button type="button" onClick={handleSyncSAP} title="Cargar órdenes de SAP" className="h-9 w-9 shrink-0 flex items-center justify-center bg-orange-100 text-orange-600 rounded-lg border border-orange-200 hover:bg-orange-200">
+                        <ArrowUpFromLine size={16} />
+                    </button>
+                }
+            />
 
             <div className="flex-1 overflow-y-auto bg-gray-50">
                 <div className="max-w-[1400px] mx-auto p-4">
+                    <div className="mb-3 text-indigo-600 text-xs font-bold uppercase tracking-wider">
+                        Órdenes: <span className="text-gray-900">{filteredOrdenes.length}</span>
+                    </div>
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
                             <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -392,13 +421,13 @@ export default function AdministracionModule({ userEmail, turno, usuarioNombre, 
 
 function MetricBox({ title, metrics }: { title: string, metrics: { label: string, val: any }[] }) {
     return (
-        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col min-w-[120px] shrink-0">
+        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col min-w-[180px] shrink-0">
             <div className="bg-gray-100 text-[10px] font-black text-center py-0.5 uppercase text-gray-600">{title}</div>
             <div className="flex divide-x divide-gray-100 bg-white">
                 {metrics.map((m, i) => (
-                    <div key={i} className="flex-1 px-2 py-0.5 flex flex-col items-center leading-tight">
+                    <div key={i} className="flex-1 px-1.5 py-0.5 flex flex-col items-center leading-tight">
                         <span className="text-[8px] font-bold text-gray-400 uppercase">{m.label}</span>
-                        <span className="text-[11px] font-black text-gray-800">{m.val || 0}</span>
+                        <span className="text-[11px] font-black text-gray-800 whitespace-nowrap">{m.val || 0}</span>
                     </div>
                 ))}
             </div>

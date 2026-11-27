@@ -5,6 +5,7 @@ import { OrdenMueble, MetricasMuebles, TareaMuebleActiva } from '@/types/muebles
 import { getOrdenesMuebles, getMetricasMueblesHoy } from '@/lib/supabase/queries/muebles'
 import { supabase } from '@/lib/supabase'
 import MetricCard from '../pintura/MetricCard'
+import EncabezadoMuebles from './EncabezadoMuebles'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
 import { Search, X, Calendar, RefreshCw, Filter, CheckSquare, Play } from 'lucide-react'
@@ -138,61 +139,21 @@ export default function CorteModule({ userEmail, turno, usuarioNombre, plantaMue
 
     return (
         <div className="h-full flex flex-col bg-white">
-            {/* Controls & Metrics Header */}
-            <div className="bg-gray-50 p-4 border-b border-gray-200">
-                <div className="max-w-7xl mx-auto flex flex-col gap-4">
-                    <div className="flex flex-col md:flex-row md:items-center gap-4">
-                        {/* Search and Date Filter */}
-                        <div className="flex items-center gap-2 flex-1">
-                            <div className="relative group">
-                                <button 
-                                    onClick={() => setDateType(dateType === 'entrega' ? 'creacion' : 'entrega')}
-                                    className={`p-2 rounded-lg text-white transition-colors duration-200 flex items-center gap-1 ${dateType === 'entrega' ? 'bg-blue-600' : 'bg-purple-600'}`}
-                                    title={dateType === 'entrega' ? 'Filtrando por Fecha Entrega' : 'Filtrando por Fecha Creación'}
-                                >
-                                    <Calendar size={20} />
-                                    <span className="text-[10px] font-bold hidden sm:inline uppercase">{dateType}</span>
-                                </button>
-                            </div>
-                            
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por OF, Pedido, Cliente o SKU..."
-                                    value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
-                            </div>
-
-                            <button
-                                onClick={handleClearFilters}
-                                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
-                            
-                            <button
-                                onClick={() => loadData()}
-                                className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-                                title="Actualizar datos"
-                            >
-                                <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                            </button>
-                        </div>
-
-                        {/* Summary Stats Bar */}
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 md:pb-0 shrink-0">
-                            <MetricCard title="Cortados" value={metricas?.cortados || 0} bgColor="bg-blue-600" />
-                            <MetricCard title="Piezas" value={metricas?.corte_piezas || 0} bgColor="bg-blue-500" />
-                            <MetricCard title="M2 Corte" value={metricas?.corte_m2 || 0} bgColor="bg-blue-400" />
-                            <MetricCard title="Reposic." value={metricas?.reposiciones || 0} bgColor="bg-red-500" />
-                            <MetricCard title="CEDI" value={metricas?.cedi || 0} bgColor="bg-gray-800" />
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* Encabezado único de Muebles / CEFI (igual en Administración y todos los módulos) */}
+            <EncabezadoMuebles
+                ordenes={filteredOrdenes}
+                plantaMuebles={plantaMuebles}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                fecha={selectedDate}
+                setFecha={setSelectedDate}
+                dateType={dateType}
+                setDateType={setDateType}
+                onRefresh={() => loadData()}
+                loading={loading}
+                calidad={metricas?.p_calidad ?? null}
+                version={ordenes}
+            />
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto bg-gray-50/50">
