@@ -96,6 +96,18 @@ export function ConfirmarVerificado({ orden, planta, verificado, usuario, onCerr
         onHecho()
     }
 
+    // Deshacer (27/11/2026): si se verificó por error, se borran las verificaciones de esta OF (queda en 0)
+    const deshacer = async () => {
+        if (!confirm(`¿Deshacer la verificación de la OF ${orden.orden_fabricacion}? Las ${verificado} unidad(es) verificadas vuelven a quedar sin verificar.`)) return
+        setGuardando(true)
+        const { error } = await supabase.from('cedi_verificaciones_muebles').delete()
+            .eq('orden_fabricacion', String(orden.orden_fabricacion)).eq('planta', planta)
+        setGuardando(false)
+        if (error) { toast.error(`No se deshizo: ${error.message}`); return }
+        toast.success(`OF ${orden.orden_fabricacion}: verificación deshecha`)
+        onHecho()
+    }
+
     if (typeof document === 'undefined') return null
     return createPortal(
         <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3"
@@ -122,6 +134,12 @@ export function ConfirmarVerificado({ orden, planta, verificado, usuario, onCerr
                         className="w-full h-11 px-3 rounded-lg border border-gray-300 bg-[#F6F3EE] text-lg font-black text-[#254153] text-center" />
                 </label>
                 <div className="flex justify-end gap-2 pt-1">
+                    {verificado > 0 && (
+                        <button type="button" onClick={deshacer} disabled={guardando} title="Quita la verificación de esta OF (si se marcó por error)"
+                            className="mr-auto h-10 px-3 rounded-lg bg-white border border-rose-300 text-[#d14747] hover:bg-rose-50 text-sm font-bold disabled:opacity-40">
+                            Deshacer verificación
+                        </button>
+                    )}
                     <button type="button" onClick={onCerrar} disabled={guardando} className="h-10 px-4 rounded-lg bg-white border border-gray-300 text-sm font-bold text-slate-700">Cancelar</button>
                     <button type="button" onClick={confirmar} disabled={guardando || !(cantidad > 0) || cantidad > maximo}
                         className="h-10 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black flex items-center gap-1.5 disabled:opacity-40">

@@ -176,8 +176,9 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     const baseLista = entregaSel === 'todas' ? filteredOrdenes
         : entregaSel !== null ? filteredOrdenes.filter(o => ofsDeEntrega(entregaSel).has(String(o.orden_fabricacion)))
             : (() => {
+                // En curso = solo lo despachado después del último cierre: al cerrar la entrega queda en 0
                 const enCursoOfs = new Set((entregaActual?.items || []).map(i => i.of))
-                return filteredOrdenes.filter(o => enCursoOfs.has(String(o.orden_fabricacion)) || (Number(o.transito) || 0) > 0)
+                return filteredOrdenes.filter(o => enCursoOfs.has(String(o.orden_fabricacion)))
             })()
     const totalAEntregar = baseLista.reduce((s, o) => s + aEntregar(o), 0)
     const totalVerificado = baseLista.reduce((s, o) => s + verificadoDe(o), 0)
