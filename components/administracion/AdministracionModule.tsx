@@ -797,7 +797,7 @@ const TRACE_STAGES: Array<{
     { label: 'Destruccion', dateKey: 'destruccion_fecha', userKey: 'destruccion_user_name' }
 ]
 
-function OrderProcessesPanel({
+export function OrderProcessesPanel({
     orden,
     registros: parentRegistros,
     onEdit,
@@ -806,9 +806,9 @@ function OrderProcessesPanel({
 }: {
     orden: OrdenFabricacion
     registros: RegistroTrazabilidad[]
-    onEdit: (registro: RegistroTrazabilidad) => void
-    onDelete: (registro: RegistroTrazabilidad) => void
-    onTransfer: (registro: RegistroTrazabilidad) => void
+    onEdit?: (registro: RegistroTrazabilidad) => void
+    onDelete?: (registro: RegistroTrazabilidad) => void
+    onTransfer?: (registro: RegistroTrazabilidad) => void
 }) {
     const [fetchedRegistros, setFetchedRegistros] = useState<RegistroTrazabilidad[] | null>(parentRegistros && parentRegistros.length > 0 ? parentRegistros : null)
     const [loadingRecords, setLoadingRecords] = useState(false)
@@ -841,7 +841,7 @@ function OrderProcessesPanel({
     const registros = fetchedRegistros !== null ? fetchedRegistros : parentRegistros
 
     const handleDeleteRecord = (registro: RegistroTrazabilidad) => {
-        onDelete(registro)
+        onDelete?.(registro)
         if (fetchedRegistros) {
             setFetchedRegistros(prev => prev ? prev.filter(r => r.id !== registro.id) : null)
         }
@@ -881,17 +881,17 @@ function OrderProcessesPanel({
                                     <InfoPill label="Pedido" value={registro.numero_pedido || registro.pedido || '-'} />
                                     <InfoPill label="Molde" value={registro.molde_serial || '-'} />
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => onEdit(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
+                                {(onEdit || onTransfer || onDelete) && <div className="flex gap-2">
+                                    <button onClick={() => onEdit?.(registro)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar registro">
                                         <Edit2 size={16} />
                                     </button>
-                                    <button onClick={() => onTransfer(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
+                                    <button onClick={() => onTransfer?.(registro)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Transferir a otra orden">
                                         <ArrowRightLeft size={16} />
                                     </button>
                                     <button onClick={() => handleDeleteRecord(registro)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Eliminar registro">
                                         <Trash2 size={16} />
                                     </button>
-                                </div>
+                                </div>}
                             </div>
                             <TraceProcessTimeline registro={registro} />
                         </div>
