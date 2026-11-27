@@ -9,12 +9,14 @@ import {
     CefiIcon,
     MoldesIcon
 } from './VigilanciaIcons';
+import { BarChart3, TrendingUp, ShieldCheck } from 'lucide-react';
 
 interface VigilanciaMainMenuProps {
     onSelectPlanta: (key: PlantaVigilanciaKey) => void;
+    onOpenIndicadores?: () => void;
 }
 
-export default function VigilanciaMainMenu({ onSelectPlanta }: VigilanciaMainMenuProps) {
+export default function VigilanciaMainMenu({ onSelectPlanta, onOpenIndicadores }: VigilanciaMainMenuProps) {
     const renderIcon = (key: PlantaVigilanciaKey) => {
         const iconProps = {
             size: 84,
@@ -39,13 +41,25 @@ export default function VigilanciaMainMenu({ onSelectPlanta }: VigilanciaMainMen
     return (
         <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
             {/* Título de la vista tal como en el diseño de referencia */}
-            <div className="text-center mb-8 sm:mb-12">
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#324354] tracking-wider uppercase font-sans">
-                    MENU PRINCIPAL
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
-                    Selecciona una planta para explorar sus procesos y capturar datos del plan de vigilancia
-                </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 sm:mb-12">
+                <div className="text-center sm:text-left">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-[#324354] tracking-wider uppercase font-sans">
+                        MENU PRINCIPAL
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md">
+                        Selecciona una planta para explorar sus procesos y capturar datos del plan de vigilancia
+                    </p>
+                </div>
+
+                {onOpenIndicadores && (
+                    <button
+                        onClick={onOpenIndicadores}
+                        className="self-center sm:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#324354] hover:bg-[#253340] text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                    >
+                        <BarChart3 className="w-4 h-4 text-[#0099e5] group-hover:scale-110 transition-transform" />
+                        <span>Ver Indicadores de Cumplimiento</span>
+                    </button>
+                )}
             </div>
 
             {/* Grid 3x2 de Plantas */}

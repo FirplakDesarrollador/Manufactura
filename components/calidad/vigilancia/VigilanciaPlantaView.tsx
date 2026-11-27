@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { PlantaVigilanciaConfig, ProcesoVigilanciaInfo } from './types';
+import { PlantaVigilanciaConfig, PlantaVigilanciaKey, ProcesoVigilanciaInfo } from './types';
 import FormPinturaMs from './FormPinturaMs';
 import HistorialPinturaMs from './HistorialPinturaMs';
 import FormVaciadoMs from './FormVaciadoMs';
@@ -55,12 +55,14 @@ import {
     ChevronRight,
     ListFilter,
     Plus,
-    LayoutGrid
+    LayoutGrid,
+    BarChart3
 } from 'lucide-react';
 
 interface VigilanciaPlantaViewProps {
     planta: PlantaVigilanciaConfig;
     onBack: () => void;
+    onOpenIndicadores?: (plantaKey: PlantaVigilanciaKey) => void;
 }
 
 const PROCESOS_CON_FORMULARIO = new Set([
@@ -71,7 +73,7 @@ const PROCESOS_CON_FORMULARIO = new Set([
     'moldes_general'
 ]);
 
-export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlantaViewProps) {
+export default function VigilanciaPlantaView({ planta, onBack, onOpenIndicadores }: VigilanciaPlantaViewProps) {
     const [selectedProceso, setSelectedProceso] = useState<ProcesoVigilanciaInfo>(planta.procesos[0]);
     const [recordsCount, setRecordsCount] = useState<Record<string, number>>({});
     const [loadingCounts, setLoadingCounts] = useState(true);
@@ -175,9 +177,21 @@ export default function VigilanciaPlantaView({ planta, onBack }: VigilanciaPlant
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                    <Layers size={14} className="text-[#0099e5]" />
-                    <span>{planta.procesos.length} Procesos configurados</span>
+                <div className="flex items-center gap-2">
+                    {onOpenIndicadores && (
+                        <button
+                            onClick={() => onOpenIndicadores(planta.key)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#324354] hover:bg-[#253340] text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                        >
+                            <BarChart3 size={14} className="text-[#0099e5]" />
+                            <span>Indicadores de {planta.codigoOficial}</span>
+                        </button>
+                    )}
+
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                        <Layers size={14} className="text-[#0099e5]" />
+                        <span>{planta.procesos.length} Procesos configurados</span>
+                    </div>
                 </div>
             </div>
 
