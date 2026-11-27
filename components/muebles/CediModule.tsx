@@ -116,25 +116,42 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     }
 
     const handleExportCSV = () => {
-        const { headers, rows } = getReportData()
-        const csvContent = 'data:text/csv;charset=utf-8,'
-            + headers.join(',') + '\n'
-            + rows.map(e => e.join(',')).join('\n')
-        const encodedUri = encodeURI(csvContent)
+        // Mismas 4 columnas del Excel: OF, SKU, Descripcion, Transito (en tránsito + recibido en CEDI)
+        const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+        const lineas = [['OF', 'SKU', 'Descripcion', 'Transito'].map(q).join(','),
+            ...filteredOrdenes.map(o => [o.orden_fabricacion, o.producto_sku, o.producto_descripcion, (Number(o.transito) || 0) + (Number(o.cedi) || 0)].map(q).join(','))]
+        const url = URL.createObjectURL(new Blob(['\ufeff' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
         const link = document.createElement('a')
-        link.setAttribute('href', encodedUri)
+        link.setAttribute('href', url)
         link.setAttribute('download', `reporte_cedi_muebles_${today}.csv`)
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
     }
 
-    const handleExportExcel = () => {
-        const { headers, rows } = getReportData()
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'CEDI Muebles')
-        XLSX.writeFile(wb, `reporte_cedi_muebles_${today}.xlsx`)
+    // Excel de CEDI (27/11/2026): solo OF, SKU, Descripción y Tránsito (lo despachado a CEDI: en tránsito + recibido),
+    // como tabla con filtros, filas alternadas en verde y anchos ajustados para leer la descripción completa
+    const handleExportExcel = async () => {
+        const ExcelJS = (await import('exceljs')).default
+        const wb = new ExcelJS.Workbook()
+        const ws = wb.addWorksheet('CEDI Muebles')
+        ws.columns = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }]
+        ws.addTable({
+            name: 'CediMuebles', ref: 'A1', headerRow: true,
+            style: { theme: 'TableStyleMedium7', showRowStripes: true },
+            columns: [{ name: 'OF', filterButton: true }, { name: 'SKU', filterButton: true }, { name: 'Descripcion', filterButton: true }, { name: 'Transito', filterButton: true }],
+            rows: filteredOrdenes.map(o => [
+                Number(o.orden_fabricacion) || String(o.orden_fabricacion || ''),
+                o.producto_sku || '',
+                o.producto_descripcion || '',
+                (Number(o.transito) || 0) + (Number(o.cedi) || 0),
+            ]),
+        })
+        ws.views = [{ state: 'frozen', ySplit: 1 }]
+        const buf = await wb.xlsx.writeBuffer()
+        const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+        const a = document.createElement('a'); a.href = url; a.download = `reporte_cedi_muebles_${today}.xlsx`; a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
 
     // Filtrado
@@ -159,6 +176,17 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     const selectedOrder = ordenes.find(o => o.id === selectedOrderId) ?? null
     // Verificación física de CEDI (casco con cachos): total por OF y total del día
     const verif = useVerificacionesCedi(filteredOrdenes.map(o => String(o.orden_fabricacion)), plantaMuebles)
+    // A entregar = en tránsito + recibido en CEDI (muebles). Verificado por OF hasta ese total; el resto, no verificado
+    const aEntregar = (o: OrdenMueble) => (Number(o.transito) || 0) + (Number(o.cedi) || 0)
+    const verificadoDe = (o: OrdenMueble) => Math.min(aEntregar(o), verif.porOf.get(String(o.orden_fabricacion)) || 0)
+    const totalAEntregar = filteredOrdenes.reduce((s, o) => s + aEntregar(o), 0)
+    const totalVerificado = filteredOrdenes.reduce((s, o) => s + verificadoDe(o), 0)
+    const totalNoVerificado = totalAEntregar - totalVerificado
+    // Filtro por verificación: clic en "Verificados" (OF con algo verificado) o "No verificados" (OF con algo sin verificar)
+    const [filtroVerif, setFiltroVerif] = useState<'todos' | 'si' | 'no'>('todos')
+    const soloNoVerificados = filtroVerif === 'no'
+    const ordenesLista = filtroVerif === 'no' ? filteredOrdenes.filter(o => verificadoDe(o) < aEntregar(o))
+        : filtroVerif === 'si' ? filteredOrdenes.filter(o => verificadoDe(o) > 0) : filteredOrdenes
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30">
@@ -191,14 +219,27 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
             />
             <div className="px-4 pt-2 bg-white">
 
-                <div className="mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1">
-                    <Warehouse size={12} />
-                    Órdenes por recibir o en CEDI: {filteredOrdenes.length}
-                    <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 normal-case tracking-normal text-[11px]"
-                        title="Unidades verificadas físicamente hoy en CEDI">
-                        <CascoDiablo size={14} /> Verificado hoy: <b className="text-emerald-900">{verif.hoy.toLocaleString('es-CO')}</b>
+                {/* Órdenes a entregar · Total muebles a entregar · Verificados · No verificados (clic: filtra) */}
+                <div className="mt-2 px-1 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-black uppercase tracking-wide">
+                        <Warehouse size={13} /> Órdenes a entregar: <b className="text-indigo-900">{filteredOrdenes.length}</b>
                     </span>
-                    {verif.error && <span className="ml-2 normal-case tracking-normal text-[11px] text-[#d14747]">{verif.error}</span>}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-black uppercase tracking-wide" title="Muebles en tránsito más los ya recibidos en CEDI">
+                        Total muebles a entregar: <b className="text-[#254153]">{totalAEntregar.toLocaleString('es-CO')}</b>
+                    </span>
+                    <button type="button" onClick={() => setFiltroVerif(v => v === 'si' ? 'todos' : 'si')}
+                        title={filtroVerif === 'si' ? 'Ver todas las órdenes' : 'Mostrar solo las órdenes con muebles verificados'}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-black uppercase tracking-wide transition-colors ${filtroVerif === 'si' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>
+                        <CascoDiablo size={14} /> Verificados: <b>{totalVerificado.toLocaleString('es-CO')}</b>
+                        {filtroVerif === 'si' && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
+                    </button>
+                    <button type="button" onClick={() => setFiltroVerif(v => v === 'no' ? 'todos' : 'no')}
+                        title={soloNoVerificados ? 'Ver todas las órdenes' : 'Mostrar solo las órdenes con muebles sin verificar'}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-black uppercase tracking-wide transition-colors ${soloNoVerificados ? 'bg-[#d14747] border-[#d14747] text-white' : 'bg-rose-50 border-rose-200 text-[#d14747] hover:bg-rose-100'}`}>
+                        No verificados: <b>{totalNoVerificado.toLocaleString('es-CO')}</b>
+                        {soloNoVerificados && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
+                    </button>
+                    {verif.error && <span className="normal-case text-[11px] text-[#d14747]">{verif.error}</span>}
                 </div>
             </div>
 
@@ -211,12 +252,12 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                                 <Loader2 className="animate-spin text-indigo-500" size={48} />
                                 <span className="font-bold uppercase tracking-widest animate-pulse">Cargando ordenes...</span>
                             </div>
-                        ) : filteredOrdenes.length === 0 ? (
+                        ) : ordenesLista.length === 0 ? (
                             <div className="text-center py-20 text-slate-400 font-bold uppercase text-lg italic bg-white rounded-3xl border-2 border-dashed border-slate-200">
                                 Sin ordenes en transito o CEDI
                             </div>
                         ) : (
-                            filteredOrdenes.map(o => (
+                            ordenesLista.map(o => (
                                 <div key={o.id} className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                                     <OrderCard
                                         orden={o}
@@ -227,6 +268,7 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                                             setIsModalOpen(true)
                                         }}
                                         proceso="Cedi"
+                                        resaltarSku
                                         franja={
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <button type="button" onClick={() => setTrazabilidadDe(o)}
@@ -264,6 +306,7 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                                     isActive={true}
                                     onClick={() => {}}
                                     proceso="Cedi"
+                                    resaltarSku
                                 />
                             </div>
                         </div>

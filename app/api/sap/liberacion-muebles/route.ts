@@ -136,10 +136,13 @@ export async function GET() {
                 const issued = Number(row.comp_issued) || 0;
                 const compQty = Math.round((planned - issued) * 100) / 100;
                 
+                // cantidad = lo que falta por consumir (planeado − consumido); planeada = total de la OF, para que la
+                // vista query_of_muebles calcule piezas, m² y canto aunque la OF ya haya consumido sus materiales
                 order.componentes.push({
                     sku: row.componente_sku,
                     componente: row.componente_nombre,
-                    cantidad: compQty
+                    cantidad: compQty,
+                    planeada: Math.round(planned * 100) / 100
                 });
             }
         });

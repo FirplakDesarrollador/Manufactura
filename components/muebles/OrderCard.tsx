@@ -14,9 +14,11 @@ interface OrderCardProps {
     onReportDefect?: (orden: OrdenMueble) => void
     /** Franja de acciones al pie de la tarjeta (Administración: Trazabilidad, componentes, Mover OF, Editar, Eliminar) */
     franja?: React.ReactNode
+    /** CEDI: el SKU resaltado (amarillo y en negrilla), porque ahí se ubican por SKU */
+    resaltarSku?: boolean
 }
 
-export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte', onReportDefect, franja }: OrderCardProps) {
+export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte', onReportDefect, franja, resaltarSku }: OrderCardProps) {
     const semaforo = useFechasSemaforoMuebles()
     const parseSafeDate = (dateStr?: string | null) => {
         if (!dateStr) return null
@@ -156,7 +158,14 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
                     </div>
                     <p className="text-base sm:text-lg font-black text-[#254153] uppercase leading-tight mt-1.5 line-clamp-2">{descripcion}</p>
                     <p className="text-[11px] font-semibold text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span>SKU: {orden.producto_sku}{orden.planta ? ` · ${orden.planta}` : ''}</span>
+                        {resaltarSku ? (
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded-md bg-[#deb841] text-[#254153] text-sm sm:text-base font-black tracking-wide">SKU: {orden.producto_sku}</span>
+                                {orden.planta && <span>{orden.planta}</span>}
+                            </span>
+                        ) : (
+                            <span>SKU: {orden.producto_sku}{orden.planta ? ` · ${orden.planta}` : ''}</span>
+                        )}
                         {/* Un solo grupo "Por mueble": piezas · m² · metros lineales de canto */}
                         {(ppuTexto || m2Unidad || mlUnidad) && (
                             <span className="inline-flex items-center rounded-full bg-[#324354]/10 text-[#324354] overflow-hidden">
