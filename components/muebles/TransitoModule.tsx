@@ -7,8 +7,10 @@ import MetricCard from '../pintura/MetricCard'
 import EncabezadoMuebles from './EncabezadoMuebles'
 import OrderCard from './OrderCard'
 import TrazabilidadModal from './TrazabilidadModal'
-import { Search, X, Calendar, RefreshCw, Truck, Undo2, Send } from 'lucide-react'
+import { Search, X, Calendar, RefreshCw, Truck, Undo2, Send, ClipboardList } from 'lucide-react'
 import DevolverInspeccionMuebles from './DevolverInspeccionMuebles'
+import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
+import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
 
 interface TransitoModuleProps {
     userEmail: string
@@ -28,6 +30,7 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
     const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [devolverOrden, setDevolverOrden] = useState<OrdenMueble | null>(null)
+    const [trazabilidadDe, setTrazabilidadDe] = useState<OrdenMueble | null>(null)
 
     const loadData = React.useCallback(async () => {
         setLoading(true)
@@ -141,7 +144,14 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
                                         proceso="Transito"
                                     />
                                     {/* Franja de acciones pegada debajo de la tarjeta (como en Digitado) */}
-                                    <div className="mx-3 -mt-0.5 rounded-b-xl border-2 border-t-0 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1.5 flex flex-wrap items-center justify-end gap-2">
+                                    <div className="mx-3 -mt-0.5 rounded-b-xl border-2 border-t-0 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1.5 flex flex-wrap items-center gap-2">
+                                        <button type="button" onClick={() => setTrazabilidadDe(orden)}
+                                            className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#254153] text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-slate-50">
+                                            <ClipboardList size={16} /> Trazabilidad
+                                        </button>
+                                        <div className="flex-1 min-w-[220px]">
+                                            <EstadoEntregaOf of={orden.orden_fabricacion} />
+                                        </div>
                                         <button type="button" onClick={() => setDevolverOrden(orden)} disabled={(orden.digitado || 0) <= 0}
                                             title="Devolver unidades por pasar a tránsito a Digitado"
                                             className="h-9 px-4 rounded-lg bg-white border border-amber-400 text-amber-700 hover:bg-amber-50 text-xs sm:text-sm font-bold flex items-center gap-1.5 disabled:opacity-40">
@@ -158,6 +168,10 @@ export default function TransitoModule({ userEmail, turno, usuarioNombre, planta
                     )}
                 </div>
             </div>
+
+            {trazabilidadDe && (
+                <HistorialTrazabilidadModal orden={trazabilidadDe} onClose={() => setTrazabilidadDe(null)} onSuccess={() => loadData()} />
+            )}
 
             {devolverOrden && (
                 <DevolverInspeccionMuebles
