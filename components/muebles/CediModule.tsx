@@ -5,10 +5,13 @@ import { OrdenMueble, TrazabilidadRecord } from '@/types/muebles'
 import { getOrdenesMuebles, getTrazabilidadMueblesHoy, registrarTrazabilidadMueble } from '@/lib/supabase/queries/muebles'
 import EncabezadoMuebles from './EncabezadoMuebles'
 import OrderCard from './OrderCard'
+import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
+import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
+import { useVerificacionesCedi, BotonVerificado, ConfirmarVerificado, CascoDiablo } from './VerificadoCedi'
 import TrazabilidadModal from './TrazabilidadModal'
 import {
     Search, Eraser, Loader2, Calendar, ArrowLeftRight,
-    ArrowLeft, FileSpreadsheet, FileCode, Warehouse
+    ArrowLeft, FileSpreadsheet, FileCode, Warehouse, ClipboardList
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
@@ -29,6 +32,8 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
     const [selectedOrden, setSelectedOrden] = useState<OrdenMueble | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [trazabilidadDe, setTrazabilidadDe] = useState<OrdenMueble | null>(null)
+    const [verificarDe, setVerificarDe] = useState<OrdenMueble | null>(null)
     const [moving, setMoving] = useState(false)
 
     const loadData = useCallback(async () => {
@@ -152,6 +157,8 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     })
 
     const selectedOrder = ordenes.find(o => o.id === selectedOrderId) ?? null
+    // Verificación física de CEDI (casco con cachos): total por OF y total del día
+    const verif = useVerificacionesCedi(filteredOrdenes.map(o => String(o.orden_fabricacion)), plantaMuebles)
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30">
@@ -187,6 +194,11 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                 <div className="mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1">
                     <Warehouse size={12} />
                     Órdenes por recibir o en CEDI: {filteredOrdenes.length}
+                    <span className="ml-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 normal-case tracking-normal text-[11px]"
+                        title="Unidades verificadas físicamente hoy en CEDI">
+                        <CascoDiablo size={14} /> Verificado hoy: <b className="text-emerald-900">{verif.hoy.toLocaleString('es-CO')}</b>
+                    </span>
+                    {verif.error && <span className="ml-2 normal-case tracking-normal text-[11px] text-[#d14747]">{verif.error}</span>}
                 </div>
             </div>
 
@@ -215,6 +227,20 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                                             setIsModalOpen(true)
                                         }}
                                         proceso="Cedi"
+                                        franja={
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <button type="button" onClick={() => setTrazabilidadDe(o)}
+                                            className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#254153] text-xs sm:text-sm font-bold flex items-center gap-1.5 hover:bg-slate-50">
+                                            <ClipboardList size={16} /> Trazabilidad
+                                        </button>
+                                                <div className="flex-1 min-w-[220px]">
+                                                    <EstadoEntregaOf of={o.orden_fabricacion} />
+                                                </div>
+                                                <div className="ml-auto">
+                                                    <BotonVerificado orden={o} verificado={verif.porOf.get(String(o.orden_fabricacion)) || 0} onClick={() => setVerificarDe(o)} />
+                                                </div>
+                                            </div>
+                                        }
                                     />
                                 </div>
                             ))
@@ -244,6 +270,21 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                     </div>
                 )}
             </div>
+
+            {trazabilidadDe && (
+                <HistorialTrazabilidadModal orden={trazabilidadDe} onClose={() => setTrazabilidadDe(null)} onSuccess={() => loadData()} />
+            )}
+
+            {verificarDe && (
+                <ConfirmarVerificado
+                    orden={verificarDe}
+                    planta={plantaMuebles}
+                    verificado={verif.porOf.get(String(verificarDe.orden_fabricacion)) || 0}
+                    usuario={userEmail || usuarioNombre}
+                    onCerrar={() => setVerificarDe(null)}
+                    onHecho={() => { setVerificarDe(null); verif.recargar() }}
+                />
+            )}
 
             {/* Modal Trazabilidad */}
             {selectedOrden && (

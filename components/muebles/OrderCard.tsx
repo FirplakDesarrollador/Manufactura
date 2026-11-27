@@ -107,7 +107,7 @@ export default function OrderCard({ orden, isActive, onClick, proceso = 'Corte',
     // Unidades por proceso (columnas como en Fibra); la del proceso de esta pantalla resaltada
     // El recuadro que alimenta el proceso de esta pantalla se resalta como "Pendiente" (Administración y Corte: Programado)
     // Recuadro que trabaja este módulo: amarillo, igual que en el encabezado (sin la etiqueta "Pendiente" en la tarjeta)
-    const resaltado = proceso === 'CEDI' ? 'transito' : proceso === 'Transito' ? 'digitado' : proceso === 'Digitado' ? 'inspeccion'
+    const resaltado = proceso.toUpperCase() === 'CEDI' ? 'transito' : proceso === 'Transito' ? 'digitado' : proceso === 'Digitado' ? 'inspeccion'
         : proceso === 'Empaque' ? 'inspeccion' : proceso === 'Inspeccion' ? 'enchape' : proceso === 'Enchape' ? 'corte' : 'por_cortar'
     // Lógica del Control de Piso MS (26/11/2026): cada recuadro es el estado en que está la unidad (último proceso
     // registrado), como Pintura/Pulido/Empaque en MS. Programado + Corte + Enchape + Inspección + Digitado + Tránsito
