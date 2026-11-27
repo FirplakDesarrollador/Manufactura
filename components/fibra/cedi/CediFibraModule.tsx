@@ -228,7 +228,7 @@ export default function CediFibraModule({ userEmail }: { userEmail: string }) {
                                     {/* Tarjeta + franja (Trazabilidad · Componentes entrega · Verificado), como en CEDI Muebles */}
                                     <div className="bg-white border-2 border-gray-300 rounded-lg">
                                         <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none">
-                                            <OrdenCard planta="fv"
+                                            <OrdenCard planta="fv" resaltarSku
                                                 orden={o}
                                                 isActive={false}
                                                 onClick={() => setSelectedOrderId(o.id)}
@@ -267,7 +267,7 @@ export default function CediFibraModule({ userEmail }: { userEmail: string }) {
                                 Volver a la lista
                             </button>
                             <div className="pointer-events-none opacity-90 scale-[0.98] origin-left">
-                                <OrdenCard planta="fv"
+                                <OrdenCard planta="fv" resaltarSku
                                     orden={selectedOrder}
                                     isActive={true}
                                     onClick={() => {}}

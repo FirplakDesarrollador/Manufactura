@@ -4,7 +4,10 @@ import React, { useState, useEffect } from 'react'
 import { OrdenFabricacion, RegistroTrazabilidad, Molde } from '@/types/pintura'
 import { getOrdenesFabricacion, getRegistrosTrazabilidadHoy, getAllMoldes } from '@/lib/supabase/queries/pintura'
 import { moverTransitoACedi } from '@/lib/supabase/queries/cedi'
-import { Search, Eraser, Loader2, Calendar, Info, FileSpreadsheet, ArrowLeftRight, FileCode, ArrowLeft } from 'lucide-react'
+import { Search, Eraser, Loader2, Calendar, Info, FileSpreadsheet, ArrowLeftRight, FileCode, ArrowLeft, ChevronsUpDown, Warehouse } from 'lucide-react'
+import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
+import { OrderProcessesPanel } from '../administracion/AdministracionModule'
+import { useVerificacionesCedi, BotonVerificado, ConfirmarVerificado, CascoDiablo } from '@/components/muebles/VerificadoCedi'
 import CediList from './CediList'
 import OrdenCard from '../pintura/OrdenCard'
 import * as XLSX from 'xlsx'
@@ -18,6 +21,9 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
     const [fechaFiltro, setFechaFiltro] = useState<string | null>(null)
     const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
     const [moving, setMoving] = useState(false)
+    const [trazAbierta, setTrazAbierta] = useState<Set<number>>(new Set())
+    const [verificarDe, setVerificarDe] = useState<OrdenFabricacion | null>(null)
+    const [filtroVerif, setFiltroVerif] = useState<'todos' | 'si' | 'no'>('todos')
 
     useEffect(() => {
         loadData()
@@ -63,51 +69,37 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
         }
     }
 
-    const getReportData = () => {
-        const headers = ['OF', 'Pedido', 'Producto', 'SKU', 'Cliente', 'Cantidad', 'Saldo', 'Vaciado', 'Pintura', 'Desgelcada', 'Pulido', 'Empaque', 'Acabado', 'Digitado', 'Transito', 'Cedi']
-        const rows = filteredOrdenes.map(o => [
-            o.orden_fabricacion || '',
-            o.pedido || '',
-            o.producto_descripcion || '',
-            o.producto_sku || '',
-            o.cliente || '',
-            o.cantidad || 0,
-            o.saldo || 0,
-            o.vaciado || 0,
-            o.pintura || 0,
-            o.desgelcada || 0,
-            o.pulido || 0,
-            o.empaque || 0,
-            o.acabado || 0,
-            o.digitado || 0,
-            o.transito || 0,
-            o.cedi || 0
-        ])
-        return { headers, rows }
-    }
-
+    // Descargas (27/11/2026): las mismas 4 columnas de CEDI Muebles y FV: OF, SKU, Descripcion y Transito
+    // (piezas despachadas a CEDI: en tránsito + ya recibidas)
+    const filasReporte = () => filteredOrdenes.map(o => [
+        Number(o.orden_fabricacion) || String(o.orden_fabricacion || ''),
+        (o.producto_sku || o.sku || '').toUpperCase(),
+        o.producto_descripcion || '',
+        (Number(o.transito) || 0) + (Number(o.cedi) || 0),
+    ])
     const handleExportCSV = () => {
-        const { headers, rows } = getReportData()
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + headers.join(",") + "\n"
-            + rows.map(e => e.join(",")).join("\n")
-
-        const encodedUri = encodeURI(csvContent)
-        const link = document.createElement("a")
-        link.setAttribute("href", encodedUri)
-        link.setAttribute("download", `reporte_cedi_${new Date().toISOString().split('T')[0]}.csv`)
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+        const lineas = [['OF', 'SKU', 'Descripcion', 'Transito'].map(q).join(','), ...filasReporte().map(r => r.map(q).join(','))]
+        const url = URL.createObjectURL(new Blob(['\ufeff' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
+        const link = document.createElement('a'); link.href = url; link.download = `reporte_cedi_ms_${new Date().toISOString().split('T')[0]}.csv`; link.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
-
-    const handleExportExcel = () => {
-        const { headers, rows } = getReportData()
-        const data = [headers, ...rows]
-        const ws = XLSX.utils.aoa_to_sheet(data)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, "Cedi Report")
-        XLSX.writeFile(wb, `reporte_cedi_${new Date().toISOString().split('T')[0]}.xlsx`)
+    const handleExportExcel = async () => {
+        const ExcelJS = (await import('exceljs')).default
+        const wb = new ExcelJS.Workbook()
+        const ws = wb.addWorksheet('CEDI MS')
+        ws.columns = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }]
+        ws.addTable({
+            name: 'CediMarmol', ref: 'A1', headerRow: true,
+            style: { theme: 'TableStyleMedium7', showRowStripes: true },
+            columns: [{ name: 'OF', filterButton: true }, { name: 'SKU', filterButton: true }, { name: 'Descripcion', filterButton: true }, { name: 'Transito', filterButton: true }],
+            rows: filasReporte(),
+        })
+        ws.views = [{ state: 'frozen', ySplit: 1 }]
+        const buf = await wb.xlsx.writeBuffer()
+        const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+        const link = document.createElement('a'); link.href = url; link.download = `reporte_cedi_ms_${new Date().toISOString().split('T')[0]}.xlsx`; link.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
 
     const filteredOrdenes = ordenes.filter(o => {
@@ -157,6 +149,17 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
         .reduce((acc, r) => acc + (Number(r.kilos_vaciados) || 0), 0)
 
     const selectedOrder = ordenes.find(o => o.id === selectedOrderId)
+
+    // Verificación física de CEDI (casco con cachos), igual que en Muebles y FV; en MS todo va en piezas
+    const verif = useVerificacionesCedi(filteredOrdenes.map(o => String(o.orden_fabricacion)), 'MS')
+    const aEntregar = (o: OrdenFabricacion) => (Number(o.transito) || 0) + (Number(o.cedi) || 0)
+    const verificadoDe = (o: OrdenFabricacion) => Math.min(aEntregar(o), verif.porOf.get(String(o.orden_fabricacion)) || 0)
+    const totalAEntregar = filteredOrdenes.reduce((t, o) => t + aEntregar(o), 0)
+    const totalVerificado = filteredOrdenes.reduce((t, o) => t + verificadoDe(o), 0)
+    const totalNoVerificado = totalAEntregar - totalVerificado
+    const ordenesLista = filtroVerif === 'no' ? filteredOrdenes.filter(o => verificadoDe(o) < aEntregar(o))
+        : filtroVerif === 'si' ? filteredOrdenes.filter(o => verificadoDe(o) > 0) : filteredOrdenes
+    const alternarTraz = (id: number) => setTrazAbierta(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
     return (
         <div className="h-full flex flex-col bg-slate-50/30">
@@ -223,10 +226,40 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                         </div>
                     </div>
                 </div>
-                <div className="mt-2 text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">
-                    Ordenes encontradas: {filteredOrdenes.length}
+                {/* Órdenes a entregar · Piezas a entregar · Verificadas · No verificadas (clic: filtra) */}
+                <div className="mt-2 px-1 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-black uppercase tracking-wide">
+                        <Warehouse size={13} /> Órdenes a entregar: <b className="text-indigo-900">{filteredOrdenes.length}</b>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-black uppercase tracking-wide" title="Piezas en tránsito más las ya recibidas en CEDI">
+                        Piezas a entregar: <b className="text-[#254153]">{totalAEntregar.toLocaleString('es-CO')}</b>
+                    </span>
+                    <button type="button" onClick={() => setFiltroVerif(v => v === 'si' ? 'todos' : 'si')}
+                        title={filtroVerif === 'si' ? 'Ver todas las órdenes' : 'Mostrar solo las órdenes con piezas verificadas'}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-black uppercase tracking-wide transition-colors ${filtroVerif === 'si' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>
+                        <CascoDiablo size={14} /> Verificadas: <b>{totalVerificado.toLocaleString('es-CO')}</b>
+                        {filtroVerif === 'si' && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
+                    </button>
+                    <button type="button" onClick={() => setFiltroVerif(v => v === 'no' ? 'todos' : 'no')}
+                        title={filtroVerif === 'no' ? 'Ver todas las órdenes' : 'Mostrar solo las órdenes con piezas sin verificar'}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-black uppercase tracking-wide transition-colors ${filtroVerif === 'no' ? 'bg-[#d14747] border-[#d14747] text-white' : 'bg-rose-50 border-rose-200 text-[#d14747] hover:bg-rose-100'}`}>
+                        No verificadas: <b>{totalNoVerificado.toLocaleString('es-CO')}</b>
+                        {filtroVerif === 'no' && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
+                    </button>
+                    {verif.error && <span className="normal-case text-[11px] text-[#d14747]">{verif.error}</span>}
                 </div>
             </div>
+
+            {verificarDe && (
+                <ConfirmarVerificado
+                    orden={verificarDe as any}
+                    planta="MS"
+                    verificado={verif.porOf.get(String(verificarDe.orden_fabricacion)) || 0}
+                    usuario={userEmail}
+                    onCerrar={() => setVerificarDe(null)}
+                    onHecho={() => { setVerificarDe(null); verif.recargar() }}
+                />
+            )}
 
             {/* Content area */}
             <div className="flex-1 overflow-hidden relative">
@@ -238,19 +271,38 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                                 <Loader2 className="animate-spin text-blue-500" size={48} />
                                 <span className="font-bold uppercase tracking-widest animate-pulse">Cargando órdenes...</span>
                             </div>
-                        ) : filteredOrdenes.length === 0 ? (
+                        ) : ordenesLista.length === 0 ? (
                             <div className="text-center py-20 text-slate-400 font-bold uppercase text-lg italic bg-white rounded-3xl border-2 border-dashed border-slate-200">
                                 Sin ordenes halladas
                             </div>
                         ) : (
-                            filteredOrdenes.map(o => (
-                                <div key={o.id} className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                                    <OrdenCard
-                                        orden={o}
-                                        isActive={false}
-                                        onClick={() => setSelectedOrderId(o.id)}
-                                        moldes={allMoldes}
-                                    />
+                            ordenesLista.map(o => (
+                                <div key={o.id} className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                    {/* Tarjeta + franja (Trazabilidad · Componentes entrega · Verificado), como en CEDI Muebles y FV */}
+                                    <div className="bg-white border-2 border-gray-300 rounded-lg">
+                                        <div className="rounded-t-md overflow-hidden [&>button]:border-0 [&>button]:rounded-none [&>button]:ring-0 [&>button]:shadow-none">
+                                            <OrdenCard
+                                                orden={o}
+                                                isActive={false}
+                                                onClick={() => setSelectedOrderId(o.id)}
+                                                moldes={allMoldes}
+                                                resaltarSku
+                                            />
+                                        </div>
+                                        <div className="rounded-b-md border-t-2 border-[#e2ded5] bg-[#F6F3EE] px-3 py-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                                            <button type="button" onClick={() => alternarTraz(o.id)}
+                                                className={`h-9 px-3 rounded-lg border text-xs font-bold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-colors ${trazAbierta.has(o.id) ? 'bg-[#324354] text-white border-[#324354]' : 'bg-white text-[#324354] border-[#e2ded5] hover:bg-[#F6F3EE]'}`}
+                                                title={trazAbierta.has(o.id) ? 'Ocultar procesos de la orden' : 'Ver procesos de la orden'}>
+                                                <ChevronsUpDown size={15} />
+                                                {trazAbierta.has(o.id) ? 'Ocultar trazabilidad' : 'Trazabilidad'}
+                                            </button>
+                                            <EstadoEntregaOf of={o.orden_fabricacion} />
+                                            <div className="ml-auto">
+                                                <BotonVerificado orden={o as any} verificado={verif.porOf.get(String(o.orden_fabricacion)) || 0} onClick={() => setVerificarDe(o)} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {trazAbierta.has(o.id) && <OrderProcessesPanel orden={o} registros={[]} />}
                                 </div>
                             ))
                         )}
@@ -274,6 +326,7 @@ export default function CediModule({ userEmail }: { userEmail: string }) {
                                     isActive={true}
                                     onClick={() => {}}
                                     moldes={allMoldes}
+                                    resaltarSku
                                 />
                             </div>
                         </div>

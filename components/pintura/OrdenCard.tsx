@@ -39,6 +39,7 @@ interface OrdenCardProps {
     planta?: 'fv'   // FV: recuadros en el orden del encabezado de piso FV (Ensayo y Huacales en lugar de Acabado/Empaque/Estantería)
     conDetalle?: boolean   // FV: botón de detalle SAP junto a "Moldes" (se apaga donde la pantalla ya tiene su propio botón)
     pesos?: 'gelcoat' | 'resina'   // FV: kilos por pieza (Bañera / Faldón) desde SAP: gelcoat en Pintura, resina en Vaciado
+    resaltarSku?: boolean   // CEDI: SKU en amarillo y negrilla (en CEDI se ubican por SKU), igual que en Muebles
 }
 
 // Kilos por pieza (por unidad) bajo los moldes: Gelcoat en Pintura y Resina en Vaciado. Sin dato de SAP lo dice, nunca 0.
@@ -78,7 +79,7 @@ const MiniMetric = ({ label, value, color, fv, siempre, nota, titulo }: { label:
     </div>
 )
 
-export default function OrdenCard({ orden, isActive, onClick, moldes, planta, conDetalle = true, pesos }: OrdenCardProps) {
+export default function OrdenCard({ orden, isActive, onClick, moldes, planta, conDetalle = true, pesos, resaltarSku }: OrdenCardProps) {
     const [verDetalle, setVerDetalle] = useState(false)
     // FV: las 4 fechas del Semáforo guardadas al cargar las órdenes
     const semaforo = useFechasSemaforoFv(planta === 'fv')
@@ -191,7 +192,9 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                                     {orden.producto_descripcion || orden.molde_descripcion || orden.producto_sku || 'Sin descripción'}
                                 </div>
                                 {/* SKU del producto de la OF (no el del molde) */}
-                                <div className="text-[10px] font-semibold text-[#7B8E90] mt-0.5 truncate">SKU: {orden.producto_sku?.trim() || orden.sku?.trim() || 'No definido'}</div>
+                                {resaltarSku
+                                    ? <div className="mt-1"><span className="px-2 py-0.5 rounded-md bg-[#deb841] text-[#254153] text-sm sm:text-base font-black tracking-wide">SKU: {(orden.producto_sku?.trim() || orden.sku?.trim() || 'No definido').toUpperCase()}</span></div>
+                                    : <div className="text-[10px] font-semibold text-[#7B8E90] mt-0.5 truncate">SKU: {orden.producto_sku?.trim() || orden.sku?.trim() || 'No definido'}</div>}
                             </div>
                             {/* Detalle de la orden en SAP, al lado de la descripción */}
                             {conDetalle ? (
@@ -283,7 +286,9 @@ export default function OrdenCard({ orden, isActive, onClick, moldes, planta, co
                             </div>
                         )
                     })()}
-                    {planta !== 'fv' && <div className="text-[9px] text-gray-400 italic mt-0.5 truncate">SKU: {sku || 'No definido'}</div>}
+                    {planta !== 'fv' && (resaltarSku
+                        ? <div className="mt-1"><span className="px-2 py-0.5 rounded-md bg-[#deb841] text-[#254153] text-sm sm:text-base font-black tracking-wide">SKU: {(orden.producto_sku?.trim() || sku || 'No definido').toUpperCase()}</span></div>
+                        : <div className="text-[9px] text-gray-400 italic mt-0.5 truncate">SKU: {sku || 'No definido'}</div>)}
                 </div>
                 {planta === 'fv' ? (
                     // FV: el cliente es dato clave, va resaltado en una etiqueta navy; SODIMAC (cliente premium, con
