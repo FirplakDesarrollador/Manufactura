@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, RefreshCw, CheckCircle2, XCircle, Eye, X } from 'lucide-react';
+import { Search, RefreshCw, CheckCircle2, XCircle, Eye, X, Pencil } from 'lucide-react';
+import EditarRegistroVigilanciaModal from './EditarRegistroVigilanciaModal';
 
 interface HistorialInspeccionMblProps { onNuevoRegistro: () => void; }
 
@@ -11,6 +12,7 @@ export default function HistorialInspeccionMbl({ onNuevoRegistro }: HistorialIns
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selected, setSelected] = useState<any | null>(null);
+    const [editingRegistro, setEditingRegistro] = useState<any | null>(null);
 
     const fetchHistorial = async () => {
         setLoading(true);
@@ -85,7 +87,10 @@ export default function HistorialInspeccionMbl({ onNuevoRegistro }: HistorialIns
                                     <td className="px-4 py-3 text-center">{row.resaltar_piezas ? <CheckCircle2 size={16} className="text-emerald-500 inline" /> : <XCircle size={16} className="text-red-500 inline" />}</td>
                                     <td className="px-4 py-3 text-center">{row.sello_calidad ? <CheckCircle2 size={16} className="text-emerald-500 inline" /> : <XCircle size={16} className="text-red-500 inline" />}</td>
                                     <td className="px-4 py-3 text-center">
-                                        <button onClick={() => setSelected(row)} className="p-1.5 rounded-lg bg-sky-50 text-[#0099e5] hover:bg-[#0099e5] hover:text-white transition cursor-pointer"><Eye size={16} /></button>
+                                        <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                                <button onClick={() => setSelected(row)} className="p-1.5 rounded-lg bg-sky-50 text-[#0099e5] hover:bg-[#0099e5] hover:text-white transition cursor-pointer"><Eye size={16} /></button>
+                                                <button onClick={() => setEditingRegistro(row)} title="Editar registro" className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition cursor-pointer"><Pencil size={15} /></button>
+                                            </div>
                                     </td>
                                 </tr>
                             ))}
@@ -124,6 +129,19 @@ export default function HistorialInspeccionMbl({ onNuevoRegistro }: HistorialIns
                         </div>
                     </div>
                 </div>
+            )}
+        
+            {editingRegistro && (
+                <EditarRegistroVigilanciaModal
+                    tabla="pv_inspeccion_mbl"
+                    titulo="Inspección Muebles"
+                    registro={editingRegistro}
+                    onClose={() => setEditingRegistro(null)}
+                    onSaved={() => {
+                        setEditingRegistro(null);
+                        fetchHistorial();
+                    }}
+                />
             )}
         </div>
     );

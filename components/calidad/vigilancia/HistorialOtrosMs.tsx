@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, RefreshCw, CheckCircle2, XCircle, Pencil } from 'lucide-react';
+import EditarRegistroVigilanciaModal from './EditarRegistroVigilanciaModal';
 
 interface HistorialOtrosMsProps {
     onNuevoRegistro: () => void;
@@ -13,6 +14,7 @@ export default function HistorialOtrosMs({ onNuevoRegistro }: HistorialOtrosMsPr
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegistro, setSelectedRegistro] = useState<any | null>(null);
+    const [editingRegistro, setEditingRegistro] = useState<any | null>(null);
 
     const fetchHistorial = async () => {
         setLoading(true);
@@ -174,12 +176,15 @@ export default function HistorialOtrosMs({ onNuevoRegistro }: HistorialOtrosMsPr
                                                 </span>
                                             </td>
                                             <td className="py-2.5 px-4 text-right">
+                                                <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                                                 <button
                                                     onClick={() => setSelectedRegistro(r)}
                                                     className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#324354] hover:text-white text-slate-700 font-semibold text-[11px] transition cursor-pointer"
                                                 >
                                                     Ver Detalle
                                                 </button>
+                                                <button onClick={() => setEditingRegistro(r)} title="Editar registro" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-[#0099e5] text-[#0099e5] hover:text-white border border-sky-200 font-semibold text-[11px] transition cursor-pointer"><Pencil size={12} /> Editar</button>
+                                            </div>
                                             </td>
                                         </tr>
                                     );
@@ -297,6 +302,19 @@ export default function HistorialOtrosMs({ onNuevoRegistro }: HistorialOtrosMsPr
                         </div>
                     </div>
                 </div>
+            )}
+        
+            {editingRegistro && (
+                <EditarRegistroVigilanciaModal
+                    tabla="pv_otros_ms"
+                    titulo="Otros MS"
+                    registro={editingRegistro}
+                    onClose={() => setEditingRegistro(null)}
+                    onSaved={() => {
+                        setEditingRegistro(null);
+                        fetchHistorial();
+                    }}
+                />
             )}
         </div>
     );

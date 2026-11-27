@@ -41,6 +41,7 @@ import CalidadFVDashboard from '@/components/calidad/CalidadFVDashboard';
 import CalidadGeneralIFI from '@/components/calidad/CalidadGeneralIFI';
 import CalidadMsDashboard from '@/components/calidad/CalidadMsDashboard';
 import CalidadSaldosDashboard from '@/components/calidad/CalidadSaldosDashboard';
+import IndicadoresVigilanciaView from '@/components/calidad/vigilancia/IndicadoresVigilanciaView';
 import {
     ResponsiveContainer,
     BarChart,
@@ -1177,12 +1178,7 @@ export default function IndicadoresCalidadView({ showMainHeader = false, soloMs 
                 {/* --- PESTAÑA 3: PLAN DE VIGILANCIA --- */}
                 {/* ========================================================================= */}
                 {activeTab === 'PLAN_VIGILANCIA' && (
-                    <UnderConstructionCard
-                        title="Plan de Vigilancia de Calidad"
-                        subtitle="Módulo en Construcción"
-                        description="Este módulo permitirá el seguimiento sistemático a los planes de control, rondas de inspección en proceso, auditorías escalonadas y vigilancia preventiva en todas las líneas de producción."
-                        icon={ShieldCheck}
-                    />
+                    <IndicadoresVigilanciaView />
                 )}
 
                 {/* ========================================================================= */}
