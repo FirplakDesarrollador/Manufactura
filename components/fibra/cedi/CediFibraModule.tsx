@@ -8,6 +8,8 @@ import { Loader2, FileSpreadsheet, ArrowLeftRight, FileCode, ArrowLeft, Chevrons
 import EstadoEntregaOf from '../EstadoEntregaOf'
 import { OrderProcessesPanel } from '../administracion/AdministracionFibraModule'
 import { useVerificacionesCedi, BotonVerificado, ConfirmarVerificado, CascoDiablo } from '@/components/muebles/VerificadoCedi'
+import { useEntregasCedi, descargarCsvEntregas, descargarExcelEntregas } from '@/lib/muebles/entregasCedi'
+import { BotonCerrarEntrega, ChipEntregasHoy } from '@/components/muebles/EntregasCediUi'
 import EncabezadoFibra, { useMetricasFibra } from '../EncabezadoFibra'
 import CediList from './CediList'
 import OrdenCard from '@/components/pintura/OrdenCard'
@@ -80,31 +82,9 @@ export default function CediFibraModule({ userEmail }: { userEmail: string }) {
     ])
     const hoyArchivo = new Date().toISOString().split('T')[0]
 
-    const handleExportCSV = () => {
-        const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-        const lineas = [['OF', 'SKU', 'Descripcion', 'Transito'].map(q).join(','), ...filasReporte().map(r => r.map(q).join(','))]
-        const url = URL.createObjectURL(new Blob(['\ufeff' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
-        const link = document.createElement('a'); link.href = url; link.download = `reporte_cedi_fv_${hoyArchivo}.csv`; link.click()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-    }
-
-    const handleExportExcel = async () => {
-        const ExcelJS = (await import('exceljs')).default
-        const wb = new ExcelJS.Workbook()
-        const ws = wb.addWorksheet('CEDI FV')
-        ws.columns = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }]
-        ws.addTable({
-            name: 'CediFibra', ref: 'A1', headerRow: true,
-            style: { theme: 'TableStyleMedium7', showRowStripes: true },
-            columns: [{ name: 'OF', filterButton: true }, { name: 'SKU', filterButton: true }, { name: 'Descripcion', filterButton: true }, { name: 'Transito', filterButton: true }],
-            rows: filasReporte(),
-        })
-        ws.views = [{ state: 'frozen', ySplit: 1 }]
-        const buf = await wb.xlsx.writeBuffer()
-        const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-        const a = document.createElement('a'); a.href = url; a.download = `reporte_cedi_fv_${hoyArchivo}.xlsx`; a.click()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-    }
+    // Descargas: una hoja (Excel) o columna Entrega (CSV) por cada entrega de hoy + "Total CEDI"
+    const handleExportCSV = () => descargarCsvEntregas(`reporte_cedi_fv_${hoyArchivo}.csv`, entregasCedi.entregas, filasReporte())
+    const handleExportExcel = () => descargarExcelEntregas(`reporte_cedi_fv_${hoyArchivo}.xlsx`, entregasCedi.entregas, filasReporte())
 
     const { baseFilteredOrdenes, metrics } = useMetricasFibra(ordenes, registros, searchText, selectedDate)
 
@@ -124,6 +104,9 @@ export default function CediFibraModule({ userEmail }: { userEmail: string }) {
 
     // Verificación física de CEDI (casco con cachos), igual que en Muebles; en FV todo va en piezas
     const verif = useVerificacionesCedi(filteredOrdenes.map(o => String(o.orden_fabricacion)), 'Fibra')
+    // Entregas del día (Entrega 1, 2, …): piezas digitadas (pasan a Tránsito) entre cierres; la descripción sale de la OF
+    const infoFv = useMemo(() => new Map(ordenes.map(o => [String(o.orden_fabricacion), { sku: String(o.producto_sku || '').toUpperCase(), descripcion: o.producto_descripcion || '' }])), [ordenes])
+    const entregasCedi = useEntregasCedi('Fibra', registros, infoFv)
     const aEntregar = (o: OrdenFabricacion) => (Number(o.transito) || 0) + (Number(o.cedi) || 0)
     const verificadoDe = (o: OrdenFabricacion) => Math.min(aEntregar(o), verif.porOf.get(String(o.orden_fabricacion)) || 0)
     const totalAEntregar = filteredOrdenes.reduce((t, o) => t + aEntregar(o), 0)
@@ -146,6 +129,7 @@ export default function CediFibraModule({ userEmail }: { userEmail: string }) {
                 placeholder="Sku / Of / Pedido / Molde"
                 extra={
                     <div className="flex items-center gap-2">
+                        <BotonCerrarEntrega planta="Fibra" enCurso={entregasCedi.enCurso} usuario={userEmail} unidad="pieza(s)" onHecho={entregasCedi.recargar} />
                         <button
                             onClick={handleMoveAllToCedi}
                             disabled={moving}
@@ -211,6 +195,7 @@ export default function CediFibraModule({ userEmail }: { userEmail: string }) {
                                 No verificadas: <b>{totalNoVerificado.toLocaleString('es-CO')}</b>
                                 {filtroVerif === 'no' && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
                             </button>
+                            <ChipEntregasHoy entregas={entregasCedi.entregas} error={entregasCedi.error} />
                             {verif.error && <span className="normal-case text-[11px] text-[#d14747]">{verif.error}</span>}
                         </div>
                         {loading ? (
