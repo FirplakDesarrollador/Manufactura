@@ -8,6 +8,7 @@ import OrderCard from './OrderCard'
 import HistorialTrazabilidadModal from './HistorialTrazabilidadModal'
 import EstadoEntregaOf from '../fibra/EstadoEntregaOf'
 import { useVerificacionesCedi, BotonVerificado, ConfirmarVerificado, CascoDiablo } from './VerificadoCedi'
+import { useEntregasCedi, cerrarEntregaCedi, descargarCsvEntregas, descargarExcelEntregas } from '@/lib/muebles/entregasCedi'
 import TrazabilidadModal from './TrazabilidadModal'
 import {
     Search, Eraser, Loader2, Calendar, ArrowLeftRight,
@@ -115,44 +116,14 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
         return { headers, rows }
     }
 
-    const handleExportCSV = () => {
-        // Mismas 4 columnas del Excel: OF, SKU, Descripcion, Transito (en tránsito + recibido en CEDI)
-        const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-        const lineas = [['OF', 'SKU', 'Descripcion', 'Transito'].map(q).join(','),
-            ...filteredOrdenes.map(o => [o.orden_fabricacion, o.producto_sku, o.producto_descripcion, (Number(o.transito) || 0) + (Number(o.cedi) || 0)].map(q).join(','))]
-        const url = URL.createObjectURL(new Blob(['\ufeff' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
-        const link = document.createElement('a')
-        link.setAttribute('href', url)
-        link.setAttribute('download', `reporte_cedi_muebles_${today}.csv`)
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-    }
-
-    // Excel de CEDI (27/11/2026): solo OF, SKU, Descripción y Tránsito (lo despachado a CEDI: en tránsito + recibido),
-    // como tabla con filtros, filas alternadas en verde y anchos ajustados para leer la descripción completa
-    const handleExportExcel = async () => {
-        const ExcelJS = (await import('exceljs')).default
-        const wb = new ExcelJS.Workbook()
-        const ws = wb.addWorksheet('CEDI Muebles')
-        ws.columns = [{ width: 11 }, { width: 22 }, { width: 72 }, { width: 11 }]
-        ws.addTable({
-            name: 'CediMuebles', ref: 'A1', headerRow: true,
-            style: { theme: 'TableStyleMedium7', showRowStripes: true },
-            columns: [{ name: 'OF', filterButton: true }, { name: 'SKU', filterButton: true }, { name: 'Descripcion', filterButton: true }, { name: 'Transito', filterButton: true }],
-            rows: filteredOrdenes.map(o => [
-                Number(o.orden_fabricacion) || String(o.orden_fabricacion || ''),
-                o.producto_sku || '',
-                o.producto_descripcion || '',
-                (Number(o.transito) || 0) + (Number(o.cedi) || 0),
-            ]),
-        })
-        ws.views = [{ state: 'frozen', ySplit: 1 }]
-        const buf = await wb.xlsx.writeBuffer()
-        const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-        const a = document.createElement('a'); a.href = url; a.download = `reporte_cedi_muebles_${today}.xlsx`; a.click()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-    }
+    // Descargas (27/11/2026): una hoja (Excel) o columna Entrega (CSV) por cada entrega de hoy + "Total CEDI"
+    // con las 4 columnas (OF, SKU, Descripcion, Transito = en tránsito + recibido en CEDI)
+    const filasTotal = () => filteredOrdenes.map(o => [
+        Number(o.orden_fabricacion) || String(o.orden_fabricacion || ''), o.producto_sku || '', o.producto_descripcion || '',
+        (Number(o.transito) || 0) + (Number(o.cedi) || 0),
+    ])
+    const handleExportCSV = () => descargarCsvEntregas(`reporte_cedi_muebles_${today}.csv`, entregasCedi.entregas, filasTotal())
+    const handleExportExcel = () => descargarExcelEntregas(`reporte_cedi_muebles_${today}.xlsx`, entregasCedi.entregas, filasTotal())
 
     // Filtrado
     const filteredOrdenes = ordenes.filter(o => {
@@ -176,6 +147,24 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
     const selectedOrder = ordenes.find(o => o.id === selectedOrderId) ?? null
     // Verificación física de CEDI (casco con cachos): total por OF y total del día
     const verif = useVerificacionesCedi(filteredOrdenes.map(o => String(o.orden_fabricacion)), plantaMuebles)
+    // Entregas del día a CEDI (Entrega 1, 2, …): se separan con el botón "Cerrar entrega N"
+    const entregasCedi = useEntregasCedi(plantaMuebles, ordenes)
+    const entregaActual = entregasCedi.enCurso
+    const [cerrando, setCerrando] = useState(false)
+    const cerrarEntrega = async () => {
+        if (!entregaActual) return
+        if (!confirm(`¿Cerrar la Entrega ${entregaActual.numero} con ${entregaActual.total} mueble(s) (${entregaActual.items.length} OF)? Lo que se registre en Tránsito después irá a la Entrega ${entregaActual.numero + 1}.`)) return
+        setCerrando(true)
+        try {
+            await cerrarEntregaCedi(plantaMuebles, entregaActual.numero, userEmail || usuarioNombre)
+            toast.success(`Entrega ${entregaActual.numero} cerrada: ${entregaActual.total} mueble(s)`)
+            await entregasCedi.recargar()
+        } catch (e: any) {
+            toast.error(`No se cerró la entrega: ${e?.message || e}`)
+        } finally {
+            setCerrando(false)
+        }
+    }
     // A entregar = en tránsito + recibido en CEDI (muebles). Verificado por OF hasta ese total; el resto, no verificado
     const aEntregar = (o: OrdenMueble) => (Number(o.transito) || 0) + (Number(o.cedi) || 0)
     const verificadoDe = (o: OrdenMueble) => Math.min(aEntregar(o), verif.porOf.get(String(o.orden_fabricacion)) || 0)
@@ -203,6 +192,11 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                 version={ordenes}
                 resaltado="transito"
                 acciones={<>
+                    <button type="button" onClick={cerrarEntrega} disabled={cerrando || !entregaActual || entregaActual.total <= 0}
+                        title="Cierra la entrega en curso: lo registrado en Tránsito hasta ahora queda como esta entrega"
+                        className="h-9 px-3 shrink-0 bg-[#deb841] hover:bg-[#c9a535] text-[#254153] rounded-lg font-black text-xs flex items-center gap-1.5 disabled:opacity-50">
+                        {cerrando ? <Loader2 className="animate-spin" size={15} /> : <Warehouse size={15} />} Cerrar entrega {entregaActual?.numero ?? 1}
+                    </button>
                     <button type="button" onClick={handleMoveAllToCedi} disabled={moving} title="Pasar todo lo que está en tránsito a CEDI"
                         className="h-9 px-3 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 disabled:opacity-50">
                         {moving ? <Loader2 className="animate-spin" size={15} /> : <ArrowLeftRight size={15} />} Mover a CEDI
@@ -239,7 +233,17 @@ export default function CediModule({ userEmail, turno, usuarioNombre, plantaMueb
                         No verificados: <b>{totalNoVerificado.toLocaleString('es-CO')}</b>
                         {soloNoVerificados && <span className="ml-1 normal-case font-bold">· filtrando ✕</span>}
                     </button>
+                    {/* Entregas de hoy: las cerradas y la en curso */}
+                    <span className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-black uppercase tracking-wide"
+                        title="Entregas de hoy a CEDI (lo registrado en Tránsito entre cierres)">
+                        Entregas hoy:
+                        {entregasCedi.entregas.filter(e => e.cerradaAt).map(e => (
+                            <b key={e.numero} className="px-1.5 rounded bg-white/70 text-[#254153]">#{e.numero}: {e.total}</b>
+                        ))}
+                        {entregaActual && <b className="px-1.5 rounded bg-[#deb841] text-[#254153]">#{entregaActual.numero} en curso: {entregaActual.total}</b>}
+                    </span>
                     {verif.error && <span className="normal-case text-[11px] text-[#d14747]">{verif.error}</span>}
+                    {entregasCedi.error && <span className="normal-case text-[11px] text-[#d14747]">{entregasCedi.error}</span>}
                 </div>
             </div>
 

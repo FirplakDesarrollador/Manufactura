@@ -34,7 +34,10 @@ async function cerrarOrdenesCerradasEnSap(liberadasEnSap: Set<string>) {
         if (!data || data.length < 1000) break;
     }
     const ausentes = abiertas.filter(of => /^[0-9]+$/.test(of) && !liberadasEnSap.has(of));
-    const aRevisar = ausentes.slice(0, MAX_REVISION_CIERRE);
+    // También las que SÍ vienen en la consulta (27/11/2026): la consulta de SAP puede seguir trayendo OF que SAP ya
+    // cerró (p. ej. 10077202/10077203 seguían abiertas aquí); se confirma el estado real de todas, primero las ausentes
+    const presentes = abiertas.filter(of => /^[0-9]+$/.test(of) && liberadasEnSap.has(of));
+    const aRevisar = [...ausentes, ...presentes].slice(0, MAX_REVISION_CIERRE);
 
     // Consultas a SAP una tras otra (en paralelo SAP se bloquea), de a 20 OF
     const porCerrar: string[] = [];
