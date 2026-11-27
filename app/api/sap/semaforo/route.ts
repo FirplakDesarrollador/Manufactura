@@ -22,6 +22,7 @@ const COLUMNAS: Array<[string, string, string[]]> = [
     ['cantPendItem', 'Cant. Pend. Item', ['U_CantPendItem', 'Cant. Pend. Item', 'CantPendItem']],
     ['cantTotal', 'Cantidad total', ['U_CantidadTotal', 'Cantidad total', 'CantidadTotal']],
     ['disponiblePt01', 'Disponible PT01', ['U_DisponiblePT01', 'Disponible PT01', 'DisponiblePT01']],
+    ['disponiblePt08', 'Disponible PT08', ['U_DisponiblePT08', 'Disponible PT08', 'DisponiblePT08']],
     ['fechaCreacionOp', 'Fecha Creación OP', ['U_FechaCreacionOP', 'Fecha Creación OP', 'FechaCreacionOP']],
     ['estado', 'Estado', ['U_Estado', 'Estado']],
     ['fechaRecomendadaLiberacion', 'Fecha Recomendada Liberación', ['U_FechaRecoLib', 'Fecha Recomendada Liberación', 'FechaRecoLib']],

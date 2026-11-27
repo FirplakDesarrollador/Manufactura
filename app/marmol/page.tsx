@@ -15,15 +15,24 @@ import PulidoModule from '@/components/pulido/PulidoModule'
 import AcabadoModule from '@/components/acabado/AcabadoModule'
 import ReparacionModule from '@/components/reparacion/ReparacionModule'
 import EmpaqueModule from '@/components/empaque/EmpaqueModule'
-import DigitadoModule, { GRUPO_DIGITADO_MS } from '@/components/digitado/DigitadoModule'
-import { useFaltantesGrupo } from '@/lib/fibra/revisionEntrega'
+import DigitadoModule from '@/components/digitado/DigitadoModule'
 import MoldesFibraModule from '@/components/fibra/moldes/MoldesFibraModule'
 import TrasladosFibraModule from '@/components/fibra/traslados/TrasladosFibraModule'
 import IconoMolde from '@/components/fibra/IconoMolde'
 
 // Bolita roja del menú: órdenes de Digitado con componentes faltantes para la entrega (última revisión de SAP)
-function AvisoFaltantesDigitado({ abierto }: { abierto: boolean }) {
-    const n = useFaltantesGrupo(GRUPO_DIGITADO_MS)
+// Número rojo tipo notificación (igual que en Fibra): OF con componentes faltantes para la entrega que tienen piezas
+// en lo que muestra ese módulo. Sale de la revisión guardada en el servidor (revision_entrega_of), así se ve en
+// cualquier equipo aunque el módulo no se haya abierto.
+const PIEZAS_POR_MODULO_MS: Record<string, string[]> = {
+    // Vaciado, Pulido y Acabado sin aviso (pedido del usuario 26/11/2026)
+    desmolde: ['vaciado'],
+    reparacion: ['reparacion', 'reparacion_larga'],
+    empaque: ['acabado', 'empaque'],
+    digitado: ['pulido', 'desgelcada', 'empaque', 'acabado', 'digitado', 'transito'],
+    administracion: ['programado', 'pintura', 'vaciado', 'desgelcada', 'estanteria', 'pulido', 'acabado', 'reparacion', 'reparacion_larga', 'empaque', 'digitado', 'transito', 'cedi'],
+}
+function AvisoNovedades({ n, abierto }: { n?: number; abierto: boolean }) {
     if (!n) return null
     return (
         <b title={`${n} OF con componentes faltantes para la entrega`}
@@ -137,6 +146,31 @@ export default function MarmorPage() {
         return () => clearInterval(t)
     }, [])
 
+    // Avisos por módulo: OF abiertas de MS con faltantes (revision_entrega_of) y piezas en lo que muestra cada módulo
+    const [novedadesProceso, setNovedadesProceso] = useState<Record<string, number>>({})
+    useEffect(() => {
+        const contar = async () => {
+            const { data: rev, error } = await supabase.from('revision_entrega_of').select('orden_fabricacion').eq('estado', 'faltante')
+            if (error) return
+            const conFaltantes = new Set((rev || []).map(r => String(r.orden_fabricacion).trim()))
+            if (!conFaltantes.size) { setNovedadesProceso({}); return }
+            const columnas = [...new Set(Object.values(PIEZAS_POR_MODULO_MS).flat())]
+            const { data: ofs, error: errOf } = await supabase.from('query_ordenes_fabricacion')
+                .select(['orden_fabricacion', ...columnas].join(', ')).in('orden_fabricacion', [...conFaltantes])
+            if (errOf) return
+            const cuenta: Record<string, number> = {}
+            for (const o of (ofs || []) as unknown as Record<string, unknown>[]) {
+                for (const [modulo, cols] of Object.entries(PIEZAS_POR_MODULO_MS)) {
+                    if (cols.some(c => Number(o[c]) > 0)) cuenta[modulo] = (cuenta[modulo] || 0) + 1
+                }
+            }
+            setNovedadesProceso(cuenta)
+        }
+        contar()
+        const t = setInterval(contar, 5 * 60000)
+        return () => clearInterval(t)
+    }, [])
+
     const handleSignOut = async () => {
         await supabase.auth.signOut()
         router.push('/login')
@@ -223,7 +257,7 @@ export default function MarmorPage() {
                                     ? <IconoDesmanchado className="w-4 h-4 shrink-0" />
                                     : <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{m.icono}</svg>}
                                 <span>{m.label}</span>
-                                {m.id === 'digitado' && <AvisoFaltantesDigitado abierto={sidebarOpen} />}
+                                <AvisoNovedades n={novedadesProceso[m.id]} abierto={sidebarOpen} />
                             </button>
                         ))}
 

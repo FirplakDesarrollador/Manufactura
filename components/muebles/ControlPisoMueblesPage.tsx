@@ -68,6 +68,7 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
     // en total y por proceso (el proceso donde están sus unidades por trabajar)
     const [novedadesTraslados, setNovedadesTraslados] = useState(0)
     const [novedadesProceso, setNovedadesProceso] = useState<Record<string, number>>({})
+    const [faltantesAdmin, setFaltantesAdmin] = useState(0)
     useEffect(() => {
         const tabla = planta === 'Cefi' ? 'traslados_of_cefi' : 'traslados_of_mbl'
         const contar = async () => {
@@ -83,15 +84,22 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
             const cuenta: Record<string, number> = {}
             const sumar = (m: string) => { cuenta[m] = (cuenta[m] || 0) + 1 }
             for (const o of q || []) {
-                if ((o.por_cortar || 0) > 0) sumar('corte')
-                if ((o.corte || 0) > 0) sumar('enchape')
-                if ((o.enchape || 0) > 0) sumar('inspeccion')
-                if (planta !== 'Cefi' && (o.inspeccion || 0) > 0) sumar('empaque')
             }
             setNovedadesProceso(cuenta)
         }
+        // Administración (como Fibra y Mármol): OF abiertas de la planta con "Falta(n) componente(s)" en Componentes entrega
+        const contarAdmin = async () => {
+            const { data: rev, error } = await supabase.from('revision_entrega_of').select('orden_fabricacion').eq('estado', 'faltante')
+            if (error) return
+            const ofs = [...new Set((rev || []).map(r => String(r.orden_fabricacion).trim()))]
+            if (!ofs.length) { setFaltantesAdmin(0); return }
+            const { data: abiertas, error: errOf } = await supabase.from('ordenes_fabricacion_muebles').select('orden_fabricacion')
+                .eq('planta', planta === 'Cefi' ? 'Cefi' : 'Muebles').eq('pendiente', true).in('orden_fabricacion', ofs)
+            if (!errOf) setFaltantesAdmin(new Set((abiertas || []).map(o => String(o.orden_fabricacion))).size)
+        }
+        contarAdmin()
         contar()
-        const t = setInterval(contar, 5 * 60000)
+        const t = setInterval(() => { contar(); contarAdmin() }, 5 * 60000)
         return () => clearInterval(t)
     }, [planta])
 
@@ -127,7 +135,8 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
     }, [router])
 
     useEffect(() => {
-        if (planta === 'Cefi' && activeModule === 'empaque') {
+        // Empaque ya no es un proceso (CEFI nunca lo usó; Muebles desde 26/11/2026)
+        if (activeModule === 'empaque') {
             setActiveModule('corte')
         }
     }, [planta, activeModule])
@@ -228,9 +237,8 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
     ]
 
     const filteredMenuItems = menuItems.filter(item => {
-        // En planta Cefi no se utiliza el ámbito/módulo de Empaque
-        const isCefi = planta === 'Cefi';
-        if (isCefi && item.id === 'empaque') {
+        // Empaque ya no es un proceso en Muebles ni en CEFI
+        if (item.id === 'empaque') {
             return false;
         }
 
@@ -283,7 +291,8 @@ export default function ControlPisoMueblesPage({ planta }: { planta: PlantaMuebl
                                 {item.icon}
                                 <span>{item.label}</span>
                                 {item.id === 'digitado' && <AvisoFaltantesDigitado planta={planta} abierto={sidebarOpen} />}
-                                {item.id !== 'digitado' && <AvisoNovedades n={novedadesProceso[item.id]} abierto={sidebarOpen} texto="OF con faltantes o sin traslado en este proceso" />}
+                                {item.id === 'administracion' && <AvisoNovedades n={faltantesAdmin} abierto={sidebarOpen} texto="OF con componentes faltantes para la entrega" />}
+                                {item.id !== 'digitado' && item.id !== 'administracion' && <AvisoNovedades n={novedadesProceso[item.id]} abierto={sidebarOpen} texto="OF con faltantes o sin traslado en este proceso" />}
                             </button>
                         ))}
 

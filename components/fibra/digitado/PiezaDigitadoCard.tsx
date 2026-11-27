@@ -5,6 +5,7 @@ import { RegistroTrazabilidad, OrdenFabricacion, Molde } from '@/types/pintura'
 import { registrarDigitado } from '@/lib/supabase/queries/fibra_digitado'
 import { revisarEntrega } from '@/lib/fibra/revisionEntrega'
 import EstadoEntregaOf from '../EstadoEntregaOf'
+import AvisoTrasladoOf from '@/components/fibra/AvisoTrasladoOf'
 import TarjetaPiezaFibra from '../TarjetaPiezaFibra'
 import AccionesPiezaFibra from '../AccionesPiezaFibra'
 import { Keyboard } from 'lucide-react'
@@ -33,5 +34,5 @@ export default function PiezaDigitadoCard({ registro, orden, moldes, usuarioEmai
     )
 
     return <TarjetaPiezaFibra registro={registro} orden={orden} moldes={moldes} acciones={acciones} franja="bg-slate-100/60"
-        extra={<EstadoEntregaOf of={registro.orden_fabricacion} desde={registro.empaque_fecha} />} />
+        extra={<><EstadoEntregaOf of={registro.orden_fabricacion} desde={registro.empaque_fecha} /><AvisoTrasladoOf of={registro.orden_fabricacion} /></>} />
 }

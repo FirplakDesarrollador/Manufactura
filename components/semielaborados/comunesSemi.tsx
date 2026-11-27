@@ -3,7 +3,7 @@
 import React from 'react'
 import { ClipboardList, Search, User, X } from 'lucide-react'
 import CarruselPestanas from '@/components/ui/CarruselPestanas'
-import type { OrdenSemi } from '@/lib/semielaborados/datos'
+import { type OrdenSemi, type TipoSemi, tipoSemi, tipoDeSku } from '@/lib/semielaborados/datos'
 
 // Piezas comunes del Control de Piso Semielaborados: indicadores, buscador y tarjeta de la OF (diseño de Fibra).
 
@@ -13,16 +13,17 @@ const fmt = (f: string | null | undefined) => {
     return m ? `${m[3]}/${m[2]}/${m[1]}` : String(f)
 }
 
-export function IndicadoresSemi({ ordenes }: { ordenes: OrdenSemi[] }) {
+export function IndicadoresSemi({ ordenes, tipo = 'cajas' }: { ordenes: OrdenSemi[]; tipo?: TipoSemi }) {
     const s = (k: keyof OrdenSemi) => ordenes.reduce((a, o) => a + (Number(o[k]) || 0), 0)
+    const n = tipoSemi(tipo).procesos
     const tarjetas: { t: string; v: number; c: string }[] = [
         { t: 'OF abiertas', v: ordenes.length, c: 'bg-[#324354]/10 text-[#324354]' },
         { t: 'Cantidad', v: s('cantidad'), c: 'bg-[#324354]/10 text-[#324354]' },
         { t: 'Programado', v: s('programado'), c: 'bg-[#324354]/10 text-[#324354]' },
-        { t: 'Corte', v: s('corte'), c: 'bg-[#deb841]/20 text-[#7a5f0e]' },
+        { t: n.Corte, v: s('corte'), c: 'bg-[#deb841]/20 text-[#7a5f0e]' },
         { t: 'Digitado', v: s('digitado'), c: 'bg-[#59a96a]/15 text-[#2f7a40]' },
         { t: 'Tránsito', v: s('transito'), c: 'bg-[#59a96a]/15 text-[#2f7a40]' },
-        { t: 'Almacén', v: s('almacen'), c: 'bg-[#324354] text-white' },
+        { t: n.Almacen, v: s('almacen'), c: 'bg-[#324354] text-white' },
     ]
     return (
         <CarruselPestanas>
@@ -49,9 +50,10 @@ export function BuscadorSemi({ valor, onCambio }: { valor: string; onCambio: (v:
 
 // Tarjeta de la OF: datos, fechas del Semáforo, cliente y unidades por proceso; abajo la franja del módulo
 export function TarjetaOrdenSemi({ orden, resaltar, franja }: { orden: OrdenSemi; resaltar?: keyof OrdenSemi; franja?: React.ReactNode }) {
+    const n = tipoSemi(tipoDeSku(orden.producto_sku)).procesos
     const cont: { t: string; k: keyof OrdenSemi | 'cantidad' }[] = [
-        { t: 'Cantidad', k: 'cantidad' }, { t: 'Programado', k: 'programado' }, { t: 'Corte', k: 'corte' },
-        { t: 'Digitado', k: 'digitado' }, { t: 'Tránsito', k: 'transito' }, { t: 'Almacén', k: 'almacen' },
+        { t: 'Cantidad', k: 'cantidad' }, { t: 'Programado', k: 'programado' }, { t: n.Corte, k: 'corte' },
+        { t: 'Digitado', k: 'digitado' }, { t: 'Tránsito', k: 'transito' }, { t: n.Almacen, k: 'almacen' },
     ]
     return (
         <div className="bg-white border-2 border-[#e2ded5] rounded-lg overflow-hidden">

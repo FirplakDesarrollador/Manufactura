@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowUpFromLine, ClipboardList, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { OrdenSemi, cargarOrdenesSemi, coincideSemi, comoOrdenMueble } from '@/lib/semielaborados/datos'
+import { OrdenSemi, TipoSemi, cargarOrdenesSemi, coincideSemi, comoOrdenMueble } from '@/lib/semielaborados/datos'
 import { IndicadoresSemi, BuscadorSemi, TarjetaOrdenSemi } from './comunesSemi'
 import { BotonMoverOfMuebles } from '@/components/muebles/MoverOfMuebles'
 import EditOrderModal from '@/components/muebles/EditOrderModal'
@@ -13,7 +13,7 @@ import EstadoEntregaOf from '@/components/fibra/EstadoEntregaOf'
 // Administración del Control de Piso Semielaborados (como la de Fibra): cada OF con Trazabilidad, componentes para
 // la entrega, Mover OF (adelante o atrás, con cantidad), Editar y Eliminar. Las OF llegan de SAP con la misma
 // sincronización de Muebles (las cajas, SKU PEMP…, quedan en la planta Semielaborados).
-export default function AdministracionSemi({ usuario }: { usuario: { email: string; nombre: string } }) {
+export default function AdministracionSemi({ tipo, usuario }: { tipo: TipoSemi; usuario: { email: string; nombre: string } }) {
     const [ordenes, setOrdenes] = useState<OrdenSemi[] | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [busqueda, setBusqueda] = useState('')
@@ -24,8 +24,8 @@ export default function AdministracionSemi({ usuario }: { usuario: { email: stri
 
     const cargar = useCallback(async () => {
         setError(null)
-        try { setOrdenes(await cargarOrdenesSemi()) } catch (e: any) { setError(e?.message || String(e)); setOrdenes([]) }
-    }, [])
+        try { setOrdenes(await cargarOrdenesSemi(tipo)) } catch (e: any) { setError(e?.message || String(e)); setOrdenes([]) }
+    }, [tipo])
     useEffect(() => { cargar() }, [cargar])
 
     const lista = useMemo(() => (ordenes || []).filter(o => coincideSemi(o, busqueda)), [ordenes, busqueda])
@@ -46,7 +46,7 @@ export default function AdministracionSemi({ usuario }: { usuario: { email: stri
     return (
         <div className="h-full flex flex-col">
             <div className="px-2 sm:px-4 py-2 bg-white border-b border-slate-200 space-y-2">
-                <IndicadoresSemi ordenes={ordenes || []} />
+                <IndicadoresSemi ordenes={ordenes || []} tipo={tipo} />
                 <div className="flex flex-wrap items-center gap-2">
                     <BuscadorSemi valor={busqueda} onCambio={setBusqueda} />
                     <button onClick={cargar} className="h-9 px-3 rounded-lg border border-[#e2ded5] bg-white text-[#324354] text-xs font-bold flex items-center gap-1.5 hover:bg-[#F6F3EE]">

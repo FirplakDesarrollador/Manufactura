@@ -146,6 +146,40 @@ export async function GET() {
 
         const groupedOrders = Array.from(orderMap.values());
 
+        // Semielaborados de Fibra que no trae la consulta de Muebles: Herrajes FV (PMPD04) y Ensamble de kits de
+        // motobomba (PEST01 … MOTOBOMBA). Se leen liberados directo de ProductionOrders y quedan en la planta
+        // Semielaborados (su control de piso los separa por SKU). Si SAP falla aquí, el resto sigue igual.
+        let avisoSemi: string | null = null;
+        try {
+            const filtro = `ProductionOrderStatus eq 'boposReleased' and (startswith(ItemNo,'PMPD04') or startswith(ItemNo,'PEST01'))`;
+            let siguiente: string | null = `${SAP_BASE_URL}/ProductionOrders?$select=DocumentNumber,ItemNo,ProductDescription,PlannedQuantity,DueDate,PostingDate&$filter=${encodeURIComponent(filtro)}`;
+            for (let paginas = 0; siguiente && paginas < 20; paginas++) {
+                const res = await fetchSAP(siguiente, { method: 'GET', headers: { Prefer: 'odata.maxpagesize=200' } });
+                if (!res.ok) throw new Error(`SAP respondió ${res.status}`);
+                const j = await res.json();
+                for (const o of j.value || []) {
+                    const sku = String(o.ItemNo || '').toUpperCase();
+                    const desc = String(o.ProductDescription || '');
+                    if (sku.startsWith('PEST01') && !/MOTOBOMBA/i.test(desc)) continue;
+                    const docNum = String(o.DocumentNumber);
+                    if (orderMap.has(docNum)) continue;
+                    groupedOrders.push({
+                        orden_fabricacion: docNum, numero_pedido: docNum, producto_sku: o.ItemNo, producto_descripcion: desc,
+                        cantidad: Number(o.PlannedQuantity) || 1, cliente: 'FIRPLAK S A',
+                        fecha_entrega_estimada: o.DueDate ? String(o.DueDate).slice(0, 10) + ' 00:00:00' : null,
+                        planta: 'Semielaborados', modificado_por: 'SAP Service Layer Sync',
+                        created_at: o.PostingDate ? String(o.PostingDate).slice(0, 10) + ' 00:00:00' : new Date().toISOString(),
+                        componentes: [],
+                    });
+                }
+                const next = j['odata.nextLink'] || j['@odata.nextLink'];
+                siguiente = next ? (String(next).startsWith('http') ? next : `${SAP_BASE_URL}/${String(next).replace(/^\//, '')}`) : null;
+            }
+        } catch (e: any) {
+            avisoSemi = `No se pudieron traer Herrajes FV / Kits motobomba de SAP: ${e?.message || e}`;
+            console.warn('[liberacion-muebles]', avisoSemi);
+        }
+
         // Las 4 fechas del Semáforo (igual que Fibra). Si la API del Semáforo no responde, no se tocan las guardadas.
         let avisoFechas: string | null = null;
         let filas: any[] = groupedOrders;
@@ -187,6 +221,7 @@ export async function GET() {
             success: true,
             cierreAutomatico: cierre,
             avisoFechas,
+            avisoSemi,
             totalSincronizadas: groupedOrders.length,
             totalEnSupabase: count || 0,
             endpoint: "/SQLQueries('ordenes_muebles_comp_v3')/List",

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
+import { almacenamientoBorrador } from '@/lib/horaHoraBorrador';
 
 export type CicloMedido = {
     id: string;
@@ -303,7 +304,8 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 }), {
     // Borrador en el equipo: si se recarga la página, se cierra el navegador o se va a otra pantalla, no se pierde lo registrado
     name: 'horaHoraBorrador',
-    storage: createJSONStorage(() => almacenamientoSeguro),
+    // IndexedDB + localStorage + copia en la nube (lib/horaHoraBorrador): en Android el localStorage se llenaba y se perdía todo
+    storage: createJSONStorage(() => almacenamientoBorrador),
     partialize: (s) => ({ evaluacionActual: s.evaluacionActual, paso: s.paso, cronometro: s.cronometro }),
     skipHydration: true,
 }));

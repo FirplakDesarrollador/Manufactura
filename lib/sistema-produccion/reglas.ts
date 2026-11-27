@@ -15,7 +15,8 @@ export const ESTADOS_REGLA: Record<EstadoRegla, { label: string; corto: string; 
 }
 export const ORDEN_ESTADOS: EstadoRegla[] = ['aplica', 'no_aplica', 'formacion', 'por_definir']
 
-export const ROLES_SP = ['Líder', 'Supervisor', 'Jefe', 'Gerente'] as const
+// Especialista del Sistema (27/11/2026): cargo con sus propias reglas, plantas y frecuencias (empieza sin herramientas)
+export const ROLES_SP = ['Líder', 'Supervisor', 'Especialista', 'Jefe', 'Gerente'] as const
 export type RolSP = typeof ROLES_SP[number]
 // Nombre en pantalla de cada rol (la clave "Jefe" incluye a los coordinadores)
 export const NOMBRE_ROL: Record<RolSP, { uno: string; varios: string; corto: string }> = {
@@ -23,6 +24,7 @@ export const NOMBRE_ROL: Record<RolSP, { uno: string; varios: string; corto: str
     'Supervisor': { uno: 'Supervisor', varios: 'Supervisores', corto: 'Supervisor' },
     'Jefe': { uno: 'Jefe o Coordinador', varios: 'Jefes y Coordinadores', corto: 'Jefe / Coord.' },
     'Gerente': { uno: 'Gerente', varios: 'Gerentes', corto: 'Gerente' },
+    'Especialista': { uno: 'Especialista del Sistema', varios: 'Especialistas del Sistema', corto: 'Especialista' },
 }
 // Frecuencia mínima de una herramienta para un rol: `semana` es la cantidad por periodo (por semana, salvo
 // periodo 'mes'); "festivo" = semanas con festivo (solo aplica a las semanales). Gerente: frecuencia mensual.
@@ -96,7 +98,7 @@ const plantas = (marcas: string): Record<string, EstadoRegla> => {
     ORDEN_VIEJO.forEach((p, i) => { m[p] = marcas[i] === 'A' ? 'aplica' : 'por_definir' })
     return m
 }
-const roles = (l: EstadoRegla, s: EstadoRegla, j: EstadoRegla, g: EstadoRegla = 'no_aplica'): Record<RolSP, EstadoRegla> => ({ 'Líder': l, 'Supervisor': s, 'Jefe': j, 'Gerente': g })
+const roles = (l: EstadoRegla, s: EstadoRegla, j: EstadoRegla, g: EstadoRegla = 'no_aplica', e: EstadoRegla = 'no_aplica'): Record<RolSP, EstadoRegla> => ({ 'Líder': l, 'Supervisor': s, 'Jefe': j, 'Gerente': g, 'Especialista': e })
 
 // Orden de las marcas: FV, MS, MBL, CEFI, CALID, MOLD, CEDI, ALM, MTTO, RMOLD, SG
 export const REGLAS_INICIALES: ReglasSP = {
@@ -128,6 +130,7 @@ export const REGLAS_INICIALES: ReglasSP = {
     // Nombres completos de la base de personal (Talento Humano). Juan David Montoya y Edisson Hernandez
     // no están activos en la base: quedan con su nombre del Excel y se marcan en pantalla.
     personas: {
+        'Especialista': [],
         'Líder': [
             'Jhonny Rafael Ortiz Tovar',
             'Henry Jose Estevez del Prado',

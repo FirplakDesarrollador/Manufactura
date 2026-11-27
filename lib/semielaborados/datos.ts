@@ -39,7 +39,40 @@ export const NOMBRE_PROCESO: Record<ProcesoSemi, string> = {
     Corte: 'Corte', Digitado: 'Digitado', Transito: 'Tránsito', Almacen: 'Almacén',
 }
 
-export async function cargarOrdenesSemi(): Promise<OrdenSemi[]> {
+// Tipos de semielaborado (26/11/2026). Todos tienen 4 pasos; cambia el nombre del primero y del último:
+//  - Cajas (SKU PEMP…):                     Corte → Digitado → Tránsito → Almacén
+//  - Herrajes FV (SKU PMPD04…):             Herrajes → Digitado → Tránsito → Almacén
+//  - Kits motobomba FV (PEST01… MOTOBOMBA): Ensamble → Digitado → Tránsito → CEDI
+// El primer paso se guarda siempre como 'Corte' en trazabilidad_muebles (proceso es una lista fija de la base) y el
+// último como 'Cedi'; la pantalla muestra el nombre de cada tipo. Cada OF es de un solo tipo (por su SKU).
+export type TipoSemi = 'cajas' | 'herrajes' | 'motobombas'
+
+export const TIPOS_SEMI: { id: TipoSemi; label: string; procesos: Record<ProcesoSemi, string>; claves: Record<ProcesoSemi, string> }[] = [
+    { id: 'cajas', label: 'Cajas', procesos: { Corte: 'Corte', Digitado: 'Digitado', Transito: 'Tránsito', Almacen: 'Almacén' },
+        claves: { Corte: 'corte', Digitado: 'digitado', Transito: 'transito', Almacen: 'almacen' } },
+    { id: 'herrajes', label: 'Herrajes FV', procesos: { Corte: 'Herrajes', Digitado: 'Digitado', Transito: 'Tránsito', Almacen: 'Almacén' },
+        claves: { Corte: 'herrajes', Digitado: 'digitado', Transito: 'transito', Almacen: 'almacen' } },
+    { id: 'motobombas', label: 'Kits motobomba FV', procesos: { Corte: 'Ensamble', Digitado: 'Digitado', Transito: 'Tránsito', Almacen: 'CEDI' },
+        claves: { Corte: 'ensamble', Digitado: 'digitado', Transito: 'transito', Almacen: 'cedi' } },
+]
+export const tipoSemi = (id: TipoSemi) => TIPOS_SEMI.find(t => t.id === id)!
+
+export function tipoDeSku(sku: string | null | undefined): TipoSemi {
+    const s = String(sku || '').toUpperCase()
+    if (s.startsWith('PMPD')) return 'herrajes'
+    if (s.startsWith('PEST')) return 'motobombas'
+    return 'cajas'
+}
+
+/** Permiso de un proceso de un tipo: semielaborados.<tipo>_<proceso> (p. ej. herrajes_herrajes, motobombas_cedi) */
+export const permisoSemi = (tipo: TipoSemi, proceso: ProcesoSemi) => `${tipo}_${tipoSemi(tipo).claves[proceso]}`
+
+export async function cargarOrdenesSemi(tipo?: TipoSemi): Promise<OrdenSemi[]> {
+    const todas = await cargarTodasSemi()
+    return tipo ? todas.filter(o => tipoDeSku(o.producto_sku) === tipo) : todas
+}
+
+async function cargarTodasSemi(): Promise<OrdenSemi[]> {
     const filas: OrdenSemi[] = []
     for (let desde = 0; ; desde += 1000) {
         const { data, error } = await supabase.from('query_of_semielaborados').select('*')
